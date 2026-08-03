@@ -172,17 +172,17 @@
     }
   },
   "advanced_nodes": {
-    "overview": "Use advanced workflow nodes (the Research node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
+    "overview": "Use advanced workflow nodes (the Deep Analysis node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
     "documents": ["budget-justification.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample budget justification to your workspace.",
       "Create a workflow that processes the budget document using advanced nodes:",
       "  **Step 1** — Extraction: Extract the salary table, supply costs, travel, subawards, and indirect costs.",
-      "  **Step 2** — Research node: Ask it to analyze the extracted figures and check whether the line items add up to the stated total. The Research node makes two LLM passes over the data — no URL or API key needed.",
+      "  **Step 2** — Deep Analysis node: Ask it to analyze the extracted figures and check whether the line items add up to the stated total. The Deep Analysis node makes two LLM passes over the data — no URL or API key needed.",
       "  **Step 2 (parallel)** — Add a second task to the same step: a Prompt task that writes a short budget narrative summary. Two tasks in one step run concurrently.",
       "Run the workflow against **budget-justification.pdf**.",
-      "Verify the Research node produces a report and that both parallel tasks complete.",
-      "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Research node covers this exercise for everyone."
+      "Verify the Deep Analysis node produces a report and that both parallel tasks complete.",
+      "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Deep Analysis node covers this exercise for everyone."
     ],
     "chat_instructions": [
       "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample budget justification to your workspace.",
@@ -300,27 +300,29 @@
     "overview": "Make your team's work discoverable: get workflows verified, published to the team library, and citable from every chat. This module uses workflows you've already built — no new documents needed.",
     "documents": [],
     "instructions": [
-      "This module uses workflows you've already built.",
-      "In chat, ask: *\"List my workflows and tell me which are verified.\"* The agent will use `list_workflows` and flag anything unverified.",
-      "Pick a workflow to promote. Ensure it has a clear description and passes validation (rerun `run_validation` if needed).",
-      "In the workflow editor, mark the workflow as **verified** and publish it to your team library.",
-      "If you work across multiple spaces, duplicate or export the workflow (`.vandalizer.json`) and import it into the other space.",
-      "Back in chat, ask: *\"What verified workflows are available to my team?\"* — confirm your workflow is now discoverable to teammates by name."
+      "This module uses workflows you've already built — no new documents needed.",
+      "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
+      "Build or duplicate a workflow in your second space.",
+      "Ensure your workflow has a clear description explaining what it does.",
+      "**Submit the workflow for verification** — this completes the module. An examiner reviews it later; you don't wait on that to finish your certification.",
+      "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
+      "You now have a submitted, portable, well-documented workflow."
     ],
     "chat_instructions": [
-      "Work through the lessons here in chat. This module uses workflows you've already built.",
-      "Ask: \"List my workflows and tell me which are verified.\" The assistant will flag anything unverified.",
-      "Pick a workflow to promote. Ensure it has a clear description and passes validation (ask the assistant to rerun validation if needed).",
-      "In the workflow editor (open it beside chat), mark the workflow as verified and publish it to your team library.",
-      "If you work across multiple spaces, duplicate or export the workflow (.vandalizer.json) and import it into the other space.",
-      "Back in chat, ask: \"What verified workflows are available to my team?\" — confirm your workflow is now discoverable to teammates by name."
+      "Work through the lessons here in chat. This module uses workflows you've already built — no new documents needed.",
+      "If you don't already have multiple spaces, create a second space from the Spaces page.",
+      "Ask the assistant to build or duplicate a workflow in your second space.",
+      "Ensure your workflow has a clear description explaining what it does.",
+      "Submit the workflow for verification — this completes the module. An examiner reviews it later; you don't wait on that to finish your certification.",
+      "Try exporting the workflow as a .vandalizer.json file and importing it into another space.",
+      "You now have a submitted, portable, well-documented workflow."
     ],
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
-      "1": "Mark a workflow as verified and use workflows across 2+ spaces",
-      "2": "Have 2+ verified workflows",
-      "3": "Have 3+ verified workflows across 3+ spaces"
+      "1": "Submit a workflow for verification",
+      "2": "Have 1+ workflow approved by an examiner",
+      "3": "Have 2+ workflows approved by an examiner"
     }
   }
 }

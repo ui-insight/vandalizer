@@ -3,10 +3,11 @@
  * Workflow). Centralized so the next time the wording shifts it doesn't drift
  * three ways.
  *
- * The tile trio standardizes to **No baseline / Your settings / Tuned**
- * everywhere — what the "no baseline" means differs per domain (no retrieval,
- * no extraction config, no workflow at all), and we explain that in the
- * score-floor descriptions rather than the tile label.
+ * The tile trio is deliberately per-domain and self-describing. The earlier
+ * generic trio (No baseline / Your settings / Tuned) tested badly: users who
+ * never touched a setting couldn't map "Your settings" to anything, and
+ * "No baseline" didn't say what was removed. Each label must answer "what
+ * configuration produced this bar?" on its own, without the tooltip.
  */
 
 export type AutovalidateDomain = 'kb' | 'extraction' | 'workflow'
@@ -21,28 +22,38 @@ export interface DomainLabels {
   liftLabel: string
 }
 
-const COMMON_TILE = { noBaseline: 'No baseline', yourSettings: 'Your settings', tuned: 'Optimized' }
-
 export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
   kb: {
-    baselineTile: COMMON_TILE,
-    scoreFloorLabel: 'Score to beat (no baseline)',
+    baselineTile: {
+      noBaseline: 'Model alone (no KB)',
+      yourSettings: 'Current KB settings',
+      tuned: 'Optimized KB settings',
+    },
+    scoreFloorLabel: 'Score to beat (model alone)',
     scoreFloorDescription:
       'How well the model answers without your knowledge base. The tuned KB needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than no baseline',
+    liftLabel: 'better than the model alone',
   },
   extraction: {
-    baselineTile: COMMON_TILE,
-    scoreFloorLabel: 'Score to beat (no baseline)',
+    baselineTile: {
+      noBaseline: 'No custom settings',
+      yourSettings: 'Current settings',
+      tuned: 'Optimized settings',
+    },
+    scoreFloorLabel: 'Score to beat (no custom settings)',
     scoreFloorDescription:
       'How well extraction performs with no custom settings. The tuned result needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than no baseline',
+    liftLabel: 'better than no custom settings',
   },
   workflow: {
-    baselineTile: COMMON_TILE,
-    scoreFloorLabel: 'Score to beat (no baseline)',
+    baselineTile: {
+      noBaseline: 'LLM alone (no workflow)',
+      yourSettings: 'Current workflow',
+      tuned: 'Optimized workflow',
+    },
+    scoreFloorLabel: 'Score to beat (LLM alone)',
     scoreFloorDescription:
       'How well a single-shot LLM call performs without the workflow. The tuned workflow needs to clear this bar to be worth keeping.',
-    liftLabel: 'better than no baseline',
+    liftLabel: 'better than the LLM alone',
   },
 }

@@ -316,7 +316,16 @@ function SourceContentInspector({
           </>
         )}
         <div style={{ color: '#888' }}>Status</div>
-        <div>{detail.status}{detail.error_message ? `: ${detail.error_message}` : ''}</div>
+        <div>
+          {detail.status}
+          {detail.status === 'error' && (
+            <div style={{ color: '#f87171', marginTop: 2 }}>
+              {detail.error_message
+                || 'No failure details were recorded for this source. Re-syncing it will capture the reason (e.g. the site blocking automated access).'}
+            </div>
+          )}
+          {detail.status !== 'error' && detail.error_message ? ` — ${detail.error_message}` : ''}
+        </div>
         <div style={{ color: '#888' }}>Chunks</div>
         <div>{detail.chunk_count}</div>
         {detail.crawl_enabled && (
@@ -366,6 +375,22 @@ function SourceContentInspector({
               </a>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Truncation warning — the page was longer than the fetcher's size cap,
+          so the text below stops partway through and later sections were never
+          chunked into the KB. */}
+      {detail.truncated && (
+        <div style={{
+          marginBottom: 10, padding: '8px 10px',
+          fontSize: 12, lineHeight: 1.5, color: '#fbbf24',
+          backgroundColor: 'rgba(217, 119, 6, 0.12)',
+          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
+        }}>
+          This page was too long to ingest in full — the extracted text below was cut
+          off at the size limit, and anything after the cut is not in this knowledge base.
+          Answers about later sections of the page may be wrong or incomplete.
         </div>
       )}
 

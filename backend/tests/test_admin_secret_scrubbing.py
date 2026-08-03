@@ -27,6 +27,7 @@ def _make_user(**overrides):
         "organization_id": None,
         "is_demo_user": False,
         "demo_status": None,
+        "token_version": 0,
     }
     defaults.update(overrides)
     user = MagicMock()
@@ -158,14 +159,18 @@ class TestAdminConfigEndpoint:
         cookies, headers = _auth()
 
         mock_config = MagicMock()
+        # GET /config runs _ensure_config_ids, which awaits cfg.save() if any
+        # model/provider entry is missing a stable id — give entries ids and
+        # make save awaitable so the endpoint works against this stub.
+        mock_config.save = AsyncMock()
         mock_config.get_extraction_config.return_value = {}
         mock_config.get_quality_config.return_value = {}
         mock_config.auth_methods = ["password", "oauth"]
         mock_config.oauth_providers = [
-            {"name": "azure", "client_id": "id1", "client_secret": "real-secret-value"},
+            {"id": "prov-1", "name": "azure", "client_id": "id1", "client_secret": "real-secret-value"},
         ]
         mock_config.available_models = [
-            {"name": "gpt-4o", "api_key": "sk-real-key-abcdef"},
+            {"id": "model-1", "name": "gpt-4o", "api_key": "sk-real-key-abcdef"},
         ]
         mock_config.ocr_endpoint = ""
         mock_config.ocr_api_key = ""

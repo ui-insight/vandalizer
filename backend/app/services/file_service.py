@@ -9,7 +9,7 @@ from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
-from app.services import access_control
+from app.services import access_control, audit_service
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
 
@@ -245,6 +245,15 @@ async def delete_document(
             logger.warning("Failed to delete file for document %s: %s", doc_uuid, relative_path)
 
     await doc.delete()
+    await audit_service.log_event(
+        action="document.delete",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc.uuid,
+        resource_name=doc.title,
+        team_id=doc.team_id,
+        detail={"folder": doc.folder},
+    )
     return True
 
 

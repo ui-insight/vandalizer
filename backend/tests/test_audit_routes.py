@@ -29,6 +29,7 @@ def _make_user(user_id="testuser", is_admin=False, is_staff=False):
     user.current_team = None
     user.organization_id = None
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     return user
 

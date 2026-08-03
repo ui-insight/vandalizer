@@ -5,6 +5,7 @@ import {
   type AdminKBSummary,
 } from '../../api/admin'
 import { updateKnowledgeBase } from '../../api/knowledge'
+import { formatDate } from './shared/format'
 
 interface Props {
   /** Full admins can rename any KB; staff get a read-only inventory (the
@@ -14,14 +15,6 @@ interface Props {
 }
 
 type SortKey = 'title' | 'updated'
-
-function formatDate(d: string | null): string {
-  if (!d) return '-'
-  const iso = !d.endsWith('Z') && !d.includes('+') && !d.includes('-', 10) ? d + 'Z' : d
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '-'
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
 
 /** Org-wide KB inventory — built for reviewing names/versions and renaming KBs
  * in place (e.g. adding a date/version to the title). Source provenance per KB

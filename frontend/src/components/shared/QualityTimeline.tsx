@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Download, Loader2, Sparkles } from 'lucide-react'
 
 // While a run is in flight, re-pull history on this cadence so a freshly
 // persisted ValidationRun appears without a manual reload.
@@ -52,11 +52,17 @@ interface Props {
   /** When true, a run is in flight: poll history on an interval so the new run
    *  lands here even while the user sits on this tab. */
   polling?: boolean
+  /** When provided, full-run rows get a download menu (CSV / Excel / JSON)
+   *  that exports the run's per-query results. Optimizer-apply rows carry no
+   *  per-query results, so they never show the menu. */
+  onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
 }
+
+export type QualityRunExportFormat = 'csv' | 'xlsx' | 'json'
 
 export function QualityTimeline({
   fetchHistory, itemKindLabel, itemKindPluralLabel, onSwitchToAutovalidate, sampleNoun = 'items',
-  refreshKey, polling = false,
+  refreshKey, polling = false, onExportRun,
 }: Props) {
   const [items, setItems] = useState<QualityHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -221,19 +227,25 @@ export function QualityTimeline({
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.slice(0, 10).map((it, i) => (
-          <Row key={it.uuid || i} item={it} sampleNoun={sampleNoun} />
+          <Row key={it.uuid || i} item={it} sampleNoun={sampleNoun} onExportRun={onExportRun} />
         ))}
       </div>
     </div>
   )
 }
 
-function Row({ item, sampleNoun }: { item: QualityHistoryItem; sampleNoun: string }) {
+function Row({ item, sampleNoun, onExportRun }: {
+  item: QualityHistoryItem
+  sampleNoun: string
+  onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
+}) {
   const score = item.score ?? 0
   const sigmaPts = (item.judge_variance ?? 0) * 100
   const nq = item.num_queries_judged ?? item.num_test_queries ?? item.num_test_cases ?? item.num_checks
   const isApply = item.source === 'optimizer_apply'
   const isPassive = item.source === 'passive_monthly'
+  // Apply rows record a config change, not a measurement — nothing to export.
+  const exportable = !!onExportRun && !!item.uuid && !isApply
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
@@ -278,7 +290,74 @@ function Row({ item, sampleNoun }: { item: QualityHistoryItem; sampleNoun: strin
       <span style={{ fontWeight: 600, color: '#e5e5e5', minWidth: 38, textAlign: 'right' }}>
         {score.toFixed(0)}%
       </span>
+      {exportable && (
+        <RowExportMenu onExport={format => onExportRun!(item.uuid!, format)} />
+      )}
     </div>
+  )
+}
+
+/** Compact per-row export control: a download icon that expands into the
+ * three format choices inline (no floating popover to position/clip). */
+function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat) => void | Promise<void> }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  const run = async (format: QualityRunExportFormat) => {
+    setBusy(true)
+    try {
+      await onExport(format)
+      setOpen(false)
+    } catch (e) {
+      console.error('Validation-run export failed', e)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const fmtButton = (format: QualityRunExportFormat, label: string) => (
+    <button
+      key={format}
+      type="button"
+      disabled={busy}
+      onClick={() => void run(format)}
+      style={{
+        fontFamily: 'inherit', fontSize: 9, fontWeight: 600,
+        padding: '2px 6px', borderRadius: 4,
+        color: busy ? '#555' : '#7dd3fc', background: 'transparent',
+        border: '1px solid #2e3a52', cursor: busy ? 'wait' : 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      {open && (
+        busy
+          ? <Loader2 size={11} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+          : <>
+              {fmtButton('csv', 'CSV')}
+              {fmtButton('xlsx', 'Excel')}
+              {fmtButton('json', 'JSON')}
+            </>
+      )}
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label="Export run results"
+        title="Export this run's per-query results"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          display: 'inline-flex', alignItems: 'center',
+          padding: 3, background: 'transparent', border: 'none',
+          color: open ? '#7dd3fc' : '#666', cursor: 'pointer',
+        }}
+      >
+        <Download size={12} aria-hidden="true" />
+      </button>
+    </span>
   )
 }
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Export the certification lesson content from the panel's MODULES array
- * (src/pages/Certification.tsx) and the reflective modules' self-assessment
+ * (src/components/certification/modules.ts) and the reflective modules' self-assessment
  * questions (src/components/certification/SelfAssessment.tsx) to
  * backend/certification-data/lessons.json, where the chat's certification
  * tools read them. The panel stays the single authored source; rerun this
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
-const srcPath = path.join(here, '../src/pages/Certification.tsx')
+const srcPath = path.join(here, '../src/components/certification/modules.ts')
 const assessPath = path.join(here, '../src/components/certification/SelfAssessment.tsx')
 const outPath = path.join(here, '../../backend/certification-data/lessons.json')
 

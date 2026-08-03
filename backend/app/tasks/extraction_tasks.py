@@ -38,6 +38,10 @@ def normalize_results(results, expected_keys: list[str] | None = None) -> dict[s
             if not isinstance(item, dict):
                 continue
             for k, v in item.items():
+                # Reserved source-tracking sidecar (dict-valued — unhashable,
+                # and not a field value anyway).
+                if k == "_field_sources":
+                    continue
                 if v in (None, "", [], {}):
                     continue
                 if v in seen[k]:
@@ -254,6 +258,21 @@ def perform_extraction_task(
                         "last_updated_at": now,
                     }
                 },
+            )
+
+        # Only once Celery is done retrying — a mid-retry bell entry would
+        # report a failure for a run that is about to succeed.
+        from app.services.failure_notifications import (
+            is_final_attempt,
+            notify_extraction_failed,
+        )
+
+        if is_final_attempt(self, e):
+            notify_extraction_failed(
+                db,
+                user_id=(activity or {}).get("user_id"),
+                search_set_uuid=searchset_uuid,
+                error=e,
             )
         raise
 

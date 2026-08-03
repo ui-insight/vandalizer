@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 MIN_PDF_TEXT_LENGTH = 100
 MAX_XLSX_COMMENT_LEN = 500
 
+# A rendered grayscale pixel this bright or brighter counts as blank paper.
+# Real content — even faint anti-aliased text — pulls pixels well below this.
+_BLANK_PAGE_INK_THRESHOLD = 250
+
 
 def clean_markdown_nans(markdown_content: str) -> str:
     """Remove NaN values from markdown content."""
@@ -569,6 +573,50 @@ def _pdf_page_count(pdf_path: str) -> int:
         return 0
 
 
+def pdf_has_ocrable_content(pdf_path: str) -> bool:
+    """True if any page could plausibly yield real text via OCR.
+
+    The OCR endpoint is a vision-LLM service; handed a blank page it
+    fabricates plausible text rather than returning nothing, and that
+    fabrication is long enough to pass the MIN_PDF_TEXT_LENGTH acceptance
+    gate. So before OCR runs, prove there is something to read.
+
+    A page counts as having content if it has a text layer, an embedded
+    image (scanned page), or a filled form field. Pages with none of those
+    are rasterized and tested for ink — rendering is the ground truth,
+    since OCR consumes the rendered page: vector/outlined text (fonts
+    converted to curves) shows up as dark pixels, while a decorative white
+    background rectangle does not. A page that rasterizes to uniform white
+    gives OCR nothing but an invitation to hallucinate.
+
+    Fails open (returns True) if the file can't be opened or a page can't
+    be rendered, so OCR still gets its chance on odd-but-valid PDFs.
+    """
+    import pymupdf
+
+    try:
+        with pymupdf.open(pdf_path) as doc:
+            for page in doc:
+                if (page.get_text("text") or "").strip():
+                    return True
+                if page.get_images(full=True):
+                    return True
+                if any(
+                    (w.field_value or "").strip() for w in page.widgets() or []
+                ):
+                    return True
+                pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
+                if pix.samples and min(pix.samples) < _BLANK_PAGE_INK_THRESHOLD:
+                    return True
+    except Exception as e:
+        logger.warning(
+            "Blank-page precheck could not inspect %s (%s) — assuming content",
+            pdf_path, e,
+        )
+        return True
+    return False
+
+
 def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
@@ -583,6 +631,13 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
     ext = file_extension.lower().lstrip(".")
 
     if ext == "pdf":
+        if not pdf_has_ocrable_content(file_path):
+            logger.warning(
+                "PDF %s rendered blank on every page — skipping OCR so the "
+                "vision model can't fabricate text",
+                file_path,
+            )
+            return "", []
         # Prefer OCR text for accuracy. When OCR is used we lose true page
         # boundaries, so fall back to interpolating against PyMuPDF's page
         # count — approximate, but enough for "around page N" citations.
@@ -630,6 +685,13 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
 
     try:
         if file_extension == "pdf":
+            if not pdf_has_ocrable_content(file_path):
+                logger.warning(
+                    "PDF %s rendered blank on every page — skipping OCR so "
+                    "the vision model can't fabricate text",
+                    file_path,
+                )
+                return ""
             # Prefer OCR when available — it handles scanned pages,
             # complex layouts, and image-heavy PDFs far better than PyPDF2.
             ocr_text = ocr_extract_text_from_pdf(file_path)

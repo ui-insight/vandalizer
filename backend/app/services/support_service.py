@@ -367,12 +367,14 @@ async def list_tickets(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[dict]:
+) -> tuple[list[dict], int]:
     """List tickets the given user_id owns *or* is tagged as a watcher on.
 
     Watched tickets are surfaced in the same list as owned ones so the
     requester sees a single unified queue — owner_tickets vs. tickets I
     follow are distinguished client-side via `user_id` vs. `watcher_ids`.
+
+    Returns the page of tickets plus the total match count for pagination.
     """
     eq: dict = {}
     or_clauses: list[dict] = []
@@ -394,14 +396,16 @@ async def list_tickets(
     if search_clause:
         or_clauses.append(search_clause)
 
+    query = _combine_query(eq, or_clauses)
+    total = await SupportTicket.find(query).count()
     tickets = (
-        await SupportTicket.find(_combine_query(eq, or_clauses))
+        await SupportTicket.find(query)
         .sort("-updated_at")
         .skip(offset)
         .limit(limit)
         .to_list()
     )
-    return [_ticket_summary(t) for t in tickets]
+    return [_ticket_summary(t) for t in tickets], total
 
 
 async def list_all_tickets(
@@ -413,9 +417,11 @@ async def list_all_tickets(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[dict]:
+) -> tuple[list[dict], int]:
     """List every ticket in the system. Defaults to regular tickets only —
     pass ``category="feedback_prompt"`` to fetch trial check-ins instead.
+
+    Returns the page of tickets plus the total match count for pagination.
     """
     eq: dict = {}
     or_clauses: list[dict] = []
@@ -435,14 +441,16 @@ async def list_all_tickets(
     if search_clause:
         or_clauses.append(search_clause)
 
+    query = _combine_query(eq, or_clauses)
+    total = await SupportTicket.find(query).count()
     tickets = (
-        await SupportTicket.find(_combine_query(eq, or_clauses))
+        await SupportTicket.find(query)
         .sort("-updated_at")
         .skip(offset)
         .limit(limit)
         .to_list()
     )
-    return [_ticket_summary(t) for t in tickets]
+    return [_ticket_summary(t) for t in tickets], total
 
 
 async def list_all_tags() -> list[str]:
@@ -593,6 +601,61 @@ async def edit_message(
     return await _ticket_to_dict(ticket), None
 
 
+async def delete_message(
+    ticket_uuid: str,
+    message_uuid: str,
+) -> tuple[dict | None, dict | None]:
+    """Remove a message from a ticket, along with any attachments that were
+    uploaded as part of it (and their on-disk blobs) — otherwise they'd
+    linger as orphan chips below the thread.
+
+    Returns ``(ticket_dict, message_meta)``. ``message_meta`` is the record
+    that was removed or ``None`` if it didn't exist. ``ticket_dict`` is
+    ``None`` if the ticket itself wasn't found. Authorization is the
+    router's job — it checks authorship/admin before calling this.
+    """
+    ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
+    if not ticket:
+        return None, None
+
+    target: SupportMessage | None = None
+    remaining: list[SupportMessage] = []
+    for m in ticket.messages:
+        if m.uuid == message_uuid and target is None:
+            target = m
+        else:
+            remaining.append(m)
+    if target is None:
+        return await _ticket_to_dict(ticket), None
+
+    kept_attachments: list[SupportAttachment] = []
+    for a in ticket.attachments:
+        if a.message_uuid != message_uuid:
+            kept_attachments.append(a)
+            continue
+        # Best-effort blob cleanup, same contract as delete_attachment.
+        if a.file_path:
+            try:
+                p = Path(a.file_path)
+                if p.exists():
+                    p.unlink()
+            except OSError:
+                logger.warning(
+                    "Failed to unlink support attachment file at %s", a.file_path
+                )
+
+    ticket.messages = remaining
+    ticket.attachments = kept_attachments
+    ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await ticket.save()
+
+    meta = {
+        "uuid": target.uuid,
+        "user_id": target.user_id,
+    }
+    return await _ticket_to_dict(ticket), meta
+
+
 def _support_attachments_dir() -> Path:
     """Return (and create) the directory for support ticket attachments."""
     from app.dependencies import get_settings
@@ -713,6 +776,7 @@ async def update_ticket(
     ticket_uuid: str,
     status: str | None = None,
     priority: str | None = None,
+    classification: str | None = None,
     assigned_to: str | None = None,
     tags: list[str] | None = None,
     subject: str | None = None,
@@ -737,6 +801,11 @@ async def update_ticket(
             ticket.closed_at = None
     if priority:
         ticket.priority = TicketPriority(priority)
+    if classification is not None:
+        # Empty string clears the type (same convention as assigned_to).
+        ticket.classification = (
+            TicketClassification(classification) if classification else None
+        )
     if assigned_to is not None:
         ticket.assigned_to = assigned_to or None
     added_tags: list[str] = []

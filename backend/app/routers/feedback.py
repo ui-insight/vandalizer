@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.models.feedback import ChatFeedback, ExtractionQualityRecord
+from app.models.feedback import ChatFeedback, ExtractionQualityRecord, ProductFeedback
 
 router = APIRouter()
 
@@ -85,6 +85,35 @@ async def _maybe_trigger_kb_shadow_run(kb_uuid: str, user_id: str) -> None:
         logging.getLogger(__name__).warning(
             "Shadow-run trigger failed for kb=%s", kb_uuid, exc_info=True,
         )
+
+
+class ProductFeedbackRequest(BaseModel):
+    message: str = Field(min_length=1, max_length=4000)
+    # Only non-negative sentiments ride this path — a problem belongs on a
+    # support ticket (triage, assignment, a status that closes), not here.
+    sentiment: str = "positive"
+    source: str = "support_panel"
+    feature: Optional[str] = None
+
+
+@router.post("/product")
+async def submit_product_feedback(
+    req: ProductFeedbackRequest, user: User = Depends(get_current_user)
+):
+    """Capture free-form positive / idea feedback. Deliberately does NOT create
+    a support ticket, so praise never enters the triage queue or triggers the
+    ticket email/Teams fan-out. It surfaces in the 'What's Working' admin feed."""
+    sentiment = req.sentiment if req.sentiment in ("positive", "idea") else "positive"
+    record = ProductFeedback(
+        message=req.message.strip(),
+        sentiment=sentiment,
+        source=req.source,
+        feature=req.feature,
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+    )
+    await record.insert()
+    return {"complete": True}
 
 
 @router.post("/chat")

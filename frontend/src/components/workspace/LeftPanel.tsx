@@ -18,7 +18,7 @@ import type { Folder } from '../../types/document'
 export function LeftPanel() {
   const {
     setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids,
-    highlightTerms, setHighlightTerms,
+    highlightTerms, highlightPage, setHighlightTerms,
     setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
     focusChat, openWorkflow,
@@ -115,13 +115,19 @@ export function LeftPanel() {
     [setSelectedDocsProcessing],
   )
 
-  // Open a document when requested from another panel (e.g. validation tab)
+  // Open a document when requested from another panel (e.g. validation tab).
+  // A request may carry its own highlight (extraction source tracking) —
+  // apply it instead of the default clear, so the terms survive the open.
   useEffect(() => {
     if (viewDocumentRequest) {
       setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
       setSelectedDocUuids([viewDocumentRequest.uuid])
       setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
-      setHighlightTerms([])
+      if (viewDocumentRequest.highlight) {
+        setHighlightTerms(viewDocumentRequest.highlight.terms, viewDocumentRequest.highlight.page)
+      } else {
+        setHighlightTerms([])
+      }
       clearViewDocumentRequest()
     }
   }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames, setHighlightTerms])
@@ -343,6 +349,7 @@ export function LeftPanel() {
           <DocumentViewer
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
+            highlightPage={highlightPage}
             onClearHighlights={verificationActive ? undefined : () => setHighlightTerms([])}
             processing={viewingDoc.processing}
             taskStatus={viewingDoc.taskStatus}

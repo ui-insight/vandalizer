@@ -19,6 +19,12 @@ class KBTestQuery(Document):
     expected_answer: Optional[str] = None
     auto_generated: bool = False
     category: Optional[str] = None
+    # Free-text evaluator notes (rationale, provenance, caveats).
+    notes: Optional[str] = None
+    # Stable caller-supplied identifier carried in from bulk imports;
+    # re-importing a spreadsheet updates the matching row instead of
+    # duplicating it, so a test set can track a KB across versions.
+    external_id: Optional[str] = None
     source_chunk_ids: list[str] = Field(default_factory=list)
     last_judged_score: Optional[float] = None
     last_judged_at: Optional[datetime.datetime] = None

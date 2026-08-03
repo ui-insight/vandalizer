@@ -8,6 +8,7 @@ import csv
 import json
 import logging
 from datetime import datetime, timezone
+from html import escape
 from pathlib import Path
 from uuid import uuid4
 
@@ -96,11 +97,15 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
         _save_workflow_as_markdown(file_path, output_data, workflow_name)
     elif format_type == "pdf":
         _save_workflow_as_pdf(file_path, output_data, workflow_name)
+    elif format_type == "docx":
+        _save_workflow_as_docx(file_path, output_data)
     elif format_type in ("text", "txt"):
         _save_workflow_as_text(file_path, output_data)
     else:
-        with open(file_path, "w") as f:
-            f.write(str(output_data))
+        raise ValueError(
+            f"Unsupported output format '{format_type}'. "
+            "Use one of: csv, docx, json, markdown, pdf, text"
+        )
 
     # Render markdown for raw_text regardless of file format. PDF/CSV/JSON files
     # aren't useful as text input to the next workflow; the markdown rendition is.
@@ -211,11 +216,13 @@ def _save_workflow_as_text(file_path: Path, data) -> None:
             f.write(str(data) if data else "")
 
 
-def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") -> None:
-    """Save workflow output as a Markdown table."""
+def render_workflow_markdown(data, title: str = "Results") -> str:
+    """Render workflow output as Markdown — shared by the download endpoint and
+    the save-to-folder .md writer so both surfaces produce identical files."""
     lines = [f"# {title.replace('_', ' ')}", ""]
     if isinstance(data, list) and data and isinstance(data[0], dict):
-        headers = list(data[0].keys())
+        # Collect keys from ALL rows so no columns are missing
+        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join("---" for _ in headers) + " |")
         for row in data:
@@ -227,8 +234,20 @@ def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") ->
             lines.append(f"| {k} | {str(v).replace('|', chr(92) + '|')} |")
     else:
         lines.append(str(data) if data else "")
-    with open(file_path, "w") as f:
-        f.write("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") -> None:
+    """Save workflow output as a Markdown table."""
+    file_path.write_text(render_workflow_markdown(data, title))
+
+
+def _save_workflow_as_docx(file_path: Path, data) -> None:
+    """Save workflow output as a Word document (same rendering as the
+    docx download in the workflows router)."""
+    from app.services.docx_service import data_to_docx_bytes
+
+    file_path.write_bytes(data_to_docx_bytes(data))
 
 
 def _save_workflow_as_pdf(file_path: Path, data, title: str = "Results") -> None:
@@ -264,6 +283,16 @@ def _save_extraction_as_pdf(file_path: Path, data: dict, title: str = "Extractio
         f.write(pdf_bytes)
 
 
+# A run that failed is recorded as "error" on WorkflowResult but "failed" on the
+# trigger event and activity rail. Both spellings reach the output handlers, and
+# treating only one as failure is why "notify me on failure" never fired.
+_FAILED_STATUSES = frozenset({"error", "failed"})
+
+
+def is_failed_status(status: str | None) -> bool:
+    return (status or "") in _FAILED_STATUSES
+
+
 def should_send_notification(result_doc: dict, notification: dict) -> bool:
     """Check if notification should be sent based on conditions."""
     condition = notification.get("conditions", "always")
@@ -272,7 +301,7 @@ def should_send_notification(result_doc: dict, notification: dict) -> bool:
     elif condition == "success":
         return result_doc.get("status") == "completed"
     elif condition == "failure":
-        return result_doc.get("status") == "failed"
+        return is_failed_status(result_doc.get("status"))
     return True
 
 
@@ -308,19 +337,30 @@ def send_workflow_notification(
     wf_name = workflow.get("name", "Workflow")
     status = result_doc.get("status", "unknown")
 
+    safe_name = escape(str(wf_name))
+    error_html = ""
+
     if status == "completed":
         subject = f"✓ {wf_name} completed"
-    elif status == "failed":
+        summary = f'Your workflow "{safe_name}" has completed.'
+    elif is_failed_status(status):
         subject = f"⚠️ {wf_name} failed"
+        summary = f'Your workflow "{safe_name}" failed.'
+        # Without the reason the mail says only "something broke", which sends
+        # the reader back into the app to find out what.
+        error = str(result_doc.get("error") or "No error detail was recorded.")
+        error_html = f"<p><strong>Error:</strong> {escape(error[:500])}</p>"
     else:
         subject = f"{wf_name} - {status}"
+        summary = f'Your workflow "{safe_name}" is {escape(str(status))}.'
 
     html_body = f"""
     <html>
     <body>
-        <h2>{subject}</h2>
-        <p>Your workflow "{wf_name}" has {status}.</p>
-        <p><strong>Trigger Type:</strong> {result_doc.get('trigger_type', 'manual')}</p>
+        <h2>{escape(subject)}</h2>
+        <p>{summary}</p>
+        {error_html}
+        <p><strong>Trigger Type:</strong> {escape(str(result_doc.get('trigger_type', 'manual')))}</p>
     </body>
     </html>
     """
@@ -378,8 +418,13 @@ def _send_teams_notification(
 
     from app.services.teams_cards import build_exception_card, build_work_item_card
 
-    if result_doc.get("status") == "failed":
-        error = str((result_doc.get("final_output") or {}).get("error", "Unknown error"))
+    if is_failed_status(result_doc.get("status")):
+        # A failed run has no final_output — the reason lives on `error`.
+        error = str(
+            result_doc.get("error")
+            or (result_doc.get("final_output") or {}).get("error")
+            or "Unknown error"
+        )
         if work_item_doc:
             card = build_exception_card(work_item_doc, error)
         else:

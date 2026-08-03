@@ -91,6 +91,20 @@ export function suggestFields(documentUuids: string[], model?: string) {
 
 // Run extraction
 
+// Where an extracted value came from, as traced by the backend: the verbatim
+// passage the LLM cited, verified against the document text and resolved to a
+// page via the document's text markers. `verified: false` means the passage
+// could not be found in the document — the value may not be reliable.
+export interface ExtractionFieldSource {
+  quote: string | null
+  page: number | null
+  document_uuid: string | null
+  document_title: string | null
+  verified: boolean
+}
+
+export type ExtractionSourceMap = Record<string, ExtractionFieldSource>
+
 export function runExtractionSync(data: {
   search_set_uuid: string
   document_uuids: string[]
@@ -98,10 +112,16 @@ export function runExtractionSync(data: {
   extraction_config_override?: Record<string, unknown>
   combined_context?: boolean
 }, signal?: AbortSignal) {
-  return apiFetch<{ results: unknown[] }>('/api/extractions/run-sync', {
+  // `sources` is index-aligned with `results` (per-field source map per entity).
+  return apiFetch<{ results: unknown[]; sources?: ExtractionSourceMap[] }>('/api/extractions/run-sync', {
     method: 'POST',
     body: JSON.stringify(data),
     signal,
+    // The sync endpoint holds the request open for the whole extraction, so
+    // the 60s client default is far too short for larger documents. Match
+    // nginx's proxy_read_timeout (300s); callers recover via run history if
+    // even that is exceeded.
+    timeoutMs: 300_000,
   })
 }
 

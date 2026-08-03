@@ -5,7 +5,7 @@ import uuid
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
-from app.services import access_control
+from app.services import access_control, audit_service
 
 logger = logging.getLogger(__name__)
 
@@ -132,8 +132,21 @@ async def delete_folder(folder_uuid: str, user: User) -> bool:
         frontier = [child.uuid for child in children]
         folder_uuids.extend(frontier)
 
+    doc_count = await SmartDocument.find({"folder": {"$in": folder_uuids}}).count()
     await SmartFolder.find({"uuid": {"$in": folder_uuids}}).delete()
     await SmartDocument.find({"folder": {"$in": folder_uuids}}).delete()
+    await audit_service.log_event(
+        action="folder.delete",
+        actor_user_id=user.user_id,
+        resource_type="folder",
+        resource_id=folder_uuid,
+        resource_name=folder.title,
+        team_id=folder.team_id,
+        detail={
+            "documents_deleted": doc_count,
+            "subfolders_deleted": len(folder_uuids) - 1,
+        },
+    )
     return True
 
 

@@ -1,17 +1,18 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   ArrowUpDown, Loader2, BookOpen, ShieldCheck, Sparkles, Tag,
-  MessageSquare, Pencil, Trash2, Bookmark, BookmarkCheck, Pin, PinOff,
+  MessageSquare, Pencil, Trash2, Bookmark, BookmarkCheck, Pin, PinOff, Copy,
 } from 'lucide-react'
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
 import { AITrustChip } from './AITrustChip'
 
-type SortOption = 'newest' | 'updated' | 'name' | 'sources' | 'chunks'
+type SortOption = 'newest' | 'recent' | 'updated' | 'name' | 'sources' | 'chunks'
 
 const SORT_LABEL: Record<SortOption, string> = {
   newest: 'Newest',
+  recent: 'Recently Used',
   updated: 'Recently Updated',
   name: 'Name A–Z',
   sources: 'Most Sources',
@@ -23,6 +24,9 @@ const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }>
   building: { label: 'Building', color: '#d97706', bg: '#fef3c7' },
   ready: { label: 'Ready', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
+  // Broken bookmark: the referenced KB was deleted, retired from the catalog,
+  // or is no longer shared with this user. The card offers only Remove.
+  unavailable: { label: 'Unavailable', color: '#b91c1c', bg: '#fef2f2' },
 }
 
 // Dark palette (matches KBExploreTab)
@@ -36,11 +40,15 @@ const C = {
   textFaint: '#666',
 }
 
-function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
+export function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
   const arr = [...kbs]
   switch (sort) {
     case 'name':
       return arr.sort((a, b) => a.title.localeCompare(b.title))
+    case 'recent':
+      // Never-used KBs ('' sorts before any ISO date) fall to the end; ties
+      // among them keep the fetched (newest-first) order.
+      return arr.sort((a, b) => (b.last_used_at || '').localeCompare(a.last_used_at || ''))
     case 'updated':
       return arr.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
     case 'sources':
@@ -61,32 +69,40 @@ interface KBGridCardProps {
   onEdit?: (uuid: string) => void
   onDelete?: (uuid: string) => void
   onAdopt?: (uuid: string) => void
+  onClone?: (uuid: string) => void
   onRemoveRef?: (refUuid: string) => void
   pinned?: boolean
   onTogglePin?: (canonicalUuid: string) => void
 }
 
 function KBGridCard({
-  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, pinned, onTogglePin,
+  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onClone, onRemoveRef, pinned, onTogglePin,
 }: KBGridCardProps) {
   const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
-  const isReady = kb.status === 'ready'
+  // A ready KB with zero indexed chunks has nothing to retrieve, so chatting
+  // with it only produces a misleading "still indexing" reply.
+  const canChat = kb.status === 'ready' && kb.total_chunks > 0
   const isReference = kb.is_reference
+  // A broken bookmark has no underlying KB to open — the card is inert except
+  // for its Remove button.
+  const isUnavailable = kb.status === 'unavailable'
   // The id a project pins is the canonical KB uuid — for a reference card that's
   // the original it points at, matching what onChat uses.
   const canonicalUuid = isReference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid
 
   return (
     <button
-      onClick={() => onSelect(kb.uuid)}
+      onClick={() => { if (!isUnavailable) onSelect(kb.uuid) }}
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
         padding: 14, borderRadius: 12,
         backgroundColor: C.card,
         border: isReference ? '1px solid rgba(37, 99, 235, 0.3)' : `1px solid ${C.border}`,
-        cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
+        cursor: isUnavailable ? 'default' : 'pointer',
+        opacity: isUnavailable ? 0.65 : 1,
+        transition: 'all 0.15s', fontFamily: 'inherit',
       }}
-      onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.cardHover }}
+      onMouseEnter={e => { if (!isUnavailable) e.currentTarget.style.backgroundColor = C.cardHover }}
       onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.card }}
     >
       {/* Title row */}
@@ -191,11 +207,13 @@ function KBGridCard({
         </p>
       )}
 
-      {/* Stats */}
-      <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
-        <span>{kb.total_sources} source{kb.total_sources !== 1 ? 's' : ''}</span>
-        <span>{kb.total_chunks.toLocaleString()} chunk{kb.total_chunks !== 1 ? 's' : ''}</span>
-      </div>
+      {/* Stats (meaningless for a broken bookmark — the source KB is gone) */}
+      {!isUnavailable && (
+        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
+          <span>{kb.total_sources} source{kb.total_sources !== 1 ? 's' : ''}</span>
+          <span>{kb.total_chunks.toLocaleString()} chunk{kb.total_chunks !== 1 ? 's' : ''}</span>
+        </div>
+      )}
 
       {/* Org badges */}
       {(kb.organization_ids?.length ?? 0) > 0 && (
@@ -231,8 +249,8 @@ function KBGridCard({
       )}
 
       {/* Actions */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', paddingTop: 4 }}>
-        {isReady && (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 'auto', paddingTop: 4 }}>
+        {canChat && (
           <button
             onClick={(e) => { e.stopPropagation(); onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) }}
             style={{
@@ -273,6 +291,21 @@ function KBGridCard({
           >
             <Bookmark size={11} />
             Add to My KBs
+          </button>
+        )}
+        {onClone && !isUnavailable && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onClone(canonicalUuid) }}
+            title="Make an editable copy of this knowledge base"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              color: '#ccc', backgroundColor: 'transparent',
+              border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+            }}
+          >
+            <Copy size={11} />
+            Clone
           </button>
         )}
         {isReference && onRemoveRef && kb.reference_uuid && (
@@ -319,6 +352,7 @@ interface KBGridViewProps {
   onEdit?: (uuid: string) => void
   onDelete?: (uuid: string) => void
   onAdopt?: (uuid: string) => void
+  onClone?: (uuid: string) => void
   onRemoveRef?: (refUuid: string) => void
   emptyMessage?: string
   emptyComponent?: ReactNode
@@ -332,7 +366,7 @@ interface KBGridViewProps {
 
 export function KBGridView({
   scope, search, allOrgs,
-  onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef,
+  onSelect, onChat, onEdit, onDelete, onAdopt, onClone, onRemoveRef,
   emptyMessage = 'No knowledge bases found.',
   emptyComponent,
   filterUuids, pinnedUuids, onTogglePin,
@@ -409,6 +443,7 @@ export function KBGridView({
             onEdit={onEdit}
             onDelete={onDelete}
             onAdopt={onAdopt}
+            onClone={onClone}
             onRemoveRef={onRemoveRef}
             pinned={pinnedUuids?.has(kb.is_reference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid)}
             onTogglePin={onTogglePin}

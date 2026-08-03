@@ -595,7 +595,8 @@ function IdleHero({
         <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get an accuracy score for this extraction, and a one-click recipe to improve it</h3>
       </div>
       <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
-        Typically <b>$1–$5</b> and <b>5–15 minutes</b>. We score your extraction
+        Typically <b>5–15 minutes</b>, using roughly <b>$1–$5</b> worth of LLM
+        tokens — an estimate of AI usage, not a charge to you. We score your extraction
         against test cases, try many model/strategy combinations, and recommend
         the best. Nothing changes until you click Apply.
       </p>

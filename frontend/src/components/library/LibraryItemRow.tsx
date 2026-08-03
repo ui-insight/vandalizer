@@ -279,6 +279,8 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <button
                 ref={triggerRef}
+                aria-label="More actions"
+                title="More actions"
                 onClick={(e) => {
                   e.stopPropagation()
                   if (!menuOpen) updateMenuPos()

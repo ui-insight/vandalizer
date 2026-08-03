@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import type { VerificationSession } from '../api/verificationSessions'
 import { useTeams } from '../hooks/useTeams'
+import type { ExtractionSourceMap } from '../api/extractions'
 
 type RightTab = 'assistant' | 'library'
 export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge' | 'projects'
@@ -15,6 +16,20 @@ export interface VerificationCompletion {
   approvedCount: number
   correctedCount: number
   skippedCount: number
+}
+
+// Cross-panel "open this document" request; `highlight` optionally carries
+// terms + page to apply once the viewer opens (extraction source tracking),
+// instead of the default highlight-clearing behavior.
+export interface ViewDocumentRequest {
+  uuid: string
+  title: string
+  highlight?: { terms: string[]; page: number | null }
+}
+
+export interface PendingExtractionResults {
+  values: Record<string, string>
+  sources?: ExtractionSourceMap
 }
 
 // ---------------------------------------------------------------------------
@@ -31,10 +46,16 @@ interface NavigationContextValue {
   openWorkflow: (id: string, sessionId?: string) => void
   closeWorkflow: () => void
   consumeWorkflowSession: () => string | null
+  // Bumped on every openWorkflow call so panels reload run data even when
+  // the workflow id in the URL is unchanged (e.g. switching between two
+  // runs of the same workflow in the Activity rail).
+  workflowOpenSignal: number
   openExtractionId: string | null
-  openExtraction: (uuid: string, initialResults?: Record<string, string>) => void
+  openExtraction: (uuid: string, initialResults?: Record<string, string>, initialSources?: ExtractionSourceMap) => void
   closeExtraction: () => void
-  consumeExtractionResults: () => Record<string, string> | null
+  consumeExtractionResults: () => PendingExtractionResults | null
+  // Same as workflowOpenSignal, for the extraction panel.
+  extractionOpenSignal: number
   openAutomationId: string | null
   openAutomation: (id: string) => void
   closeAutomation: () => void
@@ -122,11 +143,15 @@ interface UIStateContextValue {
   chatSplitOpen: boolean
   setChatSplitOpen: (open: boolean) => void
   highlightTerms: string[]
-  setHighlightTerms: (terms: string[]) => void
+  // Page hint for the current highlight terms (1-based, from extraction
+  // source tracking) — lets the viewer jump to the right page even when the
+  // passage itself can't be text-matched.
+  highlightPage: number | null
+  setHighlightTerms: (terms: string[], page?: number | null) => void
   activitySignal: number
   bumpActivitySignal: () => void
-  viewDocumentRequest: { uuid: string; title: string } | null
-  viewDocument: (uuid: string, title: string) => void
+  viewDocumentRequest: ViewDocumentRequest | null
+  viewDocument: (uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => void
   clearViewDocumentRequest: () => void
   verificationSession: VerificationSession | null
   setVerificationSession: (s: VerificationSession | null) => void
@@ -249,7 +274,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [newChatSignal, setNewChatSignal] = useState(0)
   const [focusChatSignal, setFocusChatSignal] = useState(0)
   const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
-  const [highlightTerms, setHighlightTerms] = useState<string[]>([])
+  const [highlightTerms, _setHighlightTerms] = useState<string[]>([])
+  const [highlightPage, setHighlightPage] = useState<number | null>(null)
+  // Terms and their page hint always move together — a stale page from a
+  // previous highlight must never survive a new set/clear.
+  const setHighlightTerms = useCallback((terms: string[], page?: number | null) => {
+    _setHighlightTerms(terms)
+    setHighlightPage(page ?? null)
+  }, [])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
   const [selectedDocsProcessing, _setSelectedDocsProcessing] = useState<Array<{ uuid: string; title: string; status: string | null }>>([])
@@ -275,11 +307,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeProjectRootFolder, setActiveProjectRootFolder] = useState<string | null>(null)
   const [activeProjectTeamId, setActiveProjectTeamId] = useState<string | null>(null)
   const [activeProjectRole, setActiveProjectRole] = useState<string | null>(null)
-  const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
+  const [viewDocumentRequest, setViewDocumentRequest] = useState<ViewDocumentRequest | null>(null)
   const [verificationSession, setVerificationSession] = useState<VerificationSession | null>(null)
   const [verificationCompletion, setVerificationCompletion] = useState<VerificationCompletion | null>(null)
-  const pendingExtractionResultsRef = useRef<Record<string, string> | null>(null)
+  const pendingExtractionResultsRef = useRef<PendingExtractionResults | null>(null)
   const pendingWorkflowSessionRef = useRef<string | null>(null)
+  const [workflowOpenSignal, setWorkflowOpenSignal] = useState(0)
+  const [extractionOpenSignal, setExtractionOpenSignal] = useState(0)
 
   const updateSearch = useCallback(
     (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
@@ -304,6 +338,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const openWorkflow = useCallback((id: string, sessionId?: string) => {
     pendingWorkflowSessionRef.current = sessionId ?? null
+    setWorkflowOpenSignal(prev => prev + 1)
     updateSearch((prev) => ({
       ...prev,
       workflow: id,
@@ -324,12 +359,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     return s
   }, [])
 
-  const openExtraction = useCallback((uuid: string, initialResults?: Record<string, string>) => {
-    pendingExtractionResultsRef.current = initialResults ?? null
+  const openExtraction = useCallback((uuid: string, initialResults?: Record<string, string>, initialSources?: ExtractionSourceMap) => {
+    pendingExtractionResultsRef.current = initialResults
+      ? { values: initialResults, sources: initialSources }
+      : null
+    setExtractionOpenSignal(prev => prev + 1)
     updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
   }, [updateSearch])
 
-  const consumeExtractionResults = useCallback((): Record<string, string> | null => {
+  const consumeExtractionResults = useCallback((): PendingExtractionResults | null => {
     const r = pendingExtractionResultsRef.current
     pendingExtractionResultsRef.current = null
     return r
@@ -374,7 +412,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveProjectRootFolder(null)
     setActiveProjectTeamId(null)
     setActiveProjectRole(null)
-  }, [updateSearch, clearChatAttachments])
+  }, [updateSearch, clearChatAttachments, setHighlightTerms])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
 
@@ -641,8 +679,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('workspace:chatSplit', String(open)) } catch {}
   }, [])
 
-  const viewDocument = useCallback((uuid: string, title: string) => {
-    setViewDocumentRequest({ uuid, title })
+  const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => {
+    setViewDocumentRequest({ uuid, title, highlight })
   }, [])
 
   const clearViewDocumentRequest = useCallback(() => {
@@ -655,16 +693,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    workflowOpenSignal,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
+    extractionOpenSignal,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   }), [
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    workflowOpenSignal,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
+    extractionOpenSignal,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   ])
@@ -697,7 +739,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     chatSplitOpen, setChatSplitOpen,
-    highlightTerms, setHighlightTerms,
+    highlightTerms, highlightPage, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     verificationSession, setVerificationSession,
@@ -707,7 +749,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     chatSplitOpen, setChatSplitOpen,
-    highlightTerms, activitySignal, bumpActivitySignal,
+    highlightTerms, highlightPage, setHighlightTerms,
+    activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     verificationSession, verificationCompletion,
   ])

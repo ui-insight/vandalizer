@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { MODULES } from '../../pages/Certification'
+import { MODULES } from './modules'
 import type { CertificationProgress } from '../../types/certification'
 
 export function useModuleLock(progress: CertificationProgress | null) {

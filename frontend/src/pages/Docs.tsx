@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Footer } from '../components/layout/Footer'
 import { PresentSidebar } from './present/components/PresentSidebar'
+import { CostEstimator } from './docs/CostEstimator'
 import {
   BookOpen,
   Server,
@@ -9,6 +10,7 @@ import {
   Settings,
   Layers,
   Code,
+  Calculator,
   GitPullRequest,
   GraduationCap,
   ExternalLink,
@@ -25,6 +27,7 @@ const sections = [
   { id: 'installation', label: 'Installation & Self-Hosting', icon: Server },
   { id: 'user-guide', label: 'User Guide', icon: FileText },
   { id: 'administration', label: 'Administration', icon: Settings },
+  { id: 'cost-estimator', label: 'Cost Estimator', icon: Calculator },
   { id: 'architecture', label: 'Architecture', icon: Layers },
   { id: 'api-reference', label: 'API Reference', icon: Code },
   { id: 'contributing', label: 'Contributing', icon: GitPullRequest },
@@ -601,6 +604,7 @@ const sectionComponents: Record<SectionId, ComponentType> = {
   installation: Installation,
   'user-guide': UserGuide,
   administration: Administration,
+  'cost-estimator': CostEstimator,
   architecture: Architecture,
   'api-reference': ApiReference,
   contributing: Contributing,

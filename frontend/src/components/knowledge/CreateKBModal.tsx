@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { Loader2 } from 'lucide-react'
+import { isDuplicateName } from '../../utils/nameValidation'
 
 interface CreateKBModalProps {
   onClose: () => void
   onCreate: (title: string, description: string) => Promise<void>
+  /** Titles of the user's existing KBs, for the pre-submit duplicate check. */
+  existingTitles?: string[]
 }
 
-export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
+export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBModalProps) {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [creating, setCreating] = useState(false)
@@ -30,6 +33,10 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
 
   const handleSubmit = async () => {
     if (!canSubmit) return
+    if (existingTitles && isDuplicateName(title, existingTitles)) {
+      setError(`A knowledge base named "${title.trim()}" already exists. Choose a different name.`)
+      return
+    }
     setCreating(true)
     setError(null)
     try {

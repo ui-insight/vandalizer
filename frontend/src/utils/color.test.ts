@@ -20,6 +20,9 @@ describe('getContrastTextColor', () => {
   it('picks white text on a dark brand color', () => {
     expect(getContrastTextColor('#154cf7')).toBe('#ffffff')
   })
+  it('picks white text on the #1D3C34 dark green brand color (regression: hardcoded black gave 1.75:1, a WCAG AA failure)', () => {
+    expect(getContrastTextColor('#1D3C34')).toBe('#ffffff')
+  })
 })
 
 describe('getAccessibleOnLight', () => {

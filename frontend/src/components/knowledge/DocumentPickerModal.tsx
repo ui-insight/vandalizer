@@ -307,7 +307,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '8px 12px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-                color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
               }}
             >
@@ -385,7 +385,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
                 padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
                 border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
@@ -521,7 +521,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               disabled={selected.size === 0 || uploadingCount > 0}
               style={{
                 padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
                 border: 'none', borderRadius: 6,
                 cursor: selected.size > 0 && uploadingCount === 0 ? 'pointer' : 'default',
                 opacity: selected.size > 0 && uploadingCount === 0 ? 1 : 0.5,

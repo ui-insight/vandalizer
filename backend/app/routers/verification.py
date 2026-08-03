@@ -331,34 +331,49 @@ async def unverify_item(
 
 
 @router.get("/collections/featured")
-async def list_featured_collections(user: User = Depends(get_current_user)):
-    """List featured collections (available to all users, not just examiners)."""
+async def list_featured_collections(
+    kind: Optional[str] = Query(None),
+    user: User = Depends(get_current_user),
+):
+    """List featured collections (available to all users, not just examiners).
+
+    ``kind`` restricts badge counts to one item kind, for single-kind views
+    (e.g. the KB Explore tab passes kind=knowledge_base); collections with no
+    visible item of that kind are omitted.
+    """
     from app.models.verification import VerifiedCollection
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry)
+    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry, kind=kind)
     collections = await VerifiedCollection.find(
         VerifiedCollection.featured == True,  # noqa: E712
     ).sort("-updated_at").to_list()
     result = []
     for c in collections:
+        visible_count = len(set(c.item_ids) & visible_ids)
+        if kind is not None and visible_count == 0:
+            continue
         d = svc._collection_to_dict(c)
-        d["visible_count"] = len(set(c.item_ids) & visible_ids)
+        d["visible_count"] = visible_count
         result.append(d)
     return {"collections": result}
 
 
 @router.get("/collections/browse")
-async def browse_collections(user: User = Depends(get_current_user)):
+async def browse_collections(
+    kind: Optional[str] = Query(None),
+    user: User = Depends(get_current_user),
+):
     """List collections for catalog browsing (available to all users).
 
     A collection's badge count reflects only items the caller can actually
     open — currently-verified and org-visible — and collections with nothing
     visible to this user are omitted, so the count never disagrees with the
-    list that renders when the category is opened.
+    list that renders when the category is opened. ``kind`` further restricts
+    counts to one item kind for single-kind views (e.g. the KB Explore tab).
     """
     from app.models.verification import VerifiedCollection
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry)
+    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry, kind=kind)
     collections = await VerifiedCollection.find_all().sort("-updated_at").to_list()
     result = []
     for c in collections:

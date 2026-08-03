@@ -63,25 +63,21 @@ def _notify_approval_reviewers_sync(
     step_name: str, instructions: str, approval_uuid: str,
 ) -> None:
     """Create in-app notifications and send emails to assigned reviewers (sync context)."""
-    import secrets
-    from datetime import datetime, timezone
     from app.config import Settings
+    from app.services.notification_service import create_notification_sync
 
     settings = Settings()
-    now = datetime.now(timezone.utc)
 
     for user_id in assigned_user_ids:
         # In-app notification
-        db.notification.insert_one({
-            "uuid": secrets.token_urlsafe(12),
-            "user_id": user_id,
-            "kind": "approval_request",
-            "title": f"Approval needed: {workflow_name}",
-            "body": f"Step \"{step_name}\" is waiting for your review.",
-            "link": f"/reviews/{approval_uuid}",
-            "read": False,
-            "created_at": now,
-        })
+        create_notification_sync(
+            db,
+            user_id=user_id,
+            kind="approval_request",
+            title=f"Approval needed: {workflow_name}",
+            body=f'Step "{step_name}" is waiting for your review.',
+            link=f"/reviews/{approval_uuid}",
+        )
 
         # Email
         user_doc = db.user.find_one({"user_id": user_id})
@@ -129,12 +125,18 @@ def _bson_safe(value):
     return str(value)
 
 
-def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id):
+def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id,
+                        search_from=0):
     """Persist the approval request and flip the run to ``pending_approval``.
 
     Extracted from :func:`execute_workflow_task` so the whole sequence runs
     under a single guard in the caller: any failure here must surface as an
     error status instead of silently freezing the run.
+
+    Args:
+        search_from: Index the current execution pass started at. Used only as
+            the floor for the legacy name-scan fallback; the engine normally
+            stamps the exact paused index on the sentinel.
     """
     import uuid as uuid_mod
     from datetime import datetime, timedelta, timezone
@@ -146,13 +148,21 @@ def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_i
         resolve_assignees_sync,
     )
 
-    # Find the step index (count of executed steps)
-    nodes = engine.get_topological_order()
-    step_index = 0
-    for idx, node in enumerate(nodes):
-        if node.name == "Approval":
-            step_index = idx
-            break
+    # Which step paused. The engine stamps the exact index on the sentinel;
+    # fall back to a name scan bounded below by ``search_from`` for sentinels
+    # produced before that stamp existed. The floor matters: all Approval nodes
+    # share the name "Approval", so an unbounded scan on the *second* gate would
+    # return the first gate's index and resume would replay it forever.
+    stamped = final_output.get("_paused_step_index")
+    if isinstance(stamped, int):
+        step_index = stamped
+    else:
+        nodes = engine.get_topological_order()
+        step_index = search_from
+        for idx, node in enumerate(nodes):
+            if idx >= search_from and node.name == "Approval":
+                step_index = idx
+                break
 
     approval_uuid = str(uuid_mod.uuid4())
     workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
@@ -282,9 +292,15 @@ def _classify_input_documents(db, workflow_doc: dict, doc_uuids: list[str]):
     return ready, processing, failed
 
 
-def _mark_workflow_failed(db, workflow_result_id, activity_id, error_msg, error_payload=None):
+def _mark_workflow_failed(
+    db, workflow_result_id, activity_id, error_msg, error_payload=None, notify=True,
+):
     """Flip a WorkflowResult (and its activity rail entry) to a failed state
-    with a user-facing message, matching the pre-flight oversize handler."""
+    with a user-facing message, matching the pre-flight oversize handler.
+
+    `notify=False` suppresses the bell entry for a failure Celery is still going
+    to retry — the run is not actually over yet.
+    """
     from bson import ObjectId
 
     update = {"status": "error", "error": error_msg}
@@ -293,6 +309,7 @@ def _mark_workflow_failed(db, workflow_result_id, activity_id, error_msg, error_
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)}, {"$set": update}
     )
+    activity = None
     if activity_id:
         from datetime import datetime, timezone
 
@@ -305,8 +322,36 @@ def _mark_workflow_failed(db, workflow_result_id, activity_id, error_msg, error_
                     "finished_at": datetime.now(timezone.utc),
                 }},
             )
+            activity = db.activity_event.find_one(
+                {"_id": ObjectId(activity_id)}, {"user_id": 1},
+            )
         except Exception:
             pass
+
+    if not notify:
+        return
+
+    # A run that fails after the user has navigated away leaves no trace they
+    # would see, so the bell is the only signal. Resolve the owner from the
+    # activity rail entry (which carries the user who launched it) and fall
+    # back to the workflow's owner for runs with no activity record.
+    try:
+        from app.services.failure_notifications import notify_workflow_failed
+
+        result_doc = db.workflow_result.find_one(
+            {"_id": ObjectId(workflow_result_id)}, {"workflow": 1},
+        ) or {}
+        workflow_doc = db.workflow.find_one({"_id": result_doc.get("workflow")}) or {}
+        notify_workflow_failed(
+            db,
+            workflow_doc=workflow_doc,
+            error=error_msg,
+            user_id=(activity or {}).get("user_id"),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to notify owner of workflow failure (result %s)", workflow_result_id,
+        )
 
 
 @celery_app.task(
@@ -332,6 +377,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 
     from app.services.workflow_engine import (
         WorkflowCancelled,
+        WorkflowStepError,
         build_workflow_engine,
         sanitize_step_name,
     )
@@ -600,27 +646,10 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "suggested_action": "convert_to_kb",
                 "oversize_documents": [o.to_dict() for o in oversize],
             }
-            db.workflow_result.update_one(
-                {"_id": ObjectId(workflow_result_id)},
-                {"$set": {
-                    "status": "error",
-                    "error": error_msg,
-                    "error_payload": error_payload,
-                }},
+            _mark_workflow_failed(
+                db, workflow_result_id, activity_id, error_msg,
+                error_payload=error_payload,
             )
-            if activity_id:
-                from datetime import datetime, timezone
-                try:
-                    db.activity_event.update_one(
-                        {"_id": ObjectId(activity_id)},
-                        {"$set": {
-                            "status": "failed",
-                            "error": error_msg[:2000],
-                            "finished_at": datetime.now(timezone.utc),
-                        }},
-                    )
-                except Exception:
-                    pass
             logger.warning(
                 "Workflow %s aborted pre-flight: oversize docs %s for model=%s",
                 workflow_id, [o.uuid for o in oversize], model,
@@ -687,21 +716,21 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 pass
         # Clean terminal stop — do not re-raise (no retry).
         return {"status": "canceled", "result_id": workflow_result_id}
+    except WorkflowStepError as e:
+        # A step failed (blocked URL, HTTP error, bad config, ...). This is a
+        # deterministic, user-facing failure: mark the run failed and stop —
+        # no re-raise, so it neither retries nor lands in Sentry as a crash.
+        logger.warning("Workflow %s failed: %s", workflow_id, e)
+        _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
+        return {"status": "error", "result_id": workflow_result_id}
     except Exception as e:
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
-        db.workflow_result.update_one(
-            {"_id": ObjectId(workflow_result_id)},
-            {"$set": {"status": "error", "error": str(e)}},
+        from app.services.failure_notifications import is_final_attempt
+
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id, str(e),
+            notify=is_final_attempt(self, e),
         )
-        if activity_id:
-            try:
-                from datetime import datetime, timezone
-                db.activity_event.update_one(
-                    {"_id": ObjectId(activity_id)},
-                    {"$set": {"status": "failed", "error": str(e)[:2000], "finished_at": datetime.now(timezone.utc)}},
-                )
-            except Exception:
-                pass
         raise
 
     # Check if workflow paused for approval. The handling below must run under a
@@ -719,19 +748,12 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "Approval gate handling failed for workflow %s (result %s)",
                 workflow_id, workflow_result_id,
             )
-            db.workflow_result.update_one(
-                {"_id": ObjectId(workflow_result_id)},
-                {"$set": {"status": "error", "error": f"Approval gate failed: {e}"}},
+            from app.services.failure_notifications import is_final_attempt
+
+            _mark_workflow_failed(
+                db, workflow_result_id, activity_id, f"Approval gate failed: {e}",
+                notify=is_final_attempt(self, e),
             )
-            if activity_id:
-                try:
-                    from datetime import datetime, timezone
-                    db.activity_event.update_one(
-                        {"_id": ObjectId(activity_id)},
-                        {"$set": {"status": "failed", "error": str(e)[:2000], "finished_at": datetime.now(timezone.utc)}},
-                    )
-                except Exception:
-                    pass
             raise
 
     # Aggregate citations from every step that produced retrieved_sources so
@@ -861,6 +883,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         ResearchNode,
         WebsiteNode,
         WorkflowEngine,
+        WorkflowStepError,
     )
 
     db = _get_db()
@@ -935,7 +958,21 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     for i in range(1, len(nodes)):
         engine.connect(nodes[i - 1], nodes[i])
 
-    final_output, _ = engine.execute()
+    try:
+        final_output, _ = engine.execute()
+    except WorkflowStepError as e:
+        # Deterministic config/user error (blocked URL, HTTP failure, bad
+        # headers…). Return a structured failure instead of raising: the task
+        # then neither retries nor produces a Sentry error event, the poll
+        # endpoint gets the clean message without a result-backend exception
+        # round-trip, and the step's full output (request preview included)
+        # stays available for debugging — Test Step has no
+        # workflow_result_updater to persist it anywhere else.
+        return {
+            "step_test_failed": True,
+            "error": str(e),
+            "output": e.step_output,
+        }
     return final_output
 
 
@@ -951,7 +988,7 @@ def resume_workflow_after_approval(self, approval_uuid):
     """Resume a workflow after an approval request has been approved."""
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine
+    from app.services.workflow_engine import WorkflowStepError, build_workflow_engine
 
     db = _get_db()
 
@@ -1066,11 +1103,13 @@ def resume_workflow_after_approval(self, approval_uuid):
         allow_code_execution=is_admin,
     )
 
+    # Resolved before the try so the failure handler below can always reach it.
+    _act = db.activity_event.find_one(
+        {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
+    )
+
     try:
         from app.services.metering import metered
-        _act = db.activity_event.find_one(
-            {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
-        )
         with metered(
             "workflow",
             user_id=user_id,
@@ -1082,13 +1121,46 @@ def resume_workflow_after_approval(self, approval_uuid):
                 start_index=step_index + 1,
                 initial_output=initial_output,
             )
-    except Exception as e:
-        logger.error("Workflow resume failed for %s: %s", workflow_id, e)
+    except WorkflowStepError as e:
+        # Deterministic step failure — mark the run failed, don't retry.
+        logger.warning("Workflow %s failed after resume: %s", workflow_id, e)
         db.workflow_result.update_one(
             {"_id": ObjectId(workflow_result_id)},
             {"$set": {"status": "error", "error": str(e)}},
         )
+        return {"status": "error", "result_id": workflow_result_id}
+    except Exception as e:
+        logger.error("Workflow resume failed for %s: %s", workflow_id, e)
+        from app.services.failure_notifications import is_final_attempt
+
+        _mark_workflow_failed(
+            db, workflow_result_id,
+            str(_act["_id"]) if _act else None, str(e),
+            notify=is_final_attempt(self, e),
+        )
         raise
+
+    # A workflow may have more than one approval gate. Resuming past the first
+    # one can land on another, so the resume path needs the same pause handling
+    # as the initial run — without it the second gate's sentinel was treated as
+    # a normal final output and the run was marked "completed" with no review
+    # ever created for the second reviewer.
+    if isinstance(final_output, dict) and final_output.get("_approval_pause"):
+        try:
+            return _pause_for_approval(
+                db, final_output, engine, workflow_id, workflow_result_id,
+                search_from=step_index + 1,
+            )
+        except Exception as e:
+            logger.exception(
+                "Approval gate handling failed on resume for workflow %s (result %s)",
+                workflow_id, workflow_result_id,
+            )
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": {"status": "error", "error": f"Approval gate failed: {e}"}},
+            )
+            raise
 
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},

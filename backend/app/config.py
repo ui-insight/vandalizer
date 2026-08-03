@@ -19,18 +19,28 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
+    # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
+    # unset to derive it from environment + frontend_url (see
+    # use_secure_cookies): Secure in production, EXCEPT when the deployment is
+    # served over plain http:// — a browser silently drops Secure cookies on
+    # HTTP, so login would "succeed" and every following request would 401.
+    cookie_secure: bool | None = None
     # Human-readable name for THIS deployment, shown in the UI version footer so
     # users can tell environments apart (e.g. "U of I Prod", "National Trial Prod").
     # `environment` alone can't: both prods report "production". Falls back to
     # `environment` when unset.
     deployment_label: str = ""
+    # IANA timezone for Celery beat crontab schedules (daily digests, engagement
+    # emails, retention jobs). Celery defaults to UTC when unset, which made
+    # "daily at 10am" emails land at 3am Pacific. Default matches the primary
+    # deployment (Moscow, ID).
+    celery_timezone: str = "America/Los_Angeles"
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
     # If set (e.g. "chromadb:8000"), connect to a Chroma server via HttpClient.
     # Required when multiple processes (FastAPI workers + Celery) share Chroma —
     # PersistentClient is not process-safe for concurrent writers.
     chromadb_host: str = ""
-    max_context_length: int = 100000
     max_upload_size_mb: int = 500
 
     # SSRF allowlist: comma-separated hostnames that outbound requests may hit
@@ -139,8 +149,22 @@ class Settings(BaseSettings):
     # Nuxt, etc.) produce usable content for chat / workflow / KB ingestion.
     web_fetcher_browser_enabled: bool = True
     web_fetcher_min_chars: int = 500
+    # Cap on the *extracted* main-content text kept from a page.
     web_fetcher_max_chars: int = 500_000
+    # Cap on the *raw HTML* parsed before extraction. This must be much larger
+    # than web_fetcher_max_chars: HTML markup (nav, inline styles, deeply nested
+    # tables, scripts) dwarfs the readable text, so long .gov/.edu pages routinely
+    # exceed 500 KB of HTML well before the document body ends. Capping raw HTML at
+    # the *text* limit silently drops the tail of the page before it is ever
+    # parsed (e.g. a reg page cut off mid-document, losing later subparts).
+    web_fetcher_max_html_chars: int = 8_000_000
     web_fetcher_timeout_seconds: int = 30
+
+    # Minimum characters of extracted content for an auto-discovered crawl page
+    # to be kept as a KB source. Pages below it are site navigation (Home,
+    # Topics, Agencies) — still followed for their links, never embedded. Does
+    # not apply to a URL the user pasted themselves; that is always kept.
+    kb_crawl_min_content_chars: int = 1200
 
     # Per-request read timeout (seconds) for the dedicated httpx client used by
     # workflow LLM calls. Reasoning models (e.g. gpt-oss) can think for a while
@@ -175,3 +199,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def use_secure_cookies(self) -> bool:
+        """Whether auth/CSRF cookies should carry the Secure attribute.
+
+        COOKIE_SECURE, when set, always wins. Otherwise: Secure in production
+        unless frontend_url says the site is served over plain HTTP (an
+        air-gapped / intranet box without TLS) — Secure cookies never reach
+        the server there, which breaks login silently.
+        """
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.is_production and not self.frontend_url.lower().startswith(
+            "http://"
+        )

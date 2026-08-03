@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 
@@ -21,12 +21,21 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Ref, not state: a double-click's second event can fire before React
+  // re-renders the disabled button, and two POSTs enqueue two ingest runs
+  // that race each other (the duplicate-source support ticket).
+  const submittedRef = useRef(false)
+  const [submitted, setSubmitted] = useState(false)
+
   const handleSubmit = () => {
+    if (submittedRef.current) return
     const urls = text
       .split('\n')
       .map(u => u.trim())
       .filter(u => u.length > 0)
     if (urls.length > 0) {
+      submittedRef.current = true
+      setSubmitted(true)
       onSubmit(urls, crawlEnabled, maxCrawlPages, allowedDomains)
     }
   }
@@ -93,7 +102,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         {crawlEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
             <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-              The crawler will follow links on each page and add discovered pages as additional sources.
+              The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
@@ -118,7 +127,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 type="text"
                 value={allowedDomains}
                 onChange={e => setAllowedDomains(e.target.value)}
-                placeholder="example.com, docs.example.com"
+                placeholder="example.com, example.com/section"
                 style={{
                   width: '100%', padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
                   backgroundColor: '#2a2a2a', color: '#e5e5e5',
@@ -126,7 +135,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 }}
               />
               <div style={{ fontSize: 11, color: '#666' }}>
-                Comma-separated. Defaults to the same domain as the URL.
+                Comma-separated. Include a path (e.g. example.com/irb) to limit the crawl
+                to that section of the site. Defaults to the same domain as the URL.
               </div>
             </div>
           </div>
@@ -145,16 +155,16 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!text.trim()}
+            disabled={!text.trim() || submitted}
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
               border: 'none', borderRadius: 6,
-              cursor: text.trim() ? 'pointer' : 'default',
-              opacity: text.trim() ? 1 : 0.5,
+              cursor: text.trim() && !submitted ? 'pointer' : 'default',
+              opacity: text.trim() && !submitted ? 1 : 0.5,
             }}
           >
-            Add URLs
+            {submitted ? 'Adding…' : 'Add URLs'}
           </button>
         </div>
       </div>

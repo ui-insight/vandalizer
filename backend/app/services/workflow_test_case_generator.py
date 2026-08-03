@@ -254,6 +254,18 @@ async def accept_proposals(
 
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
+        # Distinguish "no manage rights" from "doesn't exist / can't see it" so
+        # view-only users (team members, catalog viewers) get a clear 403
+        # instead of a misleading "Workflow not found".
+        if await get_authorized_workflow(workflow_id, user):
+            logger.warning(
+                "accept_proposals denied: user %s has view but not manage access "
+                "to workflow %s", user.user_id, workflow_id,
+            )
+            raise PermissionError(
+                "You don't have permission to modify this workflow's validation "
+                "setup. Ask the workflow owner or a team admin to save test cases."
+            )
         raise ValueError("Workflow not found")
 
     label_overrides = label_overrides or {}

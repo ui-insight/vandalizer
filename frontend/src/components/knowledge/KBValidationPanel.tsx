@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShieldCheck, Loader2, Sparkles } from 'lucide-react'
+import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   listKBTestQueries,
   getKBQuality,
   runKBValidationAsync,
+  downloadKBValidationRunExport,
   type KBTestQuery,
+  type KBValidationExportFormat,
   type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
@@ -22,6 +24,12 @@ interface Props {
   /** Called with the new KB's uuid after the user clones a KB they can't
    * manage, so the parent can navigate to their own copy. */
   onCloned?: (newUuid: string) => void
+  /** Collapse state is owned by the parent so it can trade screen space
+   * between this panel and sibling sections (e.g. the Sources list). The
+   * header stays visible when collapsed, keeping the latest score chip in
+   * view. Omit both props to render always-expanded. */
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }
 
 // Validation runs off the request/response path (a background Celery task), so
@@ -64,10 +72,13 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Props) {
+export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned, collapsed = false, onToggleCollapsed }: Props) {
   const [tab, setTab] = useState<Tab>('autovalidate')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
+  // Persisted uuid of the run shown in the Run-now tab, so its results can be
+  // exported. null until a run lands (or is hydrated from history).
+  const [latestRunUuid, setLatestRunUuid] = useState<string | null>(null)
   const [latestQuality, setLatestQuality] = useState<LatestQualitySummary | null>(null)
   const [loading, setLoading] = useState(false)
   // Run state lives here (not in KBValidationRunTab) so an in-flight validation
@@ -158,6 +169,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
 
       const deadline = Date.now() + MAX_POLL_MS
       let result: KBValidationResult | null = null
+      let resultUuid: string | null = null
       while (Date.now() < deadline) {
         await sleep(POLL_INTERVAL_MS)
         if (!mountedRef.current) return
@@ -174,6 +186,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
         )
         if (fresh?.result_snapshot) {
           result = fresh.result_snapshot
+          resultUuid = fresh.uuid ?? null
           applyLatestQuality(history)
           break
         }
@@ -181,6 +194,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
       if (!mountedRef.current) return
       if (result) {
         setLatestRun(result)
+        setLatestRunUuid(resultUuid)
         // Surface the new run in History without waiting for a reload.
         setHistoryRefreshKey(k => k + 1)
       } else {
@@ -195,6 +209,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
       if (mountedRef.current) setRunning(false)
     }
   }, [kbUuid, fetchHistory, applyLatestQuality])
+
+  // Export the run currently shown in the Run-now tab. Failures surface in
+  // the tab's existing error slot rather than dying silently.
+  const exportLatestRun = useCallback(async (format: KBValidationExportFormat) => {
+    if (!latestRunUuid) return
+    try {
+      await downloadKBValidationRunExport(kbUuid, latestRunUuid, format)
+    } catch (e) {
+      if (mountedRef.current) setRunError(`Export failed: ${(e as Error).message}`)
+    }
+  }, [kbUuid, latestRunUuid])
 
   useEffect(() => {
     setLoading(true)
@@ -253,8 +278,24 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
         borderRadius: 8,
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      {/* Header — doubles as the collapse toggle when the parent controls it */}
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={onToggleCollapsed ? !collapsed : undefined}
+        disabled={!onToggleCollapsed}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          marginBottom: collapsed ? 0 : 10, padding: 0,
+          background: 'transparent', border: 'none', fontFamily: 'inherit',
+          cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left',
+        }}
+      >
+        {onToggleCollapsed && (
+          collapsed
+            ? <ChevronRight size={14} style={{ color: '#888', flexShrink: 0 }} />
+            : <ChevronDown size={14} style={{ color: '#888', flexShrink: 0 }} />
+        )}
         <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
         <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
         {latestScore != null && (
@@ -286,11 +327,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
             {provenance}
           </span>
         )}
+        {collapsed && running && (
+          <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#888' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
-      </div>
+      </button>
 
+      {!collapsed && (<>
       {/* Orientation hint — single sentence above the tab strip so new users
           know what each tab is for without clicking through. */}
       <div
@@ -376,6 +421,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
           running={running}
           error={runError}
           onRun={runValidation}
+          onExport={latestRunUuid ? exportLatestRun : undefined}
         />
       ) : (
         <KBQualityHistoryTab
@@ -386,6 +432,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
         />
       )}
       </div>
+      </>)}
     </div>
   )
 }

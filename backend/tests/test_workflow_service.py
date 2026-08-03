@@ -97,8 +97,9 @@ def _make_result(session_id="abc123", status="completed", final_output=None, wor
 # ---------------------------------------------------------------------------
 
 class TestCreateWorkflow:
+    @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
     @patch("app.services.workflow_service.Workflow")
-    async def test_creates_workflow(self, mock_wf_cls):
+    async def test_creates_workflow(self, mock_wf_cls, mock_ensure):
         from app.services.workflow_service import create_workflow
 
         mock_wf = MagicMock()
@@ -552,6 +553,88 @@ class TestBuildResult:
         assert result["grade"] == "F"
         assert result["check_pass_rate"] == 0.0
 
+    @patch("app.services.quality_service.persist_validation_run", new_callable=AsyncMock)
+    async def test_multirun_stability_uses_check_consistency_not_text(self, mock_persist):
+        """A correct, check-consistent prose workflow whose wording varies
+        run-to-run scores on verdict consistency, not raw text-similarity."""
+        from app.services.workflow_service import _build_result
+
+        checks = [
+            {"check_id": "c1", "name": "Check 1", "status": "PASS", "detail": "ok", "consistency": 1.0},
+            {"check_id": "c2", "name": "Check 2", "status": "PASS", "detail": "ok", "consistency": 1.0},
+        ]
+        # Facts identical but reworded each run -> low text similarity, but the
+        # checks pass consistently every run.
+        stability_data = {
+            "stability_score": 0.45,
+            "text_similarity": 0.45,
+            "structured_field_stability": None,
+        }
+        result = await _build_result(
+            checks, "wf-id", {"name": "Test", "user_id": "u1"},
+            num_runs=3, stability_data=stability_data,
+        )
+        assert result["stability_basis"] == "evaluator_consistency"
+        assert result["stability_score"] == 100.0
+        # quality 100 * 0.6 + stability 100 * 0.4 = 100 (was ~78/C under text-sim).
+        assert result["score"] == 100.0
+        assert result["grade"] == "A"
+        # raw text similarity is still reported for diagnostics.
+        assert result["stability_detail"]["text_similarity"] == 0.45
+
+    @patch("app.services.quality_service.persist_validation_run", new_callable=AsyncMock)
+    async def test_multirun_prefers_structured_field_stability(self, mock_persist):
+        from app.services.workflow_service import _build_result
+
+        checks = [
+            {"check_id": "c1", "name": "Check 1", "status": "PASS", "detail": "ok", "consistency": 1.0},
+        ]
+        stability_data = {
+            "stability_score": 0.40,
+            "text_similarity": 0.40,
+            "structured_field_stability": 0.90,
+        }
+        result = await _build_result(
+            checks, "wf-id", {"name": "Test", "user_id": "u1"},
+            num_runs=2, stability_data=stability_data,
+        )
+        assert result["stability_basis"] == "structured_field_stability"
+        assert result["stability_score"] == 90.0
+        assert result["score"] == pytest.approx(96.0)  # 100*0.6 + 90*0.4
+        assert result["grade"] == "A"
+
+    @patch("app.services.quality_service.persist_validation_run", new_callable=AsyncMock)
+    async def test_multirun_flaky_check_lowers_stability(self, mock_persist):
+        """A check that flips verdict across runs lowers consistency, which now
+        legitimately lowers the stability term."""
+        from app.services.workflow_service import _build_result
+
+        checks = [
+            {"check_id": "c1", "name": "Check 1", "status": "PASS", "detail": "ok", "consistency": 1.0},
+            {"check_id": "c2", "name": "Check 2", "status": "PASS", "detail": "ok", "consistency": 2 / 3},
+        ]
+        stability_data = {"stability_score": 0.5, "text_similarity": 0.5, "structured_field_stability": None}
+        result = await _build_result(
+            checks, "wf-id", {"name": "Test", "user_id": "u1"},
+            num_runs=3, stability_data=stability_data,
+        )
+        assert result["stability_basis"] == "evaluator_consistency"
+        assert result["stability_score"] == pytest.approx(83.3, abs=0.1)  # (1.0 + 0.667)/2
+        assert result["grade"] == "A"  # 100*0.6 + 83.3*0.4 = 93.3
+
+    @patch("app.services.quality_service.persist_validation_run", new_callable=AsyncMock)
+    async def test_single_run_unaffected(self, mock_persist):
+        """Single-run scoring is unchanged: quality only, no stability term."""
+        from app.services.workflow_service import _build_result
+
+        checks = [
+            {"check_id": "c1", "name": "Check 1", "status": "PASS", "detail": "ok", "consistency": 1.0},
+        ]
+        result = await _build_result(checks, "wf-id", {"name": "Test", "user_id": "u1"}, num_runs=1)
+        assert result["stability_basis"] is None
+        assert result["score"] == 100.0
+        assert result["grade"] == "A"
+
 
 # ---------------------------------------------------------------------------
 # _parse_json_array
@@ -722,6 +805,28 @@ class TestGetTestStatus:
 
         status = get_test_status("task-123")
         assert status["status"] == "PENDING"
+
+    @patch("app.services.workflow_service.AsyncResult")
+    def test_step_failure_returned_by_task_reports_failed_with_clean_message(self, mock_async_result_cls):
+        """A deterministic step failure is *returned* (not raised) by the test
+        task; the poll must surface it as failed with the step's message and
+        keep the step output for diagnostics."""
+        from app.services.workflow_service import get_test_status
+
+        mock_result = MagicMock()
+        mock_result.ready.return_value = True
+        mock_result.successful.return_value = True
+        mock_result.result = {
+            "step_test_failed": True,
+            "error": "APINode step failed: Blocked URL: nope",
+            "output": {"error": "Blocked URL: nope", "output": "--- Request sent ---"},
+        }
+        mock_async_result_cls.return_value = mock_result
+
+        status = get_test_status("task-123")
+        assert status["status"] == "failed"
+        assert status["error"] == "APINode step failed: Blocked URL: nope"
+        assert status["output"]["output"] == "--- Request sent ---"
 
 
 # ---------------------------------------------------------------------------

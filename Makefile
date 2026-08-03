@@ -78,10 +78,12 @@ frontend-typecheck:
 frontend-lint:
 	cd $(FRONTEND_DIR) && npm run lint
 
-# Coverage gate set just below current measured (~44%). Bump as more
-# components/hooks/api modules get tests.
+# Coverage denominator is the whole frontend/src tree (see vitest.config.ts),
+# not just what a test happens to import, so this number is honest and
+# monotonic. Thresholds live in vitest.config.ts (single source) — bump them
+# there as more components/hooks/api modules get tests.
 frontend-test:
-	cd $(FRONTEND_DIR) && npm run test:coverage -- --coverage.thresholds.lines=40
+	cd $(FRONTEND_DIR) && npm run test:coverage
 
 frontend-build:
 	cd $(FRONTEND_DIR) && npm run build

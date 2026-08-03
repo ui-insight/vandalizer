@@ -349,6 +349,26 @@ def password_set_email(
     return subject, html
 
 
+def email_changed_notice(
+    name: str, old_email: str, new_email: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) sent to the *old* address after an email change.
+
+    A security heads-up so the original owner notices an unexpected change while
+    they may still control the old inbox.
+    """
+    subject = "Your Vandalizer email address was changed"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Email Address Changed</h1>
+      <p>Hi {name}, the email address on your Vandalizer account was just changed from <strong>{old_email}</strong> to <strong>{new_email}</strong>.</p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">If you made this change, no action is needed. If you did <strong>not</strong> make this change, contact your Vandalizer administrator immediately &mdash; your account may be compromised.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Team invitation emails
 # ---------------------------------------------------------------------------
@@ -376,6 +396,37 @@ def team_invite_email(
 # ---------------------------------------------------------------------------
 # Verification status emails
 # ---------------------------------------------------------------------------
+
+
+def verification_submitted_email(
+    reviewer_name: str,
+    submitter_name: str,
+    item_kind: str,
+    item_name: str,
+    summary: str | None,
+    frontend_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) telling a reviewer a new submission is queued."""
+    kind_label = item_kind.replace("_", " ")
+    subject = f'New verification submission: "{item_name}"'
+
+    summary_block = ""
+    if summary:
+        summary_block = f"""
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;"><strong style="color:#fff;">Summary:</strong><br/>{summary}</p>
+      </div>"""
+
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>New submission awaiting review</h1>
+      <p>Hi {reviewer_name}, <strong style="color:#fff">{submitter_name}</strong> submitted the {kind_label} <span class="highlight">{item_name}</span> for verification.</p>
+      {summary_block}
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/verification">Open Queue</a></p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
 
 
 def verification_status_email(

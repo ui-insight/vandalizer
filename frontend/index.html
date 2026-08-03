@@ -31,9 +31,12 @@
         }
       })()
     </script>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <!--
+      Public Sans is self-hosted (see @fontsource-variable/public-sans, imported
+      from src/main.tsx). Do NOT add a fonts.googleapis.com <link> here: a
+      render-blocking stylesheet on a third-party host freezes the SPA for the
+      length of the browser's connect timeout on offline / air-gapped installs.
+    -->
     <title>Vandalizer</title>
   </head>
   <body>

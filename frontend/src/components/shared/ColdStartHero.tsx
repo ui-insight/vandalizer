@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 
 interface ColdStartHeroProps {
   headline: string
-  /** Plain-language summary, e.g. "Typically $1–$5 and 10–20 minutes…" */
+  /** Plain-language summary, e.g. "Typically 10–20 minutes, using roughly $1–$5 worth of LLM tokens…" */
   body: ReactNode
   /** Optional numbered steps describing the next few minutes. */
   whatHappensNext?: string[]

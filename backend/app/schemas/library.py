@@ -54,6 +54,9 @@ class LibraryItemResponse(BaseModel):
     quality_tier: Optional[str] = None
     quality_score: Optional[float] = None
     created_by: Optional[AuthorRef] = None
+    # Whether the requesting user may permanently delete the backing
+    # workflow/extraction (vs. only removing this bookmark).
+    can_delete_underlying: bool = False
 
 
 class AddItemRequest(BaseModel):
@@ -105,6 +108,9 @@ class ShareToTeamRequest(BaseModel):
     item_id: str
     team_id: str
     comment: Optional[str] = None
+    # Share again even though the item was already shared to this team
+    # (creates a numbered copy). Set after the user confirms the 409 warning.
+    force: bool = False
 
 
 # ---------------------------------------------------------------------------

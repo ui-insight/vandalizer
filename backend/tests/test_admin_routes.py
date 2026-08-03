@@ -31,6 +31,7 @@ def _make_user(
     user.is_examiner = is_examiner
     user.current_team = current_team
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     return user
 
@@ -180,7 +181,7 @@ class TestAdminAnalyticsScoping:
             resp = await client.get("/api/admin/users", cookies=cookies, headers=headers)
 
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["items"]
         assert len(data) == 1
         assert data[0]["user_id"] == "member-1"
         assert data[0]["is_admin"] is False
@@ -397,6 +398,171 @@ class TestAdminAnalyticsScoping:
         ]
 
 
+class TestAdminListEndpointLimits:
+    """Plan 012: the five previously-unbounded admin list endpoints now accept
+    a `limit` and report `total`/`capped`. Exercised against the user
+    leaderboard (GET /users), which has the richest scoping logic of the five;
+    the other four share the same "scope via find(), then slice" shape.
+    """
+
+    @pytest.mark.asyncio
+    async def test_more_rows_than_limit_caps_and_reports_true_total(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        events = [
+            SimpleNamespace(user_id="user-1", tokens_input=100, tokens_output=0, type="workflow_run", started_at=None),
+            SimpleNamespace(user_id="user-2", tokens_input=50, tokens_output=0, type="workflow_run", started_at=None),
+            SimpleNamespace(user_id="user-3", tokens_input=10, tokens_output=0, type="workflow_run", started_at=None),
+        ]
+        users = [
+            SimpleNamespace(user_id=e.user_id, name=e.user_id, email=f"{e.user_id}@example.com", is_admin=False, is_staff=False, is_examiner=False)
+            for e in events
+        ]
+
+        activity_find = MagicMock()
+        activity_find.to_list = AsyncMock(return_value=events)
+        users_find = MagicMock()
+        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
+            patch("app.routers.admin.User") as MockRouteUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockActivityEvent.find.return_value = activity_find
+            MockRouteUser.find.return_value = users_find
+
+            resp = await client.get("/api/admin/users?limit=2", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 3
+        assert body["capped"] is True
+        assert len(body["items"]) == 2
+        # Sorted desc by tokens_total — the two highest survive the cap.
+        assert [i["user_id"] for i in body["items"]] == ["user-1", "user-2"]
+
+    @pytest.mark.asyncio
+    async def test_fewer_rows_than_limit_not_capped(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        events = [
+            SimpleNamespace(user_id="user-1", tokens_input=10, tokens_output=0, type="workflow_run", started_at=None),
+        ]
+        users = [
+            SimpleNamespace(user_id="user-1", name="User One", email="user-1@example.com", is_admin=False, is_staff=False, is_examiner=False),
+        ]
+
+        activity_find = MagicMock()
+        activity_find.to_list = AsyncMock(return_value=events)
+        users_find = MagicMock()
+        users_find.limit.return_value.to_list = AsyncMock(return_value=users)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
+            patch("app.routers.admin.User") as MockRouteUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockActivityEvent.find.return_value = activity_find
+            MockRouteUser.find.return_value = users_find
+
+            resp = await client.get("/api/admin/users", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["capped"] is False
+        assert len(body["items"]) == 1
+        assert body["items"][0]["user_id"] == "user-1"
+
+    @pytest.mark.asyncio
+    async def test_limit_above_max_list_limit_rejected(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            resp = await client.get("/api/admin/users?limit=2001", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_team_scoped_cap_never_widens_visibility_identity_check(self, client):
+        """A limit small enough to truncate the response must still only ever
+        surface rows the team-scoped caller is entitled to see. Guards against
+        a regression where `limit` is applied before (rather than after) the
+        team-scope filter — that would be a data-exposure bug, not a perf one.
+        """
+        team_admin = _make_user("team-admin", current_team="0123456789abcdef01234567")
+        cookies, headers = _auth("team-admin")
+        team = SimpleNamespace(id="0123456789abcdef01234567", uuid="team-uuid", name="Team One")
+
+        events = [
+            SimpleNamespace(user_id="member-1", tokens_input=100, tokens_output=0, type="workflow_run", started_at=None),
+            SimpleNamespace(user_id="member-2", tokens_input=10, tokens_output=0, type="workflow_run", started_at=None),
+        ]
+        team_memberships = [
+            SimpleNamespace(user_id="member-1"),
+            SimpleNamespace(user_id="member-2"),
+        ]
+        users = [
+            SimpleNamespace(user_id="member-1", name="Member One", email="member-1@example.com", is_admin=False, is_examiner=False),
+            SimpleNamespace(user_id="member-2", name="Member Two", email="member-2@example.com", is_admin=False, is_examiner=False),
+        ]
+
+        activity_find = MagicMock()
+        activity_find.to_list = AsyncMock(return_value=events)
+        memberships_find = MagicMock()
+        memberships_find.to_list = AsyncMock(return_value=team_memberships)
+        users_find = MagicMock()
+        users_find.to_list = AsyncMock(return_value=users)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "team-admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.admin._require_admin_or_team_admin",
+                new=AsyncMock(return_value=(team_admin, "0123456789abcdef01234567")),
+            ),
+            patch("app.routers.admin.Team") as MockTeam,
+            patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
+            patch("app.routers.admin.TeamMembership") as MockTeamMembership,
+            patch("app.routers.admin.User") as MockRouteUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=team_admin)
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockActivityEvent.find.return_value = activity_find
+            MockTeamMembership.find.return_value = memberships_find
+            MockRouteUser.find.return_value = users_find
+
+            resp = await client.get("/api/admin/users?limit=1", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+
+        # The query issued to ActivityEvent still carries the team scope
+        # filter regardless of the limit — the cap never substitutes for it.
+        query = MockActivityEvent.find.call_args.args[0]
+        assert query["team_id"]["$in"] == ["0123456789abcdef01234567", "team-uuid"]
+
+        body = resp.json()
+        assert body["total"] == 2
+        assert body["capped"] is True
+        assert len(body["items"]) == 1
+        # Identity, not just count: the single surviving row must be the
+        # in-scope member with the higher token total — never a row that
+        # slipped in ahead of, or instead of, the scope filter.
+        assert body["items"][0]["user_id"] == "member-1"
+
+
 class TestUserActivityHistory:
     """The per-user audit drill-down (GET /users/{id}/history)."""
 
@@ -528,4 +694,716 @@ class TestUserActivityHistory:
             MockRouteUser.find_one = AsyncMock(return_value=None)
             resp = await client.get("/api/admin/users/ghost/history", cookies=cookies, headers=headers)
 
+        assert resp.status_code == 404
+
+
+class TestOcrConnectivityTest:
+    """POST /api/admin/config/test-ocr — form-value overrides vs saved config."""
+
+    def _httpx_client_mock(self, status_code=200):
+        resp = MagicMock(status_code=status_code)
+        client = MagicMock()
+        client.get = AsyncMock(return_value=resp)
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=client)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        return ctx, client
+
+    @pytest.mark.asyncio
+    async def test_body_overrides_saved_endpoint_and_key(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "new-key"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        url, kwargs = http_client.get.call_args[0][0], http_client.get.call_args[1]
+        assert url == "https://form.example/ocr"
+        assert kwargs["headers"]["Authorization"] == "Bearer new-key"
+
+    @pytest.mark.asyncio
+    async def test_masked_key_sentinel_uses_saved_key(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin.decrypt_value", return_value="saved-plain"),
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "***"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert http_client.get.call_args[1]["headers"]["Authorization"] == "Bearer saved-plain"
+
+    @pytest.mark.asyncio
+    async def test_no_body_falls_back_to_saved_config(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        assert http_client.get.call_args[0][0] == "https://saved.example/ocr"
+        assert "Authorization" not in http_client.get.call_args[1]["headers"]
+
+    @pytest.mark.asyncio
+    async def test_no_endpoint_anywhere_returns_400(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="", ocr_api_key="")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr", json={}, cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 400
+
+
+class TestUpdateAuthMethods:
+    """PUT /api/admin/config/auth/methods must never persist an empty list —
+    that disables every login path with no recovery except direct DB access.
+    """
+
+    @pytest.mark.asyncio
+    async def test_empty_methods_rejected_and_config_unchanged(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(auth_methods=["password"], save=AsyncMock())
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.put(
+                "/api/admin/config/auth/methods",
+                json={"methods": []},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert cfg.auth_methods == ["password"]
+        cfg.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_valid_methods_persisted(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(auth_methods=["password", "oauth"], save=AsyncMock())
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.put(
+                "/api/admin/config/auth/methods",
+                json={"methods": ["password"]},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["auth_methods"] == ["password"]
+        assert cfg.auth_methods == ["password"]
+        cfg.save.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_unknown_method_rejected(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            resp = await client.put(
+                "/api/admin/config/auth/methods",
+                json={"methods": ["telepathy"]},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert 400 <= resp.status_code < 500
+
+    @pytest.mark.asyncio
+    async def test_non_superadmin_rejected_before_empty_check(self, client):
+        """A non-superadmin sending an empty list must still get 403, not 400 —
+        proving `_require_superadmin` runs before the new empty-list guard."""
+        staffer = _make_user("staffer", is_admin=False)
+        cookies, headers = _auth("staffer")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "staffer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=staffer)
+            resp = await client.put(
+                "/api/admin/config/auth/methods",
+                json={"methods": []},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+
+
+def _model(name: str, model_id: str | None = None, **overrides) -> dict:
+    """Build a minimal available_models entry for tests."""
+    entry = {
+        "id": model_id,
+        "name": name,
+        "tag": name,
+        "external": False,
+        "thinking": False,
+        "endpoint": "",
+        "api_protocol": "",
+        "api_key": "",
+        "speed": "",
+        "tier": "",
+        "privacy": "",
+        "supports_structured": True,
+        "multimodal": False,
+        "supports_pdf": False,
+        "context_window": 128000,
+        "request_timeout_seconds": None,
+        "response_reserve_tokens": None,
+        "cost_per_1m_input": None,
+        "cost_per_1m_output": None,
+    }
+    entry.update(overrides)
+    return entry
+
+
+def _get_config_cfg(available_models: list[dict], oauth_providers: list[dict] | None = None) -> SimpleNamespace:
+    """Build a fake SystemConfig with every attribute GET /config touches."""
+    return SimpleNamespace(
+        available_models=available_models,
+        oauth_providers=oauth_providers or [],
+        default_model="",
+        auth_methods=["password"],
+        ocr_endpoint="",
+        ocr_api_key="",
+        llm_endpoint="",
+        highlight_color="#eab308",
+        ui_radius="12px",
+        default_team_id="",
+        support_contacts=[],
+        get_extraction_config=lambda: {},
+        get_quality_config=lambda: {},
+        get_compliance_config=lambda: {},
+        get_retention_config=lambda: {},
+        save=AsyncMock(),
+    )
+
+
+class TestModelsAddressedById:
+    """PUT/DELETE /api/admin/config/models/{model_id} — stable-id addressing.
+
+    Regression coverage for the bug this plan fixes: the old routes addressed
+    models by array position, so a shift in the list (e.g. another delete)
+    could make a client's stale index land on the wrong model.
+    """
+
+    @pytest.mark.asyncio
+    async def test_delete_by_id_survives_a_position_shift(self, client):
+        """Seed three models, delete a different one first (shifting
+        positions), then delete a specific model BY ID — the intended model
+        must be gone and the other two must remain untouched. Under the old
+        index scheme, deleting the second model after a prior delete removed
+        whichever model happened to now sit at that position, not the one the
+        admin actually clicked delete on."""
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        models = [
+            _model("alpha", "id-alpha"),
+            _model("bravo", "id-bravo"),
+            _model("charlie", "id-charlie"),
+        ]
+        cfg = SimpleNamespace(
+            available_models=models,
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+
+            # Another admin (or tab) deletes "alpha" first — bravo/charlie
+            # shift from positions 1/2 down to 0/1.
+            resp1 = await client.delete(
+                "/api/admin/config/models/id-alpha", cookies=cookies, headers=headers
+            )
+            assert resp1.status_code == 200
+
+            # Now delete "bravo" BY ID. Under the old index scheme, a client
+            # still holding index 1 (bravo's original position) would now hit
+            # charlie instead.
+            resp2 = await client.delete(
+                "/api/admin/config/models/id-bravo", cookies=cookies, headers=headers
+            )
+            assert resp2.status_code == 200
+
+        remaining_names = {m["name"] for m in cfg.available_models}
+        assert remaining_names == {"charlie"}
+        assert resp2.json()["removed"]["name"] == "bravo"
+
+    @pytest.mark.asyncio
+    async def test_unknown_model_id_returns_404(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            available_models=[_model("alpha", "id-alpha")],
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.delete(
+                "/api/admin/config/models/no-such-id", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_non_superadmin_rejected_before_lookup(self, client):
+        """403 for a non-superadmin, proving `_require_superadmin` runs before
+        the by-id lookup (and thus before any 404 could leak list contents)."""
+        staffer = _make_user("staffer", is_admin=False)
+        cookies, headers = _auth("staffer")
+        cfg = SimpleNamespace(
+            available_models=[_model("alpha", "id-alpha")],
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "staffer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=staffer)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.delete(
+                # Even a garbage id must still 403, not 404 — the auth check
+                # must short-circuit before the list is ever searched.
+                "/api/admin/config/models/whatever",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        cfg.save.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_lazy_backfill_assigns_ids_and_is_idempotent(self, client):
+        """A config whose entries predate stable ids gains one on first touch,
+        and calling the backfill again does not change already-assigned ids."""
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        legacy_models = [_model("alpha", None), _model("bravo", None)]
+        # Simulate an already-untyped dict lacking the key entirely, not just None.
+        del legacy_models[0]["id"]
+        del legacy_models[1]["id"]
+        cfg = _get_config_cfg(legacy_models)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin.decrypt_value", return_value=""),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/admin/config", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        ids_first = [m["id"] for m in resp.json()["available_models"]]
+        assert all(ids_first)
+        assert len(set(ids_first)) == 2  # unique
+        cfg.save.assert_called_once()  # persisted the backfill
+
+        # Calling again must not regenerate the now-assigned ids.
+        cfg.save.reset_mock()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin.decrypt_value", return_value=""),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp2 = await client.get("/api/admin/config", cookies=cookies, headers=headers)
+
+        ids_second = [m["id"] for m in resp2.json()["available_models"]]
+        assert ids_second == ids_first
+        cfg.save.assert_not_called()  # nothing changed, so no persist needed
+
+    @pytest.mark.asyncio
+    async def test_update_by_id_preserves_key_on_sentinel(self, client):
+        """The '***' API-key sentinel must still preserve the stored
+        (encrypted) key when updating by id — plan 003 depends on this."""
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        models = [_model("alpha", "id-alpha", api_key="enc-stored-secret")]
+        cfg = SimpleNamespace(
+            available_models=models,
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.put(
+                "/api/admin/config/models/id-alpha",
+                json={"name": "alpha", "tag": "alpha", "api_key": "***"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert cfg.available_models[0]["api_key"] == "enc-stored-secret"
+        assert cfg.available_models[0]["id"] == "id-alpha"
+
+    @pytest.mark.asyncio
+    async def test_delete_default_model_clears_default(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        models = [_model("alpha", "id-alpha"), _model("bravo", "id-bravo")]
+        cfg = SimpleNamespace(
+            available_models=models,
+            oauth_providers=[],
+            default_model="alpha",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.delete(
+                "/api/admin/config/models/id-alpha", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        assert cfg.default_model == ""
+        assert resp.json()["default_model"] == ""
+
+
+class TestTestModelAddressedById:
+    """POST /api/admin/config/test-model/{model_id} — stable-id addressing.
+
+    Same class of bug TestModelsAddressedById covers for PUT/DELETE: the old
+    route addressed the model to test by array position, so a shift in the
+    list (e.g. another admin's delete) could silently run the connectivity
+    test — and badge as "Connected" — against the wrong model's credentials.
+    """
+
+    @staticmethod
+    def _patched_diagnostics():
+        """Patch the pieces diagnose_model calls out to so it runs its real
+        addressing/step logic without making a live model call."""
+        fake_run = MagicMock()
+        fake_run.output = "ok"
+        fake_run.usage = lambda: SimpleNamespace(request_tokens=1, response_tokens=1, total_tokens=2)
+        fake_agent = MagicMock()
+        fake_agent.run = AsyncMock(return_value=fake_run)
+        return (
+            patch("app.services.system_diagnostics.get_agent_model", return_value=MagicMock()),
+            patch("pydantic_ai.Agent", return_value=fake_agent),
+            patch("app.services.system_diagnostics.decrypt_value", return_value="secret"),
+        )
+
+    @pytest.mark.asyncio
+    async def test_test_by_id_survives_a_position_shift(self, client):
+        """Seed three models, delete a different one first (shifting
+        positions), then test a specific remaining model BY ID — the
+        response must reflect that model, not whatever now sits at its old
+        index. Under the old index scheme, testing "bravo" after "alpha" was
+        deleted would have hit "charlie" instead."""
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        models = [
+            _model("alpha", "id-alpha", api_key="enc-alpha", api_protocol="openai"),
+            _model("bravo", "id-bravo", api_key="enc-bravo", api_protocol="openai"),
+            _model("charlie", "id-charlie", api_key="enc-charlie", api_protocol="openai"),
+        ]
+        cfg = SimpleNamespace(
+            available_models=models,
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+            model_dump=lambda: {"available_models": models},
+        )
+
+        p1, p2, p3 = self._patched_diagnostics()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+            p1, p2, p3,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+
+            # Another admin (or tab) deletes "alpha" first — bravo/charlie
+            # shift from positions 1/2 down to 0/1.
+            resp_delete = await client.delete(
+                "/api/admin/config/models/id-alpha", cookies=cookies, headers=headers
+            )
+            assert resp_delete.status_code == 200
+
+            # Test "bravo" BY ID. Under the old index scheme, a client still
+            # holding index 1 (bravo's original position) would now hit
+            # "charlie" (now at index 1 post-shift) instead.
+            resp = await client.post(
+                "/api/admin/config/test-model/id-bravo", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        assert body["model"] == "bravo"
+        assert body["tag"] == "bravo"
+
+    @pytest.mark.asyncio
+    async def test_unknown_model_id_returns_404(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            available_models=[_model("alpha", "id-alpha")],
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-model/no-such-id", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_non_superadmin_rejected_before_lookup(self, client):
+        """403 for a non-superadmin, proving `_require_superadmin` runs before
+        the by-id lookup (and thus before any 404 could leak list contents)."""
+        staffer = _make_user("staffer", is_admin=False)
+        cookies, headers = _auth("staffer")
+        cfg = SimpleNamespace(
+            available_models=[_model("alpha", "id-alpha")],
+            oauth_providers=[],
+            default_model="",
+            save=AsyncMock(),
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "staffer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=staffer)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                # Even a garbage id must still 403, not 404 — the auth check
+                # must short-circuit before the list is ever searched.
+                "/api/admin/config/test-model/whatever",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        # The config (and thus the model list) must never even be loaded —
+        # proof the superadmin check ran first, not just that nothing saved.
+        MockCfg.get_config.assert_not_called()
+
+
+class TestModelIdentityUniqueness:
+    """POST/PUT /api/admin/config/models — model names and tags stay unambiguous.
+
+    Resolution scans names then tags and returns the first match, so a shared
+    tag makes a user's stored selector resolve to whichever model happens to be
+    first in the list.
+    """
+
+    def _cfg(self, *pairs):
+        # Models carry pre-set ids so _ensure_config_ids has nothing to
+        # backfill — otherwise it would call cfg.save() itself and break the
+        # save.assert_not_awaited() assertions on the rejection paths.
+        return SimpleNamespace(
+            available_models=[{"id": f"id-{n}", "name": n, "tag": t} for n, t in pairs],
+            oauth_providers=[],
+            default_model="",
+            updated_at=None,
+            updated_by=None,
+            save=AsyncMock(),
+        )
+
+    async def _call(self, client, cfg, method, url, body):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin.encrypt_value", side_effect=lambda v: v),
+            patch("app.routers.admin.clear_agent_caches"),
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            return await getattr(client, method)(
+                url, json=body, cookies=cookies, headers=headers
+            )
+
+    @pytest.mark.asyncio
+    async def test_adding_a_model_with_a_unique_identity_succeeds(self, client):
+        cfg = self._cfg(("qwen-large", "local"))
+        resp = await self._call(
+            client, cfg, "post", "/api/admin/config/models",
+            {"name": "gpt-oss", "tag": "fast"},
+        )
+        assert resp.status_code == 200
+        assert len(cfg.available_models) == 2
+
+    @pytest.mark.asyncio
+    async def test_adding_a_model_with_a_duplicate_tag_is_rejected(self, client):
+        cfg = self._cfg(("qwen-large", "local"))
+        resp = await self._call(
+            client, cfg, "post", "/api/admin/config/models",
+            {"name": "gpt-oss", "tag": "local"},
+        )
+        assert resp.status_code == 409
+        assert "local" in resp.json()["detail"]
+        # The colliding model must not have been persisted.
+        assert len(cfg.available_models) == 1
+        cfg.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_adding_a_model_whose_name_is_another_models_tag_is_rejected(self, client):
+        cfg = self._cfg(("qwen-large", "local"))
+        resp = await self._call(
+            client, cfg, "post", "/api/admin/config/models",
+            {"name": "local", "tag": "reasoning"},
+        )
+        assert resp.status_code == 409
+        assert len(cfg.available_models) == 1
+
+    @pytest.mark.asyncio
+    async def test_updating_a_model_without_changing_its_identity_succeeds(self, client):
+        cfg = self._cfg(("qwen-large", "local"), ("gpt-oss", "fast"))
+        resp = await self._call(
+            client, cfg, "put", "/api/admin/config/models/id-qwen-large",
+            {"name": "qwen-large", "tag": "local", "context_window": 32768},
+        )
+        assert resp.status_code == 200
+        assert cfg.available_models[0]["context_window"] == 32768
+
+    @pytest.mark.asyncio
+    async def test_updating_a_model_onto_another_models_tag_is_rejected(self, client):
+        cfg = self._cfg(("qwen-large", "local"), ("gpt-oss", "fast"))
+        resp = await self._call(
+            client, cfg, "put", "/api/admin/config/models/id-qwen-large",
+            {"name": "qwen-large", "tag": "fast"},
+        )
+        assert resp.status_code == 409
+        # The original row must survive untouched.
+        assert cfg.available_models[0]["tag"] == "local"
+        cfg.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unknown_model_id_is_rejected_before_identity(self, client):
+        cfg = self._cfg(("qwen-large", "local"))
+        resp = await self._call(
+            client, cfg, "put", "/api/admin/config/models/no-such-id",
+            {"name": "gpt-oss", "tag": "fast"},
+        )
         assert resp.status_code == 404

@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -20,11 +20,16 @@ jobs:
         run: pip install uv
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      # package-lock.json is generated with npm 11 (dev machines, dependabot);
+      # npm 10 (bundled with Node 22) rejects its optional-dep shape (@emnapi/*).
+      - name: Use npm 11 to match the lockfile
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: make backend-install frontend-install

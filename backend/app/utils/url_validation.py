@@ -12,6 +12,21 @@ BLOCKED_HOSTS = frozenset({
 })
 
 
+def normalize_crawl_url(url: str) -> str:
+    """Normalize a URL for crawl deduplication: strip fragments, trailing slashes.
+
+    ``example.com``, ``example.com/`` and ``example.com#section`` all serve the
+    same page; normalizing them to one form keeps crawlers from fetching (and
+    counting) the same page once per spelling.
+    """
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/") or "/"
+    clean = f"{parsed.scheme}://{parsed.netloc}{path}"
+    if parsed.query:
+        clean += f"?{parsed.query}"
+    return clean
+
+
 @lru_cache(maxsize=1)
 def _allowed_private_hosts() -> frozenset:
     """Hostnames (from ``ssrf_allowed_hosts``) exempt from the private-IP block.

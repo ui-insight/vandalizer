@@ -580,6 +580,12 @@ async def _generate_baseline_answer(query: str, model_name: str) -> tuple[str, i
 # ---------------------------------------------------------------------------
 
 
+# How much retrieved context the judge sees. Sized for ~k=5 full chunks —
+# with the old 4k cap the grounding chunk regularly fell past the cut and
+# grounded answers got flagged as hallucinated.
+_JUDGE_CONTEXT_MAX_CHARS = 12000
+
+
 _KB_JUDGE_COMMON_TAIL = (
     "\nReturn ONLY JSON (no markdown, no extra text) with this shape:\n"
     '{"score": 0.0..1.0, "verdict": "PASS|FAIL|WARN", "confidence": 0.0..1.0, '
@@ -594,6 +600,13 @@ _KB_JUDGE_COMMON_TAIL = (
     "  context but worded differently from ``expected_answer`` is PASS, not FAIL.\n"
     "- Absence equality: when both expected and actual say 'not specified' /\n"
     "  'N/A' / 'unknown', that's PASS.\n"
+    "- Expected-answer conflict: if the actual answer contradicts the expected\n"
+    "  answer BUT the contradicting claim is directly supported by the retrieved\n"
+    "  context (e.g. its quoted text appears in the context), the expected\n"
+    "  answer is suspect — not the actual answer. Return WARN, do NOT list the\n"
+    "  grounded claim in hallucinated_facts, and start reasoning with\n"
+    "  'expected-answer conflict:'. Hallucination means unsupported by the\n"
+    "  context, never merely 'disagrees with the expected answer'.\n"
     "- Verdict mapping: score >= 0.7 -> PASS, 0.4..0.7 -> WARN, < 0.4 -> FAIL.\n"
     "- Reasoning must cite the specific discrepancy or agreement, not restate\n"
     "  the values. ≤ 40 words.\n"
@@ -667,14 +680,31 @@ _KB_JUDGE_PROMPTS: dict[str, str] = {
 }
 
 
-def _kb_judge_prompt_for_category(category: str | None) -> str:
-    """Pick the rubric for a KBTestQuery.category.
+# KBQuestionGenerator emits its own category vocabulary; without this map every
+# auto-generated question silently fell through to the factoid rubric — notably
+# "boundary" (negative/absence) questions, which have a dedicated rubric.
+_RUBRIC_ALIASES = {
+    "factual": "factoid",
+    "summary": "summarization",
+    "enumeration": "partial_coverage",
+    "boundary": "absence",
+}
+
+
+def _resolve_rubric_key(category: str | None) -> str:
+    """Normalise a KBTestQuery.category to a `_KB_JUDGE_PROMPTS` key.
 
     Unknown / missing categories fall back to ``factoid``, the most common
     shape. Unknown categories also include the legacy 'other' bucket used by
     ``_classify_discrimination``."""
     key = (category or "").strip().lower().replace("-", "_")
-    return (_KB_JUDGE_PROMPTS.get(key) or _KB_JUDGE_PROMPTS["factoid"]) + _KB_JUDGE_COMMON_TAIL
+    key = _RUBRIC_ALIASES.get(key, key)
+    return key if key in _KB_JUDGE_PROMPTS else "factoid"
+
+
+def _kb_judge_prompt_for_category(category: str | None) -> str:
+    """Pick the rubric for a KBTestQuery.category."""
+    return _KB_JUDGE_PROMPTS[_resolve_rubric_key(category)] + _KB_JUDGE_COMMON_TAIL
 
 
 # Back-compat: callers and tests importing ``KB_JUDGE_SYSTEM_PROMPT`` get the
@@ -749,7 +779,7 @@ async def _judge_answer(
     # Lazy import to keep module import cheap.
     from app.services.workflow_validator import _extract_json
 
-    rubric_key = (category or "").strip().lower().replace("-", "_") or "factoid"
+    rubric_key = _resolve_rubric_key(category)
     agent = _get_or_build_agent(
         f"kb_judge:{rubric_key}",
         model_name,
@@ -763,8 +793,12 @@ async def _judge_answer(
         f"Actual answer:\n{actual_answer if actual_answer else '(empty)'}",
     ]
     if retrieved_context:
-        # Truncate so the judge prompt stays manageable.
-        parts.append(f"Retrieved context excerpt:\n{retrieved_context[:4000]}")
+        # Truncate so the judge prompt stays manageable — but generously: if
+        # the chunk that grounds the answer falls past the cut, the judge
+        # cannot distinguish a grounded claim from a hallucination.
+        parts.append(
+            f"Retrieved context excerpt:\n{retrieved_context[:_JUDGE_CONTEXT_MAX_CHARS]}"
+        )
     user_prompt = "\n\n".join(parts)
 
     try:

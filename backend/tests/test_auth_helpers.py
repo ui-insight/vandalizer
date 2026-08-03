@@ -3,7 +3,7 @@
 from fastapi import Response
 
 from app.config import Settings
-from app.routers.auth import _get_azure_provider, _set_tokens
+from app.routers.auth import _get_azure_provider, _get_saml_provider, _set_tokens
 
 
 def _make_mock_user():
@@ -11,6 +11,7 @@ def _make_mock_user():
 
     class FakeUser:
         user_id = "test-user-123"
+        token_version = 0
 
     return FakeUser()
 
@@ -29,10 +30,38 @@ class TestSetTokensCookieSecurity:
         for header in self._get_cookie_headers(response):
             assert "httponly" in header.lower()
 
-    def test_secure_flag_in_production(self):
+    def test_secure_flag_in_https_production(self):
         settings = Settings(
             jwt_secret_key="real-secret",
             environment="production",
+            frontend_url="https://vandalizer.example.edu",
+        )
+        response = Response()
+        _set_tokens(response, _make_mock_user(), settings)
+
+        for header in self._get_cookie_headers(response):
+            assert "secure" in header.lower()
+
+    def test_no_secure_flag_in_http_production(self):
+        """Production served over plain HTTP (air-gapped box, no TLS): the
+        browser would drop Secure cookies entirely, so the flag must be off."""
+        settings = Settings(
+            jwt_secret_key="real-secret",
+            environment="production",
+            frontend_url="http://localhost",
+        )
+        response = Response()
+        _set_tokens(response, _make_mock_user(), settings)
+
+        for header in self._get_cookie_headers(response):
+            assert "secure" not in header.lower()
+
+    def test_cookie_secure_override_forces_flag_on(self):
+        settings = Settings(
+            jwt_secret_key="real-secret",
+            environment="production",
+            frontend_url="http://localhost",
+            cookie_secure=True,
         )
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
@@ -170,3 +199,48 @@ class TestGetAzureProvider:
         result = _get_azure_provider(cfg)
         assert result is not None
         assert result["client_id"] == "az-id"
+
+
+class TestGetSamlProvider:
+    """_get_saml_provider returns an enabled SAML provider only when the IdP
+    metadata (entity id, SSO URL, x509 cert) is present."""
+
+    def _make_config(self, providers: list[dict]):
+        class FakeConfig:
+            oauth_providers = providers
+        return FakeConfig()
+
+    _FULL = {
+        "provider": "saml",
+        "enabled": True,
+        "idp_entity_id": "https://idp.example.edu/idp/shibboleth",
+        "idp_sso_url": "https://idp.example.edu/idp/profile/SAML2/Redirect/SSO",
+        "idp_x509_cert": "MIIC...cert...",
+    }
+
+    def test_no_providers_returns_none(self):
+        assert _get_saml_provider(self._make_config([])) is None
+
+    def test_disabled_provider_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "enabled": False}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_missing_sso_url_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "idp_sso_url": ""}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_missing_cert_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "idp_x509_cert": ""}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_fully_configured_returns_provider(self):
+        cfg = self._make_config([dict(self._FULL)])
+        result = _get_saml_provider(cfg)
+        assert result is not None
+        assert result["idp_entity_id"] == self._FULL["idp_entity_id"]
+
+    def test_oauth_provider_ignored(self):
+        cfg = self._make_config([
+            {"provider": "azure", "enabled": True, "client_id": "id", "client_secret": "s", "tenant_id": "t"},
+        ])
+        assert _get_saml_provider(cfg) is None

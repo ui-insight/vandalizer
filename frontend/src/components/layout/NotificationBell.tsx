@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, CheckCheck, Headphones, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2 } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, Timer, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
 import { relativeTime } from '../../utils/time'
 import { openSupportPanel } from '../../utils/supportPanel'
 
+const FAILURE_RED = '#dc2626'
+
 const kindIcons: Record<string, typeof ShieldCheck> = {
+  verification_submitted: Inbox,
   verification_approved: ShieldCheck,
   verification_rejected: ShieldX,
   verification_returned: RotateCcw,
@@ -16,9 +19,14 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   support_reply: MessageSquare,
   support_status: Headphones,
   team_share: Share2,
+  workflow_failed: XOctagon,
+  extraction_failed: AlertTriangle,
+  document_failed: FileX,
+  automation_failed: Timer,
 }
 
 const kindColors: Record<string, string> = {
+  verification_submitted: '#f1b300',
   verification_approved: '#15803d',
   verification_rejected: '#dc2626',
   verification_returned: '#d97706',
@@ -28,6 +36,10 @@ const kindColors: Record<string, string> = {
   support_reply: '#2563eb',
   support_status: '#059669',
   team_share: '#f1b300',
+  workflow_failed: FAILURE_RED,
+  extraction_failed: FAILURE_RED,
+  document_failed: FAILURE_RED,
+  automation_failed: FAILURE_RED,
 }
 
 const SUPPORT_KINDS = new Set([
@@ -41,6 +53,25 @@ function extractTicketUuid(link: string | null): string | undefined {
   if (!link) return undefined
   const match = link.match(/ticket=([a-f0-9]+)/)
   return match?.[1]
+}
+
+/**
+ * Split a stored link into the pathname and search object the router expects.
+ *
+ * Failure notifications deep-link into the workspace via query params
+ * (`/?workflow=<id>`, `/?mode=automations&automation=<id>`), and passing the
+ * whole string as `to` leaves the params on the floor.
+ */
+export function parseNotificationLink(link: string): {
+  to: string
+  search: Record<string, string>
+} {
+  const [path, query] = link.split('?')
+  const search: Record<string, string> = {}
+  if (query) {
+    for (const [key, value] of new URLSearchParams(query)) search[key] = value
+  }
+  return { to: path || '/', search }
 }
 
 export function NotificationBell() {
@@ -105,7 +136,8 @@ export function NotificationBell() {
     }
 
     if (n.link) {
-      navigate({ to: n.link })
+      const { to, search } = parseNotificationLink(n.link)
+      navigate({ to, search })
       setOpen(false)
     }
   }
@@ -152,15 +184,16 @@ export function NotificationBell() {
               </div>
             ) : (
               notifications.map(n => {
-                const Icon = kindIcons[n.kind] || Bell
-                const color = kindColors[n.kind] || '#6b7280'
+                const isFailure = n.severity === 'error'
+                const Icon = kindIcons[n.kind] || (isFailure ? AlertTriangle : Bell)
+                const color = kindColors[n.kind] || (isFailure ? FAILURE_RED : '#6b7280')
                 return (
                   <button
                     key={n.uuid}
                     onClick={() => handleMarkRead(n)}
                     className={`w-full text-left flex items-start gap-3 px-4 py-3 hover:bg-gray-50 transition-colors border-b border-gray-50 ${
                       n.read ? 'opacity-60' : ''
-                    }`}
+                    } ${isFailure && !n.read ? 'bg-red-50/60' : ''}`}
                   >
                     <Icon className="h-4 w-4 shrink-0 mt-0.5" style={{ color }} />
                     <div className="min-w-0 flex-1">
@@ -170,12 +203,21 @@ export function NotificationBell() {
                       {n.body && (
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
                       )}
-                      {n.created_at && (
-                        <p className="text-xs text-gray-500 mt-1">{relativeTime(n.created_at)}</p>
-                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        {n.created_at && relativeTime(n.created_at)}
+                        {n.occurrences > 1 && (
+                          <span className="ml-1 text-gray-400">
+                            {n.created_at && '· '}
+                            {`${n.occurrences} occurrences`}
+                          </span>
+                        )}
+                      </p>
                     </div>
                     {!n.read && (
-                      <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
+                      <span
+                        className="h-2 w-2 rounded-full shrink-0 mt-1.5"
+                        style={{ backgroundColor: isFailure ? FAILURE_RED : '#3b82f6' }}
+                      />
                     )}
                   </button>
                 )

@@ -262,6 +262,21 @@ def _remove_images_from_markdown(markdown_text: str) -> str:
     return text.strip()
 
 
+def _notify_document_processing_failed(db, document_uuid: str, message: str) -> None:
+    """Tell the uploader their document never became readable.
+
+    Both callers swallow the exception and return "" rather than re-raising, so
+    the document simply sits in the file list with an error state nobody is told
+    about — the bell is the only signal the uploader gets.
+    """
+    from app.services.failure_notifications import notify_document_failed
+
+    doc = db.smart_document.find_one(
+        {"uuid": document_uuid}, {"uuid": 1, "title": 1, "user_id": 1},
+    )
+    notify_document_failed(db, doc=doc, error=message)
+
+
 @celery_app.task(
     bind=True,
     name="tasks.document.extraction",
@@ -358,9 +373,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         "task_status": "error",
                         "error_message": (
                             "We couldn't extract any text from this document. "
-                            "It may be image-only, encrypted, or our OCR service "
-                            "may be temporarily unavailable. Try retrying — if "
-                            "it keeps failing, re-upload or contact support."
+                            "It may be blank, image-only, or encrypted, or our "
+                            "OCR service may be temporarily unavailable. Try "
+                            "retrying — if it keeps failing, re-upload or "
+                            "contact support."
                         ),
                     }
                 },
@@ -391,6 +407,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             "Source file missing for document %s — skipping extraction: %s",
             document_uuid, e,
         )
+        message = (
+            "The uploaded file is no longer available "
+            "(it may have been deleted during processing)."
+        )
         db.smart_document.update_one(
             {"uuid": document_uuid},
             {
@@ -398,17 +418,16 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": "",
                     "processing": False,
                     "task_status": "error",
-                    "error_message": (
-                        "The uploaded file is no longer available "
-                        "(it may have been deleted during processing)."
-                    ),
+                    "error_message": message,
                 }
             },
         )
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
     except Exception as e:
         logger.exception("Error extracting text from document %s", document_uuid)
+        message = f"Text extraction failed: {str(e)[:300]}"
         db.smart_document.update_one(
             {"uuid": document_uuid},
             {
@@ -416,10 +435,11 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": "",
                     "processing": False,
                     "task_status": "error",
-                    "error_message": f"Text extraction failed: {str(e)[:300]}",
+                    "error_message": message,
                 }
             },
         )
+        _notify_document_processing_failed(db, document_uuid, message)
         return ""
 
 
@@ -589,6 +609,14 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
                 _run_automation_extraction(db, auto, action_id, doc)
             except Exception as e:
                 logger.error("Extraction automation '%s' failed: %s", auto.get("name"), e)
+                from app.services.failure_notifications import notify_automation_failed
+
+                notify_automation_failed(
+                    db,
+                    automation=auto,
+                    error=e,
+                    detail=f'Extraction on "{doc.get("title") or "a document"}" failed.',
+                )
 
         else:
             logger.info("Skipping automation %s: unsupported action_type '%s'", auto.get("name"), action_type)

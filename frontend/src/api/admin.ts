@@ -170,9 +170,17 @@ export interface UserLeaderboardItem {
   last_active: string | null
 }
 
-export function getUserLeaderboard(days?: number) {
-  const url = days ? `/api/admin/users?days=${days}` : '/api/admin/users'
-  return apiFetch<UserLeaderboardItem[]>(url)
+export interface UserLeaderboardResponse {
+  items: UserLeaderboardItem[]
+  total: number
+  capped: boolean
+}
+
+export function getUserLeaderboard(days?: number, limit: number = 500) {
+  const params = new URLSearchParams()
+  if (days) params.set('days', String(days))
+  params.set('limit', String(limit))
+  return apiFetch<UserLeaderboardResponse>(`/api/admin/users?${params.toString()}`)
 }
 
 // Teams
@@ -188,9 +196,17 @@ export interface TeamLeaderboardItem {
   avg_latency_ms: number | null
 }
 
-export function getTeamLeaderboard(days?: number) {
-  const url = days ? `/api/admin/teams?days=${days}` : '/api/admin/teams'
-  return apiFetch<TeamLeaderboardItem[]>(url)
+export interface TeamLeaderboardResponse {
+  items: TeamLeaderboardItem[]
+  total: number
+  capped: boolean
+}
+
+export function getTeamLeaderboard(days?: number, limit: number = 500) {
+  const params = new URLSearchParams()
+  if (days) params.set('days', String(days))
+  params.set('limit', String(limit))
+  return apiFetch<TeamLeaderboardResponse>(`/api/admin/teams?${params.toString()}`)
 }
 
 // Team Detail
@@ -340,7 +356,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number }[]
+  available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null }[]
   default_model: string
   ocr_endpoint: string
   ocr_api_key: string
@@ -382,14 +398,26 @@ export interface AdminTeamItem {
   is_default: boolean
 }
 
+export interface AdminTeamListResponse {
+  items: AdminTeamItem[]
+  total: number
+  capped: boolean
+}
+
 export interface IsolatedUserItem {
   user_id: string
   name: string | null
   email: string | null
 }
 
-export function adminListAllTeams() {
-  return apiFetch<AdminTeamItem[]>('/api/admin/teams/all')
+export interface IsolatedUsersResponse {
+  items: IsolatedUserItem[]
+  total: number
+  capped: boolean
+}
+
+export function adminListAllTeams(limit: number = 500) {
+  return apiFetch<AdminTeamListResponse>(`/api/admin/teams/all?limit=${limit}`)
 }
 
 export function adminCreateTeam(name: string) {
@@ -407,8 +435,8 @@ export function adminRemoveUserFromTeam(teamUuid: string, userId: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/teams/${teamUuid}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
 }
 
-export function getIsolatedUsers() {
-  return apiFetch<IsolatedUserItem[]>('/api/admin/users/isolated')
+export function getIsolatedUsers(limit: number = 500) {
+  return apiFetch<IsolatedUsersResponse>(`/api/admin/users/isolated?limit=${limit}`)
 }
 
 export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean }) {
@@ -435,17 +463,19 @@ export type ModelFormData = {
   multimodal?: boolean
   supports_pdf?: boolean
   context_window?: number
+  request_timeout_seconds?: number | null
+  response_reserve_tokens?: number | null
 }
 
 export function addModel(data: ModelFormData) {
-  return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
+  return apiFetch<{ status: string; models: SystemConfigData['available_models']; default_model?: string }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateModel(index: number, data: ModelFormData) {
-  return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${index}`, {
+export function updateModel(modelId: string, data: ModelFormData) {
+  return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${encodeURIComponent(modelId)}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   })
@@ -463,7 +493,7 @@ export function probeModel(data: {
   endpoint?: string
   api_protocol?: string
   api_key?: string
-  existing_model_index?: number | null
+  existing_model_id?: string | null
 }) {
   return apiFetch<ProbeModelResult>('/api/admin/config/probe-model', {
     method: 'POST',
@@ -471,8 +501,8 @@ export function probeModel(data: {
   })
 }
 
-export function deleteModel(index: number) {
-  return apiFetch<{ status: string; default_model?: string }>(`/api/admin/config/models/${index}`, { method: 'DELETE' })
+export function deleteModel(modelId: string) {
+  return apiFetch<{ status: string; default_model?: string }>(`/api/admin/config/models/${encodeURIComponent(modelId)}`, { method: 'DELETE' })
 }
 
 export function setDefaultModel(name: string) {
@@ -484,8 +514,11 @@ export function setDefaultModel(name: string) {
 
 // Test connectivity
 
-export function testOcr() {
-  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', { method: 'POST' })
+export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string }) {
+  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 export function testWebSearch() {
@@ -516,8 +549,8 @@ export type ModelTestResult = {
   summary: string
 }
 
-export function testModel(index: number) {
-  return apiFetch<ModelTestResult>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
+export function testModel(modelId: string) {
+  return apiFetch<ModelTestResult>(`/api/admin/config/test-model/${encodeURIComponent(modelId)}`, { method: 'POST' })
 }
 
 // System readiness — the admin setup checklist
@@ -568,16 +601,27 @@ export function addOAuthProvider(data: Record<string, string>) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/providers', { method: 'POST', body: JSON.stringify(data) })
 }
 
-export function updateOAuthProvider(index: number, data: Record<string, string>) {
-  return apiFetch<{ status: string }>(`/api/admin/config/auth/providers/${index}`, { method: 'PUT', body: JSON.stringify(data) })
+export function updateOAuthProvider(providerId: string, data: Record<string, string>) {
+  return apiFetch<{ status: string }>(`/api/admin/config/auth/providers/${encodeURIComponent(providerId)}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 
-export function deleteOAuthProvider(index: number) {
-  return apiFetch<{ status: string }>(`/api/admin/config/auth/providers/${index}`, { method: 'DELETE' })
+export function deleteOAuthProvider(providerId: string) {
+  return apiFetch<{ status: string }>(`/api/admin/config/auth/providers/${encodeURIComponent(providerId)}`, { method: 'DELETE' })
 }
 
 export function updateAuthMethods(methods: string[]) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/methods', { method: 'PUT', body: JSON.stringify({ methods }) })
+}
+
+export interface SamlIdpFields {
+  idp_entity_id: string
+  idp_sso_url: string
+  idp_x509_cert: string
+}
+
+/** Parse an IdP's SAML metadata (from a URL or pasted XML) into the SAML fields. */
+export function parseSamlMetadata(data: { metadata_url?: string; metadata_xml?: string }) {
+  return apiFetch<SamlIdpFields>('/api/admin/config/auth/saml/parse-metadata', { method: 'POST', body: JSON.stringify(data) })
 }
 
 // Quality
@@ -788,8 +832,14 @@ export interface CertificationProgressDetail extends CertificationProgressItem {
   }>
 }
 
-export function getCertificationProgressList() {
-  return apiFetch<CertificationProgressItem[]>('/api/admin/certifications')
+export interface CertificationProgressListResponse {
+  items: CertificationProgressItem[]
+  total: number
+  capped: boolean
+}
+
+export function getCertificationProgressList(limit: number = 500) {
+  return apiFetch<CertificationProgressListResponse>(`/api/admin/certifications?limit=${limit}`)
 }
 
 export function getCertificationProgressDetail(userId: string) {
@@ -974,4 +1024,77 @@ export function getAdminKnowledgeBases(params?: { search?: string; limit?: numbe
   if (params?.limit) qs.set('limit', String(params.limit))
   const q = qs.toString()
   return apiFetch<AdminKBListResponse>(`/api/admin/knowledge-bases${q ? `?${q}` : ''}`)
+}
+
+// ──────────────────────────────────────────
+// Optimizer activity (read-only operator view over all three optimizers)
+// ──────────────────────────────────────────
+
+export interface OptimizerActivityRun {
+  surface: 'kb' | 'extraction' | 'workflow'
+  run_uuid: string
+  item_id: string
+  /** Null when the tuned item has since been deleted. */
+  item_name: string | null
+  item_deleted: boolean
+  user_id: string | null
+  user_email: string | null
+  status: string
+  /** Null for user-launched runs; a signal name for auto-triggered ones. */
+  trigger: string | null
+  trigger_detail: Record<string, unknown>
+  started_at: string | null
+  completed_at: string | null
+  baseline_score: number | null
+  optimized_score: number | null
+  tied_with_baseline: boolean
+  tokens_used: number
+  token_budget: number
+  actual_cost_usd: number | null
+  stopped_reason: string | null
+  error_message: string | null
+  error_code: string | null
+  phase: string | null
+  progress_message: string | null
+  is_live: boolean
+  dismissed_at: string | null
+}
+
+export interface OptimizerActivitySummary {
+  window_days: number
+  total: number
+  by_status: Record<string, number>
+  by_surface: Record<string, number>
+  auto_triggered: number
+  user_launched: number
+  failed: number
+  applied: number
+  dismissed: number
+  pending_review: number
+  tokens_used: number
+  failure_reasons: { reason: string; count: number }[]
+  /** True when a per-surface fetch hit the limit, so counts are a floor. */
+  truncated: boolean
+}
+
+export interface OptimizerActivityResponse {
+  runs: OptimizerActivityRun[]
+  summary: OptimizerActivitySummary
+}
+
+export function getOptimizerActivity(params?: {
+  days?: number
+  surface?: string
+  status?: string
+  trigger?: 'auto' | 'user'
+  limit?: number
+}) {
+  const qs = new URLSearchParams()
+  if (params?.days) qs.set('days', String(params.days))
+  if (params?.surface) qs.set('surface', params.surface)
+  if (params?.status) qs.set('status', params.status)
+  if (params?.trigger) qs.set('trigger', params.trigger)
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const q = qs.toString()
+  return apiFetch<OptimizerActivityResponse>(`/api/admin/optimizer/activity${q ? `?${q}` : ''}`)
 }

@@ -52,6 +52,25 @@ async def _auto_join_default_team(user: User, *, set_current: bool = True) -> No
             await user.save()
 
 
+async def _audit_email_sync(user: User, new_email: str, *, provider: str) -> None:
+    """Record that an SSO login overwrote a diverged email with the IdP's value,
+    so the audit trail explains any earlier user.email_changed entry that no
+    longer matches the account."""
+    from app.services import audit_service
+
+    await audit_service.log_event(
+        action="user.email_synced_from_provider",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+        detail={
+            "old_email": user.email,
+            "new_email": new_email,
+            "provider": provider,
+        },
+    )
+
+
 # Reason codes returned by authenticate_with_reason on failure. These are
 # consumed by the login route to produce a helpful error message.
 AUTH_REASON_UNKNOWN_USER = "unknown_user"
@@ -124,7 +143,11 @@ async def resolve_oauth_user(
             user.name = display_name
             changed = True
         if email and user.email != email:
+            await _audit_email_sync(user, email, provider="oauth")
             user.email = email
+            changed = True
+        if user.sso_provider != "oauth":
+            user.sso_provider = "oauth"
             changed = True
         if changed:
             await user.save()
@@ -142,6 +165,7 @@ async def resolve_oauth_user(
         email=email or uid,
         password_hash=None,
         name=display_name or uid,
+        sso_provider="oauth",
     )
     await user.insert()
 
@@ -193,7 +217,11 @@ async def resolve_saml_user(
             user.name = display_name
             changed = True
         if email and user.email != email:
+            await _audit_email_sync(user, email, provider="saml")
             user.email = email
+            changed = True
+        if user.sso_provider != "saml":
+            user.sso_provider = "saml"
             changed = True
         # Auto-map org from department if not already set
         if department and not user.organization_id:
@@ -217,6 +245,7 @@ async def resolve_saml_user(
         email=email or uid,
         password_hash=None,
         name=display_name or uid,
+        sso_provider="saml",
     )
 
     # Auto-map organization from department

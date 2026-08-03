@@ -4,7 +4,9 @@ export interface KnowledgeBase {
   uuid: string
   title: string
   description: string
-  status: 'empty' | 'building' | 'ready' | 'error'
+  // 'unavailable' appears only on reference rows whose source KB no longer
+  // resolves (deleted, retired from the catalog, or no longer shared).
+  status: 'empty' | 'building' | 'ready' | 'error' | 'unavailable'
   shared_with_team: boolean
   team_owned: boolean
   verified: boolean
@@ -23,6 +25,10 @@ export interface KnowledgeBase {
   is_reference?: boolean
   source_kb_uuid?: string
   reference_uuid?: string
+  // Whether the current user may run manage-level actions (add sources, rename,
+  // share, delete). False for e.g. an adopted verified catalog KB the user
+  // doesn't own. Treat a missing value as true — read it as `can_manage !== false`.
+  can_manage?: boolean
   // Set by KB Autovalidate's apply path
   has_optimized_config?: boolean
   optimized_config_set_at?: string | null
@@ -31,6 +37,8 @@ export interface KnowledgeBase {
   last_validation_baseline_score?: number | null
   last_validation_lift?: number | null
   last_validated_at?: string | null
+  // Per-requesting-user: when this user last chatted with the KB (ISO string).
+  last_used_at?: string | null
 }
 
 export interface KnowledgeBaseSource {
@@ -45,6 +53,9 @@ export interface KnowledgeBaseSource {
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string
   chunk_count: number
+  // URL source whose extracted text was cut off at the fetcher size cap:
+  // "ready" but incomplete, so the UI warns instead of showing a clean check.
+  truncated?: boolean
   created_at: string
 }
 
@@ -54,6 +65,8 @@ export interface KnowledgeBaseSourceDetail extends KnowledgeBaseSource {
   max_crawl_pages: number
   parent_source_uuid?: string | null
   crawled_urls?: string[] | null
+  // Navigation pages the crawl followed for their links but did not embed.
+  skipped_urls?: string[] | null
   child_sources: KnowledgeBaseSource[]
   processed_at?: string | null
 }

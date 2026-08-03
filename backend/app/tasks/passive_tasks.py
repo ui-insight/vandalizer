@@ -18,6 +18,16 @@ from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 logger = logging.getLogger(__name__)
 
 
+def _find_automation(db, automation_id: str | None) -> dict | None:
+    """Look up an automation by its stringified ObjectId, tolerating junk ids."""
+    if not automation_id:
+        return None
+    try:
+        return db.automation.find_one({"_id": ObjectId(automation_id)})
+    except Exception:
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Beat task: process pending triggers (every 60s)
 # ---------------------------------------------------------------------------
@@ -190,6 +200,19 @@ def process_pending_triggers(self) -> dict:
                 {"_id": event["_id"]},
                 {"$set": {"status": "failed", "error": f"Processing error: {e}"}},
             )
+            # The event never reached execution, so no run exists to carry the
+            # failure — notify the automation owner directly.
+            from app.services.failure_notifications import notify_automation_failed
+
+            ctx = event.get("trigger_context") or {}
+            automation_doc = _find_automation(db, ctx.get("automation_id"))
+            if automation_doc:
+                notify_automation_failed(
+                    db,
+                    automation=automation_doc,
+                    error=e,
+                    detail="The trigger could not be processed.",
+                )
 
     return {"processed": processed, "timestamp": now.isoformat()}
 
@@ -338,6 +361,17 @@ def process_scheduled_automations(self) -> dict:
                 "Error processing scheduled automation %s: %s",
                 auto.get("name"), e,
             )
+            # A schedule that can't even be evaluated (bad cron expression,
+            # deleted action, unreadable trigger config) never produces a run,
+            # so this is the only place the owner can be told.
+            from app.services.failure_notifications import notify_automation_failed
+
+            notify_automation_failed(
+                db,
+                automation=auto,
+                error=e,
+                detail="The schedule could not be evaluated.",
+            )
 
     return {"processed": processed, "timestamp": now.isoformat()}
 
@@ -370,6 +404,9 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
 
     now = datetime.now(timezone.utc)
     sys_config = db.system_config.find_one() or {}
+    # Bound before the try so the failure handler can reference it even when the
+    # run dies before the result document is created.
+    result_id = None
 
     try:
         # Mark running
@@ -521,23 +558,39 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         }
 
     except Exception as e:
+        from app.services.workflow_engine import WorkflowStepError
+
         logger.error("Passive execution failed for event %s: %s", event.get("uuid"), e)
+
+        # Mark the run's WorkflowResult failed too (when it got created) so it
+        # doesn't sit in "running" forever in the run history.
+        if result_id is not None:
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": str(e)}},
+            )
 
         completed_at = datetime.now(timezone.utc)
         started_at = event.get("started_at") or now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000) if started_at else 0
 
         doc_ids = event.get("documents", [])
+        failure_update = {
+            "status": "failed",
+            "completed_at": completed_at,
+            "duration_ms": duration_ms,
+            "error": str(e),
+            "documents_succeeded": 0,
+            "documents_failed": len(doc_ids),
+        }
+        # Link the run to its trigger event on failure too. Only the success
+        # path used to do this, so process_outputs could not walk back to the
+        # automation that produced a failed run and would resolve the wrong
+        # output_config (or none) when several automations share a workflow.
+        if result_id is not None:
+            failure_update["workflow_result"] = result_id
         db.workflow_trigger_event.update_one(
-            {"_id": event["_id"]},
-            {"$set": {
-                "status": "failed",
-                "completed_at": completed_at,
-                "duration_ms": duration_ms,
-                "error": str(e),
-                "documents_succeeded": 0,
-                "documents_failed": len(doc_ids),
-            }},
+            {"_id": event["_id"]}, {"$set": failure_update},
         )
 
         # Update workflow failure stats
@@ -550,12 +603,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             }},
         )
 
-        # Check retry
+        # Check retry. A WorkflowStepError is a deterministic failure (blocked
+        # URL, bad config, HTTP error the step itself reported) — re-running
+        # cannot succeed and each attempt would mint another failed
+        # WorkflowResult, so it skips straight to the failure callback.
         retry_cfg = (workflow.get("resource_config") or {}).get("retry", {})
         max_retries = retry_cfg.get("max_retries", 3)
         attempt = event.get("attempt_number", 1)
 
-        if attempt < max_retries:
+        if not isinstance(e, WorkflowStepError) and attempt < max_retries:
             retry_delay = retry_cfg.get("retry_delay_seconds", 300)
             next_retry = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
             db.workflow_trigger_event.update_one(
@@ -569,8 +625,42 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             )
             return {"status": "retry_scheduled", "attempt": attempt + 1}
 
-        # Retries exhausted — deliver failure callback if configured
+        # Retries exhausted. Record the failure on the run itself — until now a
+        # passive run that died left its WorkflowResult stuck in "running"
+        # forever, so even someone who went looking saw no failure.
         ctx = event.get("trigger_context") or {}
+        if result_id is not None:
+            db.workflow_result.update_one(
+                {"_id": result_id},
+                {"$set": {"status": "error", "error": str(e)}},
+            )
+
+        # Tell the owner. An automation firing on a schedule has no one watching
+        # it — without this it can fail every night for weeks in silence. The
+        # automation's owner is the right recipient when one exists: they are
+        # the person who set the schedule, and need not own the workflow.
+        from app.services.failure_notifications import notify_workflow_failed
+
+        automation_doc = _find_automation(db, ctx.get("automation_id"))
+        notify_workflow_failed(
+            db,
+            workflow_doc=workflow,
+            error=e,
+            user_id=(automation_doc or {}).get("user_id"),
+            automation_name=(
+                ctx.get("automation_name")
+                or (automation_doc or {}).get("name")
+                or None
+            ),
+        )
+
+        # Run the automation's own opt-in notification outputs (email/Teams).
+        # These were previously unreachable on failure: process_outputs was only
+        # dispatched from the success path.
+        if result_id is not None:
+            process_outputs.delay(str(result_id))
+
+        # Deliver failure callback if configured
         cb_url = ctx.get("callback_url")
         if cb_url:
             fail_now = datetime.now(timezone.utc)
@@ -608,7 +698,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     default_retry_delay=10,
 )
 def process_outputs(self, workflow_result_id: str) -> dict:
-    """Process output configuration after workflow completes."""
+    """Process output configuration after a workflow run finishes.
+
+    Dispatched for failed runs too, so a user who configured "notify me on
+    failure" actually hears about it. Anything that delivers a *result* —
+    storage, OneDrive, chained workflows — is gated on the run having succeeded;
+    there is no output worth writing or handing downstream otherwise.
+    """
     from app.services.output_handlers import (
         call_webhook,
         save_results_to_folder,
@@ -657,9 +753,13 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 
     outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
+    # Failed runs get notifications and webhooks (both carry the status) but no
+    # deliverables — see the docstring.
+    run_succeeded = result_doc.get("status") == "completed"
+
     # 1. Local storage
     storage_cfg = output_config.get("storage", {})
-    if storage_cfg.get("enabled"):
+    if run_succeeded and storage_cfg.get("enabled"):
         try:
             path = save_results_to_folder(result_doc, storage_cfg)
             outputs["storage"] = {"status": "completed", "path": path}
@@ -684,7 +784,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 
     # 2. OneDrive case folder
     onedrive_cfg = output_config.get("onedrive", {})
-    if onedrive_cfg.get("enabled"):
+    if run_succeeded and onedrive_cfg.get("enabled"):
         try:
             folder_path = save_results_to_onedrive_channel(result_doc, onedrive_cfg, work_item)
             outputs["onedrive"] = {"status": "completed", "path": folder_path}
@@ -748,8 +848,9 @@ def process_outputs(self, workflow_result_id: str) -> dict:
             wr = {"url": webhook_cfg.get("url"), "status": "failed", "error": str(e)}
             outputs["webhooks"].append(wr)
 
-    # 5. Chain triggers — dispatch to downstream workflows
-    for chain_cfg in output_config.get("chains", []):
+    # 5. Chain triggers — dispatch to downstream workflows. Never chain off a
+    # failed run: the downstream workflow would consume a result that isn't there.
+    for chain_cfg in (output_config.get("chains", []) if run_succeeded else []):
         target_workflow_id = chain_cfg.get("workflow_id")
         if not target_workflow_id:
             continue
@@ -861,6 +962,7 @@ def process_extraction_outputs(
     If *results* is None, runs the extraction first (used by schedule triggers).
     If *results* is provided, just processes outputs (used by API triggers).
     """
+    from app.services.failure_notifications import notify_automation_failed
     from app.services.output_handlers import (
         call_webhook,
         save_extraction_results_to_folder,
@@ -910,6 +1012,12 @@ def process_extraction_outputs(
                     {"$set": {"status": "failed", "error": "No extraction keys found",
                               "completed_at": datetime.now(timezone.utc)}},
                 )
+            notify_automation_failed(
+                db,
+                automation=auto,
+                error="The extraction set has no fields to extract.",
+                detail="The extraction could not run.",
+            )
             return {"error": "No extraction keys found"}
 
         field_metadata = [
@@ -963,18 +1071,37 @@ def process_extraction_outputs(
                 logger.error("Extraction failed for doc %s: %s", doc_uuid, e)
                 results.append({"document_id": doc_uuid, "error": str(e)})
 
+    # The run used to be reported as "completed" unconditionally, so an
+    # extraction automation that errored on every document still looked
+    # successful and never tripped a failure-conditioned notification. Treat
+    # "every document errored" (or produced nothing at all) as a failed run.
+    result_list = results if isinstance(results, list) else []
+    errored = [r for r in result_list if isinstance(r, dict) and r.get("error")]
+    run_failed = bool(errored) and len(errored) == len(result_list)
+    run_status = "failed" if run_failed else "completed"
+    run_error = errored[0].get("error") if run_failed else None
+
+    if run_failed:
+        notify_automation_failed(
+            db,
+            automation=auto,
+            error=run_error,
+            detail="Extraction failed on every input document.",
+        )
+
     output_config = auto.get("output_config") or {}
     if not output_config:
         if extraction_event_id:
             db.extraction_trigger_event.update_one(
                 {"_id": ObjectId(extraction_event_id)},
                 {"$set": {
-                    "status": "completed",
+                    "status": run_status,
+                    "error": run_error,
                     "result": results,
                     "completed_at": datetime.now(timezone.utc),
                 }},
             )
-        return {"status": "completed", "results": results}
+        return {"status": run_status, "results": results}
 
     automation_dict = {
         "name": auto.get("name"),
@@ -984,16 +1111,17 @@ def process_extraction_outputs(
     }
 
     result_doc = {
-        "status": "completed",
+        "status": run_status,
+        "error": run_error,
         "trigger_type": auto.get("trigger_type", "api"),
         "final_output": {"output": results},
     }
 
     outputs = {"storage": None, "notifications": [], "webhooks": []}
 
-    # Storage
+    # Storage — nothing worth writing when every document errored.
     storage_cfg = output_config.get("storage", {})
-    if storage_cfg.get("enabled"):
+    if not run_failed and storage_cfg.get("enabled"):
         try:
             path = save_extraction_results_to_folder(results, automation_dict, storage_cfg)
             outputs["storage"] = {"status": "completed", "path": path}
@@ -1029,14 +1157,15 @@ def process_extraction_outputs(
                 "error": str(e),
             })
 
-    # Persist results and mark extraction event as completed
+    # Persist results and close out the extraction event
     if extraction_event_id:
         now = datetime.now(timezone.utc)
         duration_ms = int((now - ext_started_at).total_seconds() * 1000) if ext_started_at else None
         db.extraction_trigger_event.update_one(
             {"_id": ObjectId(extraction_event_id)},
             {"$set": {
-                "status": "completed",
+                "status": run_status,
+                "error": run_error,
                 "result": results,
                 "completed_at": now,
                 "duration_ms": duration_ms,
@@ -1058,19 +1187,22 @@ def process_extraction_outputs(
                 trigger_event_id=extraction_event_id,
                 callback_url=cb_url,
                 payload={
-                    "event": "automation.completed",
+                    "event": (
+                        "automation.failed" if run_failed else "automation.completed"
+                    ),
                     "trigger_event_id": extraction_event_id,
                     "automation_id": automation_id,
                     "action_type": "extraction",
-                    "status": "completed",
+                    "status": run_status,
                     "output": results,
+                    "error": run_error,
                     "completed_at": now.isoformat(),
                     "timestamp": now.isoformat(),
                 },
                 user_id=user_id,
             )
 
-    return {"status": "completed", "outputs": outputs}
+    return {"status": run_status, "outputs": outputs}
 
 
 # ---------------------------------------------------------------------------

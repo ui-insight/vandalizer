@@ -392,7 +392,12 @@ def _cfg(tele):
 def test_banner_shows_for_fresh_unprompted_install():
     from app.routers.admin import _telemetry_status
 
-    s = _telemetry_status(_cfg({"decided": False, "enabled": False, "organization": ""}), Settings())
+    # Explicit "fresh install" settings — a bare Settings() reads the local
+    # .env, where TELEMETRY_PROMPTED=true would legitimately hide the banner.
+    s = _telemetry_status(
+        _cfg({"decided": False, "enabled": False, "organization": ""}),
+        Settings(telemetry_prompted=False, telemetry_enabled=False),
+    )
     assert s["show_banner"] is True
     assert s["effective_enabled"] is False
 

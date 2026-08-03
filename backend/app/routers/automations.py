@@ -24,7 +24,7 @@ from app.schemas.automations import (
     TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
-from app.services import access_control
+from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
 
@@ -451,6 +451,15 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
 async def delete_automation(automation_id: str, user: User = Depends(get_current_user)):
     auto, _ = await _load_authorized_automation(automation_id, user, manage=True)
     await auto.delete()
+    await audit_service.log_event(
+        action="automation.delete",
+        actor_user_id=user.user_id,
+        resource_type="automation",
+        resource_id=automation_id,
+        resource_name=auto.name,
+        team_id=auto.team_id,
+        detail={"trigger_type": auto.trigger_type, "action_type": auto.action_type},
+    )
     return {"ok": True}
 
 

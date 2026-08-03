@@ -29,6 +29,7 @@ def _make_user(user_id="user1"):
     user.is_examiner = False
     user.current_team = None
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     user.api_token_hash = None
     user.api_token_created_at = None
@@ -90,6 +91,9 @@ def _stub_run(*, uuid="opt-1", kb_uuid="kb-1", status="completed", best_config=N
     run.started_at = started_at or datetime.datetime.now(datetime.timezone.utc)
     run.completed_at = completed_at
     run.cancel_requested = False
+    # Explicit False — a bare MagicMock attribute is truthy, which would trip
+    # the tied-with-baseline apply gate in every apply test.
+    run.tied_with_baseline = False
     run.save = AsyncMock()
     return run
 
@@ -509,6 +513,59 @@ class TestListOptimizationHistory:
 
 
 class TestApplyOptimizationEdgeCases:
+    @pytest.mark.asyncio
+    async def test_apply_409s_when_tied_with_baseline(self, client):
+        """A statistically-tied winner can't be applied without force."""
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        kb = _stub_kb()
+        kb.save = AsyncMock()
+        run = _stub_run(status="completed", best_config={"k": 12})
+        run.tied_with_baseline = True
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=run)
+            resp = await client.post(
+                "/api/knowledge/kb-1/optimize/opt-1/apply",
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 409
+        assert resp.json()["detail"]["code"] == "tied_with_baseline"
+        kb.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_apply_force_overrides_tie_gate(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+        kb = _stub_kb()
+        kb.save = AsyncMock()
+        kb.rag_config_override = None
+        run = _stub_run(status="completed", best_config={"k": 12})
+        run.tied_with_baseline = True
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=run)
+            resp = await client.post(
+                "/api/knowledge/kb-1/optimize/opt-1/apply",
+                json={"force": True},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 200
+        assert kb.rag_config_override == {"k": 12}
+        kb.save.assert_awaited_once()
+
     @pytest.mark.asyncio
     async def test_apply_400s_when_no_best_config(self, client):
         user = _make_user("user1")

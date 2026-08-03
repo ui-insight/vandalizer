@@ -9,16 +9,28 @@ import re
 from typing import TYPE_CHECKING
 
 import httpx
+import pymongo
 from bs4 import BeautifulSoup
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from app.models.kb_suggestion import KBSuggestion
+    from app.services.web_fetcher import WebFetchResult
 
 from app.models.document import SmartDocument
-from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
+from app.models.knowledge import (
+    KnowledgeBase,
+    KnowledgeBaseReference,
+    KnowledgeBaseSource,
+    KnowledgeBaseUsage,
+)
 from app.models.user import User
-from app.services import access_control
+from app.services import access_control, audit_service, name_conflicts
 from app.services.document_manager import get_document_manager
+from app.utils.fetch_errors import describe_fetch_error
+from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +139,33 @@ async def list_knowledge_bases_flat(
     return kbs
 
 
+async def record_kb_usage(user_id: str, kb_uuid: str) -> None:
+    """Upsert the per-user usage record for a KB (last-used time + count).
+
+    ``kb_uuid`` must be the canonical KB uuid (references are resolved before
+    chat, so callers already hold the source KB).
+    """
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    await KnowledgeBaseUsage.get_motor_collection().update_one(
+        {"user_id": user_id, "kb_uuid": kb_uuid},
+        {"$set": {"last_used_at": now}, "$inc": {"use_count": 1}},
+        upsert=True,
+    )
+
+
+async def get_kb_usage_map(
+    user_id: str, kb_uuids: list[str],
+) -> dict[str, datetime.datetime]:
+    """Map canonical KB uuid → this user's last_used_at, for the given KBs."""
+    if not kb_uuids:
+        return {}
+    records = await KnowledgeBaseUsage.find(
+        KnowledgeBaseUsage.user_id == user_id,
+        {"kb_uuid": {"$in": kb_uuids}},
+    ).to_list()
+    return {r.kb_uuid: r.last_used_at for r in records}
+
+
 async def admin_list_all_knowledge_bases(
     search: str | None = None,
     limit: int = 1000,
@@ -152,6 +191,10 @@ async def create_knowledge_base(
     title: str, user_id: str, team_id: str | None = None,
     description: str | None = None, implicit: bool = False,
 ) -> KnowledgeBase:
+    # Implicit (project-owned) KBs never surface in KB lists, so their
+    # auto-generated titles are exempt from the uniqueness rule.
+    if not implicit:
+        await name_conflicts.ensure_kb_title_available(title[:300], user_id, team_id)
     kb = KnowledgeBase(
         title=title[:300],
         description=(description or "")[:5000] or None,
@@ -184,6 +227,114 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
     return await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
     ).sort(-KnowledgeBaseSource.created_at).to_list()
+
+
+KB_SOURCE_URL_UNIQUE_INDEX = "kb_uuid_url_unique"
+
+
+async def ensure_source_url_unique_index() -> None:
+    """Create the unique (knowledge_base_uuid, url) index that backs URL dedup.
+
+    URL dedup in ``add_urls`` / ``_crawl_from_source`` is check-then-insert,
+    so two concurrent ingest runs for the same KB could both pass the check
+    and ingest the same page twice (support ticket: a crawled document showed
+    up as two identical 378-chunk sources). The unique index makes the insert
+    itself the arbiter; ``_insert_source_unless_duplicate`` turns the loser's
+    error into a skip.
+
+    The index is managed here rather than in the model's ``Settings.indexes``
+    because building it over data that already contains duplicates fails —
+    Beanie would then crash every process at init. Instead the web app calls
+    this at startup: on a duplicate-key build failure it deletes the newer
+    copy of each duplicate pair (chunks included) and retries once.
+    """
+    collection = KnowledgeBaseSource.get_motor_collection()
+    index = pymongo.IndexModel(
+        [("knowledge_base_uuid", pymongo.ASCENDING), ("url", pymongo.ASCENDING)],
+        name=KB_SOURCE_URL_UNIQUE_INDEX,
+        unique=True,
+        # Document-type sources carry url=None; only real URL strings must be
+        # unique within a KB.
+        partialFilterExpression={"url": {"$type": "string"}},
+    )
+    try:
+        await collection.create_indexes([index])
+        return
+    except OperationFailure as e:
+        if e.code != 11000 and "E11000" not in str(e):
+            raise
+    removed = await _remove_duplicate_url_sources()
+    logger.warning(
+        "Removed %d duplicate KB URL source(s) left behind by the pre-index "
+        "ingest race; retrying unique index build",
+        removed,
+    )
+    await collection.create_indexes([index])
+
+
+async def _remove_duplicate_url_sources() -> int:
+    """Delete all but the oldest source of each duplicated (KB, url) pair.
+
+    Chunks are removed from ChromaDB per deleted source, so retrieval stops
+    double-counting the page, and affected KB stats are recalculated.
+    Returns the number of source rows deleted.
+    """
+    collection = KnowledgeBaseSource.get_motor_collection()
+    pipeline = [
+        {"$match": {"url": {"$type": "string"}}},
+        {"$group": {
+            "_id": {"kb": "$knowledge_base_uuid", "url": "$url"},
+            "count": {"$sum": 1},
+        }},
+        {"$match": {"count": {"$gt": 1}}},
+    ]
+    # Materialize the groups up front: the per-source ChromaDB deletions below
+    # can be slow, and holding an aggregation cursor open across them risks a
+    # cursor timeout.
+    groups = await collection.aggregate(pipeline).to_list(length=None)
+    removed = 0
+    affected_kbs: set[str] = set()
+    for group in groups:
+        kb_uuid = group["_id"]["kb"]
+        dupes = await KnowledgeBaseSource.find(
+            KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
+            KnowledgeBaseSource.url == group["_id"]["url"],
+        ).sort(+KnowledgeBaseSource.created_at).to_list()
+        for extra in dupes[1:]:
+            try:
+                dm = _get_dm()
+                await asyncio.to_thread(dm.delete_kb_source, kb_uuid, extra.uuid)
+            except Exception as e:
+                logger.error(
+                    f"Error deleting chunks of duplicate KB source {extra.uuid}: {e}",
+                )
+            await extra.delete()
+            removed += 1
+        affected_kbs.add(kb_uuid)
+    for kb_uuid in affected_kbs:
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+        if kb:
+            await recalculate_stats(kb)
+    return removed
+
+
+async def _insert_source_unless_duplicate(source: KnowledgeBaseSource) -> bool:
+    """Insert a source row; False if another writer beat us to this URL.
+
+    The ``find_one`` pre-checks at the call sites cover the sequential case;
+    the unique index behind this covers the concurrent one (two ingest runs
+    racing through the same URL list).
+    """
+    try:
+        await source.insert()
+    except DuplicateKeyError:
+        logger.info(
+            "Skipping KB source %s for KB %s — inserted concurrently by "
+            "another ingest run",
+            source.url, source.knowledge_base_uuid,
+        )
+        return False
+    return True
 
 
 async def resolve_document_titles(sources) -> dict[str, str]:
@@ -259,6 +410,10 @@ async def update_knowledge_base(
     if title is not None:
         t = title.strip()
         if t:
+            if t[:300] != kb.title:
+                await name_conflicts.ensure_kb_title_available(
+                    t[:300], kb.user_id, kb.team_id, exclude_uuid=kb.uuid,
+                )
             kb.title = t[:300]
     if description is not None:
         kb.description = description[:5000] or None
@@ -431,6 +586,19 @@ async def delete_knowledge_base(
         KnowledgeBaseReference.source_kb_uuid == kb.uuid,
     ).delete()
     await kb.delete()
+    await audit_service.log_event(
+        action="knowledge_base.delete",
+        actor_user_id=user.user_id,
+        resource_type="knowledge_base",
+        resource_id=kb.uuid,
+        resource_name=kb.title,
+        team_id=kb.team_id,
+        detail={
+            "shared_with_team": kb.shared_with_team,
+            "verified": kb.verified,
+            "total_sources": kb.total_sources,
+        },
+    )
     return True
 
 
@@ -529,19 +697,23 @@ async def add_urls(
             crawl_enabled=crawl_enabled,
             max_crawl_pages=max_crawl_pages,
         )
-        await source.insert()
+        if not await _insert_source_unless_duplicate(source):
+            continue
         added += 1
 
         # Ingest inline
-        parent_html = await _ingest_url_source(source, kb)
+        fetched = await _ingest_url_source(source, kb)
 
-        # Crawl child pages if enabled
-        if crawl_enabled and parent_html:
-            crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, parent_html)
+        # Crawl child pages if enabled (links from HTML <a href> or, for PDF
+        # URLs, from the PDF's embedded hyperlinks)
+        if crawl_enabled and fetched:
+            crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, fetched)
             added += crawled
 
-    if added:
-        await recalculate_stats(kb)
+    # Unconditional: the router set status="building" before dispatching this
+    # run, and a run that added nothing (every URL already present) must still
+    # restore the real status or the KB shows "building" forever.
+    await recalculate_stats(kb)
     return added
 
 
@@ -649,8 +821,19 @@ async def clone_knowledge_base(
     """
     team_id = str(user.current_team) if user.current_team else None
 
+    if new_title:
+        # User-chosen clone title: reject collisions like any typed name.
+        await name_conflicts.ensure_kb_title_available(new_title[:300], user.user_id, team_id)
+        clone_title = new_title[:300]
+    else:
+        clone_title = await name_conflicts.next_available_name(
+            f"{source_kb.title} (Clone)",
+            lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+            max_length=300,
+        )
+
     clone = KnowledgeBase(
-        title=(new_title or f"{source_kb.title} (Clone)")[:300],
+        title=clone_title,
         description=source_kb.description,
         tags=list(source_kb.tags or []),
         user_id=user.user_id,
@@ -670,7 +853,10 @@ async def clone_knowledge_base(
             custom_name=src.custom_name,
             content=src.content,  # Copy cached content for URLs
         )
-        await new_src.insert()
+        # A source KB that still carries pre-index duplicate URLs must not
+        # abort the whole clone — copy each URL once.
+        if not await _insert_source_unless_duplicate(new_src):
+            continue
 
         if src.source_type == "document":
             await _ingest_document_source(new_src, clone)
@@ -865,18 +1051,6 @@ async def resolve_reference(
 # --- Crawling ---
 
 
-def _normalize_crawl_url(url: str) -> str:
-    """Normalize a URL for deduplication: strip fragments, trailing slashes."""
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    path = parsed.path.rstrip("/") or "/"
-    clean = f"{parsed.scheme}://{parsed.netloc}{path}"
-    if parsed.query:
-        clean += f"?{parsed.query}"
-    return clean
-
-
 def _extract_links(html: str, base_url: str) -> list[str]:
     """Extract absolute HTTP(S) links from HTML."""
     from urllib.parse import urljoin, urlparse
@@ -899,48 +1073,90 @@ def _extract_links(html: str, base_url: str) -> list[str]:
     return links
 
 
+def _crawlable_links(fetched: WebFetchResult, base_url: str) -> list[str]:
+    """Outbound links from a fetched source, whatever its format.
+
+    HTML pages yield their <a href> links; PDF responses (raw_html is None)
+    yield the hyperlinks embedded in the PDF, normalized the same way so
+    dedup against visited/queued URLs works across both.
+    """
+    if fetched.raw_html:
+        return _extract_links(fetched.raw_html, base_url)
+    seen: set[str] = set()
+    links: list[str] = []
+    for uri in fetched.pdf_links or []:
+        normalized = _normalize_crawl_url(uri)
+        if normalized not in seen:
+            seen.add(normalized)
+            links.append(normalized)
+    return links
+
+
 async def _crawl_from_source(
     parent: KnowledgeBaseSource,
     kb: KnowledgeBase,
     max_pages: int,
     allowed_domains: str,
-    parent_html: str,
+    parent_fetched: WebFetchResult,
 ) -> int:
-    """BFS crawl from parent URL, creating child sources. Returns count added."""
-    from urllib.parse import urlparse
+    """BFS crawl from parent URL, creating child sources. Returns count added.
+
+    Only pages with real content become sources. Navigation pages (Home,
+    Topics, Agencies) are fetched and mined for links but never embedded, so
+    ``max_pages`` counts documents the user wanted rather than being spent on
+    site chrome — without anyone having to fill in Allowed domains.
+    """
+    from app.config import Settings
+    from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
+    from app.utils.page_quality import describe_low_value_page
 
     max_pages = max(1, min(max_pages, 50))
+    min_content_chars = Settings().kb_crawl_min_content_chars
+    # Skipped pages don't consume a page slot, so bound the total fetches too —
+    # otherwise a site that is nothing but navigation would crawl until it ran
+    # out of links. Mirrors the workflow CrawlerNode's budget.
+    max_fetches = max_pages * 5
+    fetches = 0
 
-    # Build allowed domain set
-    parent_domain = urlparse(parent.url).netloc.lower()
-    domain_set: set[str] = {parent_domain}
-    if allowed_domains:
-        for d in allowed_domains.split(","):
-            d = d.strip().lower()
-            if d:
-                domain_set.add(d)
+    # Explicit allowed-domains entries (which may carry path prefixes) define
+    # the scope; blank falls back to the parent URL's whole domain.
+    scope = parse_crawl_scope(allowed_domains, parent.url)
 
     parent_normalized = _normalize_crawl_url(parent.url)
+    # visited dedups the queue; landed tracks pages whose content was actually
+    # ingested — including the URL a redirect landed on (uidaho.edu →
+    # www.uidaho.edu), which only becomes known after the fetch, when the
+    # other spelling may already sit in the queue.
     visited: set[str] = {parent_normalized}
+    landed: set[str] = {parent_normalized}
+    if parent_fetched.final_url:
+        parent_final = _normalize_crawl_url(parent_fetched.final_url)
+        visited.add(parent_final)
+        landed.add(parent_final)
     queue: list[str] = []
     added = 0
 
-    # Extract seed links from already-fetched parent HTML
-    seed_links = _extract_links(parent_html, parent.url)
+    # Extract seed links from the already-fetched parent (HTML page or PDF)
+    seed_links = _crawlable_links(parent_fetched, parent.url)
     logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent.url}")
     for link in seed_links:
-        if link not in visited:
-            parsed = urlparse(link)
-            if parsed.netloc.lower() in domain_set:
-                queue.append(link)
-                visited.add(link)
+        if link not in visited and url_in_crawl_scope(link, scope):
+            queue.append(link)
+            visited.add(link)
 
-    logger.info(f"Crawl: {len(queue)} same-domain links queued (max_pages={max_pages}, domains={domain_set})")
+    logger.info(f"Crawl: {len(queue)} in-scope links queued (max_pages={max_pages}, scope={scope})")
 
     crawled_urls: list[str] = []
+    skipped_urls: list[str] = []
 
-    while queue and added < max_pages:
+    while queue and added < max_pages and fetches < max_fetches:
         url = queue.pop(0)
+
+        # A redirect on an earlier fetch may have landed on this URL under
+        # another spelling — its content is already ingested.
+        if _normalize_crawl_url(url) in landed:
+            logger.debug(f"Crawl: skipping {url} — already ingested via redirect")
+            continue
 
         # Skip if already in this KB
         existing = await KnowledgeBaseSource.find_one(
@@ -957,27 +1173,51 @@ async def _crawl_from_source(
             url=url[:2000],
             parent_source_uuid=parent.uuid,
         )
-        await child.insert()
-        # _ingest_url_source returns the HTML on success
-        child_html = await _ingest_url_source(child, kb)
-        added += 1
-        crawled_urls.append(url)
-        logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
+        if not await _insert_source_unless_duplicate(child):
+            continue
+        fetches += 1
+        # _ingest_url_source returns the fetch result on success
+        child_fetched = await _ingest_url_source(
+            child, kb,
+            content_gate=lambda result, page=url: describe_low_value_page(
+                result.text,
+                len(_crawlable_links(result, page)),
+                min_chars=min_content_chars,
+            ),
+        )
+        landed.add(_normalize_crawl_url(url))
+        if child_fetched and child_fetched.final_url:
+            child_final = _normalize_crawl_url(child_fetched.final_url)
+            visited.add(child_final)
+            landed.add(child_final)
+
+        if child.status == "skipped":
+            # Navigation, not content: drop the source record entirely so it
+            # never shows up in the KB, but fall through to harvest its links.
+            skipped_urls.append(url)
+            await child.delete()
+            logger.info(f"Crawl: skipped {url} — {child.error_message}")
+        else:
+            added += 1
+            crawled_urls.append(url)
+            logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
 
         # Extract more links from this page for BFS
-        if child_html and added < max_pages:
-            for link in _extract_links(child_html, url):
-                if link not in visited:
-                    parsed = urlparse(link)
-                    if parsed.netloc.lower() in domain_set:
-                        queue.append(link)
-                        visited.add(link)
+        if child_fetched and added < max_pages:
+            for link in _crawlable_links(child_fetched, url):
+                if link not in visited and url_in_crawl_scope(link, scope):
+                    queue.append(link)
+                    visited.add(link)
 
     # Update parent with crawled URL list
     parent.crawled_urls = crawled_urls
+    parent.skipped_urls = skipped_urls or None
     await parent.save()
 
-    logger.info(f"Crawl complete for {parent.url}: {added} child pages added")
+    logger.info(
+        f"Crawl complete for {parent.url}: {added} child pages added, "
+        f"{len(skipped_urls)} navigation pages skipped ({fetches} fetched)",
+    )
     return added
 
 
@@ -1041,9 +1281,14 @@ async def import_knowledge_base(
         raw_title = "Imported Knowledge Base"
 
     team_id = str(user.current_team) if user.current_team else None
+    import_title = await name_conflicts.next_available_name(
+        raw_title[:300],
+        lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+        max_length=300,
+    )
     raw_tags = payload.get("tags") or []
     kb = KnowledgeBase(
-        title=raw_title[:300],
+        title=import_title,
         description=(payload.get("description") or "")[:5000] or None,
         tags=_normalize_tags(raw_tags) if isinstance(raw_tags, list) else [],
         user_id=user.user_id,
@@ -1073,7 +1318,9 @@ async def import_knowledge_base(
             parent_source_uuid=src.get("parent_source_uuid"),
             crawled_urls=src.get("crawled_urls"),
         )
-        await new_src.insert()
+        # Exports taken before the unique index may repeat a URL — import it once.
+        if not await _insert_source_unless_duplicate(new_src):
+            continue
         imported += 1
 
         if content and content.strip():
@@ -1165,25 +1412,53 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
 
 async def _ingest_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
-) -> str | None:
-    """Ingest a URL source. Returns the raw HTML on success (for crawling), None on failure."""
+    content_gate: Callable[[WebFetchResult], str | None] | None = None,
+) -> WebFetchResult | None:
+    """Ingest a URL source. Returns the fetch result on success (for crawling), None on failure.
+
+    ``content_gate`` lets a caller reject a page that fetched fine but isn't
+    worth embedding (the crawler uses it to drop navigation pages). It runs
+    before anything reaches ChromaDB, so a rejected page costs no embeddings.
+    A rejected source is marked ``skipped``, but the fetch result is still
+    returned — nav pages are how a crawl reaches the content behind them.
+    """
     source.status = "processing"
     await source.save()
     try:
         from app.services.web_fetcher import fetch_url
+        from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.fetch_errors import describe_empty_fetch
 
         result = await fetch_url(source.url)
-        raw_html = result.raw_html or ""
         raw_text = result.text
 
         if not raw_text.strip():
             source.status = "error"
-            source.error_message = "Failed to extract text from URL"
+            source.error_message = describe_empty_fetch(result.status_code)
             await source.save()
             return None
 
+        if looks_like_bot_challenge(raw_text):
+            # The site served a bot-verification interstitial instead of the
+            # page. Embedding it would poison retrieval with junk text.
+            source.status = "error"
+            source.error_message = "Blocked by the site's bot protection (verification page returned instead of content)"
+            await source.save()
+            return None
+
+        if content_gate is not None:
+            skip_reason = content_gate(result)
+            if skip_reason:
+                source.status = "skipped"
+                source.error_message = skip_reason[:2000]
+                source.url_title = result.title
+                await source.save()
+                # Not an error — the caller still wants the links off this page.
+                return result
+
         source.content = raw_text[:500000]
         source.url_title = result.title
+        source.truncated = bool(result.truncated)
 
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(
@@ -1194,24 +1469,76 @@ async def _ingest_url_source(
         source.status = "ready"
         source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await source.save()
-        return raw_html
+        return result
     except httpx.HTTPStatusError as e:
         if 400 <= e.response.status_code < 500:
             logger.warning("URL source %s returned %d: %s", source.uuid, e.response.status_code, e.request.url)
         else:
             logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
-        source.error_message = str(e)[:2000]
+        source.error_message = describe_fetch_error(e)[:2000]
         await source.save()
         return None
     except (ValueError, httpx.RequestError) as e:
         logger.warning("URL source %s unreachable: %s", source.uuid, e)
         source.status = "error"
-        source.error_message = str(e)[:2000]
+        source.error_message = describe_fetch_error(e)[:2000]
         await source.save()
         return None
     except Exception as e:
         logger.error(f"Error ingesting URL source {source.uuid}: {e}")
+        source.status = "error"
+        source.error_message = describe_fetch_error(e)[:2000]
+        await source.save()
+        return None
+
+
+async def ingest_text_into_source(
+    source: KnowledgeBaseSource,
+    kb: KnowledgeBase,
+    text: str,
+    label: str | None = None,
+) -> int | None:
+    """(Re)ingest a source from caller-supplied text — no network fetch.
+
+    Replaces any existing chunks for the source, so it both ingests fresh
+    sources and repairs poisoned ones (e.g. a cached bot-challenge page).
+    Used by the catalog seeder for bundled regulation text and by
+    scripts.repair_gov_kb_sources. Returns the chunk count, or None on error
+    (the source is marked ``error`` rather than raising, matching
+    ``_ingest_url_source``).
+    """
+    if not text.strip():
+        source.status = "error"
+        source.error_message = "No text provided for ingestion"
+        await source.save()
+        return None
+    source.status = "processing"
+    await source.save()
+    try:
+        name = (
+            label or source.custom_name or source.url_title or source.url
+            or "Text Source"
+        )
+        dm = _get_dm()
+        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        chunk_count = await asyncio.to_thread(
+            dm.add_to_kb, kb.uuid, source.uuid, name, text,
+        )
+        source.content = text[:500000]
+        if label:
+            source.url_title = label[:500]
+        source.chunk_count = chunk_count
+        # Caller-supplied text is chunked in full (dm.add_to_kb gets the whole
+        # string), so re-ingesting here repairs any earlier fetch truncation.
+        source.truncated = False
+        source.status = "ready"
+        source.error_message = None
+        source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        await source.save()
+        return chunk_count
+    except Exception as e:
+        logger.error(f"Error ingesting text into source {source.uuid}: {e}")
         source.status = "error"
         source.error_message = str(e)[:2000]
         await source.save()

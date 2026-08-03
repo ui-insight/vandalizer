@@ -13,6 +13,7 @@ import { TriCounter } from '../shared/TriCounter'
 import { TrialQueryDeltas } from '../shared/TrialQueryDeltas'
 import { ReproducibilityPanel } from '../shared/ReproducibilityPanel'
 import { CrossJudgeNote } from '../shared/CrossJudgeNote'
+import { TermDef } from '../shared/TermDef'
 import { DOMAIN_LABELS } from '../shared/labels'
 
 interface Props {
@@ -68,10 +69,35 @@ export function OptimizationResults({
     )
   }
 
+  // When the run did a train/holdout split, the headline optimized_score is
+  // the winner re-measured on the holdout slice. The default bar must then be
+  // the default config's holdout score too — pairing the holdout optimized
+  // number against the train-slice default reads as a lift that the CI (also
+  // holdout-based) may flatly contradict. holdout_optimized_score is non-null
+  // exactly when the headline is holdout-based; for runs that predate that
+  // field, headline ≠ train score proves the holdout re-score succeeded.
+  const holdoutHeadline =
+    run.holdout_default_score != null
+    && (
+      run.holdout_optimized_score != null
+      || (
+        run.optimized_score != null
+        && run.optimized_score_train != null
+        && run.optimized_score !== run.optimized_score_train
+      )
+    )
+  const trainCount = run.train_query_uuids?.length ?? null
+  const holdoutCount = run.holdout_query_uuids?.length ?? null
+
   const kbLabels = DOMAIN_LABELS.kb.baselineTile
   const baselines: BaselinePoint[] = [
     { id: 'no-kb', label: kbLabels.noBaseline, score: run.baseline_no_kb_score, color: '#888' },
-    { id: 'default', label: kbLabels.yourSettings, score: run.baseline_default_score, color: '#3b82f6' },
+    {
+      id: 'default',
+      label: kbLabels.yourSettings,
+      score: (holdoutHeadline ? run.holdout_default_score : run.baseline_default_score) ?? null,
+      color: '#3b82f6',
+    },
     { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
   ]
 
@@ -93,6 +119,14 @@ export function OptimizationResults({
           'Quality score = 40% LLM judge + 25% retrieval precision + 20% source health + 15% chunk coverage. '
           + 'Matches the score the validation header reports.'
         }
+        measurementNote={
+          holdoutHeadline
+            ? `${kbLabels.yourSettings} and ${kbLabels.tuned} are measured on the `
+              + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'} the optimizer `
+              + `never tuned against; ${kbLabels.noBaseline} uses the `
+              + `${trainCount ?? ''} training queries.`
+            : undefined
+        }
         topSlot={
           <EvalSetCompositionStrip
             snapshot={run.test_query_snapshot}
@@ -106,7 +140,21 @@ export function OptimizationResults({
         }
         bottomSlot={
           (winningPerQuery?.length ?? 0) > 0 && (defaultPerQuery?.length ?? 0) > 0
-            ? <TriCounter optimized={winningPerQuery} baseline={defaultPerQuery} />
+            ? (
+              <div>
+                {/* The counter is computed on the training slice while the CI
+                    above uses the holdout slice — without this caption the two
+                    read as contradictory counts over the same queries. */}
+                {holdoutHeadline && (
+                  <div style={{ fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5 }}>
+                    Per-query outcomes below are from the {trainCount ?? ''} training
+                    quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
+                    the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
+                  </div>
+                )}
+                <TriCounter optimized={winningPerQuery} baseline={defaultPerQuery} />
+              </div>
+            )
             : null
         }
       />
@@ -119,6 +167,33 @@ export function OptimizationResults({
           primaryScore={run.optimized_score ?? 0}
           primaryJudge={run.judge_model ?? null}
         />
+      )}
+
+      {/* Significance-gated outcome banner. When the optimizer's best trial
+          is statistically tied with the KB's current config (within 2σ of the
+          blended judge noise — the same gate that sets tied_with_baseline on
+          the backend), apply is disabled and we explain why — otherwise we'd
+          be writing a config change the data can't justify. Mirrors the
+          extraction and workflow panels. */}
+      {run.tied_with_baseline && (
+        <div
+          role="status"
+          style={{
+            padding: '10px 14px', borderRadius: 6, fontSize: 13,
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#fbbf24',
+            display: 'flex', flexDirection: 'column', gap: 4,
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>No significant improvement</div>
+          <div style={{ color: '#d1d5db' }}>
+            The best trial was within the <TermDef term="noise-floor">judge's measurement noise</TermDef>{' '}
+            (±{((run.judge_variance ?? 0.02) * 80).toFixed(1)} pts confidence interval)
+            of your current settings. Apply is disabled — your settings already
+            perform as well as anything we tried.
+          </div>
+        </div>
       )}
 
       {/* Best config + Apply / Revert. ``isAlreadyApplied`` is true if this
@@ -134,7 +209,7 @@ export function OptimizationResults({
             || (!run.applied_at && !!run.options?.apply_on_finish)
           }
           canRevert={!!(run.applied_at && !run.reverted_at && onRevert)}
-          canManage={canManage}
+          canManage={canManage && !run.tied_with_baseline}
           onApply={onApply}
           applying={applying}
           onRevert={onRevert}
@@ -149,6 +224,7 @@ export function OptimizationResults({
           optimized={winningPerQuery}
           baseline={defaultPerQuery}
           noKb={noKbPerQuery}
+          title={holdoutHeadline ? 'Per-query deltas — training queries' : 'Per-query deltas'}
         />
       )}
 
@@ -169,6 +245,14 @@ export function OptimizationResults({
           getRowKey={(t) => t.trial_id}
           onRowClick={setSelectedTrial}
           title="Trials: tap any for a plain-English breakdown"
+          caption={
+            holdoutHeadline
+              ? `Trial scores are measured on the ${trainCount ?? ''} training queries. `
+                + `The headline ${kbLabels.tuned} score re-measures the winner on `
+                + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'}, `
+                + 'so it can differ from the best trial below.'
+              : undefined
+          }
         />
       )}
 

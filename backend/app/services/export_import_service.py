@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
-from app.services import search_set_service, verification_service, workflow_service
+from app.services import name_conflicts, search_set_service, verification_service, workflow_service
 
 SCHEMA_VERSION = 2
 
@@ -296,8 +296,12 @@ async def import_workflow(
         await new_step.insert()
         new_step_ids.append(new_step.id)
 
+    imported_name = await name_conflicts.next_available_name(
+        f"{item['name']} (Imported)",
+        lambda n: name_conflicts.workflow_name_taken(n, user_id, team_id),
+    )
     new_wf = Workflow(
-        name=f"{item['name']} (Imported)",
+        name=imported_name,
         description=item.get("description"),
         user_id=user_id,
         team_id=team_id,
@@ -463,12 +467,17 @@ async def import_search_set(
         result = target
     else:
         ss_uuid = str(uuid_mod.uuid4())
+        set_type = item.get("set_type", "extraction")
+        imported_title = await name_conflicts.next_available_name(
+            f"{item['title']} (Imported)",
+            lambda t: name_conflicts.search_set_title_taken(t, set_type, user_id, team_id),
+        )
         result = SearchSet(
-            title=f"{item['title']} (Imported)",
+            title=imported_title,
             uuid=ss_uuid,
             team_id=team_id,
             status="active",
-            set_type=item.get("set_type", "extraction"),
+            set_type=set_type,
             user_id=user_id,
             created_by_user_id=user_id,
             extraction_config=item.get("extraction_config", {}),
@@ -573,7 +582,10 @@ async def import_knowledge_base(
             document_uuid=src_data.get("document_uuid"),
             content=src_data.get("content"),
         )
-        await src.insert()
+        # Exports taken before the unique (kb, url) index may repeat a URL —
+        # import it once instead of failing the whole import.
+        if not await knowledge_service._insert_source_unless_duplicate(src):
+            continue
 
         # Ingest from cached content or re-fetch
         if src.content:

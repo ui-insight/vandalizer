@@ -54,6 +54,10 @@ _DEFAULT_HEADERS = {
 # Cap on the raw PDF payload we'll pull from a URL before extracting text.
 _MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB
 
+# Cap on hyperlinks harvested from a single PDF. Link annotations can number
+# in the thousands in generated documents (e.g. one per table-of-contents row).
+_MAX_PDF_LINKS = 500
+
 
 @dataclass
 class WebFetchResult:
@@ -63,6 +67,27 @@ class WebFetchResult:
     raw_html: Optional[str]
     used_browser: bool
     status_code: Optional[int]
+    # HTTP(S) hyperlinks embedded in a PDF response, in page order. None for
+    # HTML responses (crawlers extract <a href> from raw_html instead).
+    pdf_links: Optional[list[str]] = None
+    # URL the request actually landed on after redirects (uidaho.edu →
+    # www.uidaho.edu). Crawlers dedup on this too, so the same page can't be
+    # fetched once per spelling.
+    final_url: Optional[str] = None
+    # True when the returned ``text`` was cut off at web_fetcher_max_chars (a
+    # genuinely huge page). Ingestion surfaces this so a partial source shows a
+    # warning instead of a clean "ready" — a truncated page yields wrong answers
+    # for anything past the cut. (Note: raw HTML being trimmed at
+    # web_fetcher_max_html_chars would also set this, but that limit is sized so
+    # real documents never hit it.)
+    truncated: bool = False
+
+
+def _cap(text: str, limit: int) -> tuple[str, bool]:
+    """Return ``text`` bounded to ``limit`` chars plus whether it was cut."""
+    if len(text) > limit:
+        return text[:limit], True
+    return text, False
 
 
 def _extract_title(html: str, fallback_url: str) -> str:
@@ -108,21 +133,23 @@ def _looks_like_pdf(url: str, content_type: str) -> bool:
     return path.endswith(".pdf")
 
 
-def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str]:
-    """Extract text + a title from PDF bytes fetched over HTTP.
+def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str, list[str]]:
+    """Extract text, a title, and embedded hyperlinks from PDF bytes fetched over HTTP.
 
     Uses PyMuPDF (no OCR) to stay fast and dependency-light in the fetch path;
     image-only PDFs will yield little text, which the caller treats as an empty
     result. Title prefers the PDF's metadata, falling back to the URL filename.
+    Links come from the PDF's URI annotations so crawl-enabled KB sources can
+    follow them the same way <a href> links are followed on an HTML page.
     """
     if not content:
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
     if len(content) > _MAX_PDF_BYTES:
         logger.warning(
             "PDF at %s is %d bytes (> %d cap) — skipping extraction",
             url, len(content), _MAX_PDF_BYTES,
         )
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
 
     import os
     import tempfile
@@ -137,16 +164,46 @@ def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str]:
             tmp_path = tmp.name
         text = extract_text_from_pdf(tmp_path)
         title = _pdf_title(tmp_path) or filename
-        return _normalize_whitespace(text or ""), title
+        links = _pdf_uri_links(tmp_path)
+        return _normalize_whitespace(text or ""), title, links
     except Exception as e:
         logger.warning("Failed to extract PDF from %s: %s", url, e)
-        return "", filename
+        return "", filename, []
     finally:
         if tmp_path:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+def _pdf_uri_links(pdf_path: str) -> list[str]:
+    """HTTP(S) hyperlinks embedded in a PDF, deduplicated in page order."""
+    try:
+        import pymupdf
+
+        seen: set[str] = set()
+        links: list[str] = []
+        with pymupdf.open(pdf_path) as doc:
+            for page in doc:
+                for link in page.get_links():
+                    uri = (link.get("uri") or "").strip()
+                    if not uri or uri in seen:
+                        continue
+                    if urlparse(uri).scheme not in ("http", "https"):
+                        continue
+                    seen.add(uri)
+                    links.append(uri)
+                    if len(links) >= _MAX_PDF_LINKS:
+                        logger.warning(
+                            "PDF %s has more than %d links; truncating",
+                            pdf_path, _MAX_PDF_LINKS,
+                        )
+                        return links
+        return links
+    except Exception as e:
+        logger.warning("Failed to extract links from PDF %s: %s", pdf_path, e)
+        return []
 
 
 def _pdf_title(pdf_path: str) -> Optional[str]:
@@ -252,18 +309,31 @@ async def fetch_url(
         # must be parsed as PDFs, not decoded as HTML. trafilatura/BeautifulSoup
         # on PDF bytes yields either nothing or raw binary, so without this a
         # direct .pdf URL ingests garbage or fails outright.
-        if _looks_like_pdf(url, resp.headers.get("content-type", "")):
-            pdf_text, pdf_title = _extract_pdf_response(resp.content, url)
+        # WAFs (Akamai on usda.gov, Cloudflare, …) often answer a .pdf URL
+        # with an HTML bot-challenge page and a 200 — only take the PDF path
+        # when the body actually is a PDF, so challenge pages fall through to
+        # HTML extraction where bot-challenge detection can name the failure.
+        if _looks_like_pdf(url, resp.headers.get("content-type", "")) and b"%PDF" in resp.content[:1024]:
+            pdf_text, pdf_title, pdf_links = _extract_pdf_response(resp.content, url)
+            pdf_text, pdf_truncated = _cap(pdf_text, settings.web_fetcher_max_chars)
             return WebFetchResult(
                 url=url,
                 title=pdf_title,
-                text=pdf_text[: settings.web_fetcher_max_chars],
-                raw_html=None,  # no HTML — nothing to crawl from a PDF
+                text=pdf_text,
+                raw_html=None,  # no HTML — crawlers use pdf_links instead
                 used_browser=False,
                 status_code=status_code,
+                pdf_links=pdf_links or None,
+                final_url=str(resp.url),
+                truncated=pdf_truncated,
             )
 
-        raw_html = resp.text[: settings.web_fetcher_max_chars]
+        # Cap the *raw HTML* at the (much larger) HTML limit, not the text limit
+        # — trimming HTML at the text cap silently drops the tail of long pages
+        # before trafilatura ever parses them. web_fetcher_max_html_chars is
+        # sized so real documents never hit it; if they somehow do, the flag
+        # propagates so the source is not marked cleanly ready.
+        raw_html, html_truncated = _cap(resp.text, settings.web_fetcher_max_html_chars)
 
     text = _extract_main_text(raw_html)
     title = _extract_title(raw_html, url)
@@ -275,23 +345,32 @@ async def fetch_url(
         )
         rendered = await _render_with_browser(url, settings.web_fetcher_timeout_seconds)
         if rendered:
-            rendered = rendered[: settings.web_fetcher_max_chars]
+            rendered, rendered_html_truncated = _cap(rendered, settings.web_fetcher_max_html_chars)
             rendered_text = _extract_main_text(rendered)
             if len(rendered_text) > len(text):
                 raw_html = rendered
                 text = rendered_text
+                html_truncated = rendered_html_truncated
                 # Re-extract title from the rendered DOM; SPAs often set
                 # <title> via JS after mount.
                 title = _extract_title(rendered, url)
                 used_browser = True
 
+    text, text_truncated = _cap(text, settings.web_fetcher_max_chars)
+    if text_truncated:
+        logger.warning(
+            "Extracted text for %s exceeded %d chars and was truncated",
+            url, settings.web_fetcher_max_chars,
+        )
     return WebFetchResult(
         url=url,
         title=title,
-        text=text[: settings.web_fetcher_max_chars],
+        text=text,
         raw_html=raw_html,
         used_browser=used_browser,
         status_code=status_code,
+        final_url=str(resp.url),
+        truncated=text_truncated or html_truncated,
     )
 
 

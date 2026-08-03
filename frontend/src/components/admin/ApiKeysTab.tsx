@@ -15,20 +15,9 @@ import {
 } from '../../api/admin'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
+import { formatDateTime } from './shared/format'
 
 marked.setOptions({ breaks: true, gfm: true })
-
-function fmtDate(iso: string | null): string {
-  if (!iso) return '-'
-  const d = iso.endsWith('Z') || iso.includes('+') ? new Date(iso) : new Date(iso + 'Z')
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
 
 function isExpired(key: ApiKeyListItem): boolean {
   if (!key.expires_at) return false
@@ -219,14 +208,14 @@ export function ApiKeysTab() {
                   </div>
                 </td>
                 <td style={{ padding: 8 }}><StatusBadge keyItem={k} /></td>
-                <td style={{ padding: 8, color: '#6b7280' }}>{fmtDate(k.created_at)}</td>
+                <td style={{ padding: 8, color: '#6b7280' }}>{formatDateTime(k.created_at)}</td>
                 <td style={{ padding: 8, color: '#6b7280' }}>
-                  {fmtDate(k.last_used_at)}
+                  {formatDateTime(k.last_used_at)}
                   {k.last_used_ip && (
                     <div style={{ fontSize: 11, fontFamily: 'monospace' }}>{k.last_used_ip}</div>
                   )}
                 </td>
-                <td style={{ padding: 8, color: '#6b7280' }}>{fmtDate(k.expires_at)}</td>
+                <td style={{ padding: 8, color: '#6b7280' }}>{formatDateTime(k.expires_at)}</td>
                 <td style={{ padding: 8 }}>
                   {!k.revoked_at && (
                     <button

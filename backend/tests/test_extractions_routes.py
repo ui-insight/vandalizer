@@ -27,6 +27,7 @@ def _make_user(
     user.is_examiner = False
     user.current_team = current_team
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     return user
 
@@ -144,6 +145,33 @@ class TestExtractionsRoutes:
         data = resp.json()
         assert data["title"] == "Test SearchSet"
         assert data["uuid"] == "ss-uuid-1"
+
+    @pytest.mark.asyncio
+    async def test_create_search_set_duplicate_title_returns_409(self, client):
+        from app.services.name_conflicts import DuplicateNameError
+
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_search_set = AsyncMock(
+                side_effect=DuplicateNameError('Extraction "My Extraction" already exists in your library. Choose a different name.'),
+            )
+
+            resp = await client.post(
+                "/api/extractions/search-sets",
+                json={"title": "My Extraction"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_list_search_sets_success(self, client):
@@ -843,6 +871,9 @@ class TestExtractionsRoutes:
         run.status = "completed"
         run.best_config = {"model": "claude-sonnet", "strategy": "two-pass"}
         run.previous_override = None
+        # Explicit False — a bare MagicMock attribute is truthy, which would
+        # trip the tied-with-baseline apply gate.
+        run.tied_with_baseline = False
         run.save = AsyncMock()
 
         with (

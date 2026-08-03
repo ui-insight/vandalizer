@@ -293,6 +293,12 @@ step_mode() {
     _blank
     _prompt "Your domain / base URL (e.g. https://vandalizer.university.edu)" "https://example.com"
     BASE_URL="$_REPLY"
+    if [[ "$BASE_URL" == http://* ]]; then
+      _blank
+      _line "${SYM_WARN}  ${YELLOW}Production over plain HTTP:${RESET} auth cookies will be set without"
+      _line "${DIM}   the Secure flag so login works. Fine for an isolated/intranet box;${RESET}"
+      _line "${DIM}   use an https:// URL for anything internet-facing.${RESET}"
+    fi
   fi
 
   FRONTEND_URL="$BASE_URL"

@@ -47,7 +47,7 @@ class AddUrlsRequest(BaseModel):
     urls: list[str]
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
-    allowed_domains: str = ""  # comma-separated
+    allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
 
 
 class KBSourceResponse(BaseModel):
@@ -62,6 +62,9 @@ class KBSourceResponse(BaseModel):
     status: str
     error_message: Optional[str] = None
     chunk_count: int = 0
+    # URL source whose extracted text was cut off at the fetcher size cap:
+    # "ready" but incomplete, so the UI warns instead of showing a clean check.
+    truncated: bool = False
     created_at: Optional[str] = None
 
 
@@ -77,6 +80,8 @@ class KBSourceDetailResponse(KBSourceResponse):
     max_crawl_pages: int = 5
     parent_source_uuid: Optional[str] = None
     crawled_urls: Optional[list[str]] = None
+    # Navigation pages the crawl followed for links but did not embed
+    skipped_urls: Optional[list[str]] = None
     child_sources: list[KBSourceResponse] = []  # Crawled children (when this is a parent)
     processed_at: Optional[str] = None
 
@@ -110,6 +115,14 @@ class KBResponse(BaseModel):
     is_reference: bool = False
     source_kb_uuid: Optional[str] = None  # set when is_reference=True
     reference_uuid: Optional[str] = None  # the reference's own uuid
+    # Whether the requesting user may perform manage-level actions (add sources,
+    # rename, share, delete). Lets the UI disable those affordances up front
+    # instead of letting the user complete a flow that ends in a 403 — e.g. an
+    # adopted verified catalog KB, which is viewable by everyone but manageable
+    # only by its owner, an examiner, or an admin. Defaults True because the
+    # endpoints that don't set it explicitly (create/import/adopt) only ever
+    # return a KB the requester just became the owner of.
+    can_manage: bool = True
     # Set by KB Autovalidate's apply path. Presence (not value) is what the UI
     # surfaces as a small "Optimized" chip.
     has_optimized_config: bool = False
@@ -120,6 +133,9 @@ class KBResponse(BaseModel):
     last_validation_baseline_score: Optional[float] = None
     last_validation_lift: Optional[float] = None
     last_validated_at: Optional[str] = None
+    # Per-requesting-user: when this user last chatted with the KB. Powers the
+    # "Recently Used" sort. None = never used (or legacy pre-tracking usage).
+    last_used_at: Optional[str] = None
 
 
 class KBListResponse(BaseModel):

@@ -25,7 +25,10 @@ html {
   --highlight-on-light: #806600;
   --ui-radius: 12px;
   --rail-w: 220px;
-  font-family: "Public Sans", Arial, sans-serif;
+  /* "Public Sans Variable" is the family name shipped by
+     @fontsource-variable/public-sans (bundled, no network). Plain
+     "Public Sans" stays as a fallback for a locally installed copy. */
+  font-family: "Public Sans Variable", "Public Sans", Arial, sans-serif;
 }
 
 /* Global keyboard focus indicator */

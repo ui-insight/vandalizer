@@ -58,20 +58,20 @@ The canonical `bootstrap_install.py` entrypoint is covered directly in the backe
 
 ## 5. Tag And Publish
 
-When the candidate is approved, from a clean `main` that is in sync with `origin/main`:
+When the candidate is approved, first **stamp the CHANGELOG**: rename `## [Unreleased]` to `## [vX.Y.Z] - <date>` and add a fresh empty `## [Unreleased]` above it, then commit those notes. (This stays a deliberate human step so the release notes get reviewed before the tag is cut.) Then, from a clean `main` that is in sync with `origin/main`:
 
 ```bash
 ./scripts/cut_release.sh --dry-run   # preview the tag and commit list
-./scripts/cut_release.sh             # prompts, then creates and pushes the tag
+./scripts/cut_release.sh             # minor bump (default): v4.9.0 -> v4.10.0
+# ./scripts/cut_release.sh --major   # v4.9.0 -> v5.0.0
+# ./scripts/cut_release.sh --patch   # hotfix:  v4.9.0 -> v4.9.1
 ```
 
-The script computes the next CalVer tag (`vYYYY.MM.N`), refuses to run if the tree is dirty or out of sync with origin, and pushes an annotated tag. Pushing the tag triggers the release workflow, which will:
+The script computes the next SemVer tag on the `v4.x` line (default minor bump; `--major`/`--patch` for the others), refuses to run if the tree is dirty or out of sync with origin, warns if the CHANGELOG has no section for the new tag, and pushes an annotated tag. Pushing the tag triggers the release workflow, which will:
 
 - rerun `make release-check`
 - publish versioned backend and frontend GHCR images
 - create the GitHub release entry for the tag
-
-If you need to cut a SemVer-style tag instead (`vMAJOR.MINOR.PATCH`), tag manually — the release workflow accepts both since both match `v*.*.*`.
 
 ## 6. Finalize Operator Notes
 

@@ -42,7 +42,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 make backend-ci        # Unit tests (50% coverage gate) + tier-1 integration tests
 make backend-static    # Ruff lint + Bandit security scan
 make backend-backlog   # Mypy typecheck + pip-audit (non-blocking)
-make frontend-ci       # Typecheck, lint, audit, Vitest (35% line coverage gate), build
+make frontend-ci       # Typecheck, lint, audit, Vitest (coverage gate over whole src/ tree, currently ~6% lines — see frontend/vitest.config.ts), build
 make ci                # backend-ci + frontend-ci
 make release-check     # ci + backend-static + Docker builds
 

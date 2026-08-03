@@ -256,7 +256,7 @@ class TestAddItem:
 
             from app.services.library_service import add_item
 
-            result = await add_item(str(lib.id), user, item_id, "workflow")
+            await add_item(str(lib.id), user, item_id, "workflow")
             mock_item.insert.assert_awaited_once()
             lib.save.assert_awaited_once()
             assert lib.items[-1] == mock_item.id
@@ -394,6 +394,131 @@ class TestRemoveItem:
             lib.save.assert_awaited_once()
             assert item.id not in lib.items
 
+    @pytest.mark.asyncio
+    async def test_delete_underlying_workflow_cascades(self):
+        from app.models.library import LibraryItemKind
+
+        item = _make_library_item(kind_value="workflow")
+        item.kind = LibraryItemKind.WORKFLOW
+        lib = _make_library(items=[item.id])
+        user = _make_user()
+        wf = MagicMock()
+        wf.name = "NSF Proposal Extractor"
+        wf.team_id = None
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.Workflow") as MockWf,
+            patch("app.services.library_service.audit_service") as mock_audit,
+            patch("app.services.workflow_service.delete_workflow", new_callable=AsyncMock) as mock_delete,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            MockItem.get = AsyncMock(return_value=item)
+            MockItem.find.return_value.to_list = AsyncMock(return_value=[item])
+            MockLib.find.return_value.update = AsyncMock()
+            MockWf.get = AsyncMock(return_value=wf)
+            mock_audit.log_event = AsyncMock()
+            mock_delete.return_value = True
+
+            from app.services.library_service import remove_item
+
+            result = await remove_item(str(lib.id), str(item.id), user, delete_underlying=True)
+
+            assert result is True
+            mock_delete.assert_awaited_once_with(str(item.item_id), user)
+            # Every bookmark pointing at the deleted workflow is purged
+            item.delete.assert_awaited_once()
+            MockLib.find.return_value.update.assert_awaited_with({"$pull": {"items": item.id}})
+            mock_audit.log_event.assert_awaited_once()
+            assert mock_audit.log_event.await_args.kwargs["action"] == "workflow.delete"
+
+    @pytest.mark.asyncio
+    async def test_delete_underlying_forbidden_deletes_nothing(self):
+        from app.models.library import LibraryItemKind
+        from app.services.library_service import UnderlyingDeleteError, remove_item
+
+        item = _make_library_item(kind_value="workflow")
+        item.kind = LibraryItemKind.WORKFLOW
+        lib = _make_library(items=[item.id])
+        user = _make_user()
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Workflow") as MockWf,
+            patch("app.services.workflow_service.delete_workflow", new_callable=AsyncMock) as mock_delete,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            MockItem.get = AsyncMock(return_value=item)
+            MockWf.get = AsyncMock(return_value=MagicMock())
+            mock_delete.return_value = False
+
+            with pytest.raises(UnderlyingDeleteError) as exc:
+                await remove_item(str(lib.id), str(item.id), user, delete_underlying=True)
+
+            assert exc.value.code == "forbidden"
+            item.delete.assert_not_awaited()
+            lib.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_delete_underlying_search_set_cascades(self):
+        from app.models.library import LibraryItemKind
+
+        item = _make_library_item(kind_value="search_set")
+        item.kind = LibraryItemKind.SEARCH_SET
+        lib = _make_library(items=[item.id])
+        user = _make_user()
+        ss = MagicMock()
+        ss.uuid = "ss-uuid-1"
+        ss.title = "Budget Fields"
+        ss.team_id = None
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.SearchSet") as MockSS,
+            patch("app.services.library_service.audit_service") as mock_audit,
+            patch("app.services.search_set_service.delete_search_set", new_callable=AsyncMock) as mock_delete,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_search_set_by_id = AsyncMock(return_value=ss)
+            MockItem.get = AsyncMock(return_value=item)
+            MockItem.find.return_value.to_list = AsyncMock(return_value=[item])
+            MockLib.find.return_value.update = AsyncMock()
+            MockSS.get = AsyncMock(return_value=ss)
+            mock_audit.log_event = AsyncMock()
+
+            from app.services.library_service import remove_item
+
+            result = await remove_item(str(lib.id), str(item.id), user, delete_underlying=True)
+
+            assert result is True
+            mock_delete.assert_awaited_once_with("ss-uuid-1")
+            item.delete.assert_awaited_once()
+            assert mock_audit.log_event.await_args.kwargs["action"] == "extraction.delete"
+
+    @pytest.mark.asyncio
+    async def test_delete_underlying_unsupported_kind(self):
+        from app.models.library import LibraryItemKind
+        from app.services.library_service import UnderlyingDeleteError, remove_item
+
+        item = _make_library_item(kind_value="knowledge_base")
+        item.kind = LibraryItemKind.KNOWLEDGE_BASE
+        lib = _make_library(items=[item.id])
+        user = _make_user()
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            MockItem.get = AsyncMock(return_value=item)
+
+            with pytest.raises(UnderlyingDeleteError) as exc:
+                await remove_item(str(lib.id), str(item.id), user, delete_underlying=True)
+
+            assert exc.value.code == "unsupported"
+            item.delete.assert_not_awaited()
+
 
 # ---------------------------------------------------------------------------
 # update_item
@@ -419,7 +544,7 @@ class TestUpdateItem:
 
             from app.services.library_service import update_item
 
-            result = await update_item(str(item.id), user, note="updated", tags=["a", "b"])
+            await update_item(str(item.id), user, note="updated", tags=["a", "b"])
             item.set.assert_awaited_once()
             assert item.note == "updated"
             assert item.tags == ["a", "b"]
@@ -669,6 +794,11 @@ class TestShareToTeamErrors:
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
              patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=_make_library(scope="team")),
+             ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
+             patch(
                  "app.services.library_service._clone_underlying_object",
                  AsyncMock(side_effect=CloneSourceMissingError("Workflow gone")),
              ):
@@ -690,6 +820,11 @@ class TestShareToTeamErrors:
         team_oid = PydanticObjectId()
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=_make_library(scope="team")),
+             ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
              patch(
                  "app.services.library_service._clone_underlying_object",
                  AsyncMock(side_effect=RuntimeError("db blew up")),
@@ -721,6 +856,7 @@ class TestShareToTeamErrors:
                  "app.services.library_service.get_or_create_team_library",
                  AsyncMock(return_value=team_lib),
              ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
              patch(
                  "app.services.library_service.add_item",
                  AsyncMock(side_effect=RuntimeError("indexing failed")),
@@ -734,6 +870,101 @@ class TestShareToTeamErrors:
             assert exc.value.code == "clone_failed"
             assert exc.value.status == 500
             assert any("adding cloned object" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# share_to_team — duplicate-share detection
+# ---------------------------------------------------------------------------
+
+
+class TestShareToTeamDuplicates:
+    def _patches(self, item, team_oid, prior_shares):
+        """Common patch set for a share that passes auth and team checks."""
+        team_lib = _make_library(scope="team")
+        clone = AsyncMock(return_value=PydanticObjectId())
+        add = AsyncMock(return_value={"id": "new", "kind": "workflow", "name": "WF (Copy)"})
+        return team_lib, clone, add, [
+            patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)),
+            patch("app.services.library_service.get_or_create_team_library", AsyncMock(return_value=team_lib)),
+            patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=prior_shares)),
+            patch("app.services.library_service._clone_underlying_object", clone),
+            patch("app.services.library_service.add_item", add),
+            patch("app.services.library_service.Team", MagicMock(get=AsyncMock(return_value=None))),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_raises_already_shared_on_repeat_share(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, _, patches = self._patches(item, team_oid, prior_shares=1)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
+            finally:
+                for p in patches:
+                    p.stop()
+            assert exc.value.code == "already_shared"
+            assert exc.value.status == 409
+            clone.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_force_shares_again_with_numbered_copy(self):
+        from app.services.library_service import share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, add, patches = self._patches(item, team_oid, prior_shares=1)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                result = await share_to_team("item-1", _make_user(), str(team_oid), force=True)
+            finally:
+                for p in patches:
+                    p.stop()
+            assert result["id"] == "new"
+            assert clone.await_args.kwargs["copy_number"] == 2
+            assert add.await_args.kwargs["cloned_from_id"] == item.item_id
+
+    @pytest.mark.asyncio
+    async def test_first_share_records_provenance(self):
+        from app.services.library_service import share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, add, patches = self._patches(item, team_oid, prior_shares=0)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                result = await share_to_team("item-1", _make_user(), str(team_oid))
+            finally:
+                for p in patches:
+                    p.stop()
+            assert result["id"] == "new"
+            assert clone.await_args.kwargs["copy_number"] == 1
+            assert add.await_args.kwargs["cloned_from_id"] == item.item_id
+
+    @pytest.mark.asyncio
+    async def test_count_team_shares_short_circuits_on_empty_library(self):
+        from app.services.library_service import _count_team_shares_of
+
+        team_lib = _make_library(scope="team", items=[])
+        assert await _count_team_shares_of(team_lib, PydanticObjectId()) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -889,3 +1120,98 @@ class TestClonePreservesValidation:
             assert captured_tcs[0]["expected_values"] == {"field1": "answer1"}
             assert captured_tcs[0]["user_id"] == "new-user"
             assert captured_tcs[0]["search_set_uuid"] == captured_ss["uuid"]
+
+
+# ---------------------------------------------------------------------------
+# _clone_underlying_object — knowledge_base kind
+# ---------------------------------------------------------------------------
+
+
+class TestCloneKnowledgeBaseKind:
+    """knowledge_base library items historically raised 'unsupported kind',
+    breaking both Duplicate and Send-to-team for KBs. The clone must delegate
+    to knowledge_service.clone_knowledge_base and stamp the destination."""
+
+    def _kb_item(self):
+        from app.models.library import LibraryItemKind
+
+        item = _make_library_item(kind_value="knowledge_base")
+        item.kind = LibraryItemKind.KNOWLEDGE_BASE
+        return item
+
+    def _clone_mock(self, *, team_id, shared_with_team):
+        clone = MagicMock()
+        clone.id = PydanticObjectId()
+        clone.team_id = team_id
+        clone.shared_with_team = shared_with_team
+        clone.save = AsyncMock()
+        return clone
+
+    @pytest.mark.asyncio
+    async def test_kb_share_to_team_stamps_destination_team(self):
+        from app.services.library_service import _clone_underlying_object
+
+        item = self._kb_item()
+        original = MagicMock()
+        # clone_knowledge_base stamps the user's current team, unshared —
+        # the library share must override both for the destination team.
+        clone = self._clone_mock(team_id="current-team", shared_with_team=False)
+        user = _make_user()
+
+        with (
+            patch("app.models.knowledge.KnowledgeBase") as MockKB,
+            patch(
+                "app.services.knowledge_service.clone_knowledge_base",
+                AsyncMock(return_value=clone),
+            ) as mock_clone,
+        ):
+            MockKB.get = AsyncMock(return_value=original)
+            new_id = await _clone_underlying_object(
+                item, user.user_id, team_id="team-9", user=user
+            )
+
+        assert new_id == clone.id
+        mock_clone.assert_awaited_once_with(original, user)
+        assert clone.team_id == "team-9"
+        assert clone.shared_with_team is True
+        clone.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_kb_clone_to_personal_clears_team_scope(self):
+        from app.services.library_service import _clone_underlying_object
+
+        item = self._kb_item()
+        clone = self._clone_mock(team_id="current-team", shared_with_team=False)
+        user = _make_user()
+
+        with (
+            patch("app.models.knowledge.KnowledgeBase") as MockKB,
+            patch(
+                "app.services.knowledge_service.clone_knowledge_base",
+                AsyncMock(return_value=clone),
+            ),
+        ):
+            MockKB.get = AsyncMock(return_value=MagicMock())
+            new_id = await _clone_underlying_object(
+                item, user.user_id, team_id=None, user=user
+            )
+
+        assert new_id == clone.id
+        assert clone.team_id is None
+        assert clone.shared_with_team is False
+        clone.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_kb_clone_missing_source_raises_clone_source_missing(self):
+        from app.services.library_service import (
+            CloneSourceMissingError,
+            _clone_underlying_object,
+        )
+
+        item = self._kb_item()
+        with patch("app.models.knowledge.KnowledgeBase") as MockKB:
+            MockKB.get = AsyncMock(return_value=None)
+            with pytest.raises(CloneSourceMissingError):
+                await _clone_underlying_object(
+                    item, "user-1", team_id=None, user=_make_user()
+                )

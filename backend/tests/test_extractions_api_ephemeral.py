@@ -21,6 +21,7 @@ def _make_api_user(user_id="api-user"):
     user.is_examiner = False
     user.current_team = None
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     user.api_token_hash = hash_api_token(API_KEY)
     user.api_token_created_at = None

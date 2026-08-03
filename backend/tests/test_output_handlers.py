@@ -36,6 +36,18 @@ class TestShouldSendNotification:
 
         assert should_send_notification({"status": "failed"}, {"conditions": "failure"}) is True
 
+    def test_failure_matches_error(self):
+        # WorkflowResult records a failed run as "error", not "failed". Matching
+        # only "failed" is why "notify me on failure" never fired for workflows.
+        from app.services.output_handlers import should_send_notification
+
+        assert should_send_notification({"status": "error"}, {"conditions": "failure"}) is True
+
+    def test_success_rejects_error(self):
+        from app.services.output_handlers import should_send_notification
+
+        assert should_send_notification({"status": "error"}, {"conditions": "success"}) is False
+
     def test_failure_rejects_completed(self):
         from app.services.output_handlers import should_send_notification
 
@@ -542,6 +554,60 @@ class TestSaveResultsToFolder:
             )
             mock_db.smart_document.insert_one.assert_called_once()
             mock_db.smart_document.update_one.assert_not_called()
+
+    def test_saves_docx_file(self, tmp_path):
+        """Word must be savable to a folder — parity with the docx download."""
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "Test WF", "user_id": "user1"}
+
+        result_doc = {
+            "workflow": "wf-1",
+            "_id": "res-1",
+            "final_output": {"output": "# Report\n\nBody text."},
+        }
+        storage_config = {
+            "destination_folder": "folder-1", "format": "docx",
+            "skip_semantic_ingestion": True,
+        }
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            path = save_results_to_folder(result_doc, storage_config)
+            assert path.endswith(".docx")
+            # .docx is a ZIP container — check the magic bytes
+            assert Path(path).read_bytes()[:4] == b"PK\x03\x04"
+            saved = mock_db.smart_document.insert_one.call_args[0][0]
+            assert saved["extension"] == "docx"
+            assert saved["raw_text"], "raw_text must be populated for downstream chaining"
+
+    def test_unsupported_format_raises_value_error(self, tmp_path):
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "WF", "user_id": "user1"}
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            with pytest.raises(ValueError, match="Unsupported output format"):
+                save_results_to_folder(
+                    {"workflow": "wf-1", "_id": "res-1", "final_output": {"output": "x"}},
+                    {"destination_folder": "folder-1", "format": "xlsx"},
+                )
+            mock_db.smart_document.insert_one.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

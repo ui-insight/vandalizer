@@ -12,6 +12,7 @@ from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, Workfl
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
+from app.models.verification import VerificationRequest, VerificationStatus
 
 log = logging.getLogger(__name__)
 
@@ -785,10 +786,11 @@ async def _validate_advanced_nodes(user_id: str) -> dict:
 
     # Task names are stored verbatim from the workflow editor palette
     # (WorkflowEditorPanel TASK_TYPES) and the engine factory in
-    # build_workflow_engine — e.g. "ResearchNode", not "Research". CodeNode is
-    # admin-only and hidden from the palette, so a non-admin trainee completes
-    # this module via the Research / API / Crawler nodes that are reachable in
-    # the UI; CodeNode and Browser still count for admins who can add them.
+    # build_workflow_engine — e.g. "ResearchNode" (shown in the UI as "Deep
+    # Analysis"), not the display label. CodeNode is admin-only and hidden from
+    # the palette, so a non-admin trainee completes this module via the Deep
+    # Analysis / API / Crawler nodes that are reachable in the UI; CodeNode and
+    # Browser still count for admins who can add them.
     advanced_task_names = {"CodeNode", "APINode", "ResearchNode", "CrawlerNode", "Browser"}
 
     for wf in workflows:
@@ -805,7 +807,7 @@ async def _validate_advanced_nodes(user_id: str) -> dict:
                     has_advanced = True
                     advanced_types.add(task.name)
 
-    checks.append({"name": "Advanced node type", "passed": has_advanced, "detail": "Use a Research, API, or Crawler node (Code Execution is admin-only)"})
+    checks.append({"name": "Advanced node type", "passed": has_advanced, "detail": "Use a Deep Analysis, API, or Crawler node (Code Execution is admin-only)"})
     checks.append({"name": "Parallel tasks", "passed": has_parallel, "detail": f"Max {max_parallel} parallel tasks in a step (need 2+)"})
 
     passed = all(c["passed"] for c in checks)
@@ -963,18 +965,37 @@ async def _validate_batch_processing(user_id: str) -> dict:
 
 
 async def _validate_governance(user_id: str) -> dict:
+    """Governance module.
+
+    Passing is gated on *submitting* a workflow for verification — an action the
+    learner controls — not on an examiner approving it. Approval happens on the
+    examiner's schedule (often days or weeks later), so gating the final module
+    on it left every certifying user blocked on another person. Approved
+    submissions still earn the extra stars, so the credential keeps its teeth.
+    """
     checks = []
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
 
-    verified_count = sum(1 for wf in workflows if wf.verified)
+    requests = await VerificationRequest.find(
+        {"item_kind": "workflow", "submitter_user_id": user_id}
+    ).to_list()
+    submitted_count = len(requests)
+    approved_count = sum(1 for r in requests if r.status == VerificationStatus.APPROVED.value)
 
-    checks.append({"name": "Verified workflow", "passed": verified_count >= 1, "detail": f"Have {verified_count} verified workflows (need 1+)"})
+    # Users who already earned stars against verified workflows keep them, even
+    # if the request record is missing (pre-queue verifications, seeded items).
+    verified_count = max(approved_count, sum(1 for wf in workflows if wf.verified))
+
+    detail = f"Submitted {submitted_count} workflow(s) for verification (need 1+)"
+    if submitted_count:
+        detail += f" — {verified_count} approved so far; approval is not required to pass"
+    checks.append({"name": "Submitted for verification", "passed": submitted_count >= 1, "detail": detail})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
-    if passed and verified_count >= 2:
+    if passed and verified_count >= 1:
         stars = 2
-    if passed and verified_count >= 3:
+    if passed and verified_count >= 2:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}

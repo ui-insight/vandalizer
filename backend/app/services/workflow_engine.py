@@ -16,7 +16,7 @@ import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NoReturn
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
@@ -246,27 +246,47 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
                    usage_acc: UsageAccumulator | None = None):
     """Run a chat prompt via LLM. Sync context."""
     if data is None or data == "":
-        data_block = "(No data provided.)"
+        has_context = False
+        data_block = ""
     elif isinstance(data, str):
+        has_context = True
         data_block = data
     else:
+        has_context = True
         try:
             data_block = json.dumps(data, indent=2, default=str)
         except (TypeError, ValueError):
             data_block = str(data)
 
-    output_prompt = (
-        "You are completing one step of a multi-step workflow. Answer the "
-        "INSTRUCTION below using ONLY the CONTEXT block, which is the output "
-        "of the previous step. Do not draw on outside knowledge or invent "
-        "details that are not present in the CONTEXT. If the CONTEXT does not "
-        "contain what the instruction needs, say so explicitly rather than "
-        "guessing.\n\n"
-        "Format your answer as clean markdown for a web chat UI. Output only "
-        "the markdown — no preamble, no code fences around the whole reply.\n\n"
-        f"INSTRUCTION:\n{prompt}\n\n"
-        f"CONTEXT:\n{data_block}"
-    )
+    if has_context:
+        # Grounded mode: an upstream step (or document) supplied context, so
+        # constrain the answer to it — this is what keeps multi-step chains
+        # faithful and prevents hallucination.
+        output_prompt = (
+            "You are completing one step of a multi-step workflow. Answer the "
+            "INSTRUCTION below using ONLY the CONTEXT block, which is the output "
+            "of the previous step. Do not draw on outside knowledge or invent "
+            "details that are not present in the CONTEXT. If the CONTEXT does not "
+            "contain what the instruction needs, say so explicitly rather than "
+            "guessing.\n\n"
+            "Format your answer as clean markdown for a web chat UI. Output only "
+            "the markdown — no preamble, no code fences around the whole reply.\n\n"
+            f"INSTRUCTION:\n{prompt}\n\n"
+            f"CONTEXT:\n{data_block}"
+        )
+    else:
+        # Standalone mode: no upstream context exists (e.g. a "No Input"
+        # workflow, or the first step running directly). There is nothing to
+        # ground against, so answer the instruction on its own merits instead
+        # of reporting that "the context does not contain the information."
+        output_prompt = (
+            "You are completing one step of a workflow that runs without any "
+            "input document or prior-step context. Complete the INSTRUCTION "
+            "below directly, drawing on your own knowledge.\n\n"
+            "Format your answer as clean markdown for a web chat UI. Output only "
+            "the markdown — no preamble, no code fences around the whole reply.\n\n"
+            f"INSTRUCTION:\n{prompt}"
+        )
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
     result = chat_agent.run_sync(output_prompt)
     if usage_acc:
@@ -402,17 +422,25 @@ class MultiTaskNode(Node):
         task_step_name = self.name
         merged_sources: list[dict] = []
         warnings: list[str] = []
+        errors: list[str] = []
+        request_preview = None
         for result in results:
             if result.get("_approval_pause"):
                 return result
-            # Citations and warnings must survive the wrapper even when a task
-            # produced no output (e.g. a failed KB lookup reports a warning).
+            # Citations, warnings, errors, and the API request preview must
+            # survive the wrapper even when a task produced no output (e.g. a
+            # failed KB lookup reports a warning, a blocked API call an error).
             sources = result.get("retrieved_sources")
             if isinstance(sources, list):
                 merged_sources.extend(sources)
             warning = result.get("warning")
             if isinstance(warning, str) and warning:
                 warnings.append(warning)
+            error = result.get("error")
+            if isinstance(error, str) and error:
+                errors.append(error)
+            if isinstance(result.get("request"), dict):
+                request_preview = result["request"]
             result_output = result.get("output")
             if result_output is None:
                 continue
@@ -432,6 +460,10 @@ class MultiTaskNode(Node):
             out["retrieved_sources"] = merged_sources
         if warnings:
             out["warning"] = " | ".join(warnings)
+        if errors:
+            out["error"] = " | ".join(errors)
+        if request_preview is not None:
+            out["request"] = request_preview
         return out
 
 
@@ -567,16 +599,22 @@ class WebsiteNode(Node):
         from app.services.web_fetcher import fetch_url_sync
 
         self.report_progress(f"Fetching {url}")
+        error = None
         try:
             result = fetch_url_sync(url)
             text = result.text
         except ValueError as e:
-            text = f"Blocked URL: {e}"
-        except httpx.HTTPStatusError as e:
-            text = f"HTTP error fetching {url}: {e.response.status_code}"
-        except httpx.RequestError as e:
-            text = f"Request error fetching {url}: {e}"
-        return {"output": text, "input": inputs.get("output"), "step_name": self.name}
+            error = f"Blocked URL: {e}"
+            text = error
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            from app.utils.fetch_errors import describe_fetch_error
+
+            error = f"Could not fetch {url}: {describe_fetch_error(e)}"
+            text = error
+        out = {"output": text, "input": inputs.get("output"), "step_name": self.name}
+        if error:
+            out["error"] = error
+        return out
 
 
 class AddDocumentNode(Node):
@@ -637,6 +675,7 @@ class CodeExecutionNode(Node):
         except (ValueError, SyntaxError) as e:
             return {
                 "output": f"Code rejected: {e}",
+                "error": f"Code rejected: {e}",
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
@@ -648,8 +687,10 @@ class CodeExecutionNode(Node):
         )
 
         if result.get("timed_out"):
+            timeout_msg = f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds"
             return {
-                "output": f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds",
+                "output": timeout_msg,
+                "error": timeout_msg,
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
@@ -657,6 +698,7 @@ class CodeExecutionNode(Node):
         if "error" in result:
             return {
                 "output": f"Code execution error: {result['error']}",
+                "error": f"Code execution error: {result['error']}",
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
@@ -685,42 +727,79 @@ class CrawlerNode(Node):
         try:
             validate_outbound_url(start_url)
         except ValueError as e:
-            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": f"Blocked URL: {e}",
+                "error": f"Blocked URL: {e}",
+                "input": inputs.get("output"),
+                "step_name": self.name,
+            }
+
+        from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
+        from app.utils.url_validation import normalize_crawl_url
 
         self.report_progress(f"Crawling from {start_url}")
-        parsed_start = urlparse(start_url)
-        allowed = {d.strip() for d in allowed_domains.split(",") if d.strip()} if allowed_domains else {parsed_start.netloc}
+        scope = parse_crawl_scope(allowed_domains, start_url)
 
         visited = set()
         to_visit = [start_url]
         all_text = []
+        blocked = 0
+        fetches = 0
+        # Max Pages counts pages of real content; blocked/failed fetches don't
+        # consume a slot. This cap bounds total fetch attempts so a site that
+        # blocks every request can't keep the crawl running indefinitely.
+        max_fetches = max_pages * 5
 
         with httpx.Client(timeout=30, follow_redirects=True) as client:
-            while to_visit and len(visited) < max_pages:
+            while to_visit and len(all_text) < max_pages and fetches < max_fetches:
                 url = to_visit.pop(0)
-                if url in visited:
+                # Dedup on the normalized form so spelling variants of the same
+                # page (trailing slash, #fragment) don't each consume a slot.
+                page_key = normalize_crawl_url(url)
+                if page_key in visited:
                     continue
-                visited.add(url)
-                self.report_progress(f"Crawling page {len(visited)}/{max_pages}: {url}")
+                visited.add(page_key)
+                fetches += 1
+                self.report_progress(f"Crawling page {len(all_text) + 1}/{max_pages}: {url}")
                 try:
                     resp = client.get(url)
                     resp.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    # Challenge pages are often served with a 403/503 status —
+                    # recognize them so the user learns the site blocked us.
+                    if looks_like_bot_challenge(_extract_text_from_html(e.response.text)):
+                        blocked += 1
+                    continue
                 except Exception:
                     continue
+                # A redirect lands on a different spelling of the same page
+                # (uidaho.edu → www.uidaho.edu) — stamp the landing URL so the
+                # page can't be fetched again under it.
+                visited.add(normalize_crawl_url(str(resp.url)))
                 text = _extract_text_from_html(resp.text)
+                if looks_like_bot_challenge(text):
+                    # Bot-verification interstitial, not real content: exclude
+                    # the junk text, don't follow its links, don't use a slot.
+                    blocked += 1
+                    continue
                 all_text.append(f"--- {url} ---\n{text}")
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for link in soup.find_all("a", href=True):
                     abs_url = urljoin(url, link["href"])
-                    parsed = urlparse(abs_url)
-                    if parsed.netloc in allowed and abs_url not in visited:
+                    if url_in_crawl_scope(abs_url, scope) and normalize_crawl_url(abs_url) not in visited:
                         try:
                             validate_outbound_url(abs_url)
                             to_visit.append(abs_url)
                         except ValueError:
                             continue
 
-        return {"output": "\n\n".join(all_text), "input": inputs.get("output"), "step_name": self.name}
+        output = "\n\n".join(all_text)
+        if blocked:
+            note = f"{blocked} page(s) skipped — blocked by bot protection"
+            self.report_progress(note)
+            output = f"{output}\n\n[{note}]" if output else f"[No page content retrieved — {note}]"
+        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
 
 
 class ResearchNode(Node):
@@ -844,6 +923,19 @@ class APICallNode(Node):
         super().__init__("APINode")
         self.data = data
 
+    def _error_result(self, message: str, inputs, *, output=None, request=None) -> dict:
+        """A failed-step result: ``error`` carries the concise failure message
+        (becomes the run's error), ``output`` the full diagnostic text."""
+        result = {
+            "output": output if output is not None else message,
+            "error": message,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
+        if request is not None:
+            result["request"] = request
+        return result
+
     def process(self, inputs):
         from app.utils import templating
 
@@ -862,7 +954,7 @@ class APICallNode(Node):
                 self.data.get("headers", ""), inputs, json_encode=False
             )
         except templating.TemplateError as e:
-            return {"output": str(e), "input": inputs.get("output"), "step_name": self.name}
+            return self._error_result(str(e), inputs)
         body_raw = self.data.get("body", "")
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
@@ -872,7 +964,7 @@ class APICallNode(Node):
         try:
             validate_outbound_url(url)
         except ValueError as e:
-            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+            return self._error_result(f"Blocked URL: {e}", inputs)
 
         self.report_progress(f"{method} {url}")
         headers: dict[str, str] = {}
@@ -880,33 +972,25 @@ class APICallNode(Node):
             try:
                 parsed = json.loads(headers_raw)
             except json.JSONDecodeError as e:
-                return {
-                    "output": (
-                        f"Invalid Headers JSON: {e}. "
-                        "Check for smart quotes or other invisible characters."
-                    ),
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(
+                    f"Invalid Headers JSON: {e}. "
+                    "Check for smart quotes or other invisible characters.",
+                    inputs,
+                )
             if not isinstance(parsed, dict):
-                return {
-                    "output": (
-                        "Invalid Headers JSON: expected an object like "
-                        '{"x-api-key": "..."}'
-                    ),
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(
+                    'Invalid Headers JSON: expected an object like {"x-api-key": "..."}',
+                    inputs,
+                )
             headers = {str(k): str(v) for k, v in parsed.items()}
 
         # Apply credential-based auth (overrides any conflicting header).
         if auth_strategy != "none":
             if not credential_id:
-                return {
-                    "output": f"API Node auth_strategy {auth_strategy!r} requires credential_id",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(
+                    f"API Node auth_strategy {auth_strategy!r} requires credential_id",
+                    inputs,
+                )
             from app.services import credentials_service
 
             try:
@@ -914,34 +998,19 @@ class APICallNode(Node):
                 cred_doc = credentials_service.fetch_credential_sync(db, credential_id)
             except Exception as e:
                 logger.exception("Credential lookup failed")
-                return {
-                    "output": f"Credential lookup failed: {e}",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(f"Credential lookup failed: {e}", inputs)
             if not cred_doc:
-                return {
-                    "output": f"Credential {credential_id!r} not found",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(f"Credential {credential_id!r} not found", inputs)
             if cred_doc.get("type") != auth_strategy:
-                return {
-                    "output": (
-                        f"Credential type {cred_doc.get('type')!r} does not match "
-                        f"auth_strategy {auth_strategy!r}"
-                    ),
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(
+                    f"Credential type {cred_doc.get('type')!r} does not match "
+                    f"auth_strategy {auth_strategy!r}",
+                    inputs,
+                )
             try:
                 credentials_service.apply_auth(credential_doc=cred_doc, headers=headers)
             except credentials_service.CredentialError as e:
-                return {
-                    "output": f"Auth setup failed: {e}",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
+                return self._error_result(f"Auth setup failed: {e}", inputs)
 
         body = None
         body_is_json = False
@@ -953,11 +1022,7 @@ class APICallNode(Node):
                 try:
                     rendered_body = templating.render(body_raw, inputs, json_encode=True)
                 except templating.TemplateError as e:
-                    return {
-                        "output": str(e),
-                        "input": inputs.get("output"),
-                        "step_name": self.name,
-                    }
+                    return self._error_result(str(e), inputs)
                 try:
                     parsed = json.loads(rendered_body)
                 except json.JSONDecodeError:
@@ -1010,25 +1075,21 @@ class APICallNode(Node):
                 resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
                 resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            return {
-                "output": (
-                    f"HTTP error: {e.response.status_code} {e.response.text[:500]}\n\n"
-                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
-                ),
-                "input": inputs.get("output"),
-                "step_name": self.name,
-                "request": request_preview,
-            }
+            message = f"HTTP error: {e.response.status_code} {e.response.text[:500]}"
+            return self._error_result(
+                message,
+                inputs,
+                output=f"{message}\n\n--- Request sent ---\n{_format_request_preview(request_preview)}",
+                request=request_preview,
+            )
         except httpx.RequestError as e:
-            return {
-                "output": (
-                    f"Request error: {e}\n\n"
-                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
-                ),
-                "input": inputs.get("output"),
-                "step_name": self.name,
-                "request": request_preview,
-            }
+            message = f"Request error: {e}"
+            return self._error_result(
+                message,
+                inputs,
+                output=f"{message}\n\n--- Request sent ---\n{_format_request_preview(request_preview)}",
+                request=request_preview,
+            )
 
         try:
             output = resp.json()
@@ -1417,6 +1478,32 @@ class WorkflowCancelled(Exception):
     ``canceled``), not an error, and must not retry the task."""
 
 
+class WorkflowStepError(Exception):
+    """Raised inside execute() when a step reports a failure via the ``error``
+    key on its result dict (blocked URL, HTTP failure, bad config, ...).
+
+    Callers should mark the run failed with this message and must not retry
+    the task — the failure is deterministic, not transient. The step's full
+    result (including any request preview) is persisted to steps_output
+    before this is raised, so the run record keeps the debugging detail."""
+
+    def __init__(self, step_name: str, message: str, step_output: dict | None = None) -> None:
+        self.step_name = step_name
+        self.message = message
+        # Not part of args: it exists for in-process callers (e.g. Test Step)
+        # that want the full step result — request preview and all — without
+        # it having to survive a result-backend round trip.
+        self.step_output = step_output
+        # args must stay exactly the constructor's required arguments: Celery's
+        # JSON result backend reconstructs exceptions as cls(*args), so a
+        # single pre-formatted string here would make reconstruction fall back
+        # to a mangled generic Exception on every poll of a failed task.
+        super().__init__(step_name, message)
+
+    def __str__(self) -> str:
+        return f"{self.step_name} step failed: {self.message}"
+
+
 class WorkflowEngine:
     def __init__(self) -> None:
         self.nodes: list[Node] = []
@@ -1501,8 +1588,12 @@ class WorkflowEngine:
 
             latest_output = output
 
-            # Check for approval pause signal
+            # Check for approval pause signal. Stamp the index of the node that
+            # paused: every ApprovalNode is named "Approval", so a workflow with
+            # more than one gate can't be resolved by name alone, and the caller
+            # needs the exact index to resume past *this* gate.
             if latest_output and latest_output.get("_approval_pause"):
+                latest_output["_paused_step_index"] = idx
                 return latest_output, data
 
             if workflow_result_updater:
@@ -1511,6 +1602,14 @@ class WorkflowEngine:
                     f"steps_output.{step_name}": output,
                     "num_steps_completed": idx,
                 })
+
+            # A step that reported a failure halts the run. Its error text must
+            # not flow downstream as step input or become the deliverable — the
+            # run fails with the step's message. The full step result (request
+            # preview etc.) was persisted to steps_output just above.
+            step_error = latest_output.get("error") if isinstance(latest_output, dict) else None
+            if isinstance(step_error, str) and step_error:
+                raise WorkflowStepError(node.name, step_error, step_output=latest_output)
 
             entry = {
                 "name": node.name,
@@ -1585,6 +1684,8 @@ def _output_looks_empty_or_error(output: dict | None) -> bool:
     obviously dead outputs so we don't pay a retry on every borderline run.
     """
     if not output:
+        return True
+    if output.get("error"):
         return True
     val = output.get("output")
     if val is None:

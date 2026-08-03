@@ -26,7 +26,20 @@ export default function WorkflowEditor() {
         replace: true,
       })
     } else {
-      navigate({ to: '/workflows', replace: true })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: undefined,
+          extraction: undefined,
+          automation: undefined,
+          kb: undefined,
+          project: undefined,
+          workflow_share_token: undefined,
+        },
+        replace: true,
+      })
     }
   }, [id, navigate])
 

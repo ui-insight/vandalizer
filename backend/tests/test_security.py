@@ -38,6 +38,18 @@ def test_refresh_token_roundtrip():
     assert payload["type"] == "refresh"
 
 
+def test_tokens_embed_token_version():
+    access = create_access_token("user123", _TEST_SETTINGS, token_version=7)
+    refresh = create_refresh_token("user123", _TEST_SETTINGS, token_version=7)
+    assert decode_token(access, _TEST_SETTINGS)["ver"] == 7
+    assert decode_token(refresh, _TEST_SETTINGS)["ver"] == 7
+
+
+def test_token_version_defaults_to_zero():
+    payload = decode_token(create_access_token("user123", _TEST_SETTINGS), _TEST_SETTINGS)
+    assert payload["ver"] == 0
+
+
 def test_decode_invalid_token_returns_none():
     assert decode_token("not-a-real-token", _TEST_SETTINGS) is None
 

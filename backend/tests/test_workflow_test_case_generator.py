@@ -342,6 +342,31 @@ async def test_accept_skips_missing_result():
     assert result["skipped"][0]["reason"] == "result not found"
 
 
+@pytest.mark.asyncio
+async def test_accept_raises_permission_error_for_view_only_user():
+    """A user with view but not manage access gets PermissionError (→ 403),
+    not the misleading "Workflow not found" (→ 404)."""
+    wf = _make_workflow()
+    user = MagicMock(); user.user_id = "u"
+
+    with patch(
+        "app.services.workflow_service.get_authorized_workflow",
+        new=AsyncMock(side_effect=lambda wid, u, **kw: None if kw.get("manage") else wf),
+    ):
+        with pytest.raises(PermissionError, match="permission"):
+            await accept_proposals("wfid", user, ["s1"])
+
+
+@pytest.mark.asyncio
+async def test_accept_raises_when_workflow_not_found():
+    user = MagicMock(); user.user_id = "u"
+
+    with patch("app.services.workflow_service.get_authorized_workflow",
+               new=AsyncMock(return_value=None)):
+        with pytest.raises(ValueError, match="not found"):
+            await accept_proposals("missing", user, ["s1"])
+
+
 # ---------------------------------------------------------------------------
 # synthesize_seed_input
 # ---------------------------------------------------------------------------

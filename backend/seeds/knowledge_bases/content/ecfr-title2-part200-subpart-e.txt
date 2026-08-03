@@ -1,0 +1,871 @@
+Subpart E—Cost Principles
+
+General Provisions
+
+§ 200.400 Policy guide.
+
+The application of these cost principles is based on the fundamental premises that:
+(a) The recipient and subrecipient are responsible for the efficient and effective administration of the Federal award through sound management practices.
+(b) The recipient and subrecipient are responsible for administering Federal funds in a manner consistent with Federal statutes, regulations, and the terms and conditions of the Federal award.
+(c) The recipient and subrecipient, in recognition of their unique combination of staff, facilities, and experience, are responsible for employing organization and management techniques necessary to ensure the proper and efficient administration of the Federal award.
+(d) The accounting practices of the recipient and subrecipient must be consistent with these cost principles and support the accumulation of costs as required by these cost principles, including maintaining adequate documentation to support costs charged to the Federal award.
+(e) When reviewing, negotiating, and approving cost allocation plans or indirect cost proposals, the cognizant agency for indirect costs should ensure that the recipient consistently applies these cost principles. Where wide variations exist in the treatment of a given cost item by the recipient, the reasonableness and equity of such treatments should be fully considered. See the definition of indirect costs in § 200.1.
+(f) For recipients and subrecipients that educate and engage students in research, the dual role of students as both trainees and employees (including pre- and post-doctoral staff) contributing to the completion of Federal awards for research must be recognized in the application of these principles.
+(g) The recipient or subrecipient must not earn or keep any profit resulting from Federal financial assistance unless explicitly authorized by the terms and conditions of the Federal award. See also § 200.307. When the required activities of a fixed amount award were completed in accordance with the terms and conditions of the award, the unexpended funds retained by the recipient or subrecipient are not considered profit.
+
+§ 200.401 Application.
+
+(a) General. The recipient and subrecipient must apply these principles in determining allowable costs under Federal awards. The recipient and subrecipient must also use these principles as a guide in pricing fixed-price contracts and subcontracts when costs are used in determining the appropriate price. These cost principles do not apply to:
+(1) Arrangements under which Federal financing is in the form of loans, scholarships, fellowships, traineeships, or other fixed amounts based on items such as education allowance or published tuition rates and fees.
+(2) Capitation awards based on case counts or the number of beneficiaries.
+(3) Fixed amount awards, except as provided in § 200.101(b). See also § 200.201.
+(4) Federal awards to hospitals (see Appendix IX of this part).
+(5) Food commodities provided through grants and cooperative agreements.
+(6) Other awards under which the recipient or subrecipient is not required to account for actual costs incurred.
+(b) Federal contract. A Federal contract awarded to a recipient is subject to the Cost Accounting Standards (CAS). It must incorporate the applicable CAS requirements per 48 CFR Chapter 99 and 48 CFR part 30 (FAR Part 30). With respect to the allocation of costs, the Cost Accounting Standards at 48 CFR parts 9904 or 9905 take precedence over the cost principles in subpart E. When a contract with a recipient is subject to full CAS coverage, the allowability of certain costs under the cost principles will be affected by the allocation provisions of the Cost Accounting Standards (for example, CAS 414—48 CFR 9904.414—Cost of Money as an Element of the Cost of Facilities Capital, and CAS 417—48 CFR 9904.417—Cost of Money as an Element of the Cost of Capital Assets Under Construction, apply instead of the allowability provisions of § 200.449). For example, the allowability of costs in CAS-covered contracts is determined first by the allocation provisions of the Cost Accounting Standards rather than the allowability provisions in § 200.449 (unless the CAS does not address the specific costs). In complying with those requirements, the recipient's application of cost accounting practices for estimating, accumulating, and reporting costs for Federal awards and CAS-covered contracts must be consistent with 48 CFR. The recipient only needs to maintain one set of accounting records supporting the allocation of costs if the recipient administers both Federal awards and CAS-covered contracts.
+(c) Exemptions. Some nonprofit organizations, because of their size and nature of operations, can be considered to be similar to for-profit organizations in terms of the applicability of cost principles. These nonprofit organizations must operate under Federal cost principles that apply to for-profit organizations located at 48 CFR 31.2. Appendix VIII contains a list of these nonprofit organizations. Other organizations may be added to this list if approved by the cognizant agency for indirect costs.
+
+Basic Considerations
+
+§ 200.402 Composition of costs.
+
+The total cost of a Federal award is the sum of the allowable direct and allocable indirect costs minus any applicable credits
+
+§ 200.403 Factors affecting allowability of costs.
+
+Except where otherwise authorized by statute, costs must meet the following criteria to be allowable under Federal awards:
+(a) Be necessary and reasonable for the performance of the Federal award and be allocable thereto under these principles.
+(b) Conform to any limitations or exclusions set forth in these principles or in the Federal award as to types or amount of cost items.
+(c) Be consistent with policies and procedures that apply uniformly to both federally financed and other activities of the recipient or subrecipient.
+(d) Be accorded consistent treatment. For example, a cost must not be assigned to a Federal award as a direct cost if any other cost incurred for the same purpose in like circumstances has been allocated to the Federal award as an indirect cost.
+(e) Be determined in accordance with generally accepted accounting principles (GAAP), except, for State and local governments and Indian Tribes only, as otherwise provided for in this part.
+(f) Not be included as a cost or used to meet cost sharing requirements of any other federally-financed program in either the current or a prior period. See § 200.306(b).
+(g) Be adequately documented. See §§ 200.300 through 200.309.
+(h) Administrative closeout costs may be incurred until the due date of the final report(s). If incurred, these costs must be liquidated prior to the due date of the final report(s) and charged to the final budget period of the award unless otherwise specified by the Federal agency. All other costs must be incurred during the approved budget period. At its discretion, the Federal agency is authorized to waive prior written approvals to carry forward unobligated balances to subsequent budget periods. See § 200.308(g)(3).
+
+§ 200.404 Reasonable costs.
+
+A cost is reasonable if it does not exceed an amount that a prudent person would incur under the circumstances prevailing when the decision was made to incur the cost. In determining the reasonableness of a given cost, consideration must be given to the following:
+(a) Whether the cost is generally recognized as ordinary and necessary for the recipient's or subrecipient's operation or the proper and efficient performance of the Federal award;
+(b) The restraints or requirements imposed by such factors as sound business practices; arm's-length bargaining; Federal, State, local, tribal, and other laws and regulations; and terms and conditions of the Federal award;
+(c) Market prices for comparable costs for the geographic area;
+(d) Whether the individuals concerned acted with prudence in the circumstances considering their responsibilities to the recipient or subrecipient, its employees, its students or membership (if applicable), the public at large, and the Federal Government; and
+(e) Whether the cost represents a deviation from the recipient's or subrecipient's established written policies and procedures for incurring costs.
+
+§ 200.405 Allocable costs.
+
+(a) Allocable costs in general. A cost is allocable to a Federal award or other cost objective if the cost is assignable to that Federal award or other cost objective in accordance with the relative benefits received. This standard is met if the cost satisfies any of the following criteria:
+(1) Is incurred specifically for the Federal award;
+(2) Benefits both the Federal award and other work of the recipient or subrecipient and can be distributed in proportions that may be approximated using reasonable methods; or
+(3) Is necessary to the overall operation of the recipient or subrecipient and is assignable in part to the Federal award in accordance with these cost principles.
+(b) Allocation of indirect costs. All activities which benefit from the recipient's or subrecipient's indirect cost, including unallowable activities and donated services by the recipient or subrecipient or third parties, will receive an appropriate allocation of indirect costs.
+(c) Limitation on charging certain allocable costs to other Federal awards. A cost allocable to a particular Federal award may not be charged to other Federal awards (for example, to overcome fund deficiencies or to avoid restrictions imposed by Federal statutes, regulations, or the terms and conditions of the Federal awards). However, this prohibition would not preclude the recipient or subrecipient from shifting costs that are allowable under two or more Federal awards in accordance with existing Federal statutes, regulations, or the terms and conditions of the Federal awards.
+(d) Direct cost allocation principles. If a cost benefits two or more projects or activities in proportions that can be determined without undue effort or cost, the cost must be allocated to the projects based on the proportional benefit. However, when those proportions cannot be determined because of the interrelationship of the work involved, then, notwithstanding paragraph (c), the costs may be allocated or transferred to benefitted projects on any reasonable documented basis. Where the purchase of equipment or other capital asset is specifically authorized under a Federal award, the costs are assignable to the Federal award regardless of the use that may be made of the equipment or other capital asset involved, when no longer needed for the purpose for which it was originally required. See also §§ 200.310 through 200.316 and 200.439.
+(e) Costs of contracts subject to CAS. If a contract is subject to CAS, costs must be allocated to that contract according to the Cost Accounting Standards, which take precedence over the allocation provisions in this part.
+
+§ 200.406 Applicable credits.
+
+(a) Applicable credits refer to transactions that offset or reduce direct or indirect costs allocable to a Federal award. Examples of such transactions are purchase discounts, rebates or allowances, recoveries or indemnities on losses, insurance refunds or rebates, and adjustments of overpayments or erroneous charges. To the extent that such credits accruing to or received by the recipient or subrecipient relate to allowable costs, they must be credited to the Federal award either as a cost reduction or cash refund, as appropriate.
+(b) In some instances, the amounts received from the Federal Government to finance activities or service operations of the recipient or subrecipient should be treated as applicable credits. Specifically, the concept of netting such credit items (including any amounts used to meet cost sharing requirements) must be recognized in determining the rates or amounts to be charged to the Federal award. See §§ 200.436 and 200.468 for potential application areas.
+
+§ 200.407 Prior written approval (prior approval).
+
+The reasonableness and allocability of certain costs under Federal awards may be difficult to determine. To avoid subsequent disallowance or dispute based on unreasonableness or nonallocability, the recipient may seek the prior written approval of the Federal agency (or, for indirect costs, the cognizant agency for indirect costs) before incurring the cost. The absence of prior written approval on any element of cost will not, in itself, affect the reasonableness or allocability of that cost unless prior approval is specifically required for allowability as described under certain circumstances in the following sections:
+(a) Section 200.306 Cost sharing;
+(b) Section 200.307 Program income;
+(c) Section 200.308 Revision of budget and program plans;
+(d) Section 200.333 Fixed amount subawards;
+(e) Section 200.430 Compensation—personal services, paragraph (h);
+(f) Section 200.431 Compensation—fringe benefits;
+(g) Section 200.439 Equipment and other capital expenditures;
+(h) Section 200.440 Exchange rates;
+(i) Section 200.441 Fines, penalties, damages and other settlements;
+(j) Section 200.442 Fund raising and investment management costs;
+(k) Section 200.445 Goods or services for personal use;
+(l) Section 200.447 Insurance and indemnification;
+(m) Section 200.455 Organization costs;
+(n) Section 200.458 Pre-award costs;
+(o) Section 200.462 Rearrangement and reconversion costs;
+(p) Section 200.475 Travel costs.
+
+§ 200.408 Limitation on allowance of costs.
+
+Statutory requirements may limit the allowability of costs. Any costs that exceed the maximum amount allowed by statute may not be charged to the Federal award. Only the amount allowable by statute may be charged to the Federal award.
+
+§ 200.409 Special considerations.
+
+Other sections in this part describe special considerations and requirements applicable to states, local governments, Indian Tribes, and IHEs. In addition, certain provisions among the items of cost in this subpart are only applicable to certain types of recipients and subrecipients, as specified in the following sections:
+(a) Direct and Indirect Costs (§§ 200.412-200.415);
+(b) Special Considerations for States, Local Governments and Indian Tribes (§§ 200.416 and 200.417); and
+(c) Special Considerations for Institutions of Higher Education (§§ 200.418 and 200.419).
+
+§ 200.410 Collection of unallowable costs.
+
+Payments made for costs determined to be unallowable by either the awarding Federal agency, cognizant agency for indirect costs, or pass-through entity must be refunded with interest to the Federal Government. Unless directed by Federal statute or regulation, repayments must be made in accordance with the instructions provided by the Federal agency or pass-through entity that made the allowability determination. See §§ 200.300 through 200.309, and § 200.346.
+
+§ 200.411 Adjustment of previously negotiated indirect cost rates containing unallowable costs.
+
+(a) Negotiated indirect cost rates based on a proposal later found to have included costs that:
+(1) Are unallowable as specified by Federal statutes, regulations or the terms and conditions of a Federal award; or
+(2) Are unallowable because they are not allocable to the Federal award(s), must be adjusted, or a refund must be made in accordance with the requirements of this section. These adjustments or refunds are intended to correct the proposals used to establish the rates and do not constitute a reopening of the rate negotiation. The adjustments or refunds must be made regardless of the type of rate negotiated (predetermined, final, fixed, or provisional).
+(b) For rates covering a future fiscal year of the recipient or subrecipient, the unallowable costs must be removed from the indirect cost pools and the rates must be adjusted.
+(c) For rates covering a past period, the Federal share of the unallowable costs must be computed for each year involved, and a cash refund (including interest) must be made to the Federal Government in accordance with the directions provided by the cognizant agency for indirect costs. When cash refunds are made for past periods covered by provisional or fixed rates, appropriate adjustments must be made when the rates are finalized to avoid duplicate recovery of the unallowable costs.
+(d) For rates covering the current period, either a rate adjustment or a refund, as described in paragraphs (b) and (c) of this section, must be required by the cognizant agency for indirect costs. The choice of method must be at the discretion of the cognizant agency for indirect costs, based on its judgment as to which method would be most practical.
+(e) The amount or proportion of unallowable costs included in each year's rate will be assumed to be the same as the amount or proportion of unallowable costs included in the base year proposal used to establish the rate.
+
+Direct and Indirect Costs
+
+§ 200.412 Classification of costs.
+
+There is no universal rule for classifying certain costs as direct or indirect costs. A cost may be direct for some specific service or function but indirect for the Federal award or other final cost objective. Therefore, each cost incurred for the same purpose in like circumstances must be treated consistently either as a direct or an indirect cost to avoid possible double-charging of Federal awards. Guidelines for determining direct and indirect costs charged to Federal awards are provided in this subpart.
+
+§ 200.413 Direct costs.
+
+(a) General. Direct costs are those costs that can be identified specifically with a particular final cost objective, such as a Federal award, or other internally or externally funded activity, or that can be directly assigned to such activities relatively easily with a high degree of accuracy. Costs incurred for the same purpose in like circumstances must be treated consistently as direct or indirect costs. See § 200.405.
+(b) Application to Federal awards. The association of costs with a Federal award determines whether costs are direct or indirect. Costs charged directly to a Federal award are typically incurred specifically for that Federal award (including, for example, supplies needed to achieve the award's objectives and the proportion of employee compensation and fringe benefits expended in relation to that specific award). Costs that otherwise would be treated as indirect costs may also be considered direct costs if they are directly related to a specific award (including, for example, extraordinary utility consumption, the cost of materials supplied from stock or services rendered by specialized facilities, cybersecurity, integrated data systems, asset management systems, performance management costs, program evaluation costs, or other institutional service operations).
+(c) Administrative and clerical staff salaries. Administrative and clerical staff salaries should normally be treated as indirect costs. Direct charging of these costs may be appropriate only if they meet all of the following conditions:
+(1) The administrative or clerical services are integral to a Federal award;
+(2) Individuals involved can be specifically identified with a Federal award; and
+(3) The costs are not also recovered as indirect costs.
+(d) Minor items. A direct cost of a minor amount may be treated as an indirect cost, for reasons of practicality, provided that it is treated consistently for all Federal and non-Federal purposes.
+(e) Treatment of unallowable costs in determining indirect cost rates. The costs of certain activities are not allowable as charges to Federal awards. Even though these costs are unallowable, they must be treated as direct costs for purposes of determining indirect cost rates and be allocated their equitable share of the recipient's or subrecipient's indirect costs if they represent activities which:
+(1) Include the salaries of personnel;
+(2) Occupy space; and
+(3) Benefit from the recipient's or subrecipient's indirect costs.
+(f) Treatment of certain costs for nonprofit organizations. For nonprofit organizations, the costs of activities performed by the nonprofit organization primarily as a service to members, clients, or the general public when significant and necessary to the organization's mission must be treated as direct costs whether or not allowable, and be allocated an equitable share of indirect costs. Some examples of these types of activities include:
+(1) Maintenance of membership rolls, subscriptions, publications, and related functions. See § 200.454.
+(2) Providing services and information to members, the government, or the public. See §§ 200.454 and 200.450.
+(3) Promotion, lobbying, and other forms of public relations. See §§ 200.421 and 200.450.
+(4) Conferences (except those held to conduct the general administration of the recipient or subrecipient). See also § 200.432.
+(5) Maintenance, protection, and investment of special funds not used in the recipient's or subrecipient's operation. See also § 200.442.
+(6) Administration of group benefits on behalf of members or clients, including life and hospital insurance, annuity or retirement plans, and financial aid. See also § 200.431.
+
+§ 200.414 Indirect costs.
+
+(a) Facilities and administration classification. For major Institutions of Higher Education (IHE) and major nonprofit organizations, indirect costs must be classified within two broad categories: “Facilities” and “Administration.” “Facilities” is defined as depreciation on buildings, equipment and capital improvements, interest on debt associated with certain buildings, equipment and capital improvements, and operations and maintenance expenses. “Administration” is defined as general administration and general expenses such as the director's office, accounting, personnel, and all other types of expenditures not listed specifically under one of the subcategories of “Facilities” (including cross allocations from other pools, where applicable). For nonprofit organizations, library expenses are included in the “Administration” category; for IHEs, they are included in the “Facilities” category. Major IHEs are defined as those required to use the Standard Format for Submission as noted in Appendix III. Major nonprofit organizations are those which receive more than $10 million in direct Federal funding.
+(b) Diversity of nonprofit organizations. It is not always possible to specify the types of costs that may be classified as indirect costs for nonprofit organizations due to the diversity of their accounting practices. The association of a cost with a Federal award is the determining factor in distinguishing direct from indirect costs. However, typical examples of indirect cost for many nonprofit organizations may include depreciation on buildings and equipment, the costs of operating and maintaining facilities, and general administration and general expenses, such as the salaries and expenses of executive officers, personnel administration, and accounting.
+(c) Federal Agency Acceptance of Negotiated Indirect Cost Rates. (See § 200.306.)
+(1) Negotiated indirect cost rates must be accepted by all Federal agencies. A Federal agency may use a rate different from the negotiated rate for either a class of Federal awards or a single Federal award only when required by Federal statute or regulation, or when approved by the awarding Federal agency in accordance with paragraph (c)(3) of this section.
+(2) The Federal agency must notify OMB of any approved deviations. The recipient or subrecipient may notify OMB of any disputes with Federal agencies regarding the application of a federally negotiated indirect cost rate.
+(3) The Federal agency must implement, and make publicly available, the policies, procedures and general decision-making criteria that their programs will follow to seek and justify deviations from negotiated rates.
+(4) The Federal agency must include, in the notice of funding opportunity, the policies relating to indirect cost rate reimbursement or cost share as approved under paragraph (e). As appropriate, the Federal agency should incorporate discussion of these policies into its outreach activities with applicants before posting a notice of funding opportunity. See § 200.204.
+(d) Pass-through entities. Pass-through entities are subject to the requirements in § 200.332(b)(4) and must accept all federally negotiated indirect costs rates for subrecipients.
+(e) Appendices. Requirements for development and submission of indirect cost rate proposals and cost allocation plans are contained in the following Appendices:
+(1) Appendix III to Part 200—Indirect (F&A) Costs Identification and Assignment, and Rate Determination for Institutions of Higher Education (IHEs);
+(2) Appendix IV to Part 200—Indirect (F&A) Costs Identification and Assignment, and Rate Determination for Nonprofit Organizations;
+(3) Appendix V to Part 200—State/Local Government-wide Central Service Cost Allocation Plans;
+(4) Appendix VI to Part 200—Public Assistance Cost Allocation Plans;
+(5) Appendix VII to Part 200—States and Local Government and Indian Tribe Indirect Cost Proposals; and
+(6) Appendix IX to Part 200—Hospital Cost Principles.
+(f) De minimis rate. Recipients and subrecipients that do not have a current Federal negotiated indirect cost rate (including provisional rate) may elect to charge a de minimis rate of up to 15 percent of modified total direct costs (MTDC). The recipient or subrecipient is authorized to determine the appropriate rate up to this limit. Federal agencies and pass-through entities may not require recipients and subrecipients to use a de minimis rate lower than the negotiated indirect cost rate or the rate elected pursuant to this subsection unless required by Federal statute or regulation. The de minimis rate must not be applied to cost reimbursement contracts issued directly by the Federal Government in accordance with the FAR. Recipients and subrecipients are not required to use the de minimis rate. When applying the de minimis rate, costs must be consistently charged as either direct or indirect costs and may not be double charged or inconsistently charged as both. The de minimis rate does not require documentation to justify its use and may be used indefinitely. Once elected, the recipient or subrecipient must use the de minimis rate for all Federal awards until the recipient or subrecipient chooses to receive a negotiated rate.
+(g) One-time extension of indirect rates. A recipient or subrecipient with a current Federal negotiated indirect cost rate may apply for a one-time extension of that agreement for up to four years. This extension will be subject to review and approval by the cognizant agency for indirect costs. If this extension is granted, the recipient or subrecipient may not request a rate review until the extension period ends. The recipient or subrecipient must re-apply to negotiate a new rate when the extension ends. After a new rate has been negotiated, the recipient or subrecipient may again apply for a one-time extension of the new rate in accordance with this paragraph.
+
+§ 200.415 Required certifications.
+
+(a) Financial reports must include a certification, signed by an official who is authorized to legally bind the recipient, which reads as follows: “By signing this report, I certify to the best of my knowledge and belief that the report is true, complete, and accurate, and the expenditures, disbursements and cash receipts are for the purposes and objectives set forth in the terms and conditions of the Federal award. I am aware that any false, fictitious, or fraudulent information, or the omission of any material fact, may subject me to criminal, civil or administrative penalties for fraud, false statements, false claims or otherwise. (U.S. Code Title 18, Section 1001 and Title 31, Sections 3729-3730 and 3801-3812).”
+(b) Subrecipients under the Federal award must certify to the pass-through entity whenever applying for funds, requesting payment, and submitting financial reports: “I certify to the best of my knowledge and belief that the information provided herein is true, complete, and accurate. I am aware that the provision of false, fictitious, or fraudulent information, or the omission of any material fact, may subject me to criminal, civil, or administrative consequences including, but not limited to violations of U.S. Code Title 18, Sections 2, 1001, 1343 and Title 31, Sections 3729-3730 and 3801-3812.” Each such certification must be maintained pursuant to the requirements of § 200.334. This paragraph applies to all tiers of subrecipients.
+(c) Certification of cost allocation plan or indirect cost rate proposal. Each cost allocation plan or indirect cost rate proposal must comply with the following:
+(1) A proposal to establish a cost allocation plan or an indirect cost rate, whether submitted to a Federal cognizant agency for indirect costs or maintained on file by the recipient, must be certified by the recipient using the Certificate of Cost Allocation Plan or Certificate of Indirect Costs as set forth in appendices III through VII, and IX of this part. The certificate must be signed on behalf of the recipient by an individual at a level no lower than the vice president or chief financial officer of the recipient that submits the proposal.
+(2) The Federal Government may either disallow all indirect costs or unilaterally establish an indirect cost rate when the recipient fails to submit a certified proposal for establishing a rate. This rate should be based upon audited historical data or other data furnished to the cognizant agency for indirect costs and for which it can be demonstrated that all unallowable costs have been excluded. The rate established must ensure that potentially unallowable costs are not reimbursed. Alternatively, the recipient may use the de minimis indirect cost rate. See § 200.414(f).
+(d) Nonprofit organizations must certify that they did not meet the definition of a major nonprofit organization as defined in § 200.414(a), if applicable.
+(e) The recipient must certify that the requirements and standards for lobbying (see § 200.450) have been met when submitting its indirect cost rate proposal.
+
+Special Considerations for States, Local Governments and Indian Tribes
+
+§ 200.416 Cost allocation plans and indirect cost proposals.
+
+(a) Awards to states, local governments, and Indian Tribes are often implemented at the level of department within the State, local government, or Indian Tribe. A central service cost allocation plan is established to allow such department to claim a portion of centralized service costs that are incurred in proportion to the award's activities. Examples of centralized service costs may include motor pools, computer centers, purchasing, and accounting. Since Federal awards are performed within the individual operating agencies, there needs to be a process whereby these central service costs can be identified and assigned to benefitted activities on a reasonable and consistent basis. The central service cost allocation plan establishes this process.
+(b) Individual departments typically charge Federal awards for indirect costs through an indirect cost rate. A separate indirect cost rate proposal for each operating department is usually necessary to claim indirect costs under Federal awards. Indirect costs include:
+(1) The indirect costs originating in each operating department of the State, local government, or Indian Tribe carrying out Federal awards; and
+(2) The costs of central governmental services distributed through the central service cost allocation plan and not otherwise treated as direct costs.
+(c) The requirements for developing and submitting cost allocation plans (for central service costs and public assistance programs) and indirect cost rate proposals are contained in appendices V, VI, and VII of this part.
+
+§ 200.417 Interagency service.
+
+An operating department may provide services to another operating department of the same State, local government, or Indian Tribe. In these instances, the cost of services provided may include allowable direct costs of the service plus a pro-rated share of indirect costs. A standard indirect cost rate equal to 15 percent of the direct salaries and wages for providing the service (excluding overtime, shift premiums, and fringe benefits) may be used instead of determining the actual indirect costs of the service. These services do not include centralized services that are included in central service cost allocation plans described in Appendix V of this part.
+
+Special Considerations for Institutions of Higher Education
+
+§ 200.418 Costs incurred by states and local governments.
+
+Costs incurred or paid by a State or local government on behalf of and in direct benefit to its IHEs are allowable. These costs include but are not limited to fringe benefit programs such as pension costs and Federal Insurance Contributions Act (FICA) costs. These costs are allowable regardless of whether they are recorded in the accounting records of the institutions, subject to the following conditions:
+(a) The costs meet the requirements of § 200.402-200.411;
+(b) The costs are properly supported by approved cost allocation plans in accordance with the applicable cost accounting principles of this part; and
+(c) The costs are not otherwise borne directly or indirectly by the Federal Government.
+
+§ 200.419 Cost accounting standards.
+
+An IHE that receive an aggregate total $50 million or more in Federal awards and instruments subject to this subpart (as specified in § 200.101) in its most recently completed fiscal year must comply with the Cost Accounting Standards Board's cost accounting standards located at 48 CFR 9905.501, 9905.502, 9905.505, and 9905.506. CAS-covered contracts and subcontracts awarded to the IHEs are subject to the broader range of CAS requirements at 48 CFR 9900 through 9999 and 48 CFR part 30 (FAR Part 30).
+
+General Provisions for Selected Items of Cost
+
+§ 200.420 Considerations for selected items of cost.
+
+(a) This section provides principles to be applied in establishing the allowability of certain items involved in determining cost, in addition to other requirements of this subpart. These principles apply whether or not a particular cost item is properly treated as a direct or indirect cost.
+(b) The following sections are not intended to be a comprehensive list of potential items of cost encountered under Federal awards. Failure to mention a particular item of cost, including as an example in certain sections, is not intended to imply that it is either allowable or unallowable. When determining the allowability for an item of cost, each case should be based on the treatment provided for similar or related items of cost and based on the principles described in §§ 200.402 through 200.411. In case of a discrepancy between the provisions of a specific Federal award and the provisions below, the Federal award governs. Criteria outlined in § 200.403 must be applied in determining allowability.
+
+§ 200.421 Advertising and public relations.
+
+(a) The term advertising costs means the costs of advertising media and corollary administrative costs. Advertising media includes, but is not limited to, magazines, newspapers, radio and television, direct mail, exhibits, and electronic or computer transmittals.
+(b) The only allowable advertising costs are those which are solely for:
+(1) The recruitment of personnel required by the recipient or subrecipient for the performance of a Federal award (See also § 200.463);
+(2) The procurement of goods and services for the performance of a Federal award;
+(3) The disposal of scrap or surplus materials acquired in the performance of a Federal award except when the recipient or subrecipient is reimbursed for disposal costs at a predetermined amount; or
+(4) Program outreach (for example, recruiting project participants) and other specific purposes necessary to meet the Federal award requirements.
+(c) The term “public relations” includes community relations and means those activities dedicated to maintaining the recipient's or subrecipient's image or maintaining or promoting understanding and favorable relations with the community or public at large or any segment of the public.
+(d) The only allowable public relations costs are:
+(1) Costs specifically required by the Federal award;
+(2) Costs of communicating with the public and press about specific activities or accomplishments which result from the performance of the Federal award (these costs are considered necessary as part of the outreach effort for the Federal award); or
+(3) Costs of conducting general liaison with news media and government public relations officers, to the extent that such activities are limited to communication and liaison necessary to keep the public informed on matters of public concern, such as notices of funding opportunities or financial matters.
+(e) Unallowable advertising and public relations costs include the following:
+(1) All advertising and public relations costs other than as specified in paragraphs (b) and (d) of this section;
+(2) Costs of meetings, conventions, conferences, or other events related to other activities of the entity (see also § 200.432), including:
+(i) Costs of displays, demonstrations, and exhibits;
+(ii) Costs of meeting rooms, hospitality suites, and other special facilities used in conjunction with shows and other special events; and
+(iii) Salaries and wages of employees engaged in setting up and displaying exhibits, making demonstrations, and providing briefings;
+(3) Costs of promotional items and memorabilia;
+(4) Costs of advertising and public relations designed solely to promote the recipient or subrecipient.
+
+§ 200.422 Advisory councils.
+
+An advisory council or committee is a body that provides advice to the management of such entities as corporations, organizations, or foundations. Costs incurred by both internal and external advisory councils or committees are allowable if authorized by statute, the Federal agency, or as an indirect cost where allocable to Federal awards. See § 200.444, which applies to States, local governments, and Indian Tribes.
+
+§ 200.423 Alcoholic beverages.
+
+The cost of alcoholic beverages is unallowable.
+
+§ 200.424 Alumni activities.
+
+Costs incurred by IHEs for, or in support of, alumni activities are unallowable.
+
+§ 200.425 Audit services.
+
+(a) A reasonably proportionate share of the costs of audits required by and performed in accordance with the Single Audit Act Amendments of 1996 (31 U.S.C. 7501-7507), and the requirements of this part are allowable. However, the following audit costs are unallowable:
+(1) Any costs when audits required by the Single Audit Act and subpart F of this part have not been conducted, or have been conducted but not in accordance with the requirements; and
+(2) Except as provided for in paragraph (c) of this section, any costs of auditing a non-Federal entity that is exempted from having an audit conducted under the Single Audit Act and subpart F of this part because its expenditures under Federal awards are less than $1,000,000 during its fiscal year.”
+(b) The costs of a financial statement audit of a recipient or subrecipient that does not currently have a Federal award may be included in the indirect cost pool for a cost allocation plan or indirect cost proposal.
+(c) Pass-through entities may charge Federal awards for the cost of agreed-upon procedures engagements to monitor subrecipients (in accordance with §§ 200.331-333) exempt from having an audit conducted under the Single Audit Act and the requirements of this part. This cost is allowable only if the agreed-upon procedures engagements are:
+(1) Conducted in accordance with GAGAS or applicable international attestation standards, as appropriate;
+(2) Paid for and arranged by the pass-through entity; and
+(3) Limited in scope to one or more of the following types of compliance requirements: activities allowed or unallowed; allowable costs/cost principles; eligibility; and reporting.
+
+§ 200.426 Bad debts.
+
+Bad debts (debts determined to be uncollectable), including losses (whether actual or estimated) arising from uncollectable accounts and other claims, are unallowable. Related collection costs, and related legal costs, arising from such debts are also unallowable. See § 200.428.
+
+§ 200.427 Bonding costs.
+
+(a) Bonding costs arise when the Federal agency requires assurance against financial loss to itself or others because of an act or default of the recipient or subrecipient. They also arise when the recipient or subrecipient requires similar assurance, including bonds as bid, performance, payment, advance payment, infringement, and fidelity bonds for employees and officials.
+(b) Costs of bonding required under the Federal award's terms and conditions are allowable.
+(c) Costs of bonding required by the recipient or subrecipient in the general conduct of its operations are allowable as an indirect cost to the extent that such bonding is in accordance with sound business practice and the rates and premiums are reasonable under the circumstances.
+
+§ 200.428 Collections of improper payments.
+
+The costs incurred by a recipient or subrecipient to recover improper payments, including improper overpayments, are allowable as either direct or indirect costs, as appropriate. The recipient or subrecipient may use the amounts collected in accordance with cash management standards described in § 200.305.
+
+§ 200.429 Commencement and convocation costs.
+
+For IHEs, costs incurred for commencements and convocations are unallowable, except as activity costs provided for in Appendix III, (B)(9) Student Administration and Services.
+
+§ 200.430 Compensation—personal services.
+
+(a) General. Compensation for personal services includes all remuneration, paid currently or accrued, for services of employees rendered during the period of performance under the Federal award, including but not necessarily limited to wages and salaries. Compensation for personal services may also include fringe benefits addressed in § 200.431. Costs of compensation are allowable to the extent that they satisfy the specific requirements of this part and that the total compensation for individual employees:
+(1) Is reasonable for the services rendered and conforms to the established written policy of the recipient or subrecipient consistently applied to both Federal and non-Federal activities;
+(2) Follows an appointment made in accordance with the recipient's or subrecipient's laws, rules, or written policies and meets the requirements of Federal statute, where applicable; and
+(3) Is determined and supported as provided in paragraph (g) of this section, when applicable.
+(b) Reasonableness. Compensation for employees engaged in work on Federal awards will be reasonable to the extent that it is consistent with that paid for similar work in other activities of the recipient or subrecipient. In cases where the kinds of employees required for Federal awards are not found in the other activities of the recipient or subrecipient, compensation will be considered reasonable to the extent that it is comparable to that paid for similar work in the labor market in which the recipient or subrecipient competes for the kind of employees involved.
+(c) Professional activities outside the recipient or subrecipient. Unless the Federal agency expressly authorizes an arrangement, a recipient or subrecipient must follow its written policies and procedures concerning the permissible extent of professional services that can be provided outside the recipient or subrecipient for non-organizational compensation. Where the recipient or subrecipient does not have written policies or procedures, or they do not adequately define the permissible extent of consulting or other non-organizational activities undertaken for extra outside pay, the Federal Government may require the recipient or subrecipient to allocate the effort of professional staff working on Federal awards between:
+(1) Recipient or subrecipient activities, and
+(2) Non-organizational professional activities. Appropriate arrangements governing compensation must be negotiated on a case-by-case basis if the Federal agency considers the extent of non-organizational professional effort excessive or inconsistent with the conflicts-of-interest terms and conditions of the Federal award.
+(d) Unallowable costs. (1) Costs unallowable under other sections of these principles must not be allowable under this section solely because they constitute personnel compensation.
+(2) The allowable compensation for certain employees is subject to a ceiling in accordance with Federal statute. See 10 U.S.C. 3744(a)(16), 41 U.S.C. 1127, and 41 U.S.C. 4304(a)(16) for the ceiling amount, covered compensation subject to the ceiling, covered employees, and other relevant provisions for cost-reimbursement contracts. For other types of Federal awards, other statutory ceilings may apply.
+(e) Special considerations. Special considerations in determining the allowability of compensation will be given to any change in a recipient's or subrecipient's compensation policy resulting in a substantial increase in its employees' level of compensation (particularly when the change was concurrent with an increase in the ratio of Federal awards to other activities) or any change in the treatment of allowability of specific types of compensation due to changes in Federal policy.
+(f) Incentive compensation. Incentive compensation to employees based on cost reduction, efficient performance, suggestion awards, or safety awards is allowable to the extent that the overall compensation is determined to be reasonable and such costs are paid or accrued according to an agreement entered into in good faith between the recipient or subrecipient and the employees before the services were rendered, or according to an established plan followed by the recipient or subrecipient so consistently as to imply, in effect, an agreement to make such payment.
+(g) Standards for Documentation of Personnel Expenses. (1) Charges to Federal awards for salaries and wages must be based on records that accurately reflect the work performed. These records must:
+(i) Be supported by a system of internal control that provides reasonable assurance that the charges are accurate, allowable, and properly allocated;
+(ii) Be incorporated into the official records of the recipient or subrecipient;
+(iii) Reasonably reflect the total activity for which the employee is compensated by the recipient or subrecipient, not exceeding 100 percent of compensated activities (for IHEs, this is the IBS);
+(iv) Encompass federally-assisted and all other activities compensated by the recipient or subrecipient on an integrated basis but may include the use of subsidiary records as defined in the recipient's or subrecipient's written policy;
+(v) Comply with the established accounting policies and procedures of the recipient or subrecipient (See paragraph (i)(1)(ii) of this section for treatment of incidental work for IHEs.); and
+(vi) Support the distribution of the employee's salary or wages among specific activities or cost objectives if the employee works on more than one Federal award; a Federal award and non-Federal award; an indirect cost activity and a direct cost activity; two or more indirect activities allocated using different allocation bases; or an unallowable activity and a direct or indirect cost activity.
+(vii) Budget estimates (meaning, estimates determined before the services are performed) alone do not qualify as support for charges to Federal awards, but may be used for interim accounting purposes, provided that:
+(A) The system for establishing the estimates produces reasonable approximations of the activity performed;
+(B) Significant changes in the related work activity (as defined by the recipient's or subrecipient's written policies) are promptly identified and entered into the records. Short-term (such as one or two months) fluctuations between workload categories do not need to be considered as long as the distribution of salaries and wages is reasonable over the longer term; and
+(C) The recipient's or subrecipient's system of internal controls includes processes to perform periodic after-the-fact reviews of interim charges made to a Federal award based on budget estimates. All necessary adjustments must be made so that the final amount charged to the Federal award is accurate, allowable, and properly allocated.
+(viii) Because practices vary as to the activity constituting a full workload (for example, the Institutional Base Salary (IBS) for IHEs), records may reflect categories of activities expressed as a percentage distribution of total activities.
+(ix) It is recognized that teaching, research, service, and administration are often inextricably intermingled in an academic setting. Therefore, a precise assessment of factors contributing to costs is not required when IHEs record salaries and wages charged to Federal awards.
+(2) For records that meet the standards required in paragraph (g)(1) of this section, the recipient or subrecipient is not required to provide additional support or documentation for the work performed other than that referenced in paragraph (g)(3) of this section.
+(3) In accordance with Department of Labor regulations implementing the Fair Labor Standards Act (FLSA) (29 CFR part 516), charges for the salaries and wages of nonexempt employees, in addition to the supporting documentation described in this section, must also be supported by records indicating the total number of hours worked each day.
+(4) Salaries and wages of employees used in meeting cost sharing requirements on Federal awards must be supported in the same manner as salaries and wages claimed for reimbursement from Federal awards.
+(5) States, local governments, and Indian Tribes may use substitute processes or systems for allocating salaries and wages to Federal awards either in place of or in addition to the records described in paragraph (g)(1) of this section if approved by the cognizant agency for indirect cost. Such systems may include, but are not limited to, random moment sampling, “rolling” time studies, case counts, or other quantifiable measures of work performed.
+(i) Substitute systems that use sampling methods (primarily for Temporary Assistance for Needy Families (TANF), the Supplemental Nutrition Assistance Program (SNAP), Medicaid, and other public assistance programs) must meet acceptable statistical sampling standards, including:
+(A) The sampling universe must include all of the employees whose salaries and wages are to be allocated based on sample results except as provided in paragraph (g)(5)(iii);
+(B) The sample must cover the entire period involved; and
+(C) The results must be statistically valid and applied to the period being sampled.
+(ii) Allocating charges for the sampled employees' supervisors and clerical and support staff, based on the results of the sampled employees, will be acceptable.
+(iii) Less than full compliance with the statistical sampling standards noted in paragraph (5)(i) may be accepted by the cognizant agency for indirect costs if it concludes that the amounts allocated to Federal awards will be minimal or if it concludes that the system proposed by the recipient or subrecipient will result in lower costs to Federal awards than a system which complies with the standards.
+(6) Cognizant agencies for indirect costs are encouraged to approve alternative proposals based on outcomes and milestones for program performance when these are clearly documented. These plans are acceptable as an alternative to requirements in paragraph (g)(1) of this section when approved by the cognizant agency for indirect costs.
+(7) For Federal awards of similar purpose activity or instances of approved blended funding, a recipient or subrecipient may submit performance plans that incorporate funds from multiple Federal awards and account for their combined use based on performance-oriented metrics, provided the plans are approved in advance by all involved Federal agencies. In these instances, the recipient or subrecipient must submit a request for waiver of the requirements based on documentation that describes the method of charging costs, relates the charging of costs to the specific activity that is applicable to all fund sources, and is based on quantifiable measures of the activity in relation to time charged.
+(8) For a recipient or subrecipient whose records do not meet the standards described in this section, the Federal Government may require personnel activity reports, including prescribed certifications, or equivalent documentation supporting the records as required in this section.
+(h) Nonprofit organizations. This paragraph (h) provides guidance specific to only nonprofit organizations. For compensation to members of nonprofit organizations, trustees, directors, associates, officers, or the immediate families thereof, a determination must be made that the compensation is reasonable for the actual personal services rendered rather than a distribution of earnings above actual costs. Compensation may include director's and executive committee member's fees, incentive awards, off-site or incentive pay, location allowances, hardship pay, and cost-of-living differentials.
+(i) Institutions of Higher Education (IHEs). This paragraph provides guidance specific to only IHEs.
+(1) Determining allowable personnel costs. Certain conditions require special consideration and possible limitations in determining allowable personnel compensation costs under Federal awards. Among such conditions are the following:
+(i) Allowable activities. Charges to Federal awards may include reasonable amounts for activities contributing and directly related to work under an agreement, such as delivering special lectures about specific aspects of the ongoing activity, writing reports and articles, developing and maintaining protocols (human, animals, etcetera), managing substances/chemicals, managing and securing project-specific data, coordinating research subjects, participating in appropriate seminars, consulting with colleagues and graduate students, and attending meetings and conferences.
+(ii) Incidental activities. Incidental activities for which supplemental compensation is allowable under the written institutional policy (at a rate not to exceed institutional base salary) do not need to be included in the records described in paragraph (g). To charge payments of incidental activities directly, such activities must either be expressly authorized in the Federal award budget or receive prior written approval by the Federal agency.
+(2) Salary basis. Charges for work performed on Federal awards by faculty members during the academic year are allowable at the institutional base salary (IBS) rate. Except as noted in paragraph (i)(1)(ii), in no event will charges to Federal awards, irrespective of the basis of computation, exceed the proportionate share of the IBS for that period. This principle applies to all members of the faculty at an institution. IBS is the annual compensation paid by an IHE for an individual's appointment, whether that individual's time is spent on research, instruction, administration, or other activities. IBS excludes any income an individual earns outside of duties performed for the IHE. Unless there is prior approval by the Federal agency, charges of a faculty member's salary to a Federal award may not exceed the proportionate share of the IBS for the period during which the faculty member worked on the Federal award.
+(3) Intra-Institution of Higher Education (IHE) consulting. Intra-IHE consulting by faculty should be undertaken as an IHE responsibility requiring no compensation in addition to IBS. However, in unusual cases where consultation is across departmental lines or involves a separate or remote operation, and the work performed by the faculty members is in addition to their regular responsibilities, any charges for such work representing additional compensation above IBS are allowable provided that such consulting arrangements are expressly authorized in the Federal award or approved in writing by the Federal agency.
+(4) Extra service pay. Extra service pay typically represents overload compensation, subject to institutional compensation policies for services above and beyond IBS. Where extra service pay results from Intra-IHE consulting, it is subject to the same requirements of paragraph (b) of this section. It is allowable if all of the following conditions are met:
+(i) The IHE establishes consistent written policies which apply uniformly to all faculty members, not just those working on Federal awards.
+(ii) The IHE establishes a consistent written definition of work covered by IBS, which is specific enough to determine conclusively when work beyond that level has occurred. This definition may be described in appointment letters or other documentation.
+(iii) The supplementation amount paid is commensurate with the IBS pay rate and additional work performed. See paragraph (i)(2) of this section.
+(iv) The salaries, as supplemented, fall within the salary structure and pay ranges established by and documented in writing or otherwise applicable to the IHE.
+(v) The total salaries charged to Federal awards, including extra service payments, are subject to the standards of documentation as described in paragraph (g).
+(5) Periods outside the academic year. (i) Except as specified for teaching activity in paragraph (i)(5)(ii) of this section, charges for work performed by faculty members on Federal awards during periods not included in the base salary period must be at a rate not more than the IBS.
+(ii) Charges for teaching activities performed by faculty members on Federal awards during periods not included in IBS period must be based on the written policy of the IHE governing compensation to faculty members for teaching assignments during such periods.
+(6) Part-time faculty. Charges for work performed on Federal awards by faculty members having only part-time appointments must be determined at a rate not more than that regularly paid for part-time assignments.
+(7) Sabbatical leave costs. Rules for sabbatical leave are as follows:
+(i) Costs of leaves of absence by employees for performance of graduate work or sabbatical study, travel, or research are allowable, provided the IHE has a uniform written policy on sabbatical leave for persons engaged in instruction and persons engaged in research. These costs must be allocated equitably among all related activities of the IHE.
+(ii) Where sabbatical leave is included in fringe benefits for which a cost is determined for assessment as a direct charge, the aggregate amount of such assessments applicable to all work of the institution during the base period must be reasonable in relation to the IHE's actual experience under its sabbatical leave policy.
+(8) Salary rates for non-faculty members. Non-faculty full-time professional personnel may also earn “extra service pay” in accordance with the IHE's written policy and paragraph (i)(1)(i).
+
+§ 200.431 Compensation—fringe benefits.
+
+(a) General. Fringe benefits are allowances and services employers provide to their employees as compensation in addition to regular salaries and wages. Fringe benefits include, but are not limited to, the costs of leave, employee insurance, pensions, and unemployment benefits. Except as provided elsewhere in these principles, the costs of fringe benefits are allowable provided that the benefits are reasonable and are required by law, an organization-employee agreement, or an established policy of the recipient or subrecipient.
+(b) Leave. The cost of fringe benefits in the form of regular compensation paid to employees during periods of authorized absences from the job, such as for annual leave, family-related leave, sick leave, holidays, court leave, military leave, administrative leave, and other similar benefits, are allowable if all of the following criteria are met:
+(1) They are provided under established written leave policies;
+(2) The costs are equitably allocated to all related activities, including Federal awards; and,
+(3) The accounting basis (cash or accrual) selected for costing each type of leave is consistently followed by the recipient or subrecipient or a specified grouping of employees.
+(i) When a recipient or subrecipient uses the cash basis of accounting, the cost of leave is recognized in the period that the leave is taken and paid for. Payments for unused leave when an employee retires or terminates employment are allowable in the year of payment and should be allocated as a general administrative expense to all activities or included in the fringe benefit rate.
+(ii) The accrual basis may be only used for those types of leave for which a liability as defined by GAAP exists when the leave is earned. When a recipient or subrecipient uses the accrual basis of accounting, allowable leave costs are the lesser of the amount accrued or funded.
+(c) Fringe benefits. The cost of fringe benefits in the form of employer contributions or expenses for social security; employee life, health, unemployment, and worker's compensation insurance (except as indicated in § 200.447); pension plan costs; and other similar benefits are allowable, provided such benefits are permitted under established written policies. The recipient or subrecipient must allocate fringe benefits to Federal awards and all other activities in a manner consistent with the pattern of benefits attributable to the individuals or group(s) of employees whose salaries and wages are chargeable to such Federal awards and other activities, and charged as direct or indirect costs following the recipient's or subrecipient's accounting practices.
+(d) Cost objectives. The recipient or subrecipient may assign fringe benefits to cost objectives by identifying specific benefits to specific individual employees or by allocating them based on entity-wide salaries and wages of the employees receiving the benefits. When the allocation method is used, separate allocations must be made to selective groupings of employees unless the recipient or subrecipient demonstrates that costs in relationship to salaries and wages do not differ significantly for different groups of employees.
+(e) Insurance. See also § 200.447(d)(1) and (2).
+(1) Provisions for a reserve under a self-insurance program for unemployment compensation or workers' compensation are allowable to the extent that the provisions represent reasonable estimates of the liabilities for such compensation and the types of coverage, the extent of coverage, and rates and premiums would have been allowable had insurance been purchased to cover the risks. However, provisions for self-insured liabilities which do not become payable for more than one year after the provision is made must not exceed the present value of the liability.
+(2) Insurance costs on the lives of trustees, officers, or other employees holding positions of similar responsibility are allowable only to the extent that the insurance represents additional compensation. The cost of such insurance is unallowable when the recipient or subrecipient is named as beneficiary.
+(3) Actual claims paid to or on behalf of employees or former employees for workers' compensation, unemployment compensation, severance pay, and similar employee benefits (for example, post-retirement health benefits) are allowable in the year of payment provided that the recipient or subrecipient follows a consistent costing policy.
+(f) Automobiles. That portion of automobile costs furnished by the recipient or subrecipient that relates to personal use by employees (including transportation to and from work) is unallowable as a fringe benefit or indirect costs regardless of whether the cost is reported as taxable income to the employees.
+(g) Pension plan costs. Pension plan costs incurred in accordance with the established written policies of the recipient or subrecipient are allowable, provided that:
+(1) Such policies meet the test of reasonableness.
+(2) The methods of cost allocation are not discriminatory.
+(3) The cost assigned to each fiscal year should be determined in accordance with GAAP, except for State and local governments.
+(4) The costs assigned to a given fiscal year are funded for all plan participants within six months after the end of that year. However, increases to normal and past service pension costs caused by a delay in funding the actuarial liability beyond 30 calendar days after each quarter of the year to which such costs are assignable are unallowable. The recipient or subrecipient may follow the “Cost Accounting Standard for Composition and Measurement of Pension Costs” (48 CFR 9904.412).
+(5) Premiums for pension plan termination insurance that are paid according to the Employee Retirement Income Security Act (ERISA) of 1974 (29 U.S.C. 1301-1461) are allowable. Late payment charges on such premiums are unallowable. Excise taxes on accumulated funding deficiencies and other penalties imposed under ERISA are unallowable.
+(6) Pension plan costs may be computed using a pay-as-you-go method or an actuarial cost method recognized by GAAP and following the recipient's or subrecipient's established written policies.
+(i) For pension plans financed on a pay-as-you-go method, allowable costs will be limited to those representing actual payments to retirees or their beneficiaries.
+(ii) Pension costs calculated using an actuarial cost method recognized by GAAP are allowable for a given fiscal year if they are funded for that year within six months after the end of that year. Costs funded after six months (or a later period agreed to by the cognizant agency for indirect costs) are allowable in the year funded. The cognizant agency for indirect costs may agree to an extension if an appropriate adjustment is made to compensate for the timing of the charges to the Federal Government and related Federal reimbursement and the recipient's or subrecipient's contribution to the pension fund. Adjustments may be made by cash refund or other equitable procedures to compensate the Federal Government for the time value of Federal reimbursements in excess of contributions to the pension fund.
+(iii) Amounts funded by the recipient or subrecipient in excess of the actuarially determined amount for a fiscal year may be used as the recipient's or subrecipient's contribution in future periods.
+(iv) When a recipient or subrecipient establishes or converts to an acceptable actuarial cost method, as defined by GAAP, and funds pension costs in accordance with this method, the unfunded liability at the time of conversion is allowable if amortized over a period of years in accordance with GAAP.
+(v) Payments for unfunded pension costs must be charged in accordance with the allocation principles of this subpart. Specifically, the recipient or subrecipient may not charge unfunded pension costs directly to a Federal award if those unfunded pension costs are not allocable to that award.
+(vi) The recipient or subrecipient must provide the Federal Government an equitable share of any previously allowed pension costs (including subsequent earnings) that revert or inure to the recipient or subrecipient through a refund, withdrawal, or other credit.
+(h) Post-retirement health. A post-retirement health plan (PRHP) refers to the costs of health insurance or health services not included in a pension plan covered by paragraph (g) for retirees and their spouses, dependents, and survivors. PRHP costs may be computed using a pay-as-you-go method or an actuarial cost method recognized by GAAP and following the recipient's or subrecipient's established written policies.
+(1) For PRHP financed on a pay-as-you-go method, allowable costs will be limited to those representing actual payments to retirees or their beneficiaries.
+(2) PRHP costs calculated using an actuarial cost method recognized by GAAP are allowable for a given fiscal year if they are funded for that year within six months after the end of that year. Costs funded after six months (or a later period agreed to by the cognizant agency for indirect costs) are allowable in the year funded. The cognizant agency for indirect costs may agree to an extension if an appropriate adjustment is made to compensate for the timing of the charges to the Federal Government and related Federal reimbursement and the recipient's or subrecipient's contributions to the PRHP fund. Adjustments may be made by cash refund, reduction in the current year's PRHP costs, or other equitable procedures to compensate the Federal Government for the time value of Federal reimbursements in excess of contributions to the PRHP fund.
+(3) Amounts funded by the recipient or subrecipient in excess of the actuarially determined amount for a fiscal year may be used as the recipient's or subrecipient's contribution in future periods.
+(4) If a recipient or subrecipient establishes or converts to an actuarial cost method and funds PRHP costs in accordance with this method, the initial unfunded liability attributable to prior years is allowable if amortized over a period of years in accordance with GAAP, or, if no such GAAP period exists, over a period negotiated with the cognizant agency for indirect costs.
+(5) Payments for unfunded PRHP costs must be charged in accordance with the allocation principles of this subpart. Specifically, the recipient or subrecipient may not charge unfunded PRHP costs directly to a Federal award if those unfunded PRHP costs are not allocable to that award.
+(6) To be allowable in the current year, the PRHP costs must be paid either to:
+(i) An insurer or other benefit provider as current year costs or premiums; or
+(ii) An insurer or trustee that will maintain a trust fund or reserve for the sole purpose of providing post-retirement benefits to retirees and other beneficiaries.
+(7) The recipient or subrecipient must provide the Federal Government an equitable share of any previously allowed post-retirement benefit costs (including subsequent earnings) that revert or inure to the recipient or subrecipient through a refund, withdrawal, or other credit.
+(i) Severance pay. (1) Severance pay, also commonly referred to as dismissal wages, is a payment in addition to regular salaries and wages, by recipients and subrecipients to workers whose employment is being terminated. Severance pay is allowable only to the extent that, in each case, it is required by:
+(i) Law;
+(ii) Employer-employee agreement;
+(iii) Established policy that constitutes, in effect, an implied agreement on the recipient's or subrecipient's part; or
+(iv) Circumstances of the particular employment.
+(2) Costs of severance payments are divided into two categories as follows:
+(i) Actual severance payments for normal turnover must be allocated to all activities; or, where the recipient or subrecipient provides for a reserve for normal severances, such method is acceptable if the charge to current operations is reasonable in light of payments made for normal severances over a representative past period, and if amounts charged are allocated to all activities of the recipient or subrecipient.
+(ii) Measuring the costs of abnormal or mass severance pay by means of an accrual method will not achieve equity for both parties. Therefore, accruals are not allowable. However, the Federal Government recognizes its responsibility to contribute its fair share toward a specific payment. Prior approval by the Federal agency or cognizant agency for indirect cost, as appropriate, is required.
+(3) Costs incurred in severance pay packages that are in excess of the standard severance pay provided by the recipient or subrecipient to an employee upon termination of employment and that are paid to the employee contingent upon a change in management control over, or ownership of, the recipient's or subrecipient's assets, are unallowable.
+(4) Severance payments to foreign nationals employed by the recipient or subrecipient outside the United States, to the extent that the amount exceeds the customary or prevailing practices for the recipient or subrecipient in the United States, are unallowable unless they are required by applicable foreign law or necessary for the performance of Federal programs and approved by the Federal agency.
+(5) Severance payments to foreign nationals employed by the recipient or subrecipient outside the United States due to the termination of the foreign national as a result of the closing of, or curtailment of activities by, the recipient or subrecipient in that country, are unallowable unless they are either:
+(i) Required by applicable foreign law; or
+(ii) Necessary for the performance of Federal programs and approved by the Federal agency.
+(j) For IHEs only. (1) Fringe benefits in the form of undergraduate and graduate tuition or tuition remission for individual employees are allowable, provided such benefits are granted in accordance with established written policies of the IHE and are distributed to all IHE activities on an equitable basis. Tuition benefits for family members other than the employee are unallowable.
+(2) Fringe benefits in the form of undergraduate and graduate tuition or tuition remission for individual employees not employed by the IHE are limited to the tax-free amount allowed by the Internal Revenue Code as amended (26 U.S.C. 127).
+(3) IHEs may offer employees tuition waivers or reductions, provided that the benefit does not discriminate in favor of highly compensated employees. Employees can exercise these benefits at other institutions according to institutional policy. See § 200.466, for treatment of tuition remission provided to students.
+(k) Fringe benefit programs and other benefit costs. (1) For IHEs whose costs are paid by a State or local government, fringe benefit programs (such as pension costs and FICA) and any other benefits costs incurred specifically on behalf of, and in direct benefit to, the IHE, are allowable, subject to the following:
+(i) The costs meet the requirements of Basic Considerations in §§ 200.402 through 200.411;
+(ii) The costs are properly supported by approved cost allocation plans in accordance with applicable Federal cost accounting principles; and
+(iii) The costs are not otherwise borne directly or indirectly by the Federal Government.
+(2) The allowability of these costs for the IHE does not depend on whether they are recorded in the accounting records of the IHE.
+[89 FR 30136, Apr. 22, 2024, as amended at 89 FR 79732, Oct. 1, 2024]
+
+§ 200.432 Conferences.
+
+A conference means an event whose primary purpose is to disseminate technical information beyond the recipient or subrecipient and is necessary and reasonable for successful performance under the Federal award. Allowable conference costs may include the rental of facilities, speakers' fees, attendance fees, costs of meals and refreshments, local transportation, and other items incidental to such conferences unless further restricted by the terms and conditions of the Federal award. The costs of identifying and providing locally available dependent-care resources for participants are allowable as needed. Conference hosts/sponsors must exercise discretion and judgment in ensuring that conference costs are appropriate, necessary, and managed to minimize costs to the Federal award. The Federal agency may authorize exceptions for programs including Indian Tribes, children, and the elderly. See also §§ 200.438, 200.456, and 200.475.
+
+§ 200.433 Contingency provisions.
+
+(a) Contingency provisions are part of a budget estimate of future costs (typically of large construction projects, IT systems, or other items approved by the Federal agency) which are associated with possible events or conditions arising from causes for which the precise outcome is indeterminable at the time of estimate and that are likely to result, in the aggregate, in additional costs for the approved activity or project. Contingency amounts for major project scope changes, unforeseen risks, or extraordinary events must not be included in the budget estimates for a Federal award.
+(b) It is permissible for contingency amounts other than those excluded in paragraph (a) of this section to be explicitly included in budget estimates to the extent necessary to improve their precision. Contingency amounts must be estimated using broadly-accepted cost estimating methodologies, specified in the budget documentation of the Federal award, and accepted by the Federal agency. As such, contingency amounts are to be included in the Federal award. In order for actual costs incurred to be allowable, they must comply with the cost principles and other requirements of this part (see §§ 200.300 and 200.403), be necessary and reasonable for proper and efficient accomplishment of project or program objectives, and be verifiable from the recipient's or subrecipient's records.
+(c) Payments to a recipient's or subrecipient's “contingency reserve” or any similar payment made for events the occurrence of which cannot be foretold with certainty as to the time or intensity, or with an assurance of their happening, are unallowable, except as noted in §§ 200.431 and 200.447.
+
+§ 200.434 Contributions and donations.
+
+(a) Costs of contributions and donations, including cash, property, and services, from the recipient or subrecipient to other entities are unallowable.
+(b) The value of services and property donated (that is, in-kind donations) to the recipient or subrecipient may not be charged to the Federal award either as a direct or indirect cost. The value of donated services and property may be used to meet cost sharing requirements (see § 200.306). Depreciation on donated assets is permitted so long as the donated property is not counted towards meeting cost sharing requirements (see § 200.436).
+(c) Services donated or volunteered to the recipient or subrecipient may be provided by professional and technical personnel, consultants, and other skilled and unskilled labor. The value of these services may not be charged to the Federal award as a direct or indirect cost. However, the value of donated services may be used to meet cost sharing requirements in accordance with the provisions of § 200.306.
+(d) To the extent feasible, services donated to the recipient or subrecipient will be supported by the same methods used to support the allocability of regular personnel services.
+(e) The following provisions apply to nonprofit organizations. The value of services donated to a nonprofit organization and used in the performance of a direct cost activity must be considered in the determination of the recipient's or subrecipient's indirect cost rate(s) and, accordingly, must be allocated a proportionate share of applicable indirect costs when the following circumstances exist:
+(1) The aggregate value of the services is material;
+(2) The services are supported by a significant amount of the indirect costs incurred by the recipient or subrecipient;
+(i) In those instances where there is no basis for determining the fair market value of the services rendered, the recipient or subrecipient and the cognizant agency for indirect costs must negotiate an appropriate allocation of indirect cost to the services.
+(ii) Where donated services directly benefit a project supported by the Federal award, the indirect costs allocated to the services will be considered as a part of the project's total costs. Such indirect costs may be reimbursed under the Federal award or used to meet cost sharing requirements.
+(f) Fair market value of donated services must be computed as described in § 200.306.
+(g) Personal property and use of space.
+(1) Donated personal property and use of space may be furnished to a recipient or subrecipient. The value of the personal property and space may not be charged to the Federal award either as a direct or indirect cost.
+(2) The value of the donations of personal property and use of space may be used to meet cost sharing requirements described in § 200.300. The recipient or subrecipient must value the donations in accordance with § 200.300. Where the recipient or subrecipient treats donations as indirect costs, indirect cost rates must separate the value of the donations so that reimbursement is not made.
+
+§ 200.435 Defense and prosecution of criminal and civil proceedings, claims, appeals and patent infringements.
+
+(a) Definitions for this section—(1) Conviction means a judgment or conviction of a criminal offense by any court of competent jurisdiction, whether entered upon verdict or a plea, including a conviction due to a plea of nolo contendere.
+(2) Costs include the services that bear a direct relationship to a judicial or administrative proceeding and provided by in-house or private counsel, accountants, consultants, or others engaged to assist the recipient or subrecipient before, during, or after the commencement of that proceeding.
+(3) Fraud means:
+(i) Acts of fraud or corruption or attempts to defraud the Federal Government or to corrupt its agents,
+(ii) Acts that constitute a cause for debarment or suspension (as specified in agency regulations), and
+(iii) Acts that violate the False Claims Act (31 U.S.C. 3729-3732) or the Anti-kickback Act (42 U.S.C. 1320a-7b(b)).
+(4) Penalty does not include restitution, reimbursement, or compensatory damages.
+(5) Proceeding includes an investigation.
+(b) Costs. (1) Except as otherwise described herein, costs incurred in connection with any criminal, civil, or administrative proceeding (including the filing of a false certification) commenced by the Federal Government, a State, local government, or foreign government, or joined by the Federal Government (including a proceeding under the False Claims Act), against the recipient or subrecipient, (or commenced by third parties or a current or former employee of the recipient or subrecipient who submits a whistleblower complaint of reprisal in accordance with 10 U.S.C. 4701 or 41 U.S.C. 4712), are not allowable if the proceeding:
+(i) Relates to a violation of, or failure to comply with, a Federal, State, local or foreign statute, regulation, or the terms and conditions of the Federal award by the recipient or subrecipient (including its agents and employees); and
+(ii) Results in any of the following dispositions:
+(A) In a criminal proceeding, a conviction.
+(B) In a civil or administrative proceeding involving an allegation of fraud or similar misconduct, a determination of recipient or subrecipient liability.
+(C) In the case of any civil or administrative proceeding, the disallowance of costs, the imposition of a monetary penalty, or an order issued by the Federal agency head or delegate to the recipient or subrecipient to take corrective action under 10 U.S.C. 4701 or 41 U.S.C. 4712.
+(D) A final decision by an appropriate Federal official to debar or suspend the recipient or subrecipient, to rescind or void a Federal award, or to terminate a Federal award because of a violation or failure to comply with a statute, regulation, or the terms and conditions of the Federal award.
+(E) A disposition by consent or compromise if the action could have resulted in any of the dispositions described in paragraphs (b)(1)(ii)(A) through (D) of this section.
+(2) If more than one proceeding involves the same alleged misconduct, the costs of all such proceedings are unallowable if any results in one of the dispositions shown in paragraph (b) of this section.
+(c) Allowability of costs for proceeding commenced by Federal Government. If a proceeding referred to in paragraph (b) of this section is commenced by the Federal Government and is resolved by consent or compromise pursuant to an agreement by the recipient or subrecipient and the Federal Government, then the costs incurred may be allowed to the extent expressly authorized in the agreement.
+(d) Allowability of costs for proceeding commenced by State, local, or foreign government. If a proceeding referred to in paragraph (b) of this section is commenced by a State, local or foreign government, then the costs incurred may be allowed if the authorized Federal official determines that the costs were incurred as a result of:
+(1) A specific term or condition of the Federal award, or
+(2) Specific written direction of an authorized official of the Federal agency.
+(e) Allowability of costs in general. Costs incurred in connection with proceedings described in paragraph (b), and not made unallowable by that paragraph, may be allowed to the extent that:
+(1) The costs are reasonable and necessary for the administration of the Federal award and activities required to deal with the proceeding and the underlying cause of action;
+(2) Payment of the reasonable, necessary, allocable and otherwise allowable costs incurred is not prohibited by any other provision(s) of the Federal award;
+(3) The costs are not recovered from the Federal Government or a third party, either directly as a result of the proceeding or otherwise; and,
+(4) An authorized Federal official has determined the percentage of costs allowed considering the complexity of litigation, generally accepted principles governing the award of legal fees in civil actions involving the United States, and other factors that may be appropriate. This percentage must not exceed 80 percent unless an agreement under paragraph (c) has explicitly considered this limitation and permitted a higher percentage. In that case, the total amount of costs incurred may be allowable.
+(f) Major Fraud Act. Costs incurred by the recipient or subrecipient in connection with the defense of suits brought by its employees or ex-employees under section 2 of the Major Fraud Act of 1988 (18 U.S.C. 1031), including the cost of all relief necessary to make the employee whole, where the recipient or subrecipient was found liable or settled, are unallowable.
+(g) Un-allowability of costs for prosecuting claims against Federal Government. Costs for prosecuting claims against the Federal Government, including appeals of final Federal agency decisions, are unallowable.
+(h) Patent infringement litigation. Costs of legal, accounting, and consultant services, and related costs incurred in connection with patent infringement litigation, are unallowable unless otherwise provided for in the Federal award.
+(i) Potentially unallowable costs. Costs that may be unallowable under this section, including directly associated costs, must be segregated and accounted for separately. During the pendency of any proceeding covered by paragraphs (b) and (f) of this section, the Federal Government must generally withhold payment of such costs. However, if in its best interests, the Federal Government may provide for conditional payment upon provision of adequate security, or other adequate assurance, and agreement to repay all unallowable costs, plus interest, if the costs are subsequently determined to be unallowable.
+
+§ 200.436 Depreciation.
+
+(a) Depreciation is the method for allocating the cost of fixed assets to periods benefitting from asset use. The recipient or subrecipient may be compensated for the use of its buildings, capital improvements, equipment, and software projects capitalized in accordance with GAAP provided that they are needed and used in the recipient's or subrecipient's activities and correctly allocated to Federal awards. The compensation must be made by computing the proper depreciation.
+(b) The allocation for depreciation must be made in accordance with Appendices III through IX of this part.
+(c) Depreciation is computed applying the following rules. The computation of depreciation must be based on the acquisition cost of the assets involved. For an asset donated to the recipient or subrecipient by a third party, its fair market value at the time of the donation must be considered as the acquisition cost. Such assets may be depreciated or claimed as cost sharing but not both. When computing depreciation charges, the acquisition cost will exclude:
+(1) The cost of land;
+(2) Any portion of the cost of buildings and equipment borne by or donated by the Federal Government, irrespective of where the title was originally vested or is presently located;
+(3) Any portion of the cost of buildings and equipment contributed by or for the recipient or subrecipient that is already claimed as cost sharing or where law or agreement prohibits recovery; and
+(4) Any asset acquired solely for the performance of a non-Federal award.
+(d) When computing depreciation charges, the following must be observed:
+(1) The period of useful service or useful life established in each case for usable capital assets must take into consideration such factors as the type of construction, nature of the equipment, technological developments in the particular area, historical data, and the renewal and replacement policies followed for the individual items or classes of assets involved.
+(2) The depreciation method used to charge the cost of an asset (or group of assets) to accounting periods must reflect the pattern of consumption of the asset during its useful life. In the absence of clear evidence indicating that the expected consumption of the asset will be significantly greater in the early portions than in the later portions of its useful life, the straight-line method must be presumed to be the appropriate method. Once used, depreciation methods may not be changed unless approved in advance by the cognizant agency for indirect costs. The depreciation methods used to calculate the depreciation amounts for indirect cost rate purposes must be the same methods used by the recipient or subrecipient for its financial statements.
+(3) The entire building, including the shell and all components, may be treated as a single asset and depreciated over a single useful life. A building may also be divided into multiple components. Each component may be depreciated over its estimated useful life in this case. The building components must be grouped into three general components: building shell (including construction and design costs), building services systems (for example, elevators, HVAC, and plumbing system), and fixed equipment (for example, sterilizers, casework, fume hoods, cold rooms, and glassware/washers). A cognizant agency for indirect costs may authorize a recipient or subrecipient to use more than these three groupings in exceptional cases. When a recipient or subrecipient elects to depreciate its buildings by their components, the same depreciation method must be used for indirect and financial statements purposes, as described in paragraphs (d)(1) and (2).
+(4) No depreciation may be allowed on assets that have outlived their depreciable lives.
+(5) Where the depreciation method is introduced to replace the use allowance method, depreciation must be computed as if the asset had been depreciated over its entire life (meaning, from the date the asset was acquired and ready for use to the date of disposal or withdrawal from service). The total amount of use allowance and depreciation for an asset (including imputed depreciation applicable to periods before the conversion from the use allowance method and depreciation after the conversion) may not exceed the total acquisition cost of the asset.
+(e) Adequate property records must support depreciation charges, and physical inventories must be taken at least once every two years to ensure that the assets exist and are usable, used, and needed. The recipient or subrecipient may use statistical sampling techniques when taking these inventories. In addition, the recipient or subrecipient must maintain adequate depreciation records showing the amount of depreciation.
+
+§ 200.437 Employee health and welfare costs.
+
+(a) Costs incurred in accordance with the recipient's or subrecipient's established written policies for improving working conditions, employer-employee relations, employee health, and employee performance are allowable.
+(b) These costs must be equitably apportioned to all activities of the recipient or subrecipient. Income generated from these activities must be credited to the cost thereof unless such income has been irrevocably sent to employee welfare organizations.
+(c) Losses resulting from operating food services are allowable only if the recipient's or subrecipient's objective is to operate food services on a break-even basis. Losses sustained because of operating objectives other than the above are allowable only when:
+(1) The recipient or subrecipient can demonstrate unusual circumstances; and
+(2) Approved by the cognizant agency for indirect costs.
+
+§ 200.438 Entertainment and prizes.
+
+(a) Entertainment costs. Costs of entertainment, including amusement, diversion, and social activities and any associated costs (such as gifts), are unallowable unless they have a specific and direct programmatic purpose and are included in a Federal award.
+(b) Prizes. Costs of prizes or challenges are allowable if they have a specific and direct programmatic purpose and are included in the Federal award. Federal agencies should refer to OMB guidance in M-10-11 “Guidance on the Use of Challenges and Prizes to Promote Open Government,” issued March 8, 2010, or its successor.
+
+§ 200.439 Equipment and other capital expenditures.
+
+(a) See § 200.1 for the definitions of capital expenditures, equipment, special purpose equipment, general purpose equipment, acquisition cost, and capital assets.
+(b) The following rules of allowability must apply to equipment and other capital expenditures:
+(1) Capital expenditures for general purpose equipment, buildings, and land are allowable as direct costs, but only with the prior written approval of the Federal agency or pass-through entity.
+(2) Capital expenditures for special purpose equipment are allowable as direct costs, provided that items with a unit cost of $10,000 or more have the prior written approval of the Federal agency or pass-through entity.
+(3) Capital expenditures for improvements to land, buildings, or equipment that materially increase their value or useful life are allowable as a direct cost, but only with the prior written approval of the Federal agency or pass-through entity. See § 200.436 on the allowability of depreciation on buildings, capital improvements, and equipment. See § 200.465 on the allowability of real property and equipment rental costs.
+(4) When approved as a direct cost in accordance with paragraphs (b)(1) through (3), capital expenditures must be charged in the period in which the expenditure is incurred or as otherwise determined appropriate and negotiated with the Federal agency.
+(5) The recipient or subrecipient may claim the unamortized portion of any equipment written off as a result of a change in capitalization levels by continuing to claim the otherwise allowable depreciation on the equipment or by amortizing the amount to be written off over a period of years negotiated with the cognizant agency for indirect cost.
+(6) Cost of equipment disposal. If the Federal agency instructs the recipient or subrecipient to otherwise dispose of or transfer the equipment, the costs of disposal or transfer are allowable.
+(7) Equipment and other capital expenditures are unallowable as indirect costs. See § 200.436.
+
+§ 200.440 Exchange rates.
+
+(a) Cost increases for fluctuations in exchange rates are allowable costs subject to the availability of funding. Prior approval of exchange rate fluctuations is required only when the change results in the need for additional Federal funding, or the increased costs result in the need to significantly reduce the scope of the project. Before providing approval, the Federal agency must ensure that adequate funds are available to cover currency fluctuations in order to avoid a violation of the Antideficiency Act.
+(b) The recipient or subrecipient is required to make reviews of local currency gains to determine the need for additional Federal funding before the expiration date of the Federal award. Subsequent adjustments for currency increases may be allowable only when the recipient or subrecipient provides the Federal agency with adequate source documentation from a commonly used source in effect at the time the expense was made, and to the extent that sufficient Federal funds are available.
+
+§ 200.441 Fines, penalties, damages and other settlements.
+
+Costs resulting from recipient or subrecipient violations of, alleged violations of, or failure to comply with, Federal, State, local, tribal, or foreign laws and regulations are unallowable, except when incurred as a result of compliance with specific provisions of the Federal award, or with the prior written approval of the Federal agency. See § 200.435.
+
+§ 200.442 Fundraising and investment management costs.
+
+(a) Costs of organized fundraising, including financial campaigns, endowment drives, solicitation of gifts and bequests, and similar expenses incurred to raise capital or obtain contributions, are unallowable. Fundraising costs for meeting the Federal program objectives are allowable with the prior written approval of the Federal agency.
+(b) Costs of investment counsel and staff and similar expenses incurred to enhance income from investments are unallowable except when associated with investments covering pension, self-insurance, or other funds, which include Federal participation allowed by this part.
+(c) Costs related to the physical custody and control of monies and securities are allowable.
+(d) Both allowable and unallowable fundraising and investment activities must be allocated an appropriate share of indirect costs in accordance with § 200.413.
+
+§ 200.443 Gains and losses on the disposition of depreciable assets.
+
+(a) The recipient or subrecipient must include gains and losses on the sale, retirement, or other disposition of depreciable property in the year they occur as credits or charges to the asset cost grouping(s) of the property. The amount of the gain or loss is the difference between the amount realized on the property and the undepreciated basis of the property.
+(b) Gains and losses from the disposition of depreciable property must not be recognized as a separate credit or charge under the following conditions:
+(1) The gain or loss is processed through a depreciation account and is reflected in the depreciation allowable under §§ 200.436 and 200.439.
+(2) The property is given in exchange as part of the purchase price of a similar item, and the gain or loss is taken into account in determining the depreciation cost basis of the new item.
+(3) A loss results from failing to maintain proper insurance, except as provided in § 200.447.
+(4) Compensation for the use of the property was provided through use allowances instead of depreciation.
+(5) Gains and losses arising from extraordinary or bulk sales, retirements, or other dispositions must be considered on a case-by-case basis.
+(c) Gains or losses of any nature arising from the sale or exchange of property other than the property covered in paragraph (a) of this section must be excluded in computing Federal award costs.
+(d) When assets acquired with Federal funds, in part or wholly, are disposed of, the distribution of the proceeds must be made in accordance with §§ 200.310 through 200.316.
+
+§ 200.444 General costs of government.
+
+(a) For states, local governments, and Indian Tribes, the general costs of government are unallowable except as provided in § 200.475. Unallowable costs include:
+(1) Salaries and expenses of the Office of the Governor of a State or the chief executive of a local government or the chief executive of an Indian Tribe;
+(2) Salaries and other expenses of a State legislature, tribal council, or similar local governmental body, such as a county supervisor, city council, or school board, whether incurred for purposes of legislation or executive direction;
+(3) Costs of the judicial branch of a government;
+(4) Costs of prosecutorial activities unless treated as a direct cost to a specific program if authorized by statute or regulation. However, this does not preclude the allowability of other legal activities of the Attorney General as described in § 200.435; and
+(5) Costs of other general types of government services normally provided to the general public, such as fire and police, unless provided as a direct cost under a program statute or regulation.
+(b) Indian Tribes and Councils of Governments (COGs) (see definition for Local government in § 200.1) may include up to 50 percent of salaries and expenses directly attributable to managing and operating Federal programs by the chief executive and their staff in the indirect cost calculation without documentation.
+
+§ 200.445 Goods or services for personal use.
+
+(a) Costs of goods or services for the personal use of the recipient's or subrecipient's employees are unallowable regardless of whether the cost is reported as taxable income to the employees.
+(b) Housing costs (for example, depreciation, maintenance, utilities, furnishings, rent), housing allowances, and personal living expenses for the recipient's or subrecipient's employees are only allowable as direct costs and must be approved in advance by the Federal agency.
+
+§ 200.446 Idle facilities and idle capacity.
+
+(a) Definitions for the purpose of this section:
+(1) Facilities means land and buildings or any portion thereof, equipment individually or collectively, or any other tangible capital asset, wherever located, and whether owned or leased by the recipient or subrecipient.
+(2) Idle facilities mean completely unused facilities that exceed the recipient's or subrecipient's current needs.
+(3) Idle capacity means the unused capacity of partially used facilities. It is the difference between:
+(i) That which a facility could achieve under 100 percent operating time on a one-shift basis less operating interruptions resulting from time lost for repairs, setups, unsatisfactory materials, and other normal delays; and
+(ii) The extent to which the facility was actually used to meet demands during the accounting period. A multi-shift basis should be used if it can be shown that this amount of usage would normally be expected for the type of facility involved.
+(4) Cost of idle facilities or idle capacity means maintenance, repair, housing, rent, and other related costs (for example, insurance, interest, and depreciation). These costs could include the costs of idle public safety emergency facilities, telecommunications, or information technology system capacity that is built to withstand major fluctuations in load (for example, consolidated data centers).
+(b) The costs of idle facilities are unallowable except to the extent that:
+(1) They are necessary to meet workload requirements which may fluctuate, and are allocated appropriately to all benefiting programs; or
+(2) Although not necessary to meet fluctuations in workload, they were necessary when acquired and are now idle because of changes in program requirements, efforts to achieve more economical operations, reorganization, termination, or other causes which could not have been reasonably foreseen. Under this exception, costs of idle facilities are allowable for a reasonable period, ordinarily not to exceed one year, depending on the initiative taken to use, lease, or dispose of such facilities.
+(c) The costs of idle capacity are normal costs of doing business and are a factor in the normal fluctuations of usage or indirect cost rates from period to period. These costs are allowable, provided that the capacity is reasonably anticipated to be necessary to carry out the purpose of the Federal award or was originally reasonable and is not subject to reduction or elimination by use on other Federal awards, subletting, renting, or sale, in accordance with sound business, economic, or security practices. Widespread idle capacity throughout an entire facility or among a group of assets having substantially the same function may be considered idle facilities.
+
+§ 200.447 Insurance and indemnification.
+
+(a) Costs of insurance required or approved and maintained by the terms and conditions of the Federal award are allowable.
+(b) Costs of other insurance in connection with the general conduct of activities are allowable subject to the following limitations:
+(1) The types, extent, and cost of coverage are in accordance with the recipient's or subrecipient's established written policy and sound business practices.
+(2) Costs of insurance or contributions to any reserve covering the risk of loss of, or damage to, Federal Government property are unallowable except to the extent that the Federal agency has approved the costs.
+(3) Costs allowed for business interruption or other similar insurance must exclude coverage of management fees.
+(4) Insurance costs on the lives of trustees, officers, or other employees holding positions of similar responsibilities are allowable only when the insurance represents additional compensation (see § 200.431). This insurance is unallowable when the recipient or subrecipient is identified as the beneficiary.
+(5) Insurance costs to correct defects in the recipient's or subrecipient's materials or workmanship are unallowable.
+(6) Medical liability (malpractice) insurance is an allowable cost of a Federal research program only when the program involves human subjects or training of participants in research techniques. Medical liability insurance costs must be treated as a direct cost and assigned to individual projects based on how the insurer allocates the risk to the population covered by the insurance.
+(c) Actual losses which could have been covered by permissible insurance (through a self-insurance program or otherwise) are unallowable unless expressly authorized in the Federal award. However, costs incurred because of losses not covered under nominal deductible insurance coverage provided in keeping with sound management practice, and minor losses not covered by insurance, such as spoilage, breakage, and disappearance of small hand tools, which occur in the ordinary course of operations, are allowable.
+(d) Contributions to a reserve for a self-insurance program, including workers' compensation, unemployment compensation, and severance pay, are allowable subject to the following requirements:
+(1) The type, extent, and cost of coverage and the rates and premiums would have been allowed had insurance (including reinsurance) been purchased to cover the risks. However, a provision for known or reasonably estimated self-insured liabilities, which do not become payable for more than one year after the provision is made, must not exceed the discounted present value of the liability. The rate used for discounting the liability must be determined by considering factors such as the recipient's or subrecipient's settlement rate for those liabilities and its investment rate of return.
+(2) Earnings or investment income on reserves must be credited to those reserves.
+(3)(i) Contributions to reserves must be based on sound actuarial principles using historical experience and reasonable assumptions. Reserve levels must be analyzed and updated at least biennially for each major risk being insured and take into account any reinsurance, coinsurance, and other relevant factors or information. Reserve levels related to employee-related coverages must normally be limited to the value of claims:
+(A) Submitted and adjudicated but not paid;
+(B) Submitted but not adjudicated; and
+(C) Incurred but not submitted.
+(ii) Reserve exceeding the levels described in paragraph (d)(3)(i) of this section must be identified and justified in the cost allocation plan or indirect cost rate proposal.
+(4) Accounting records, actuarial studies, and cost allocations (or billings) must recognize any significant differences due to the types of insured risk and losses generated by the various insured activities or agencies of the recipient or subrecipient. If individual departments or agencies of the recipient or subrecipient experience significantly different levels of claims for a particular risk, those differences must be recognized by using separate allocations or other techniques resulting in an equitable allocation.
+(5) Whenever funds are transferred from a self-insurance reserve to other accounts (for example, general fund or unrestricted account), refunds must be made to the Federal Government for its share of funds transferred, including earned or imputed interest from the date of transfer and debt interest, if applicable, chargeable in accordance with the claims collection regulations of the cognizant agency for indirect cost.
+(e) Insurance refunds must be credited against insurance costs in the year the refund is received.
+(f) Indemnification includes securing the recipient or subrecipient against liabilities to third persons and other losses not compensated by insurance or otherwise. The Federal Government is obligated to indemnify the recipient or subrecipient only to the extent expressly provided for in the Federal award, except as provided in paragraph (c).
+
+§ 200.448 Intellectual property.
+
+(a) Patent and copyright costs. (1) The following costs related to securing patents and copyrights are allowable:
+(i) Costs of preparing disclosures, reports, and other documents required by the Federal award and of searching the art to the extent necessary to make such disclosures;
+(ii) Costs of preparing documents and any other patent costs in connection with the filing and prosecution of a United States patent application where the Federal Government requires that a title or a royalty-free license be conveyed to the Federal Government; and
+(iii) General counseling services relating to patent and copyright matters, such as advice on patent and copyright laws, regulations, clauses, and employee intellectual property agreements (See § 200.459).
+(2) The following costs related to securing patents and copyrights are unallowable:
+(i) Costs of preparing disclosures, reports, and other documents and of searching the art to make disclosures not required by the Federal award;
+(ii) Costs in connection with filing and prosecuting any foreign patent application, or any United States patent application, where the Federal award does not require conveying title or a royalty-free license to the Federal Government.
+(b) Royalties and other costs for the use of patents and copyrights. (1) Royalties on a patent or copyright or amortization of the cost of acquiring by purchase a copyright, patent, or rights thereto, necessary for the proper performance of the Federal award are allowable unless:
+(i) The Federal Government already has a license or the right to free use of the patent or copyright.
+(ii) The patent or copyright has been adjudicated to be invalid or administratively determined to be invalid.
+(iii) The patent or copyright is considered to be unenforceable.
+(iv) The patent or copyright is expired.
+(2) Special care should be exercised in determining reasonableness when the royalties may have been obtained as a result of less-than-arm's-length bargaining, such as:
+(i) Royalties paid to persons, including corporations, affiliated with the recipient or subrecipient.
+(ii) Royalties paid to unaffiliated parties, including corporations, under an agreement entered into in contemplation that a Federal award would be made.
+(iii) Royalties paid under an agreement entered into after a Federal award is made to a recipient or subrecipient.
+(3) In any case involving a patent or copyright formerly owned by the recipient or subrecipient, the amount of royalty allowed must not exceed the cost which would have been allowed had the recipient or subrecipient retained ownership.
+
+§ 200.449 Interest.
+
+(a) General. Costs incurred for interest on borrowed capital, temporary use of endowment funds, or the use of the recipient's or subrecipient's own funds are unallowable. Financing costs (including interest) to acquire, construct, or replace capital assets are allowable, subject to the requirements of this section.
+(b) Capital assets. (1) Capital assets is defined in § 200.1. An asset cost includes (as applicable) acquisition costs, construction costs, and other costs capitalized in accordance with GAAP.
+(2) For recipient or subrecipient fiscal years beginning on or after January 1, 2016, intangible assets include patents and computer software. For software development projects, only interest attributable to the portion of the project costs capitalized in accordance with GAAP is allowable.
+(c) Requirements for all recipients and subrecipients. (1) The recipient or subrecipient uses the capital assets in support of Federal awards;
+(2) The allowable asset costs to acquire facilities and equipment are limited to a fair market value available to the recipient or subrecipient from an unrelated (arm's length) third party.
+(3) The recipient or subrecipient obtains the financing via an arm's-length transaction (meaning, a transaction with an unrelated third party); or claims reimbursement of actual interest cost at a rate available via such a transaction.
+(4) The recipient or subrecipient limits claims for Federal reimbursement of interest costs to the least expensive alternative. For example, a lease contract that transfers ownership by the end of the contract may be determined less costly than purchasing through other types of debt financing, in which case reimbursement must be limited to the amount of interest determined if leasing had been used.
+(5) The recipient or subrecipient expenses or capitalizes allowable interest cost in accordance with GAAP.
+(6) Earnings generated by the investment of borrowed funds pending their disbursement for the asset costs are used to offset the current period's allowable interest cost, whether that cost is expensed or capitalized. Earnings subject to being reported to the Federal Internal Revenue Service under arbitrage requirements are excludable.
+(7) The following conditions must apply to debt arrangements over $1 million to purchase or construct facilities unless the recipient or subrecipient makes an initial equity contribution to the purchase of 25 percent or more. For this purpose, “initial equity contribution” means the amount or value of contributions made by the recipient or subrecipient for the acquisition of facilities prior to occupancy.
+(i) The recipient or subrecipient must reduce claims for reimbursement of interest cost by an amount equal to imputed interest earnings on excess cash flow attributable to the portion of the facility used for Federal awards.
+(ii) The recipient or subrecipient must impute interest on excess cash flow as follows:
+(A) Annually, the recipient or subrecipient must prepare a cumulative (from the project's inception) report of monthly cash inflows and outflows, regardless of the funding source. For this purpose, inflows consist of Federal reimbursement for depreciation, amortization of capitalized construction interest, and annual interest cost. Outflows consist of initial equity contributions, debt principal payments (less the pro-rata share attributable to the cost of land), and interest payments.
+(B) To compute monthly cash inflows and outflows, the recipient or subrecipient must divide the above-mentioned annual amounts by the months in the year (usually 12) that the building is in service.
+(C) For any month in which cumulative cash inflows exceed cumulative outflows, interest must be calculated on the excess inflows for that month and be treated as a reduction to allowable interest cost. The interest rate to be used must be the three-month Treasury bill closing rate as of the last business day of that month.
+(8) Interest attributable to a fully depreciated asset is unallowable.
+(d) Additional requirements for states, local governments and Indian Tribes. For interest costs to be allowable for states, local governments, and Indian Tribes, the recipient or subrecipient must have incurred the interest costs for buildings after October 1, 1980, or after September 1, 1995, for land and equipment.
+(1) The requirement to offset the interest earned on borrowed funds against allowable interest cost (paragraph (c)(5) of this section) also applies to earnings on debt service reserve funds.
+(2) The recipient or subrecipient must negotiate the amount of allowable interest cost related to the acquisition of facilities with asset costs of $1 million or more, as described in paragraph (c)(7) of this section. For this purpose, a recipient or subrecipient must consider only cash inflows and outflows attributable to that portion of the real property used for Federal awards.
+(e) Additional requirements for IHEs. For interest costs to be allowable, the IHE must have incurred the interest costs after July 1, 1982, in connection with acquisitions of capital assets that occurred after that date.
+(f) Additional requirements for nonprofit organizations. For interest costs to be allowable, the nonprofit organization must have incurred the interest costs after September 29, 1995, in connection with acquisitions of capital assets that occurred after that date.
+(g) Requirements for nonprofit organizations subject to full coverage under CAS. The interest allowability provisions of this section do not apply to a nonprofit organization subject to “full coverage” under the Cost Accounting Standards (CAS), as defined at 48 CFR 9903.201-2(a). The nonprofit organization's Federal awards are instead subject to CAS 414 (48 CFR 9904.414), “Cost of Money as an Element of the Cost of Facilities Capital,” and CAS 417 (48 CFR 9904.417), “Cost of Money as an Element of the Cost of Capital Assets Under Construction.”
+
+§ 200.450 Lobbying.
+
+(a) Lobbying costs associated with obtaining Federal assistance awards. The costs of certain influencing activities associated with obtaining grants, cooperative agreements, contracts, or loans are unallowable. Lobbying with respect to certain grants, cooperative agreements, contracts, and loans is governed by relevant statutes, including the provisions of 31 U.S.C. 1352, as well as the common rule, “New Restrictions on Lobbying,” published on February 26, 1990, including definitions, and the Office of Management and Budget “Government-wide Guidance for New Restrictions on Lobbying” and notices published on December 20, 1989, June 15, 1990, January 15, 1992, and January 19, 1996.
+(b) Executive lobbying costs. Costs incurred in attempting to improperly influence, either directly or indirectly, an employee or officer of the executive branch of the Federal Government to give consideration or to act regarding a Federal award or a regulatory matter are unallowable. Improper influence means any influence that induces or tends to induce a Federal employee or officer to give consideration or to act regarding a Federal award or regulatory matter on any basis other than the merit.
+(c) Restrictions on nonprofit organizations and IHEs. In addition, the following restrictions apply to nonprofit organizations and IHEs:
+(1) Costs associated with the following activities are unallowable:
+(i) Attempts to influence the outcomes of any Federal, State, or local election, referendum, initiative, or similar procedure through in-kind or cash contributions, endorsements, publicity, or similar activity;
+(ii) Establishing, administering, contributing to, or paying the expenses of a political party, campaign, political action committee, or other organization established to influence the outcomes of elections in the United States;
+(iii) Any attempt to influence:
+(A) The introduction of Federal or State legislation;
+(B) The enactment or modification of any pending Federal or State legislation through communication with any member or employee of the Congress or State legislature (including efforts to influence State or local officials to engage in similar lobbying activity);
+(C) The enactment or modification of any pending Federal or State legislation by preparing, distributing, or using publicity or propaganda or by urging members of the general public, or any segment thereof, to contribute to or participate in any mass demonstration, march, rally, fundraising drive, lobbying campaign or letter writing or telephone campaign; or
+(D) Any government official or employee in connection with a decision to sign or veto enrolled legislation;
+(iv) Legislative liaison activities, including attendance at legislative sessions or committee hearings, gathering information regarding legislation, and analyzing the effect of legislation, when such activities are carried on in support of or in knowing preparation for an effort to engage in unallowable lobbying.
+(2) The following activities are excepted from the coverage of paragraph (c)(1) of this section:
+(i) Technical and factual presentations on topics directly related to the performance of a grant, contract, or other agreement (through hearing testimony, statements, or letters to the Congress or a State legislature, or subdivision, member, or cognizant staff member thereof), in response to a documented request (including a Congressional Record notice requesting testimony or statements for the record at a regularly scheduled hearing) made by the recipient's or subrecipient's member of congress, legislative body, subdivision, or a cognizant staff member thereof, provided such information is readily obtainable and can be readily put in deliverable form, and further provided that costs under this section for travel, lodging or meals are unallowable unless incurred to offer testimony at a regularly scheduled Congressional hearing pursuant to a written request for such presentation made by the Chairman or Ranking Minority Member of the Committee or Subcommittee conducting such hearings;
+(ii) Any lobbying made unallowable by paragraph (c)(1)(iii) of this section to influence State legislation to directly reduce the cost, or to avoid material impairment of the recipient's or subrecipient's authority to perform the grant, contract, or other agreement;
+(iii) Any activity specifically authorized by statute to be undertaken with funds from the Federal award; or
+(iv) Any activity excepted from the definitions of “lobbying” or “influencing legislation” by the Internal Revenue Code provisions that require nonprofit organizations to limit their participation in direct and “grass roots” lobbying activities to retain their charitable deduction status and avoid punitive excise taxes, 26 U.S.C. (I.R.C.) 501(c)(3), 501(h), 4911(a), including:
+(A) Nonpartisan analysis, study, or research reports;
+(B) Examinations and discussions of broad social, economic, and similar problems; and
+(C) Information provided upon request by a legislator for technical advice and assistance, as defined by I.R.C. 4911(d)(2) and 26 CFR 56.4911-2(c)(1) through (c)(3).
+(3) When a recipient or subrecipient seeks reimbursement for indirect costs, total lobbying costs must be identified separately in the indirect cost rate proposal and thereafter be treated as other unallowable activity costs in accordance with § 200.413.
+(4) The recipient or subrecipient must submit a certification that the requirements and standards of this section have been complied with as part of its annual indirect cost rate proposal. (See § 200.415.)
+(5)(i) Time logs, calendars, or similar records are not required to be created for purposes of complying with the record-keeping requirements in § 200.302 with respect to lobbying costs during a particular calendar month when:
+(A) The employee engages in lobbying (as defined in paragraphs (c)(1) and (2) of this section) for 25 percent or less of the employee's compensated hours of employment during that calendar month; and
+(B) Within the preceding five-year period, the recipient or subrecipient has not materially misstated allowable or unallowable costs of any nature, including legislative lobbying costs.
+(ii) When conditions in paragraph (c)(5)(i)(A) and (B) of this section are met, recipients and subrecipients are not required to establish records to support the allowability of claimed costs in addition to records already required or maintained. Also, when conditions in paragraphs (c)(5)(i)(A) and (B) of this section are met, the absence of time logs, calendars, or similar records will not serve as a basis for disallowing costs by contesting estimates of lobbying time spent by employees during a calendar month.
+(iii) In consultation with OMB, the Federal agency must establish procedures for resolving, in advance, any significant questions or disagreements concerning the interpretation or application of this section. Any such advance resolutions must be binding in any subsequent settlements, audits, or investigations with respect to that grant or contract for purposes of interpretation of this part, provided, however, that this must not be construed to prevent a contractor or recipient or subrecipient from contesting the lawfulness of such a determination.
+
+§ 200.451 Losses on other awards or contracts.
+
+Any excess costs over income under any other award or contract of any nature is unallowable. This includes, but is not limited to, the recipient's or subrecipient's contributed portion by reason of cost sharing agreements or any under-recoveries through negotiation of flat amounts for indirect costs. Also, any excess of costs over authorized funding levels transferred from any award or contract to another is unallowable. All losses are not allowable indirect costs and must be included in the appropriate indirect cost rate base for allocating indirect costs.
+
+§ 200.452 Maintenance and repair costs.
+
+Costs incurred for utilities, insurance, security, necessary maintenance, janitorial services, repair, or upkeep of buildings and equipment (including Federal property unless otherwise provided for) which neither add to the permanent value of the property nor appreciably prolong its intended life, but keep it in an efficient operating condition, are allowable. Costs incurred for improvements that add to the permanent value of the buildings and equipment or appreciably prolong their intended life must be treated as capital expenditures (see § 200.439). These costs are only allowable to the extent not paid through rental or other agreements.
+
+§ 200.453 Materials and supplies costs, including costs of computing devices.
+
+(a) Costs incurred for materials, supplies, and fabricated parts necessary for the performance of a Federal award are allowable.
+(b) Purchased materials and supplies must be charged at their actual prices, net of applicable credits. Withdrawals from general stores or stockrooms must be charged at their actual net cost under any recognized method of pricing inventory withdrawals, consistently applied. Incoming transportation charges are an allowable part of materials and supplies costs.
+(c) Materials and supplies used for the performance of a Federal award may be charged as direct costs. Charging computing devices as direct costs is allowable for devices that are essential and allocable, but not solely dedicated, to the performance of a Federal award.
+(d) Where Federally-donated or furnished materials are used in performing the Federal award, the materials will be used without charge.
+
+§ 200.454 Memberships, subscriptions, and professional activity costs.
+
+(a) Costs of the recipient's or subrecipient's membership in business, technical, and professional organizations are allowable.
+(b) Costs of the recipient's or subrecipient's subscriptions to business, professional, and technical periodicals are allowable.
+(c) Costs of membership in any civic or community organization are allowable.
+(d) Costs of membership in any country club or social or dining club or organization are unallowable.
+(e) Costs of membership in organizations whose primary purpose is lobbying are unallowable. See § 200.450.
+
+§ 200.455 Organization costs.
+
+(a) Costs such as incorporation fees, brokers' fees, fees to promoters, organizers or management consultants, attorneys, accountants, or investment counselors, whether or not employees of the recipient or subrecipient in connection with the establishment or reorganization of an organization, are unallowable except with prior approval of the Federal agency.
+(b) The costs of any of the following activities are unallowable: activities undertaken to persuade employees of the recipient or subrecipient, or any other entity, to exercise or not to exercise, or concerning the manner of exercising, the right to organize and bargain collectively through representatives of the employees' own choosing.
+(c) The costs related to data and evaluation are allowable. Data costs include (but are not limited to) the expenditures needed to gather, store, track, manage, analyze, disaggregate, secure, share, publish, or otherwise use data to administer or improve the program, such as data systems, personnel, data dashboards, cybersecurity, and related items. Data costs may also include direct or indirect costs associated with building integrated data systems—data systems that link individual-level data from multiple State and local government agencies for purposes of management, research, and evaluation. Evaluation costs include (but are not limited to) evidence reviews, evaluation planning and feasibility assessment, conducting evaluations, sharing evaluation results, and other personnel or materials costs related to the effective building and use of evidence and evaluation for program design, administration, or improvement.
+
+§ 200.456 Participant support costs.
+
+Participant support costs are allowable (see § 200.1). The classification of items as participant support costs must be documented in the recipient's or subrecipient's written policies and procedures and treated consistently across all Federal awards.
+
+§ 200.457 Plant and security costs.
+
+Necessary and reasonable expenses incurred for the protection and security of facilities, personnel, and work products are allowable. Such costs include, but are not limited to, wages and uniforms of personnel engaged in security activities; equipment; barriers; protective (non-military) gear, devices, and equipment; contractual security services; and consultants. Capital expenditures for plant security purposes are subject to § 200.439.
+
+§ 200.458 Pre-award costs.
+
+Pre-award costs are those incurred before the start date of the Federal award or subaward directly pursuant to the negotiation and in anticipation of the Federal award where such costs are necessary for efficient and timely performance of the scope of work. These costs are allowable only to the extent that they would have been allowed if incurred after the start date of the Federal award and only with the written approval of the Federal agency. If approved, these costs must be charged to the initial budget period of the Federal award unless otherwise specified by the Federal agency or pass-through entity.
+
+§ 200.459 Professional service costs.
+
+(a) Costs of professional and consultant services rendered by persons who are members of a particular profession or possess a special skill and who are not officers or employees of the recipient or subrecipient are allowable, subject to paragraphs (b) and (c) of this section when reasonable in relation to the services rendered and when not contingent upon recovery of the costs from the Federal Government. In addition, legal and related services are limited under § 200.435.
+(b) In determining the allowability of costs in a particular case, no single factor or any combination of factors is necessarily determinative. However, the following factors are relevant:
+(1) The nature and scope of the service rendered in relation to the service required.
+(2) The necessity of contracting for the service, considering the recipient's or subrecipient's capability in the particular area.
+(3) The past pattern of such costs, particularly in the years prior to receiving a Federal award(s).
+(4) The impact of Federal awards on the recipient's or subrecipient's business (meaning, what new problems have arisen).
+(5) Whether the proportion of Federal work to the recipient's or subrecipient's total business influences the recipient or subrecipient in favor of incurring the cost, particularly where the services rendered are not of a continuing nature and have little relationship to work under Federal awards.
+(6) Whether the service can be performed more economically by direct employment rather than contracting.
+(7) The qualifications of the individual or entity providing the service and the customary fees charged, especially on non-federally funded activities.
+(8) Adequacy of the contractual agreement for the service (for example, description of the service, estimate of the time required, rate of compensation, and termination provisions).
+(c) To be allowable, retainer fees must be supported by evidence of bona fide services available or rendered in addition to the factors in paragraph (b) of this section.
+
+§ 200.460 Proposal costs.
+
+Proposal costs are the costs of preparing bids, proposals, or applications on potential Federal and non-Federal awards or projects, including developing data necessary to support the recipient's or subrecipient's bids or proposals. Proposal costs of the current accounting period of both successful and unsuccessful bids and proposals normally should be treated as indirect costs and allocated to all current activities of the recipient or subrecipient. No proposal costs of past accounting periods may be allocated to the current period.
+
+§ 200.461 Publication and printing costs.
+
+(a) Publication costs for electronic and print media, including distribution, promotion, and general handling, are allowable. These costs should be allocated as indirect costs to all benefiting activities of the recipient or subrecipient if they are not identifiable with a particular cost objective.
+(b) Page charges, article processing charges (APCs), or similar fees such as open access fees for professional journal publications and other peer-reviewed publications resulting from a Federal award are allowable where:
+(1) The publications report work supported by the Federal Government; and
+(2) The charges are levied impartially on all items published by the journal, whether or not under a Federal award.
+(3) The recipient or subrecipient may charge the Federal award during closeout for the costs of publication or sharing of research results if the costs were not incurred during the period of performance of the Federal award. These costs must be charged to the final budget period of the award unless otherwise specified by the Federal agency.
+
+§ 200.462 Rearrangement and reconversion costs.
+
+(a) Costs incurred for ordinary and normal rearrangement and alteration of facilities are allowable as indirect costs. Special arrangements and alterations are allowable as a direct cost if the costs are incurred specifically for a Federal award and with the prior approval of the Federal agency or pass-through entity.
+(b) Costs incurred in restoring or rehabilitating the recipient's or subrecipient's facilities to approximately the same condition existing immediately before the commencement of a Federal award(s), less costs related to normal wear and tear, are allowable.
+
+§ 200.463 Recruiting costs.
+
+(a) Subject to paragraphs (b) and (c) of this section, and provided that the size of the staff recruited and maintained is in keeping with workload requirements, costs of “help wanted” advertising, operating costs of an employment office necessary to secure and maintain adequate staff, costs of operating an aptitude and educational testing program, travel costs of employees while engaged in recruiting personnel, travel costs of applicants for interviews for prospective employment, and relocation costs incurred incident to recruitment of new employees, are allowable to the extent that such costs are incurred pursuant to the recipient's or subrecipient's standard recruitment program. When the recipient or subrecipient uses employment agencies, costs not in excess of standard commercial rates for such services are allowable.
+(b) Special emoluments, fringe benefits, and salary allowances incurred to attract professional personnel that do not meet the test of reasonableness or do not conform with the established practices of the recipient or subrecipient, are unallowable.
+(c) If relocation costs incurred incident to recruitment of a new employee have been funded in whole or in part by a Federal award, and the newly hired employee resigns for reasons within the employee's control within 12 months after hire, the recipient or subrecipient must refund or credit the Federal Government for its share of those relocation costs. See § 200.464.
+(d) Short-term visas (as opposed to longer-term immigration visas) are generally an allowable cost and they may be proposed as a direct cost because they are issued for a specific period and purpose and can be clearly identified as directly connected to work performed on a Federal award. For these costs to be directly charged to a Federal award, they must:
+(1) Be critical and necessary for the conduct of the project;
+(2) Be allowable under the applicable cost principles;
+(3) Be consistent with the recipient's or subrecipient's cost accounting practices and established written policy; and
+(4) Meet the definition of “direct cost” as described in the applicable cost principles.
+
+§ 200.464 Relocation costs of employees.
+
+(a) Relocation costs are costs incident to the permanent change of duty assignment (for an indefinite period or a stated period of not less than 12 months) of an existing employee or upon recruitment of a new employee. Relocation costs are allowable, subject to the limitations described in paragraphs (b), (c), and (d) of this section, provided that:
+(1) The move is for the benefit of the employer.
+(2) Reimbursement to the employee is in accordance with an established written policy consistently followed by the employer.
+(3) The reimbursement does not exceed the employee's actual (or reasonably estimated) expenses.
+(b) Allowable relocation costs for current employees are limited to the following:
+(1) The costs of transportation of the employee, members of their immediate family and their household, and personal effects to the new location.
+(2) The costs of finding a new home, such as advance trips by employees and spouses to locate living quarters and temporary lodging during the transition period, up to a maximum period of 30 calendar days.
+(3) Closing costs, such as brokerage, legal, and appraisal fees, incidental to the disposition of the employee's former home. These costs, together with those described in paragraph (b)(4) of this section, are limited to eight percent of the sales price of the employee's former home.
+(4) The continuing costs of ownership (for up to six months) of the vacant former home after the settlement or lease date of the employee's new permanent home, such as maintenance of buildings and grounds (exclusive of fixing-up expenses), utilities, taxes, and property insurance.
+(5) Other necessary and reasonable expenses normally incident to relocation, such as canceling an unexpired lease, transportation of personal property, and purchasing insurance against loss of or damages to personal property. The cost of canceling an unexpired lease is limited to three times the monthly rental.
+(c) Allowable relocation costs for new employees are limited to those described in paragraphs (b)(1) and (2) of this section. If relocation costs incurred incident to the recruitment of a new employee have been funded in whole or in part by a Federal award, and the newly hired employee resigns for reasons within the employee's control within 12 months after hire, the recipient or subrecipient must refund or credit the Federal Government for its share of the cost. If a new employee is relocating to an overseas location and dependents are not permitted for any reason, and the costs do not include transporting household goods, the costs must be considered travel costs in accordance with § 200.474, not relocation costs under this section.
+(d) The following costs related to relocation are unallowable:
+(1) Fees and other costs associated with acquiring a new home.
+(2) A loss on the sale of a former home.
+(3) Continuing mortgage principal and interest payments on a home being sold.
+(4) Income taxes paid by an employee related to reimbursed relocation costs.
+
+§ 200.465 Rental costs of real property and equipment.
+
+(a) Subject to the limitations described in paragraphs (b) through (d) of this section, rental costs are allowable to the extent that the rates are reasonable in light of such factors as costs of comparable rental properties; market conditions in the area; alternatives available; and the type, life expectancy, condition, and value of the property leased. Rental arrangements should be reviewed periodically to determine if circumstances have changed and if other options are available.
+(b) Rental costs under “sale and lease back” arrangements are allowable only up to the amount that would have been allowed if the recipient or subrecipient had continued to own the property. This amount would include expenses such as depreciation, maintenance, taxes, and insurance.
+(c) Rental costs under “less-than-arm's-length” leases are allowable only up to the amount described in paragraph (b) of this section. For this purpose, a less-than-arm's-length lease is one under which one party to the lease agreement can control or substantially influence the actions of the other. Such leases include, but are not limited to, those between:
+(1) Divisions of the recipient or subrecipient;
+(2) The recipient or subrecipient and another entity under common control through common officers, directors, or members; and
+(3) The recipient or subrecipient and a director, trustee, officer, or key employee of the recipient or subrecipient or an immediate family member, either directly or through corporations, trusts, or similar arrangements in which they hold a controlling interest. For example, the recipient or subrecipient may establish a separate corporation to own property and lease it back to the recipient or subrecipient.
+(4) Family members include one party with any of the following relationships to another party:
+(i) Spouse and parents thereof;
+(ii) Children and spouses thereof;
+(iii) Parents and spouses thereof;
+(iv) Siblings and spouses thereof;
+(v) Grandparents and grandchildren and spouses thereof;
+(vi) Domestic partner and parents thereof, including domestic partners of any individual in 2 through 5 of this definition; and
+(vii) Any individual related by blood or affinity whose close association with the employee is the equivalent of a family relationship.
+(d) Rental costs under leases which are required to be accounted for as a financed purchase under GASB standards or a finance lease under FASB standards are allowable only up to the amount (described in paragraph (b) of this section) that would have been allowed if the recipient or subrecipient had purchased the property on the date the lease agreement was executed. Interest costs related to these leases are allowable if they meet the criteria in § 200.449. Unallowable costs include costs that would not have been incurred if the recipient or subrecipient had purchased the property, such as amounts paid for profit, management fees, and taxes.
+(e) Rental or lease payments are allowable under lease contracts where the recipient or subrecipient is required to recognize an intangible right-to-use lease asset under GASB standards or right-of-use operating lease asset under FASB standards for purposes of financial reporting in accordance with GAAP.
+(f) The rental of any property owned by any individuals or entities affiliated with the recipient or subrecipient, including commercial or residential real estate, for purposes such as the home office is unallowable.
+
+§ 200.466 Scholarships, student aid costs, and tuition remission.
+
+(a) Costs of scholarships, fellowships, and student aid programs at IHEs are allowable only when the purpose of the Federal award is to provide training to participants, and the Federal agency approves the cost.
+(b) Tuition remission and other forms of compensation paid as, or instead of, wages to students performing necessary work are allowable provided that:
+(1) The individual is conducting activities necessary to the Federal award;
+(2) Tuition remission and other support are provided in accordance with the established written policy of the IHE and consistently provided in a like manner to students in return for similar activities conducted under Federal awards as well as other activities; and
+(3) The student is enrolled in an advanced degree program at the IHE or an affiliated institution during the academic period and the student's activities under the Federal award are related to their degree program;
+(4) The tuition or other payments are reasonable compensation for the work performed and are conditioned explicitly upon the performance of necessary work; and
+(5) The IHE compensates students under Federal awards as well as other activities in similar manners.
+(c) Charges for tuition remission and other forms of compensation paid to students as, or instead of, salaries and wages are subject to the reporting requirements in § 200.430. The charges must be treated as a direct or indirect cost in accordance with the actual work performed. Tuition remission may be charged on an average rate basis. See § 200.431.
+
+§ 200.467 Selling and marketing costs.
+
+Costs of selling and marketing any products or services of the recipient or subrecipient are unallowable unless they are allowed under § 200.421 and are necessary to meet the requirements of the Federal award.
+
+§ 200.468 Specialized service facilities.
+
+(a) The costs of services provided by highly complex or specialized facilities operated by the recipient or subrecipient are allowable provided the charges for the services meet the conditions of either paragraph (b) or (c) of this section and take into account any items of income or Federal financing that qualify as applicable credits under § 200.406. These costs include charges for facilities such as computing facilities, wind tunnels, and reactors.
+(b) The costs of such services, when material, must be charged directly to the applicable Federal awards based on actual usage of the services on the basis of a schedule of rates or established methodology that:
+(1) Does not discriminate between activities under Federal awards and other activities of the recipient or subrecipient, including usage by the recipient or subrecipient for internal purposes; and
+(2) Is designed to recover only the aggregate costs of the services. Each service's costs must normally consist of its direct costs and an allocable share of all indirect costs. Rates must be adjusted at least biennially and must consider any over or under-applied costs of the previous period(s).
+(c) Where the costs incurred for a service are not material, they may be allocated as indirect costs.
+(d) Under extraordinary circumstances, the cognizant agency for indirect costs and the recipient or subrecipient may negotiate and establish an alternative costing arrangement if it is in the Federal Government's best interest.
+
+§ 200.469 Student activity costs.
+
+Costs incurred for intramural activities, student publications, student clubs, and other student activities are unallowable unless expressly authorized in the Federal award.
+
+§ 200.470 Taxes (including Value Added Tax).
+
+(a) For States, local governments, and Indian Tribes. (1) Taxes that a governmental unit is legally required to pay are allowable, except for self-assessed taxes that disproportionately affect Federal programs or changes in tax policies that disproportionately affect Federal programs.
+(2) Gasoline taxes, motor vehicle fees, and other taxes that are, in effect, user fees for benefits provided to the Federal Government are allowable.
+(3) This provision does not restrict the authority of the Federal agency to identify taxes where Federal participation is inappropriate. The cognizant agency for indirect costs may accept a reasonable approximation in circumstances where determining the amount of unallowable taxes would require an excessive amount of effort.
+(b) For nonprofit organizations and IHEs. (1) Taxes that the recipient or subrecipient is required to pay and which are paid or accrued in accordance with GAAP are generally allowable. These costs include payments made to local governments instead of taxes and that are commensurate with the local government services received. The following taxes are unallowable:
+(i) Taxes for which exemptions are available to the recipient or subrecipient directly or which are available to the recipient or subrecipient based on an exemption afforded the Federal Government and, in the latter case, when the Federal agency makes available the necessary exemption certificates;
+(ii) Special assessments on land which represent capital improvements; and
+(iii) Federal income taxes.
+(2) Any refund of taxes and interest thereon, which were allowed as Federal award costs, must be credited to the Federal Government as a cost reduction or cash refund, as appropriate. However, any interest paid or credited to a recipient or subrecipient incident to a refund of tax, interest, and penalty will be paid or credited to the Federal Government only to the extent that such interest accrued over the period during which the Federal Government has reimbursed the recipient or subrecipient for the taxes, interest, and penalties.
+(c) Value Added Tax (VAT). Foreign taxes charged for procurement transactions that a recipient or subrecipient is legally required to pay in a country are allowable. Foreign tax refunds or applicable credits under Federal awards refer to receipts or reduction of expenditures, which operate to offset or reduce expense items that are allocable to Federal awards as direct or indirect costs. To the extent that such credits accrued or received by the recipient or subrecipient relate to allowable cost, these costs must be credited to the Federal agency as a cost reduction or cash refunds, as appropriate. In cases where the costs are credited back to the Federal award, the recipient or subrecipient may reduce the Federal share of costs by the amount of the foreign tax reimbursement, or where Federal award has not expired, the Federal agency may allow the recipient or subrecipient to use the foreign government tax refund for approved activities under the Federal award.
+
+§ 200.471 Telecommunication and video surveillance costs.
+
+(a) Costs incurred for telecommunications and video surveillance services or equipment such as phones, internet, video surveillance, and cloud servers are allowable except for the following circumstances:
+(b) Obligating or expending covered telecommunications and video surveillance services or equipment or services as described in § 200.216 to:
+(1) Procure or obtain, extend or renew a contract to procure or obtain;
+(2) Enter into a contract (or extend or renew a contract) to procure; or
+(3) Obtain the equipment, services, or systems.
+
+§ 200.472 Termination and standard closeout costs.
+
+(a) Termination Costs. Termination of a Federal award generally gives rise to the incurrence of costs or the need for special treatment of costs, which would not have arisen had the Federal award not been terminated. Cost principles covering these items are set forth in this section. They must be used in conjunction with the other termination requirements of this part.
+(1) The cost of items reasonably usable on the recipient's or subrecipient's other work is unallowable unless the recipient or subrecipient submits evidence that it would not retain such items without sustaining a loss. In deciding whether such items are reasonably usable on other work of the recipient or subrecipient, the Federal agency or pass-through entity should consider the recipient's or subrecipient's plans and orders for current and scheduled activity. Contemporaneous purchases of common items by the recipient or subrecipient must be considered evidence that the items are reasonably usable on the recipient's or subrecipient's other work. Any acceptance of common items as allocable to the terminated portion of the Federal award must be limited to the extent that the quantities of such items on hand, in transit, and on order do not exceed the reasonable quantitative requirements of other work.
+(2) If the recipient or subrecipient cannot discontinue certain costs immediately after the effective termination date, despite making all reasonable efforts, then the costs are generally allowable within the limitations of this part. Any costs continuing after termination due to the negligent or willful failure of the recipient or subrecipient to immediately discontinue the costs are unallowable.
+(3) Loss of useful value of special tooling, machinery, and equipment is generally allowable if:
+(i) Such special tooling, special machinery, or equipment is not reasonably capable of use in the other work of the recipient or subrecipient;
+(ii) The interest of the Federal Government is protected by transfer of title or by other means deemed appropriate by the Federal agency (see § 200.313 (d)); and
+(iii) The loss of useful value for any one terminated Federal award is limited to the portion of the acquisition cost which bears the same ratio to the total acquisition cost as the terminated portion of the Federal award bears to the entire terminated Federal award and other Federal awards for which the special tooling, machinery, or equipment was acquired.
+(4) If paragraph (a)(4)(i) and (ii) below are satisfied, rental costs under unexpired leases (less the residual value of such leases) are generally allowable where clearly shown to have been reasonably necessary for the performance of the terminated Federal award. These rental costs may include the cost of alterations of the leased property and the cost of reasonable restoration required by the lease, provided the alterations were necessary for the performance of the Federal award.
+(i) The amount of claimed rental costs does not exceed the reasonable use value of the property leased for the period of the Federal award and a further period as may be reasonable; and
+(ii) The recipient or subrecipient makes all reasonable efforts to terminate, assign, settle, or otherwise reduce the cost of the lease.
+(5) The following settlement expenses are generally allowable.
+(i) Accounting, legal, clerical, and similar costs that are reasonably necessary for:
+(A) The preparation and presentation to the Federal agency or pass-through entity of settlement claims and supporting data with respect to the terminated portion of the Federal award, unless the termination is for cause (see §§ 200.339-200.343); and
+(B) The termination and settlement of subawards.
+(ii) Reasonable costs for the storage, transportation, protection, and disposition of property provided by the Federal Government or acquired or produced for the Federal award.
+(6) Claims under subawards, including the allocable portion of claims common to the Federal award and other work of the recipient or subrecipient, are generally allowable. An appropriate share of the recipient's or subrecipient's indirect costs may be allocated to the amount of settlements with contractors and subrecipients, provided that the amount allocated is consistent with the requirements of § 200.414. These allocated indirect costs must exclude the same and similar costs claimed directly or indirectly as settlement expenses.
+(b) Closeout Costs. Administrative costs associated with the closeout activities of a Federal award are allowable. The recipient or subrecipient may charge the Federal award during the closeout for the necessary administrative costs of that Federal award (for example, salaries of personnel preparing final reports, publication and printing costs, costs associated with the disposition of equipment and property, and related indirect costs). These costs may be incurred until the due date of the final report(s). If incurred, these costs must be liquidated prior to the due date of the final report(s) and charged to the final budget period of the award unless otherwise specified by the Federal agency.
+
+§ 200.473 Training and education costs.
+
+The cost of training and education provided for employee development is allowable.
+
+§ 200.474 Transportation costs.
+
+Costs incurred for freight, express, cartage, postage, and other transportation services relating to goods purchased, in process, or delivered, are allowable. When the costs can be readily identified with the items involved, they may be charged directly as transportation costs or added to the cost of such items. When identification with the materials received cannot be readily made, the inbound transportation cost may be charged to the appropriate indirect cost accounts if the recipient or subrecipient follows a consistent, equitable procedure in this respect. If reimbursable under the terms and conditions of the Federal award, outbound freight should be treated as a direct cost.
+
+§ 200.475 Travel costs.
+
+(a) General. Travel costs include the transportation, lodging, subsistence, and related items incurred by employees who are in travel status on official business of the recipient or subrecipient. These costs may be charged on an actual cost basis, on a per diem or mileage basis, or on a combination of the two, provided the method used is applied to an entire trip and not to selected days of the trip. The method used must be consistent with those normally allowed in like circumstances in the recipient's or subrecipient's other activities and in accordance with the recipient's or subrecipient's established written policies. Notwithstanding the provisions of § 200.444, travel costs of officials covered by that section are allowable with the prior written approval of the Federal agency or pass-through entity when they are specifically related to the Federal award.
+(b) Lodging and subsistence. Costs incurred by employees and officers for travel, including costs of lodging, other subsistence, and incidental expenses, must be considered reasonable and otherwise allowable only to the extent such costs do not exceed charges normally allowed by the recipient or subrecipient in its regular operations as the result of the recipient's or subrecipient's established written policy. In addition, if these costs are charged directly to the Federal award documentation must justify that:
+(1) Participation of the individual is necessary for the Federal award; and
+(2) The costs are reasonable and consistent with the recipient's or subrecipient's established written policy.
+(c) Dependents. (1) Temporary dependent care costs (dependent is defined in 26 U.S.C. 152) above and beyond regular dependent care are allowable provided that these costs:
+(i) Are a direct result of the individual's travel to a conference for the Federal award;
+(ii) Are consistent with the recipient's or subrecipient's established written policy for all travel; and
+(iii) Are only temporary during the travel period.
+(2) Travel costs for dependents are unallowable, except for travel of six months or more with prior approval of the Federal agency. See § 200.432.
+(d) Establishing rates and amounts. In the absence of an established written policy regarding travel costs, the rates and amounts established under 5 U.S.C. 5701-11 (“Travel and Subsistence Expenses; Mileage Allowances”), by the Administrator of General Services, or by the President (or their designee) pursuant to any provisions of such subchapter must apply to travel under Federal awards (48 CFR 31.205-46(a)).
+(e) Commercial air travel. (1) Airfare costs in excess of the basic least expensive unrestricted accommodations class offered by commercial airlines are unallowable except when such accommodations would:
+(i) Require circuitous routing;
+(ii) Require travel during unreasonable hours;
+(iii) Excessively prolong travel;
+(iv) Result in additional costs that would offset the transportation savings; or
+(v) Offer accommodations not reasonably adequate for the traveler's medical needs. The recipient or subrecipient must justify and document these conditions on a case-by-case basis for the use of first-class or business-class airfare to be allowable in such cases.
+(2) Unless a pattern of avoidance is detected, the Federal Government will generally not question a recipient's or subrecipient's determinations that customary standard airfare or other discount airfare is unavailable for specific trips if the recipient or subrecipient can demonstrate that such airfare was not available in the specific case.
+(f) Air travel by other than commercial carrier. Travel costs by recipient or subrecipient-owned, -leased, or -chartered aircraft include the cost of the lease, charter, operation (including personnel costs), maintenance, depreciation, insurance, and other related costs. The portion of these costs that exceeds the cost of airfare, as provided for in paragraph (d), is unallowable.
+
+§ 200.476 Trustees.
+
+Travel and subsistence costs of trustees (or directors) at IHEs and nonprofit organizations are allowable. See § 200.475.

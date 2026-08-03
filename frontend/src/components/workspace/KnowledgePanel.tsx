@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -50,7 +50,7 @@ export function KnowledgePanel() {
   const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { create, remove, transferToTeam, refresh } = useKnowledgeBases()
+  const { knowledgeBases, create, remove, transferToTeam, refresh } = useKnowledgeBases()
   const projectPins = useProjectPins(activeProjectUuid)
   // Inside a project, default to showing only the KBs pinned to it; "Show all"
   // escapes the scope. Reset to scoped when the project changes.
@@ -121,6 +121,10 @@ export function KnowledgePanel() {
   const [savingDescription, setSavingDescription] = useState(false)
   const [inspectingSource, setInspectingSource] = useState<KnowledgeBaseSource | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  // Collapsible detail sections. Collapsing Validation also lifts the inner
+  // scroll cap on the Sources list so long source lists become fully visible.
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
+  const [validationCollapsed, setValidationCollapsed] = useState(false)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const cancelTitleEdit = useRef(false)
   // Single commit path for the inline KB title editor: every exit from edit
@@ -186,6 +190,12 @@ export function KnowledgePanel() {
     }
   }, [toast])
 
+  // A different KB starts with both detail sections expanded
+  useEffect(() => {
+    setSourcesCollapsed(false)
+    setValidationCollapsed(false)
+  }, [selectedKB?.uuid])
+
   // Poll status when building
   useEffect(() => {
     if (!selectedKB || selectedKB.status !== 'building') return
@@ -225,6 +235,24 @@ export function KnowledgePanel() {
     } catch (err) {
       console.error('Failed to delete KB:', err)
       toast(err instanceof Error ? err.message : 'Failed to delete knowledge base', 'error')
+    }
+  }
+
+  // Clone lands an owned, editable copy in My KBs (sources re-ingest in the
+  // background, so it opens in 'building' status).
+  const handleClone = async (uuid: string) => {
+    try {
+      const clone = await api.cloneKnowledgeBase(uuid)
+      const newUuid = (clone as { uuid?: string }).uuid
+      toast('Knowledge base cloned — sources are re-indexing', 'success')
+      refresh()
+      if (newUuid) {
+        setActiveTab('mine')
+        loadDetail(newUuid)
+      }
+    } catch (err) {
+      console.error('Failed to clone KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to clone knowledge base', 'error')
     }
   }
 
@@ -619,6 +647,15 @@ export function KnowledgePanel() {
   // Detail view
   if (selectedKB) {
     const badge = STATUS_BADGE[selectedKB.status] || STATUS_BADGE.empty
+    // Manage rights come from the backend's own gate (owner / examiner on a
+    // verified KB / team manager / admin). Without this, a viewer on e.g. an
+    // adopted verified catalog KB could walk the whole add-source flow and only
+    // hit "You don't have permission to manage this knowledge base." on submit.
+    const canManageKB = selectedKB.can_manage !== false
+    const noManageReason = "You don't have permission to manage this knowledge base."
+    // A ready KB with zero indexed chunks has nothing to retrieve — chatting
+    // with it only produces a misleading "still indexing" reply.
+    const canChatKB = selectedKB.status === 'ready' && selectedKB.total_chunks > 0
     return (
       <>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
@@ -683,29 +720,31 @@ export function KnowledgePanel() {
           ) : (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span
-                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
-                title="Click to rename"
+                onClick={canManageKB ? () => { setTitleDraft(selectedKB.title); setEditingTitle(true) } : undefined}
+                title={canManageKB ? 'Click to rename' : noManageReason}
                 style={{
                   fontSize: 16, fontWeight: 600, color: '#fff',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  cursor: 'text', borderRadius: 4, padding: '2px 0',
+                  cursor: canManageKB ? 'text' : 'default', borderRadius: 4, padding: '2px 0',
                   minWidth: 0,
                 }}
               >
                 {selectedKB.title}
               </span>
-              <button
-                type="button"
-                aria-label="Edit title"
-                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
-                title="Edit title"
-                style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  padding: 2, display: 'flex', color: '#888', flexShrink: 0,
-                }}
-              >
-                <Pencil size={13} />
-              </button>
+              {canManageKB && (
+                <button
+                  type="button"
+                  aria-label="Edit title"
+                  onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                  title="Edit title"
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                  }}
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
             </div>
           )}
           {selectedKB.shared_with_team && (
@@ -845,24 +884,28 @@ export function KnowledgePanel() {
                     fontStyle: selectedKB.description ? 'normal' : 'italic',
                     whiteSpace: 'pre-wrap',
                   }}>
-                    {selectedKB.description || 'No description yet. Add one to help others understand what this KB is for.'}
+                    {selectedKB.description || (canManageKB
+                      ? 'No description yet — add one to help others understand what this KB is for.'
+                      : 'No description.')}
                   </div>
-                  <button
-                    type="button"
-                    aria-label="Edit description"
-                    onClick={() => {
-                      setDescriptionDraft(selectedKB.description || '')
-                      setEditingDescription(true)
-                    }}
-                    title="Edit description"
-                    style={{
-                      background: 'transparent', border: 'none', cursor: 'pointer',
-                      padding: 2, display: 'flex', color: '#888', flexShrink: 0,
-                      marginTop: 2,
-                    }}
-                  >
-                    <Pencil size={13} />
-                  </button>
+                  {canManageKB && (
+                    <button
+                      type="button"
+                      aria-label="Edit description"
+                      onClick={() => {
+                        setDescriptionDraft(selectedKB.description || '')
+                        setEditingDescription(true)
+                      }}
+                      title="Edit description"
+                      style={{
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                        marginTop: 2,
+                      }}
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -905,14 +948,15 @@ export function KnowledgePanel() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setShowDocPicker(true)}
-                disabled={addingDocs}
+                disabled={addingDocs || !canManageKB}
+                title={canManageKB ? undefined : noManageReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   color: '#e5e5e5',
                   backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-                  cursor: addingDocs ? 'default' : 'pointer',
-                  opacity: addingDocs ? 0.5 : 1,
+                  cursor: addingDocs || !canManageKB ? 'default' : 'pointer',
+                  opacity: addingDocs || !canManageKB ? 0.5 : 1,
                 }}
               >
                 <FileText size={13} />
@@ -920,14 +964,15 @@ export function KnowledgePanel() {
               </button>
               <button
                 onClick={() => setShowUrlModal(true)}
-                disabled={addingUrls}
+                disabled={addingUrls || !canManageKB}
+                title={canManageKB ? undefined : noManageReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   color: '#e5e5e5', backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a',
                   borderRadius: 6,
-                  cursor: addingUrls ? 'default' : 'pointer',
-                  opacity: addingUrls ? 0.5 : 1,
+                  cursor: addingUrls || !canManageKB ? 'default' : 'pointer',
+                  opacity: addingUrls || !canManageKB ? 0.5 : 1,
                 }}
               >
                 {addingUrls ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Globe size={13} />}
@@ -935,16 +980,19 @@ export function KnowledgePanel() {
               </button>
               <button
                 onClick={handleChat}
-                disabled={selectedKB.status !== 'ready'}
+                disabled={!canChatKB}
+                title={!canChatKB && selectedKB.status === 'ready'
+                  ? 'This knowledge base has no indexed content yet'
+                  : undefined}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: selectedKB.status === 'ready' ? 'var(--highlight-text-color, #000)' : '#666',
-                  backgroundColor: selectedKB.status === 'ready' ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
-                  border: selectedKB.status === 'ready' ? 'none' : '1px solid #3a3a3a',
+                  color: canChatKB ? 'var(--highlight-text-color, #000)' : '#666',
+                  backgroundColor: canChatKB ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
+                  border: canChatKB ? 'none' : '1px solid #3a3a3a',
                   borderRadius: 6,
-                  cursor: selectedKB.status === 'ready' ? 'pointer' : 'default',
-                  opacity: selectedKB.status === 'ready' ? 1 : 0.5,
+                  cursor: canChatKB ? 'pointer' : 'default',
+                  opacity: canChatKB ? 1 : 0.5,
                 }}
               >
                 <MessageSquare size={13} />
@@ -978,13 +1026,17 @@ export function KnowledgePanel() {
                 role="switch"
                 aria-checked={!!selectedKB.shared_with_team}
                 onClick={() => handleToggleShare(selectedKB)}
+                disabled={!canManageKB}
+                title={canManageKB ? undefined : noManageReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   color: selectedKB.shared_with_team ? 'rgb(0, 128, 128)' : '#e5e5e5',
                   backgroundColor: selectedKB.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#2a2a2a',
                   border: selectedKB.shared_with_team ? '1px solid rgba(0, 128, 128, 0.3)' : '1px solid #3a3a3a',
-                  borderRadius: 6, cursor: 'pointer',
+                  borderRadius: 6,
+                  cursor: canManageKB ? 'pointer' : 'default',
+                  opacity: canManageKB ? 1 : 0.5,
                 }}
               >
                 <Users size={13} />
@@ -1049,6 +1101,18 @@ export function KnowledgePanel() {
               )}
             </div>
 
+            {/* A disabled button's tooltip is unreachable by keyboard and touch,
+                so say once, visibly, why the add-source actions are inert. */}
+            {!canManageKB && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                marginTop: -8, marginBottom: 16, fontSize: 11, color: '#999',
+              }}>
+                <ShieldCheck size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
+                <span>View only — {noManageReason}</span>
+              </div>
+            )}
+
             {/* Org visibility badges */}
             {(selectedKB.organization_ids?.length ?? 0) > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -1075,7 +1139,7 @@ export function KnowledgePanel() {
             {/* Tags editor */}
             <KBTagsEditor
               tags={selectedKB.tags || []}
-              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+              canManage={canManageKB}
               onSave={async (next) => {
                 await api.updateKnowledgeBase(selectedKB.uuid, { tags: next })
                 setSelectedKB(prev => prev ? { ...prev, tags: next } : prev)
@@ -1084,19 +1148,45 @@ export function KnowledgePanel() {
             />
 
             {/* Sources list */}
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Sources</div>
-            {selectedKB.sources.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => setSourcesCollapsed(c => !c)}
+              aria-expanded={!sourcesCollapsed}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: 0, marginBottom: sourcesCollapsed ? 0 : 8,
+                background: 'transparent', border: 'none',
+                fontFamily: 'inherit', cursor: 'pointer', color: '#ccc',
+                textAlign: 'left',
+              }}
+            >
+              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: '#888' }} /> : <ChevronDown size={14} style={{ color: '#888' }} />}
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Sources</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+                {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
+              </span>
+            </button>
+            {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
               <div style={{ fontSize: 12, color: '#888', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
               <div style={{
                 display: 'flex', flexDirection: 'column', gap: 6,
-                maxHeight: 320, overflowY: 'auto',
+                // With Validation collapsed the sources list gets the freed
+                // space: no inner scroll cap, the full list is visible.
+                maxHeight: validationCollapsed ? undefined : 320, overflowY: 'auto',
                 paddingRight: 4,
               }}>
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
-                  const st = SOURCE_STATUS[source.status] || SOURCE_STATUS.pending
+                  // A ready-but-truncated source is incomplete: the fetched page
+                  // was cut off at the size cap, so it retrieves wrong answers
+                  // for anything past the cut. Show an amber warning, not a
+                  // clean green check.
+                  const isTruncated = source.status === 'ready' && !!source.truncated
+                  const st = isTruncated
+                    ? { icon: AlertTriangle, color: '#d97706' }
+                    : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
                   const autoLabel = source.source_type === 'url'
                     ? (source.url_title || source.url || source.uuid)
@@ -1211,6 +1301,11 @@ export function KnowledgePanel() {
                         {!isRenaming && source.status === 'ready' && (
                           <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{source.chunk_count} chunks</div>
                         )}
+                        {!isRenaming && isTruncated && (
+                          <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
+                            Page too long — text was cut off; later sections aren’t in this source.
+                          </div>
+                        )}
                       </div>
                       {isRenaming ? (
                         <>
@@ -1239,29 +1334,36 @@ export function KnowledgePanel() {
                         <>
                           <StatusIcon
                             size={14}
+                            aria-label={isTruncated ? 'Source text was truncated' : undefined}
                             style={{
                               color: st.color, flexShrink: 0,
                               ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
                             }}
-                          />
-                          <button
-                            type="button"
-                            aria-label="Rename source"
-                            onClick={(e) => { e.stopPropagation(); beginRenameSource(source) }}
-                            title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                           >
-                            <Pencil size={12} style={{ color: '#888' }} />
-                          </button>
-                          <button
-                            type="button"
-                            aria-label="Remove source"
-                            onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
-                            title="Remove source"
-                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
-                          >
-                            <X size={12} style={{ color: '#666' }} />
-                          </button>
+                            {isTruncated && <title>Page too long — text was cut off; later sections aren’t in this source.</title>}
+                          </StatusIcon>
+                          {canManageKB && (
+                            <>
+                              <button
+                                type="button"
+                                aria-label="Rename source"
+                                onClick={(e) => { e.stopPropagation(); beginRenameSource(source) }}
+                                title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                              >
+                                <Pencil size={12} style={{ color: '#888' }} />
+                              </button>
+                              <button
+                                type="button"
+                                aria-label="Remove source"
+                                onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
+                                title="Remove source"
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                              >
+                                <X size={12} style={{ color: '#666' }} />
+                              </button>
+                            </>
+                          )}
                         </>
                       )}
                     </div>
@@ -1274,8 +1376,10 @@ export function KnowledgePanel() {
             <KBValidationPanel
               kbUuid={selectedKB.uuid}
               kbReady={selectedKB.status === 'ready'}
-              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+              canManage={canManageKB}
               onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
+              collapsed={validationCollapsed}
+              onToggleCollapsed={() => setValidationCollapsed(c => !c)}
             />
 
             {/* "What are knowledge bases?" pill */}
@@ -1443,24 +1547,27 @@ export function KnowledgePanel() {
       {/* Header */}
       <div
         style={{
-          height: 50,
+          minHeight: 50,
           backgroundColor: '#191919',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-          padding: '0 20px',
+          padding: '8px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          columnGap: 12,
+          rowGap: 8,
           flexShrink: 0,
           zIndex: 300,
           position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
           <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
         </div>
         {activeTab === 'mine' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input
               ref={importInputRef}
               type="file"
@@ -1627,6 +1734,7 @@ export function KnowledgePanel() {
             onChat={(uuid, title) => activateKB(uuid, title)}
             onEdit={loadDetail}
             onDelete={activeTab === 'mine' ? handleDelete : undefined}
+            onClone={handleClone}
             onAdopt={activeTab === 'team'
               ? async (uuid) => {
                   try {
@@ -1683,6 +1791,7 @@ export function KnowledgePanel() {
       <CreateKBModal
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreate}
+        existingTitles={knowledgeBases.filter((kb) => !kb.verified).map((kb) => kb.title)}
       />
     )}
     {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}

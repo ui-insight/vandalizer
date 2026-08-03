@@ -20,19 +20,34 @@ class KnowledgeBaseSource(Document):
     custom_name: Optional[str] = None  # user-provided label; overrides auto-derived title
     source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
     content: Optional[str] = None
-    status: str = "pending"  # pending | processing | ready | error
+    # "skipped" is transient: the crawler marks a navigation page skipped and
+    # then deletes the record, so it should not be seen on a stored source.
+    status: str = "pending"  # pending | processing | ready | error | skipped
     error_message: Optional[str] = None
     chunk_count: int = 0
+    # True when the fetched web page's extracted text was cut off at the fetcher
+    # size cap — the source is "ready" but incomplete, so the UI shows a warning
+    # rather than a clean check. Only set for URL sources.
+    truncated: bool = False
     # Crawl fields
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
     parent_source_uuid: Optional[str] = None  # links crawled children to parent
     crawled_urls: Optional[list[str]] = None  # list of discovered URLs (on parent)
+    # Pages the crawl fetched and mined for links but judged to be navigation
+    # rather than content, so they were never embedded (on parent).
+    skipped_urls: Optional[list[str]] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     processed_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "knowledge_base_sources"
+        # A unique (knowledge_base_uuid, url) index also exists but is NOT
+        # listed here: it must not be Beanie-managed, because building it over
+        # legacy duplicate rows would crash every process at init. The web app
+        # creates it at startup via
+        # knowledge_service.ensure_source_url_unique_index(), which dedupes
+        # first and then builds.
         indexes = ["uuid", "knowledge_base_uuid"]
 
     def __init__(self, **data):
@@ -67,6 +82,28 @@ class KnowledgeBaseReference(Document):
         super().__init__(**data)
         if not self.uuid:
             self.uuid = uuid4().hex
+
+
+class KnowledgeBaseUsage(Document):
+    """Per-user usage record for a knowledge base.
+
+    Keyed on the canonical KB uuid (references resolve to their source KB
+    before chat, so a referenced KB shares its usage record with the
+    original). Powers the per-user "Recently Used" sort on the KB lists.
+    """
+
+    user_id: str
+    kb_uuid: str
+    last_used_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+    use_count: int = 1
+
+    class Settings:
+        name = "knowledge_base_usage"
+        indexes = [
+            [("user_id", 1), ("kb_uuid", 1)],
+        ]
 
 
 class KnowledgeBase(Document):

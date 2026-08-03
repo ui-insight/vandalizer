@@ -223,9 +223,29 @@ def _require_applyable(run) -> None:
         raise OptimizationActionError("no_best_config", "Run has no best_config to apply")
 
 
-async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str) -> dict:
+def _require_not_tied(run, force: bool, subject: str) -> None:
+    """Refuse to apply a config that's statistically tied with the baseline.
+
+    A tie (within judge noise) means the data doesn't justify a config change.
+    ``force=True`` overrides — for callers who reviewed the data and still want
+    the tied config (e.g. it scored the same on a cheaper model).
+    """
+    if getattr(run, "tied_with_baseline", False) and not force:
+        raise OptimizationActionError(
+            "tied_with_baseline",
+            (
+                f"The winning configuration is statistically tied with the "
+                f"{subject}'s current settings (within judge noise), so the "
+                "data doesn't justify a config change. Re-submit with "
+                "force=true to apply anyway."
+            ),
+        )
+
+
+async def apply_kb_optimization(kb, run: KBOptimizationRun, user_id: str, force: bool = False) -> dict:
     """Apply a completed optimization's best config to the KB's rag_config_override."""
     _require_applyable(run)
+    _require_not_tied(run, force, "KB")
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     # Snapshot the prior override on the run so Revert can restore it.
@@ -279,6 +299,7 @@ async def apply_extraction_optimization(
     ``cross_field_below_threshold``. Resubmit with ``force=True`` to apply anyway.
     """
     _require_applyable(run)
+    _require_not_tied(run, force, "search set")
 
     # Cross-field apply-gate. Only meaningful when the run actually evaluated
     # rules (winner_cross_field_summary populated and has a decisive pass_rate).
@@ -366,6 +387,7 @@ async def apply_workflow_optimization(
     run: WorkflowOptimizationRun,
     user_id: str,
     step_ids: Optional[list[str]] = None,
+    force: bool = False,
 ) -> dict:
     """Apply a completed run's best config to ``Workflow.config_override``.
 
@@ -373,6 +395,7 @@ async def apply_workflow_optimization(
     None applies all winning step overrides.
     """
     _require_applyable(run)
+    _require_not_tied(run, force, "workflow")
 
     # Snapshot the previous override so revert is exact.
     run.previous_override = wf.config_override

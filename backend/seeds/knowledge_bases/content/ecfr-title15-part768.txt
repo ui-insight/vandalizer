@@ -1,0 +1,222 @@
+PART 768—FOREIGN AVAILABILITY DETERMINATION PROCEDURES AND CRITERIA
+
+Authority:50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; E.O. 13222, 66 FR 44025, 3 CFR, 2001 Comp., p. 783; Notice of August 15, 2017, 82 FR 39005 (August 16, 2017).
+Source:61 FR 12915, Mar. 25, 1996, unless otherwise noted.
+
+§ 768.1 Introduction.
+
+In this part, references to the Export Administration Regulations (EAR) are references to 15 CFR chapter VII, subchapter C.
+(a) Authority. Pursuant to sections 5(f) and 5(h) of the Export Administration Act (EAA), the Under Secretary of Commerce for Export Administration directs the Bureau of Industry and Security (BIS) in gathering and analyzing all the evidence necessary for the Secretary to determine foreign availability.
+(b) Scope. This part applies only to the extent that items are controlled for national security purposes. This part does not apply to encryption items that were formerly controlled on the U.S. Munitions List and that were transferred to the Commerce Control List consistent with E.O. 13026 of November 15, 1996 (61 FR 58767) and pursuant to the Presidential Memorandum of that date, which shall not be subject to any mandatory foreign availability review procedures.
+(c) Types of programs. There are two general programs of foreign availability:
+(1) Foreign availability to controlled countries. In this category are denied license assessments (see §§ 768.4(b) and 768.7 of this part) and decontrol assessments (see §§ 768.4(c) and 768.7 of this part).
+(2) Foreign availability to non-controlled countries. In this category are denied license assessments, decontrol assessments, and evaluations of eligibility for expedited licensing (see § 768.8 of this part).
+(d) Definitions. The following are definitions of terms used in this part 768:
+Allegation. See foreign availability submission.
+Assessment. An evidentiary analysis that BIS conducts concerning the foreign availability of a given item based on the assessment criteria, data gathered by BIS, and the data and recommendations submitted by the Departments of Defense and State and other relevant departments and agencies, TAC committees, and industry.
+Assessment criteria. Statutorily established criteria that must be assessed for the Secretary to make a determination with respect to foreign availability. They are, available-in-fact, from a non-U.S. source, in sufficient quantity so as to render the control ineffective, and of comparable quality. (See § 768.6 of this part).
+Available-in-fact. An item is available-in-fact to a country if it is produced within the country or if it may be obtained by that country from a third country. Ordinarily, items will not be considered available-in-fact to non-controlled countries if the items are available only under a validated national security license or a comparable authorization from a country that maintains export controls on such items cooperatively with the United States.
+Claimant. Any party who makes a foreign availability submission, excluding TACs.
+Comparable quality. An item is of comparable quality to an item controlled under the EAR if it possesses the characteristics specified in the Commerce Control List (CCL) for that item and is alike in key characteristics that include, but are not limited to: (1) Function; (2) technological approach; (3) performance thresholds; (4) maintainability and service life; and (5) any other attribute relevant to the purpose for which the control was placed on the item.
+Controlled countries. Albania, Armenia, Azerbaijan, Belarus, Bulgaria, Cambodia, Cuba, Estonia, Georgia, Kazakhstan, Kyrgyzstan, Laos, Latvia, Lithuania, Moldova, Mongolia, North Korea, Romania, Russia, Tajikistan, Turkmenistan, Ukraine, Uzbekistan, Vietnam and the People's Republic of China.
+Decontrol. Removal of license requirements under the EAR.
+Decontrol assessment. An assessment of the foreign availability of an item to a country or countries for purposes of determining whether decontrol is warranted. Such assessments may be conducted after BIS receives a foreign availability submission or a TAC certification, or by the Secretary's own initiative.
+Denied license assessment. A foreign availability assessment conducted as a result of a claimant's allegation of foreign availability for an item (or items) that BIS has denied or has issued a letter of intent to deny a license. If the Secretary determines that foreign availability exists, BIS's approval of a license will be limited to the items, countries, and quantities in the allegation.
+Determination. The Secretary's decision that foreign availability within the meaning of the EAA does or does not exist. (See § 768.7 of this part).
+Expedited licensing procedure eligibility evaluation. An evaluation that BIS initiates for the purpose of determining whether an item is eligible for the expedited licensing procedure. (See § 768.8 of this part).
+Expedited licensing procedures. Under expedited licensing procedures, BIS reviews and processes a license application for the export of an eligible item to a non-controlled country within statutory time limits. Licenses are deemed approved unless BIS denies within the statutory time limits (See § 768.8 of this part).
+Foreign availability submission (FAS). An allegation of foreign availability a claimant makes, supported by reasonable evidence, and submits to BIS. (See § 768.5 of this part).
+Item. Any commodity, software, or technology.
+Items eligible for non-controlled country expedited licensing procedures. The items described in supplement no. 2 to this part 768 are eligible for the expedited license procedures (See § 768.8 of this part).
+National Security Override (NSO). A Presidential decision to maintain export controls on an item notwithstanding its foreign availability as determined under the EAA. The President's decision is based on his/her determination that the absence of the controls would prove detrimental to the national security of the United States. Once the President makes such a decision, the President must actively pursue negotiations to eliminate foreign availability with the governments of the sources of foreign availability. (See § 768.7 of this part).
+Non-controlled countries. Any country not defined as a controlled country by this section.
+Non-U.S. source/foreign source. A person located outside the jurisdiction of the United States (as defined in part 772 of the EAR).
+Reasonable evidence. Relevant information that is credible.
+Reliable evidence. Relevant information that is credible and dependable.
+Secretary. As used in this part, the Secretary refers to the Secretary of Commerce or his/her designee.
+Similar quality. An item is of similar quality to an item that is controlled under the EAR if it is substantially alike in key characteristics that may include, but are not limited to: (1) Function; (2) technological approach; (3) performance thresholds; (4) maintainability and service life; and (5) any other attribute relevant to the purpose for which the control was placed on the item.
+Sufficient quantity. The amount of an item that would render the U.S. export control, or the denial of the license in question, ineffective in achieving its purpose. For a controlled country, it is the quantity that meets the military needs of that country so that U.S. exports of the item to that country would not make a significant contribution to its military potential.
+Technical Advisory Committee (TAC). A Committee created under section 5(h) of the EAA that advises and assists the Secretary of Commerce, the Secretary of Defense, and any other department, agency, or official of the Government of the United States to which the President delegates authority under the EAA on export control matters related to specific areas of controlled items.
+TAC certification. A statement that a TAC submits to BIS, supported by reasonable evidence, documented as in a FAS, that foreign availability to a controlled country exists for an item that falls within the TAC's area of technical expertise.
+[61 FR 12915, Mar. 25, 1996, as amended at 61 FR 68585, Dec. 30, 1996; 62 FR 25469, May 9, 1997]
+
+§ 768.2 Foreign availability described.
+
+(a) Foreign availability. Foreign availability exists when the Secretary determines that an item is comparable in quality to an item subject to U.S. national security export controls, and is available-in-fact to a country, from a non-U.S. source, in sufficient quantities to render the U.S. export control of that item or the denial of a license ineffective. For a controlled country, such control or denial is “ineffective” when maintaining such control or denying a specific license would not restrict the availability of items that would make a significant contribution to the military potential of the controlled country or combination of countries detrimental to the national security of the United States (see sections 5(a) and 3(2)(A) of the EAA.)
+(b) Types of foreign availability. There are two types of foreign availability:
+(1) Foreign availability to a controlled country; and
+(2) Foreign availability to a non-controlled country.
+Note to paragraph (b) of this section: See § 768.7 of this part for delineation of the foreign availability assessment procedures, and § 768.6 of this part for the criteria used in determining foreign availability.
+
+§ 768.3 Foreign availability assessment.
+
+(a) Foreign availability assessment. A foreign availability assessment is an evidentiary analysis that BIS conducts to assess the foreign availability of a given item according to the assessment criteria, based on data submitted by a claimant, the data gathered by BIS, and the data and recommendations submitted by the Departments of Defense and State and other relevant departments and agencies, TAC committees, and industry. BIS uses the results of the analysis in formulating its recommendation to the Secretary on whether foreign availability exists for a given item. If the Secretary determines that foreign availability exists, the Secretary will decontrol the item for national security reasons or approve the license in question if there is no foreign policy reason to deny the license, unless the President exercises a National Security Override (see § 768.7 of this part). The effect of any such determination on the effectiveness of foreign policy controls may be considered independent of this part.
+(b) Types of assessments. There are two types of foreign availability assessments:
+(1) Denied license assessment; and
+(2) Decontrol assessment.
+(c) Expedited licensing procedures. See § 768.8 of this part for the evaluation of eligibility of an item for the expedited licensing procedures.
+[61 FR 12915, Mar. 25, 1996, as amended at 61 FR 68585, Dec. 30, 1996]
+
+§ 768.4 Initiation of an assessment.
+
+(a) Assessment request. To initiate an assessment, each claimant or TAC must submit a FAS or a TAC Certification to BIS. TACs are authorized to certify foreign availability only to controlled countries. Claimants can allege foreign availability for either controlled or non-controlled countries.
+(b) Denied license assessment. A claimant whose license application BIS has denied, or for which it has issued a letter of intent to deny on national security grounds, may request that BIS initiate a denied license assessment by submitting a Foreign Availability Submission (FAS) within 90 days after denial of the license. As part of its submission, the claimant must request that the specified license application be approved on the grounds of foreign availability. The evidence must relate to the particular export as described on the license application and to the alleged comparable item. If foreign availability is found, the Secretary will approve the license for the specific items, countries, and quantities listed on the application. The denied license assessment procedure, however, is not intended to result in the removal of the U.S. export control on an item by incrementally providing a country with amounts that, taken together, would constitute a sufficient quantity of an item. The Secretary will not approve on foreign availability grounds a denied license if the approval of such license would itself render the U.S. export control ineffective in achieving its purpose. In the case of a positive determination, the Secretary will determine whether a decontrol assessment is warranted. If so, then BIS will initiate a decontrol assessment.
+(c) Decontrol assessment. (1) Any claimant may at any time request that BIS initiate a decontrol assessment by a FAS to BIS alleging foreign availability to any country or countries.
+(2) A TAC may request that BIS initiate a decontrol assessment at any time by submitting a TAC Certification to BIS that there is foreign availability to a controlled country for items that fall within the area of the TAC's technical expertise.
+(3) The Secretary, on his/her own initiative, may initiate a decontrol assessment.
+(d) BIS mailing address. All foreign availability submissions and TAC certifications should be submitted to: Department of Commerce, Bureau of Industry and Security, Room H-1093, 14th Street and Pennsylvania Avenue, NW, Washington, DC 20230.
+[61 FR 12915, Mar. 25, 1996, as amended at 72 FR 25196, May 4, 2007]
+
+§ 768.5 Contents of foreign availability submissions and Technical Advisory Committee certifications.
+
+(a) All foreign availability submissions must contain, in addition to information on product or technology alleged to be available from foreign sources, at least:
+(1) The name of the claimant;
+(2) The claimant's mailing and business address;
+(3) The claimant's telephone number; and
+(4) A contact point and telephone number.
+(b) Foreign availability submissions and TAC certifications should contain as much evidence as is available to support the claim, including, but not limited to:
+(1) Product names and model designations of the items alleged to be comparable;
+(2) Extent to which the alleged comparable item is based on U.S. technology;
+(3) Names and locations of the non-U.S. sources and the basis for claiming that the item is a non-U.S. source item;
+(4) Key performance elements, attributes, and characteristics of the items on which a qualitative comparison may be made;
+(5) Non-U.S. source's production quantities and/or sales of the alleged comparable items and marketing efforts;
+(6) Estimated market demand and the economic impact of the control;
+(7) Product names, model designations, and value of U.S. controlled parts and components incorporated in the items alleged to be comparable; and
+(8) The basis for the claim that the item is available-in-fact to the country or countries for which foreign availability is alleged.
+(c) Supporting evidence of foreign availability may include, but is not limited to, the following:
+(1) Foreign manufacturers' catalogs, brochures, operation or maintenance manuals;
+(2) Articles from reputable trade and technical publications;
+(3) Photographs;
+(4) Depositions based on eyewitness accounts; and
+(5) Other credible evidence.
+Note to paragraph (c) of this section: See supplement no. 1 to part 768 for additional examples of supporting evidence.
+(d) Upon receipt of a FAS or TAC certification, BIS will review it to determine whether there is sufficient evidence to support the belief that foreign availability may exist. If BIS determines the FAS or TAC certification is lacking in supporting evidence, BIS will seek additional evidence from appropriate sources, including the claimant or TAC. BIS will initiate the assessment when it determines that it has sufficient evidence that foreign availability may exist. Claimant and TAC certified assessments will be deemed to be initiated as of the date of such determination.
+(e) Claimants and TACs are advised to review the foreign availability assessment criteria described in § 768.6 of this part and the examples of evidence described in supplement no. 1 to part 768 when assembling supporting evidence for inclusion in the FAS or TAC certification.
+
+§ 768.6 Criteria.
+
+BIS will evaluate the evidence contained in a FAS or TAC certification and all other evidence gathered in the assessment process in accordance with certain criteria that must be met before BIS can recommend a positive determination to the Secretary. The criteria are defined in § 768.1(d) of this part. In order to initiate an assessment, each FAS and TAC certification should address each of these criteria. The criteria are statutorily prescribed and are:
+(a) Available-in-fact;
+(b) Non-U.S. source;
+(c) Sufficient quantity; and
+(d) Comparable quality.
+
+§ 768.7 Procedures.
+
+(a) Initiation of an assessment. (1) Once BIS accepts a FAS or TAC certification of foreign availability, BIS will notify the claimant or TAC that it is initiating the assessment.
+(2) BIS will publish a Federal Register notice of the initiation of any assessment.
+(3) BIS will notify the Departments of Defense and State, the intelligence community, and any other departments, agencies and their contractors that may have information concerning the item on which BIS has initiated an assessment. Each such department, agency, and contractor shall provide BIS all relevant information concerning the item. BIS will invite interested departments and agencies to participate in the assessment process (See paragraph (e) of this section).
+(b) Data gathering. BIS will seek and consider all available information that bears upon the presence or absence of foreign availability, including but not limited to that evidence described in § 768.5 (b) and (c) of this part. As soon as BIS initiates the assessment, it will seek evidence relevant to the assessment, including an analysis of the military needs of a selected country or countries, technical analysis, and intelligence information from the Departments of Defense and State, and other U.S. agencies. Evidence is particularly sought from: industry sources worldwide; other U.S. organizations; foreign governments; commercial, academic and classified data bases; scientific and engineering research and development organizations; and international trade fairs.
+(c) Analysis. BIS will conduct its analysis by evaluating whether the reasonable and reliable evidence that is relevant to each of the foreign availability criteria provides a sufficient basis to recommend a determination that foreign availability does or does not exist.
+(d) Recommendation and determination. (1) Upon completion of each assessment, BIS, on the basis of its analysis, will recommend that the Secretary make a determination either that there is or that there is not foreign availability, whichever the evidence supports. The assessment upon which BIS bases its recommendation will accompany the recommendation to the Secretary.
+(2) BIS will recommend on the basis of its analysis that the Secretary determine that foreign availability exists to a country when the available evidence demonstrates that an item of comparable quality is available-in-fact to the country, from non-U.S. sources, in sufficient quantity so that continuation of the existing national security export control, or denial of the license application in question on national security grounds, would be ineffective in achieving its purpose. For a controlled country, such control or denial is “ineffective” when comparable items are available-in-fact from foreign sources in sufficient quantities so that maintaining such control or denying a license would not be effective in restricting the availability of items that would make a significant contribution to the military potential of any country or combination of countries detrimental to the national security of the United States.
+(3) The Secretary will make the determination of foreign availability on the basis of the BIS assessment and recommendation; the Secretary's determination will take into account the evidence provided to BIS, the recommendations of the Secretaries of Defense and State and any other interested agencies, and any other information that the Secretary considers relevant.
+(4) For all decontrol and denied license assessments (under section 5(f)(3) of the EAA) initiated by a FAS, the Secretary will make a determination within 4 months of the initiation of the assessment and will notify the claimant. The Secretary will submit positive determinations for review to the appropriate departments and agencies.
+(5) The deadlines for determinations based on self-initiated and TAC-initiated assessments are different from the deadlines for claimant-initiated assessments (see paragraphs (f)(2) and (f)(3) of this section).
+(e) Interagency review. BIS will notify all appropriate U.S. agencies and Departments upon the initiation of an assessment and will invite their participation in the assessment process. BIS will provide all interested agencies and departments an opportunity to review source material, draft analyses and draft assessments immediately upon their receipt or production. For claimant-initiated assessments, BIS will provide a copy of all positive recommendations and assessments to interested agencies and departments for their review following the Secretary's determination of foreign availability. For self-initiated and TAC-initiated assessments, BIS will provide all interested agencies an opportunity to review and comment on the assessment.
+(f) Notification. (1) No later than 5 months after the initiation of an assessment based on a FAS (claimant assessments), the Secretary will inform the claimant in writing and will submit for publication in the Federal Register a notice that:
+(i) Foreign availability exists, and
+(A) The requirement of a license has been removed or the license application in question has been approved; or
+(B) The President has determined that for national security purposes the export controls must be maintained or the license application must be denied, notwithstanding foreign availability, and that appropriate steps to eliminate the foreign availability are being initiated; or
+(C) In the case of an item controlled multilaterally under the former COCOM regime, the U.S. Government will conduct any necessary consultations concerning the proposed decontrol or approval of the license with the former COCOM regime for a period of up to 4 months from the date of the publication of the determination in the Federal Register (the U.S. Government may remove the license requirement for exports to non-controlled countries pending completion of the former COCOM regime review process); or
+(ii) Foreign availability does not exist.
+(2) For all TAC certification assessments, the Secretary will make a foreign availability determination within 90 days following initiation of the assessment. BIS will prepare and submit a report to the TAC and to the Congress stating that:
+(i) The Secretary has found foreign availability and has removed the license requirement; or
+(ii) The Secretary has found foreign availability, but has recommended to the President that negotiations be undertaken to eliminate the foreign availability; or
+(iii) The Secretary has not found foreign availability.
+(3) There is no statutory deadline for assessments self-initiated by the Secretary or for the resulting determination. However, BIS will make every effort to complete such assessments and determinations promptly.
+(g) Foreign availability to controlled countries. When the Secretary determines that an item controlled for national security reasons is available to a controlled country and the President does not issue a National Security Override (NSO), BIS will submit the determination to the Department of State, along with a draft proposal for the multilateral decontrol of the item or for the former COCOM regime approval of the license. The Department of State will submit the proposal or the license for former COCOM regime review. The former COCOM regime will have up to 4 months for review of the proposal.
+(h) Foreign availability to non-controlled countries. If the Secretary determines that foreign availability to non-controlled countries exists, the Secretary will decontrol the item for export to all non-controlled countries where it is found to be available, or approve the license in question, unless the President exercises a National Security Override.
+(i) Negotiations to eliminate foreign availability. (1) The President may determine that an export control must be maintained notwithstanding the existence of foreign availability. Such a determination is called a National Security Override (NSO) and is based on the President's decision that the absence of the control would prove detrimental to the United States national security. Unless extended (as described in paragraph (i)(7) of this section), an NSO is effective for 6 months. Where the President invokes an NSO, the U.S. Government will actively pursue negotiations with the government of any source country during the 6 month period to eliminate the availability.
+(2) There are two types of National Security Overrides:
+(i) An NSO of a determination of foreign availability resulting from an assessment initiated pursuant to section 5(f) of the EAA (claimant and self-initiated assessments); and
+(ii) An NSO of a determination of foreign availability resulting from an assessment initiated pursuant to section 5(h) of the EAA (TAC-certification assessments).
+(3) For an NSO resulting from an assessment initiated under section 5(f) of the EAA, the Secretary of any agency may recommend that the President exercise the authority under the EAA to retain the controls or deny the license notwithstanding the finding of foreign availability.
+(4) For an NSO resulting from an assessment initiated under section 5(h) of the EAA, the Secretary of Commerce may recommend that the President exercise the authority under the EAA to retain the controls notwithstanding the finding of foreign availability.
+(5) Under an NSO resulting from an assessment initiated under section 5(f) of the EAA, the Committee on Banking, Housing, and Urban Affairs of the Senate and the Committee on International Relations of the House of Representatives will be notified of the initiation of the required negotiations. The notice will include an explanation of the national security interest that necessitates the retention of controls.
+(6) Under an NSO resulting from an assessment initiated under section 5(f) of the EAA, BIS will publish notices in the Federal Register consisting of:
+(i) The Secretary's determination of foreign availability;
+(ii) The President's decision to exercise the NSO;
+(iii) A concise statement of the basis for the President's decision; and
+(iv) An estimate of the economic impact of the decision.
+(7) The 6 month effective period for an NSO may be extended up to an additional 12 months if, prior to the end of the 6 months, the President certifies to Congress that the negotiations are progressing, and determines that the absence of the controls would continue to be detrimental to the United States national security.
+(8) After the conclusion of negotiations, BIS will retain the control only to the extent that foreign availability is eliminated. If foreign availability is not eliminated, BIS will decontrol the item by removing the requirement for a license for the export of the item to the destinations covered by the assessment. To the extent that the negotiations are successful and the foreign availability is eliminated, BIS will remove the license requirement for the export of the item to any country that has agreed to eliminate foreign availability.
+(j) Changes in foreign availability. If BIS becomes aware of conditions, including new evidence, that affect a previous determination that foreign availability exists or does not exist, BIS may review the conditions. If BIS finds that the foreign availability previously determined no longer exists, or that foreign availability not earlier found now does exist, BIS will make a recommendation to the Secretary of Commerce for the appropriate changes in the control. The Secretary of Commerce will make a determination, and BIS will publish a Federal Register notice of the determination.
+
+§ 768.8 Eligibility of expedited licensing procedures for non-controlled countries.
+
+(a) BIS determines the eligibility of an item for expedited licensing procedures on the basis of an evaluation of the foreign availability of the item. Eligibility is specific to the items and the countries to which they are found to be available.
+(b) BIS will initiate an eligibility evaluation:
+(1) On its own initiative;
+(2) On receipt of a FAS; or
+(3) On receipt of a TAC certification.
+(c) Upon initiation of an eligibility evaluation following receipt of either a FAS or TAC certification, BIS will notify the claimant or TAC of the receipt and initiation of an evaluation and publish a Federal Register notice of the initiation of the evaluation.
+(d) The criteria for determining eligibility for expedited licensing procedures are:
+(1) The item must be available-in-fact to the specified
+non-controlled country from a foreign source;
+(2) The item must be of a quality similar to that of the U.S.-controlled item; and
+(3) The item must be available-in-fact to the specified non-controlled country without effective restrictions.
+(e) Within 30 days of initiation of the evaluation, the Secretary of Commerce will make a determination of foreign availability on the basis of the BIS evaluation and recommendation, taking into consideration the evidence the Secretaries of Defense, State, and other interested agencies provide to BIS and any other information that the Secretary considers relevant.
+(f) Within 30 days of the receipt of the FAS or TAC certification, BIS will publish the Secretary's determination in the Federal Register, that the item will or will not be eligible for expedited licensing procedures to the stated countries and, where appropriate, amend supplement no. 2 to part 768.
+(g) Following completion of a self-initiated evaluation, BIS will be notified of the Secretary's determination and, where appropriate, supplement no. 2 to part 768 will be amended.
+(h) Foreign availability submissions and TAC certifications to initiate an expedited licensing procedure evaluation must be clearly designated on their face as a request for expedited licensing procedure and must specify the items, quantities and countries alleged eligible. Submissions and certifications should be sent to: Department of Commerce, Bureau of Industry and Security, Room H-1093, 14th Street and Pennsylvania Avenue, NW., Washington, DC 20230.
+[61 FR 12915, Mar. 25, 1996, as amended at 72 FR 25196, May 4, 2007]
+
+§ 768.9 Appeals of negative foreign availability determinations.
+
+Appeals of negative determinations will be conducted according to the standards and procedures described in part 756 of the EAR. A Presidential decision (NSO) to deny a license or continue controls notwithstanding a determination of foreign availability is not subject to appeal.
+
+§ 768.10 Removal of controls on less sophisticated items.
+
+Where the Secretary has removed national security controls on an item for foreign availability reasons, the Secretary will also remove controls on similar items that are controlled for national security reasons and whose functions, technological approach, performance thresholds, and other attributes that form the basis for national security export controls do not exceed the technical parameters of the item that BIS has decontrolled for foreign availability reasons.
+
+Supplement No. 1 to Part 768—Evidence of Foreign Availability
+
+This supplement provides a list of examples of evidence that the Bureau of Industry and Security (BIS) has found to be useful in conducting assessments of foreign availability. A claimant submitting evidence supporting a claim of foreign availability should review this list for suggestions as evidence is collected. Acceptable evidence indicating possible foreign availability is not limited to these examples, nor is any one of these examples, usually, in and of itself, necessarily sufficient to meet a foreign availability criterion. A combination of several types of evidence for each criterion usually is required. A Foreign Availability Submission (FAS) should include as much evidence as possible on all four of the criteria listed below. BIS combines the submitted evidence with the evidence that it collects from other sources. BIS evaluates all evidence, taking into account factors that may include, but are not limited to: Information concerning the source of the evidence, corroborative or contradictory indications, and experience concerning the reliability or reasonableness of such evidence. BIS will assess all relevant evidence to determine whether each of the four criteria has been met. Where possible, all information should be in writing. If information is based on third party documentation, the submitter should provide such documentation to BIS. If information is based on oral statements a third party made, the submitter should provide a memorandum of the conversation to BIS if the submitter cannot obtain a written memorandum from the source. BIS will amend this informational list as it identifies new examples of evidence.
+(a) Examples of evidence of foreign availability:
+The following are intended as examples of evidence that BIS will consider in evaluating foreign availability. BIS will evaluate all evidence according to the provisions in § 768.7(c) of this part in order for it to be used in support of a foreign availability determination. This list is illustrative only.
+(1) Available-in-fact:
+(i) Evidence of marketing of an item in a foreign country (e.g., an advertisement in the media of the foreign country that the item is for sale there);
+(ii) Copies of sales receipts demonstrating sales to foreign countries;
+(iii) The terms of a contract under which the item has been or is being sold to a foreign country;
+(iv) Information, preferably in writing, from an appropriate foreign government official that the government will not deny the sale of an item it produces to another country in accordance with its laws and regulations;
+(v) Information, preferably in writing, from a named company official that the company legally can and would sell an item it produces to a foreign country;
+(vi) Evidence of actual shipments of the item to foreign countries (e.g., shipping documents, photographs, news reports);
+(vii) An eyewitness report of such an item in operation in a foreign country, providing as much information as available, including where possible the make and model of the item and its observed operating characteristics;
+(viii) Evidence of the presence of sales personnel or technical service personnel in a foreign country;
+(ix) Evidence of production within a foreign country;
+(x) Evidence of the item being exhibited at a trade fair in a foreign country, particularly for the purpose of inducing sales of the item to the foreign country;
+(xi) A copy of the export control laws or regulations of the source country, showing that the item is not controlled; or
+(xii) A catalog or brochure indicating the item is for sale in a specific country.
+(2) Foreign (non-U.S.) source:
+(i) Names of foreign manufacturers of the item including, if possible, addresses and telephone numbers;
+(ii) A report from a reputable source of information on commercial relationships that a foreign manufacturer is not linked financially or administratively with a U.S. company;
+(iii) A list of the components in the U.S. item and foreign item indicating model numbers and their sources;
+(iv) A schematic of the foreign item identifying its components and their sources;
+(v) Evidence that the item is a direct product of foreign technology (e.g., a patent law suit lost by a U.S. producer, a foreign patent);
+(vi) Evidence of indigenous technology, production facilities, and the capabilities at those facilities; or
+(vii) Evidence that the parts and components of the item are of foreign origin or are exempt from U.S. licensing requirements by the parts and components provision § 732.4 of the EAR.
+(3) Sufficient quantity:
+(i) Evidence that foreign sources have the item in serial production;
+(ii) Evidence that the item or its product is used in civilian applications in foreign countries;
+(iii) Evidence that a foreign country is marketing in the specific country an item of its indigenous manufacture;
+(iv) Evidence of foreign inventories of the item;
+(v) Evidence of excess capacity in a foreign country's production facility;
+(vi) Evidence that foreign countries have not targeted the item or are not seeking to purchase it in the West;
+(vii) An estimate by a knowledgeable source of the foreign country's needs; or
+(viii) An authoritative analysis of the worldwide market (i.e., demand, production rate for the item for various manufacturers, plant capacities, installed tooling, monthly production rates, orders, sales and cumulative sales over 5-6 years).
+(4) Comparable quality:
+(i) A sample of the foreign item;
+(ii) Operation or maintenance manuals of the U.S. and foreign items;
+(iii) Records or a statement from a user of the foreign item;
+(iv) A comparative evaluation, preferably in writing, of the U.S. and foreign items by, for example, a western producer or purchaser of the item, a recognized expert, a reputable trade publication, or independent laboratory;
+(v) A comparative list identifying, by manufacturers and model numbers, the key performance components and the materials used in the item that qualitatively affect the performance of the U.S. and foreign items;
+(vi) Evidence of the interchangeability of U.S. and foreign items;
+(vii) Patent descriptions for the U.S. and foreign items;
+(viii) Evidence that the U.S. and foreign items meet a published industry, national, or international standard;
+(ix) A report or eyewitness account, by deposition or otherwise, of the foreign item's operation;
+(x) Evidence concerning the foreign manufacturers' corporate reputation;
+(xi) Comparison of the U.S. and foreign end item(s) made from a specific commodity, tool(s), device(s), or technical data; or
+(xii) Evidence of the reputation of the foreign item including, if possible, information on maintenance, repair, performance, and other pertinent factors.
+
+Supplement No. 2 to Part 768—Items Eligible for Expedited Licensing Procedures [Reserved]

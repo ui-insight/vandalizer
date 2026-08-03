@@ -810,6 +810,10 @@ class KBOptimizer:
                     round(holdout_default_score, 4)
                     if holdout_default_score is not None else None
                 ),
+                holdout_optimized_score=(
+                    round(holdout_optimized_score, 4)
+                    if holdout_optimized_score is not None else None
+                ),
                 best_config=best_config,
                 data_source_suggestions=suggestions,
                 lift_ci=lift_ci,

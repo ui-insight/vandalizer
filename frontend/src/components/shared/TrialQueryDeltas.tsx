@@ -128,7 +128,12 @@ function HeaderRow() {
       <span>Query</span>
       <span style={{ textAlign: 'right' }}>Default</span>
       <span style={{ textAlign: 'right' }}>Optimized</span>
-      <span style={{ textAlign: 'right' }}>Δ</span>
+      <span
+        style={{ textAlign: 'right', cursor: 'help' }}
+        title="Difference in percentage points (optimized minus default), not a relative % change."
+      >
+        Δ pts
+      </span>
     </div>
   )
 }

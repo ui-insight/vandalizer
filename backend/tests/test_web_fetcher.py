@@ -293,6 +293,40 @@ async def test_pdf_content_type_is_extracted_as_pdf():
 
 
 @pytest.mark.asyncio
+async def test_html_challenge_page_on_pdf_url_falls_through_to_html():
+    """A WAF answering a .pdf URL with an HTML bot-challenge page (HTTP 200)
+    must be parsed as HTML so bot-challenge detection can name the failure,
+    not fed to the PDF extractor (which would yield empty text)."""
+    settings = Settings(web_fetcher_browser_enabled=False, web_fetcher_min_chars=0)
+    challenge_html = (
+        "<html><head><title>Just a moment...</title></head>"
+        "<body><p>Verify you are human. Enable JavaScript and cookies to continue.</p>"
+        "</body></html>"
+    )
+
+    resp = MagicMock()
+    resp.content = challenge_html.encode()
+    resp.text = challenge_html
+    resp.status_code = 200
+    resp.headers = {"content-type": "text/html"}
+    resp.raise_for_status = MagicMock()
+    client = MagicMock()
+    client.get = AsyncMock(return_value=resp)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient", return_value=client), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    from app.utils.bot_challenge import looks_like_bot_challenge
+
+    assert result.raw_html is not None  # took the HTML path, not the PDF path
+    assert looks_like_bot_challenge(result.text)
+
+
+@pytest.mark.asyncio
 async def test_pdf_detected_by_url_extension_when_content_type_generic():
     """A .pdf URL served as octet-stream is still parsed as a PDF."""
     settings = Settings(web_fetcher_browser_enabled=False)
@@ -306,3 +340,180 @@ async def test_pdf_detected_by_url_extension_when_content_type_generic():
 
     assert "Effective December 31 2025" in result.text
     assert result.raw_html is None
+
+
+# ---------------------------------------------------------------------------
+# Embedded PDF hyperlinks are surfaced for crawl-enabled KB sources
+# ---------------------------------------------------------------------------
+
+def _pdf_with_links_bytes(text: str, uris: list[str]) -> bytes:
+    """Build a one-page PDF with a URI link annotation per entry in *uris*."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), text)
+    for i, uri in enumerate(uris):
+        rect = pymupdf.Rect(72, 100 + i * 20, 300, 115 + i * 20)
+        page.insert_link({"kind": pymupdf.LINK_URI, "from": rect, "uri": uri})
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+@pytest.mark.asyncio
+async def test_pdf_embedded_links_are_extracted():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _pdf_with_links_bytes(
+        "USDA General Terms and Conditions",
+        [
+            "https://www.usda.gov/ocfo/federal-financial-assistance",
+            "https://www.usda.gov/ocfo/federal-financial-assistance",  # duplicate
+            "mailto:grants@usda.gov",  # non-HTTP scheme — excluded
+            "https://www.grants.gov/learn-grants",
+        ],
+    )
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    assert result.raw_html is None
+    assert result.pdf_links == [
+        "https://www.usda.gov/ocfo/federal-financial-assistance",
+        "https://www.grants.gov/learn-grants",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_pdf_without_links_yields_none():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("No links in here")
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/plain.pdf"):
+        result = await fetch_url("https://example.gov/plain.pdf", settings=settings)
+
+    assert result.pdf_links is None
+
+
+@pytest.mark.asyncio
+async def test_html_pages_do_not_set_pdf_links():
+    settings = Settings(web_fetcher_browser_enabled=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(STATIC_PAGE_HTML)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com"):
+        result = await fetch_url("https://example.com", settings=settings)
+
+    assert result.pdf_links is None
+    assert result.raw_html is not None
+
+
+# ---------------------------------------------------------------------------
+# Truncation: raw HTML is capped at the (large) HTML limit, not the text limit.
+# Regression test for the bug where a long page's HTML was trimmed at
+# web_fetcher_max_chars before extraction, silently dropping the document tail.
+# ---------------------------------------------------------------------------
+
+def _long_html(body_paragraphs: int) -> str:
+    """An HTML page whose *markup* is far larger than its extracted text.
+    Each paragraph carries a heavy wrapper of tags/attributes so the HTML
+    inflates ~10x relative to the readable sentence it contains."""
+    parts = ["<!DOCTYPE html><html><head><title>Long Reg</title></head><body><main><article>"]
+    for i in range(body_paragraphs):
+        parts.append(
+            f'<section class="para" data-index="{i}" '
+            f'style="margin:0;padding:0;border:0;font-family:serif">'
+            f"<p>Section {i}: subrecipient and contractor determinations must be "
+            f"documented and retained for audit under the applicable federal rules.</p>"
+            f"</section>"
+        )
+    parts.append("</article></main></body></html>")
+    return "".join(parts)
+
+
+@pytest.mark.asyncio
+async def test_long_page_not_truncated_when_html_exceeds_text_cap():
+    # HTML far larger than the text cap, but under the HTML cap. Under the old
+    # code (raw_html sliced at web_fetcher_max_chars) the tail sections would be
+    # dropped; now the whole body must survive extraction.
+    html = _long_html(300)
+    text_cap = 50_000
+    # The markup is well over the text cap, but the *extracted* text is under it
+    # — the exact regime where the old code (HTML sliced at the text cap) would
+    # have dropped the document tail.
+    assert len(html) > text_cap
+    settings = Settings(
+        web_fetcher_browser_enabled=False,
+        web_fetcher_max_chars=text_cap,
+        web_fetcher_max_html_chars=8_000_000,
+    )
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(html)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/reg"):
+        result = await fetch_url("https://example.gov/reg", settings=settings)
+
+    assert len(result.text) < text_cap  # extracted text really is under the cap
+    # The last section must be present — proof the tail was extracted, not cut.
+    assert "Section 299" in result.text
+    assert result.truncated is False
+
+
+@pytest.mark.asyncio
+async def test_extracted_text_over_cap_sets_truncated_flag():
+    # A page whose *extracted text* genuinely exceeds the cap must still be
+    # bounded — but now the truncation is flagged rather than silent.
+    html = _long_html(100)
+    settings = Settings(
+        web_fetcher_browser_enabled=False,
+        web_fetcher_max_chars=2_000,        # tiny cap: extracted text will exceed it
+        web_fetcher_max_html_chars=8_000_000,
+    )
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(html)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/reg"):
+        result = await fetch_url("https://example.gov/reg", settings=settings)
+
+    assert len(result.text) <= 2_000
+    assert result.truncated is True
+
+
+@pytest.mark.asyncio
+async def test_raw_html_over_html_cap_sets_truncated_flag():
+    html = _long_html(400)
+    settings = Settings(
+        web_fetcher_browser_enabled=False,
+        web_fetcher_max_chars=500_000,
+        web_fetcher_max_html_chars=2_000,   # HTML cap smaller than the markup
+    )
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(html)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/reg"):
+        result = await fetch_url("https://example.gov/reg", settings=settings)
+
+    assert result.truncated is True
+
+
+@pytest.mark.asyncio
+async def test_normal_page_is_not_flagged_truncated():
+    settings = Settings(web_fetcher_browser_enabled=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(STATIC_PAGE_HTML)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/policy"):
+        result = await fetch_url("https://example.com/policy", settings=settings)
+
+    assert result.truncated is False

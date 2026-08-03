@@ -28,16 +28,7 @@ import { CelebrationOverlay } from './CelebrationOverlay'
 import { ModuleDetail } from './ModuleDetail'
 import { JourneyMap } from './JourneyMap'
 import { useModuleLock } from './useModuleLock'
-
-// ---------------------------------------------------------------------------
-// MODULES — inline here since they live in the page file, not in constants
-// We re-import them lazily from the page module to avoid duplication
-// ---------------------------------------------------------------------------
-// The MODULES array is large and lives in Certification.tsx. Rather than
-// duplicating, we import dynamically. For the panel, we need them at render
-// time, so we'll pass them from the Certification page or load eagerly.
-// For now, we import directly from the page file.
-import { MODULES } from '../../pages/Certification'
+import { MODULES } from './modules'
 
 // ---------------------------------------------------------------------------
 // Sub-components

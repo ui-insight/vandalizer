@@ -8,6 +8,7 @@ import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
+from beanie.operators import In
 from bson import ObjectId as BsonObjectId
 
 from app.models.library import (
@@ -21,7 +22,7 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
 from app.models.team import Team
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
-from app.services import access_control
+from app.services import access_control, audit_service
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -50,6 +51,19 @@ class CloneSourceMissingError(Exception):
     "the original was deleted — refresh and try again" message instead of a
     confusing internal-error string.
     """
+
+
+class UnderlyingDeleteError(Exception):
+    """remove_item(delete_underlying=True) could not delete the backing object.
+
+    ``code`` is ``forbidden`` (the caller can't manage the object) or
+    ``unsupported`` (this item kind has no cascade path). Nothing has been
+    deleted when this raises.
+    """
+
+    def __init__(self, code: str):
+        self.code = code
+        super().__init__(code)
 
 
 async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
@@ -244,6 +258,7 @@ async def add_item(
     note: str | None = None,
     tags: list[str] | None = None,
     folder: str | None = None,
+    cloned_from_id: PydanticObjectId | None = None,
 ) -> dict | None:
     lib = await access_control.get_authorized_library(library_id, user, contribute=True)
     if not lib:
@@ -274,6 +289,7 @@ async def add_item(
         note=note,
         tags=tags or [],
         folder=folder,
+        cloned_from_id=cloned_from_id,
         created_at=now,
     )
     await li.insert()
@@ -285,7 +301,9 @@ async def add_item(
     return await _attach_author(await _dereference_item(li))
 
 
-async def remove_item(library_id: str, item_id: str, user: User) -> bool:
+async def remove_item(
+    library_id: str, item_id: str, user: User, delete_underlying: bool = False,
+) -> bool:
     # Contribute-level: any team member can remove items from a team library
     # (personal libraries stay owner-only; verified stays admin-only). This
     # mirrors that any member can add/share items to the team library.
@@ -293,14 +311,98 @@ async def remove_item(library_id: str, item_id: str, user: User) -> bool:
     if not lib:
         return False
     item_oid = PydanticObjectId(item_id)
+
+    if delete_underlying:
+        item = await LibraryItem.get(item_oid)
+        if not item:
+            return False
+        # Delete the backing object first (it carries its own authorization);
+        # only then clean up bookmarks, so a forbidden delete removes nothing.
+        await _delete_underlying_object(item, user)
+        await _purge_bookmarks(item.item_id, item.kind)
+        return True
+
     lib.items = [i for i in lib.items if i != item_oid]
     lib.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await lib.save()
 
     item = await LibraryItem.get(item_oid)
+    item_name = None
+    detail: dict = {"library": lib.title, "library_scope": lib.scope.value}
     if item:
+        deref = await _dereference_item(item)
+        item_name = (deref or {}).get("name") or None
+        detail["kind"] = item.kind.value
         await item.delete()
+    await audit_service.log_event(
+        action="library_item.remove",
+        actor_user_id=user.user_id,
+        resource_type="library_item",
+        resource_id=item_id,
+        resource_name=item_name,
+        detail=detail,
+    )
     return True
+
+
+async def _delete_underlying_object(item: LibraryItem, user: User) -> None:
+    """Permanently delete the Workflow/SearchSet a bookmark points at.
+
+    Authorization matches deleting the object from its own editor
+    (``delete_workflow`` / ``get_authorized_search_set_by_id(manage=True)``).
+    An object that is already gone is treated as deleted so the caller can
+    still purge the stale bookmarks.
+    """
+    from app.services import search_set_service, workflow_service
+
+    if item.kind == LibraryItemKind.WORKFLOW:
+        wf = await Workflow.get(item.item_id)
+        if not wf:
+            return
+        if not await workflow_service.delete_workflow(str(item.item_id), user):
+            raise UnderlyingDeleteError("forbidden")
+        await audit_service.log_event(
+            action="workflow.delete",
+            actor_user_id=user.user_id,
+            resource_type="workflow",
+            resource_id=str(item.item_id),
+            resource_name=wf.name,
+            team_id=wf.team_id,
+        )
+    elif item.kind == LibraryItemKind.SEARCH_SET:
+        existing = await SearchSet.get(item.item_id)
+        if not existing:
+            return
+        ss = await access_control.get_authorized_search_set_by_id(
+            str(item.item_id), user, manage=True,
+        )
+        if ss is None:
+            raise UnderlyingDeleteError("forbidden")
+        await search_set_service.delete_search_set(ss.uuid)
+        await audit_service.log_event(
+            action="extraction.delete",
+            actor_user_id=user.user_id,
+            resource_type="extraction",
+            resource_id=ss.uuid,
+            resource_name=ss.title,
+            team_id=ss.team_id,
+        )
+    else:
+        raise UnderlyingDeleteError("unsupported")
+
+
+async def _purge_bookmarks(object_id: PydanticObjectId, kind: LibraryItemKind) -> None:
+    """Remove every LibraryItem bookmark pointing at a deleted object.
+
+    Without this, deleting the backing object strands invisible bookmarks in
+    other libraries while the object's name stays reserved elsewhere.
+    """
+    stale = await LibraryItem.find(
+        LibraryItem.item_id == object_id, LibraryItem.kind == kind,
+    ).to_list()
+    for row in stale:
+        await Library.find({"items": row.id}).update({"$pull": {"items": row.id}})
+        await row.delete()
 
 
 async def update_item(
@@ -367,9 +469,11 @@ async def get_library_items(
     from app.models.verification import VerifiedItemMetadata
     from app.services.quality_service import get_latest_validation, compute_quality_tier
 
+    team_access = await access_control.get_team_access_context(user)
+
     results = []
     for item in items:
-        deref = await _dereference_item(item)
+        deref = await _dereference_item(item, user=user, team_access=team_access)
         if deref:
             if search:
                 name_lower = deref.get("name", "").lower()
@@ -423,7 +527,7 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
         return None
 
     try:
-        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=None)
+        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=None, user=user)
     except CloneSourceMissingError as exc:
         logger.warning("Clone-to-personal source missing: %s", exc)
         return None
@@ -442,7 +546,18 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
         kind=item.kind.value,
         note="Cloned from library item",
         tags=list(item.tags),
+        cloned_from_id=item.item_id,
     )
+
+
+async def _count_team_shares_of(team_lib: Library, source_object_id: PydanticObjectId) -> int:
+    """How many items in ``team_lib`` were cloned from ``source_object_id``."""
+    if not team_lib.items:
+        return 0
+    return await LibraryItem.find(
+        In(LibraryItem.id, team_lib.items),
+        LibraryItem.cloned_from_id == source_object_id,
+    ).count()
 
 
 async def share_to_team(
@@ -451,6 +566,7 @@ async def share_to_team(
     team_id: str,
     *,
     comment: str | None = None,
+    force: bool = False,
 ) -> dict:
     item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
@@ -464,8 +580,18 @@ async def share_to_team(
     if not access_control.can_view_team(str(team_oid), team_access):
         raise ShareError("not_team_member", 403)
 
+    # Re-sharing the same item would silently create an identical, independent
+    # clone in the team library. Refuse unless the caller explicitly forces it,
+    # and number forced copies so they stay distinguishable.
+    team_lib = await get_or_create_team_library(user.user_id, team_id)
+    prior_shares = await _count_team_shares_of(team_lib, item.item_id)
+    if prior_shares and not force:
+        raise ShareError("already_shared", 409)
+
     try:
-        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
+        new_obj_id = await _clone_underlying_object(
+            item, user.user_id, team_id=team_id, copy_number=prior_shares + 1, user=user
+        )
     except CloneSourceMissingError as exc:
         logger.warning("Share-to-team source missing for item %s: %s", item.id, exc)
         raise ShareError("original_missing", 404)
@@ -476,13 +602,13 @@ async def share_to_team(
         )
         raise ShareError("clone_failed", 500)
 
-    team_lib = await get_or_create_team_library(user.user_id, team_id)
     try:
         result = await add_item(
             library_id=str(team_lib.id),
             user=user,
             item_id=str(new_obj_id),
             kind=item.kind.value,
+            cloned_from_id=item.item_id,
         )
     except Exception:
         logger.exception(
@@ -717,12 +843,20 @@ def _item_created_at(item: LibraryItem) -> str | None:
     return _iso_utc(item.created_at)
 
 
-async def _dereference_item(item: LibraryItem) -> dict | None:
+async def _dereference_item(
+    item: LibraryItem,
+    user: User | None = None,
+    team_access=None,
+) -> dict | None:
     """Load the actual Workflow or SearchSet and return combined dict.
 
     Sets ``creator_user_id`` for workflow items (falling back to the workflow
     owner when the dedicated field is missing). Use :func:`_attach_authors` to
     expand it into a full ``created_by`` AuthorRef for response payloads.
+
+    When ``user`` (and their ``team_access`` context) is provided, also sets
+    ``can_delete_underlying`` — whether that user may permanently delete the
+    backing object, so the UI can offer a true delete next to bookmark removal.
     """
     name = ""
     description = None
@@ -730,6 +864,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
     set_type = None
     item_uuid = None
     creator_user_id: str | None = None
+    can_delete_underlying = False
 
     if item.kind == LibraryItemKind.WORKFLOW:
         wf = await Workflow.get(item.item_id)
@@ -738,6 +873,8 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         name = wf.name
         description = wf.description
         creator_user_id = wf.created_by_user_id or wf.user_id
+        if user is not None and team_access is not None:
+            can_delete_underlying = access_control.can_manage_workflow(wf, user, team_access)
     elif item.kind == LibraryItemKind.SEARCH_SET:
         ss = await SearchSet.get(item.item_id)
         if not ss:
@@ -746,6 +883,10 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         description = ss.extraction_config.get("content") if ss.extraction_config else None
         set_type = ss.set_type
         item_uuid = ss.uuid
+        if user is not None:
+            can_delete_underlying = access_control.can_manage_search_set(
+                ss, user, team_access=team_access,
+            )
 
     return {
         "id": str(item.id),
@@ -765,6 +906,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "created_at": _item_created_at(item),
         "last_used_at": _iso_utc(item.last_used_at),
         "creator_user_id": creator_user_id,
+        "can_delete_underlying": can_delete_underlying,
     }
 
 
@@ -794,9 +936,17 @@ async def _attach_author(item: dict | None) -> dict | None:
 
 
 async def _clone_underlying_object(
-    item: LibraryItem, user_id: str, *, team_id: str | None = None
+    item: LibraryItem,
+    user_id: str,
+    *,
+    team_id: str | None = None,
+    copy_number: int = 1,
+    user: "User | None" = None,
 ) -> PydanticObjectId:
-    """Clone the workflow or extraction backing a LibraryItem.
+    """Clone the workflow, extraction, or knowledge base backing a LibraryItem.
+
+    ``copy_number`` numbers repeat clones of the same source ("X (Copy 2)")
+    so deliberate duplicates stay distinguishable in library listings.
 
     Returns the new object's id. Raises:
       - ``CloneSourceMissingError`` if the original or the item's kind
@@ -809,6 +959,7 @@ async def _clone_underlying_object(
     with the original — and so legacy documents stored with ``None`` in
     those fields don't blow up during the copy.
     """
+    copy_suffix = "(Copy)" if copy_number <= 1 else f"(Copy {copy_number})"
     if item.kind == LibraryItemKind.WORKFLOW:
         original = await Workflow.get(item.item_id)
         if not original:
@@ -816,7 +967,7 @@ async def _clone_underlying_object(
                 f"Workflow {item.item_id} not found for library item {item.id}"
             )
         new_wf = Workflow(
-            name=f"{original.name} (Copy)",
+            name=f"{original.name} {copy_suffix}",
             description=original.description,
             user_id=user_id,
             team_id=team_id,
@@ -868,7 +1019,7 @@ async def _clone_underlying_object(
             )
         new_uuid = str(uuid_mod.uuid4())
         new_ss = SearchSet(
-            title=f"{original.title} (Copy)",
+            title=f"{original.title} {copy_suffix}",
             uuid=new_uuid,
             status=original.status,
             set_type=original.set_type,
@@ -920,6 +1071,33 @@ async def _clone_underlying_object(
             await new_tc.insert()
 
         return new_ss.id
+
+    elif item.kind == LibraryItemKind.KNOWLEDGE_BASE:
+        from app.models.knowledge import KnowledgeBase
+        from app.models.user import User as UserModel
+        from app.services import knowledge_service
+
+        original = await KnowledgeBase.get(item.item_id)
+        if not original:
+            raise CloneSourceMissingError(
+                f"KnowledgeBase {item.item_id} not found for library item {item.id}"
+            )
+        # clone_knowledge_base needs the full User (name-conflict checks run
+        # against the user's current team). Callers pass it; the user_id
+        # fallback covers direct invocations.
+        owner = user or await UserModel.find_one(UserModel.user_id == user_id)
+        if not owner:
+            raise CloneSourceMissingError(
+                f"User {user_id} not found while cloning library item {item.id}"
+            )
+        clone = await knowledge_service.clone_knowledge_base(original, owner)
+        # The library flows carry an explicit destination: a personal copy has
+        # no team scope, a team share must be visible to the destination team.
+        if clone.team_id != team_id or bool(team_id) != clone.shared_with_team:
+            clone.team_id = team_id
+            clone.shared_with_team = bool(team_id)
+            await clone.save()
+        return clone.id
 
     raise CloneSourceMissingError(
         f"Library item {item.id} has unsupported kind: {item.kind!r}"

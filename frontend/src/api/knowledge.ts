@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, rawFetch } from './client'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
 
 export function listKnowledgeBases() {
@@ -124,6 +124,7 @@ export interface KBSourceResponse {
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number
+  truncated?: boolean
   created_at?: string | null
 }
 
@@ -330,6 +331,8 @@ export type KBTestQuery = {
   expected_answer_contains: string | null
   expected_answer: string | null
   category: string | null
+  notes: string | null
+  external_id: string | null
   auto_generated: boolean
   source_chunk_ids: string[]
   last_judged_score: number | null
@@ -350,6 +353,8 @@ export function createKBTestQuery(uuid: string, data: {
   expected_answer_contains?: string
   expected_answer?: string
   category?: string
+  notes?: string
+  external_id?: string
 }) {
   return apiFetch<KBTestQuery>(`/api/knowledge/${uuid}/test-queries`, {
     method: 'POST',
@@ -363,6 +368,8 @@ export function updateKBTestQuery(uuid: string, queryUuid: string, data: {
   expected_answer_contains?: string | null
   expected_answer?: string | null
   category?: string | null
+  notes?: string | null
+  external_id?: string | null
 }) {
   return apiFetch<KBTestQuery>(`/api/knowledge/${uuid}/test-queries/${queryUuid}`, {
     method: 'PATCH',
@@ -374,6 +381,37 @@ export function deleteKBTestQuery(uuid: string, queryUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/test-queries/${queryUuid}`, {
     method: 'DELETE',
   })
+}
+
+export type KBTestQueryImportResult = {
+  created: number
+  updated: number
+  skipped: number
+  total_rows: number
+  errors: { row: number; error: string }[]
+}
+
+/**
+ * Bulk-import test queries from a CSV/XLSX file. Rows carrying a stable ID
+ * that matches an existing query's external_id update it in place; ID-less
+ * rows duplicating an existing question are skipped.
+ */
+export async function importKBTestQueries(uuid: string, file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  // btoa takes a binary string; build it in chunks to stay under the
+  // argument-count limit String.fromCharCode hits on large arrays.
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return apiFetch<KBTestQueryImportResult>(
+    `/api/knowledge/${uuid}/test-queries/import`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ filename: file.name, content_base64: btoa(binary) }),
+    },
+  )
 }
 
 export function generateKBTestQueries(
@@ -587,6 +625,9 @@ export type KBOptimizationRun = {
   cross_judge?: CrossJudge | null
   optimized_score_train?: number | null
   holdout_default_score?: number | null
+  // Non-null iff the winner's holdout re-score succeeded — i.e. optimized_score
+  // is the holdout number. Pair holdout_default_score only against this.
+  holdout_optimized_score?: number | null
   train_query_uuids?: string[]
   holdout_query_uuids?: string[]
   overfitting_warning?: boolean
@@ -831,6 +872,41 @@ export async function downloadKBExport(uuid: string, fallbackTitle = 'knowledge_
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export type KBValidationExportFormat = 'csv' | 'xlsx' | 'json'
+
+/** Download the per-query results of a validation run (CSV / Excel / JSON).
+ * Pass ``runUuid = 'latest'`` for the most recent full run. */
+export async function downloadKBValidationRunExport(
+  kbUuid: string,
+  runUuid: string,
+  format: KBValidationExportFormat,
+): Promise<void> {
+  const res = await rawFetch(
+    `/api/knowledge/${kbUuid}/validation-runs/${runUuid}/export?format=${format}`,
+  )
+  if (!res.ok) {
+    let detail = 'Export failed'
+    try {
+      const body = await res.json() as { detail?: string }
+      if (body.detail) detail = body.detail
+    } catch { /* non-JSON error body — keep the generic message */ }
+    throw new Error(detail)
+  }
+  // Honor the server-provided filename (KB title + run timestamp + run id).
+  const disposition = res.headers.get('Content-Disposition') || ''
+  const match = disposition.match(/filename="?([^"]+)"?/)
+  const filename = match?.[1] || `kb-validation-results.${format}`
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
   URL.revokeObjectURL(url)
 }
 

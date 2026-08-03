@@ -55,6 +55,13 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
+    # Reject tokens minted before a session-invalidating event (password reset,
+    # email change, account recovery). Tokens carry the token_version they were
+    # issued with; a bump on the User record orphans every older token.
+    if payload.get("ver", 0) != (user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired"
+        )
     # Block locked demo users from all API access. Surface the end-of-trial
     # feedback token so the frontend can route them straight to the renewal
     # screen (mid-session expiry, where login didn't supply the token).

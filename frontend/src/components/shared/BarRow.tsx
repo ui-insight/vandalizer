@@ -9,7 +9,8 @@ export function BarRow({ label, pct, color, emphasised = false }: BarRowProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
       <div style={{
-        width: 80, fontSize: 12, fontWeight: emphasised ? 600 : 400,
+        width: 150, flexShrink: 0, fontSize: 12, lineHeight: 1.3,
+        fontWeight: emphasised ? 600 : 400,
         color: emphasised ? '#fff' : '#aaa',
       }}>
         {label}

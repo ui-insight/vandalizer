@@ -19,9 +19,26 @@ from app.services.workflow_engine import (
     Node,
     UsageAccumulator,
     WorkflowEngine,
+    WorkflowStepError,
     build_workflow_engine,
     sanitize_step_name,
 )
+
+
+class _FailingNode(Node):
+    """Stub node that reports a step failure via the ``error`` key."""
+
+    def __init__(self, name="FailingNode", message="Blocked URL: nope"):
+        super().__init__(name)
+        self.message = message
+
+    def process(self, inputs):
+        return {
+            "output": self.message,
+            "error": self.message,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -266,8 +283,40 @@ class TestWorkflowEngineExecute:
         final, data = engine.execute()
         assert isinstance(final, dict)
         assert final.get("_approval_pause") is True
+        assert final.get("_paused_step_index") == 1
         # AddDocumentNode should NOT have executed
         assert all(d["name"] != "AddDocument" for d in data)
+
+    def test_second_approval_pause_reports_its_own_index(self):
+        """Two gates: resuming past the first must pause at the second and
+        report the second node's index, not the first's. All ApprovalNodes are
+        named "Approval", so the index is the only thing distinguishing them."""
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["a"]})
+        first = ApprovalNode({"review_instructions": "First review"})
+        middle = AddDocumentNode({"doc_texts": ["between the gates"]})
+        second = ApprovalNode({"review_instructions": "Second review"})
+        tail = AddDocumentNode({"doc_texts": ["should not run"]})
+
+        for node in (doc, first, middle, second, tail):
+            engine.add_node(node)
+        engine.connect(doc, first)
+        engine.connect(first, middle)
+        engine.connect(middle, second)
+        engine.connect(second, tail)
+
+        final, _ = engine.execute()
+        assert final.get("_paused_step_index") == 1
+
+        # Resume past the first gate — the engine must stop again at index 3.
+        resumed, data = engine.execute(
+            start_index=2, initial_output={"output": "approved artifact"},
+        )
+        assert resumed.get("_approval_pause") is True
+        assert resumed.get("_review_instructions") == "Second review"
+        assert resumed.get("_paused_step_index") == 3
+        # Only the step between the gates ran; the tail is still pending.
+        assert [d["name"] for d in data] == ["AddDocument"]
 
     def test_resume_from_start_index(self):
         """Engine can resume from a specific step index with initial_output."""
@@ -304,6 +353,81 @@ class TestWorkflowEngineExecute:
 
 
 # ---------------------------------------------------------------------------
+# Step failure semantics
+# ---------------------------------------------------------------------------
+
+class TestWorkflowStepFailure:
+    def _engine_with_failing_middle_step(self):
+        """Document -> failing step -> AddDocument (must never run)."""
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["a"]})
+        fail = MultiTaskNode("API")
+        fail.add_task(_FailingNode())
+        downstream = AddDocumentNode({"doc_texts": ["should not run"]})
+        engine.add_node(doc)
+        engine.add_node(fail)
+        engine.add_node(downstream)
+        engine.connect(doc, fail)
+        engine.connect(fail, downstream)
+        return engine
+
+    def test_step_error_raises_and_halts(self):
+        engine = self._engine_with_failing_middle_step()
+        with pytest.raises(WorkflowStepError) as exc_info:
+            engine.execute()
+        assert exc_info.value.step_name == "API"
+        assert "Blocked URL: nope" in str(exc_info.value)
+
+    def test_step_error_does_not_run_downstream_steps(self):
+        engine = self._engine_with_failing_middle_step()
+        updates = []
+        with pytest.raises(WorkflowStepError):
+            engine.execute(workflow_result_updater=lambda u: updates.append(u))
+        started = [u.get("current_step_name") for u in updates if "current_step_name" in u]
+        assert "AddDocument" not in started
+
+    def test_failing_step_output_still_persisted(self):
+        """The failing step's result (with its diagnostics) lands in
+        steps_output before the run is failed."""
+        engine = self._engine_with_failing_middle_step()
+        updates = []
+        with pytest.raises(WorkflowStepError):
+            engine.execute(workflow_result_updater=lambda u: updates.append(u))
+        persisted = {k: v for u in updates for k, v in u.items()
+                     if k.startswith("steps_output.")}
+        assert "steps_output.API" in persisted
+        assert persisted["steps_output.API"]["error"] == "Blocked URL: nope"
+
+    def test_step_error_survives_celery_json_reconstruction(self):
+        """Celery's JSON result backend rebuilds a task's exception as
+        cls(*args). If args were a single pre-formatted string, reconstruction
+        would TypeError and degrade to a mangled generic Exception — exactly
+        what the Test Step poll endpoint would then show the user."""
+        original = WorkflowStepError("APINode", "Blocked URL: nope")
+        rebuilt = WorkflowStepError(*original.args)
+        assert rebuilt.step_name == "APINode"
+        assert rebuilt.message == "Blocked URL: nope"
+        assert str(rebuilt) == "APINode step failed: Blocked URL: nope"
+
+    def test_step_error_carries_step_output_for_in_process_callers(self):
+        engine = self._engine_with_failing_middle_step()
+        with pytest.raises(WorkflowStepError) as exc_info:
+            engine.execute()
+        assert exc_info.value.step_output is not None
+        assert exc_info.value.step_output.get("error") == "Blocked URL: nope"
+
+    def test_error_free_run_unaffected(self):
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["a"]})
+        add = AddDocumentNode({"doc_texts": ["fine"]})
+        engine.add_node(doc)
+        engine.add_node(add)
+        engine.connect(doc, add)
+        final, data = engine.execute()
+        assert final == "fine"
+
+
+# ---------------------------------------------------------------------------
 # MultiTaskNode
 # ---------------------------------------------------------------------------
 
@@ -325,6 +449,32 @@ class TestMultiTaskNode:
         assert result["_approval_pause"] is True
         assert result["_review_instructions"] == "Review this"
         assert result["output"] == "pending review"
+
+    def test_error_propagates_through_wrapper(self):
+        multi = MultiTaskNode("API Step")
+        multi.add_task(_FailingNode(message="HTTP error: 500"))
+        result = multi.process({"output": "prev"})
+        assert result["error"] == "HTTP error: 500"
+
+    def test_request_preview_propagates_through_wrapper(self):
+        class _RequestNode(Node):
+            def process(self, inputs):
+                return {
+                    "output": "ok",
+                    "request": {"method": "GET", "url": "https://x.test"},
+                    "step_name": self.name,
+                }
+
+        multi = MultiTaskNode("API Step")
+        multi.add_task(_RequestNode("APINode"))
+        result = multi.process({"output": "prev"})
+        assert result["request"] == {"method": "GET", "url": "https://x.test"}
+
+    def test_no_error_key_when_tasks_succeed(self):
+        multi = MultiTaskNode("Step")
+        multi.add_task(AddDocumentNode({"doc_texts": ["fine"]}))
+        result = multi.process({"output": "prev"})
+        assert "error" not in result
 
     def test_multiple_tasks_parallel(self):
         """Multiple tasks execute in parallel and outputs are collected."""
@@ -769,3 +919,43 @@ class TestNodeBase:
         node = Node("test")
         with pytest.raises(NotImplementedError):
             node.process({})
+
+
+# ---------------------------------------------------------------------------
+# llm_chat_model prompt construction
+# ---------------------------------------------------------------------------
+
+class TestLlmChatModelPrompt:
+    """A Prompt step must ground itself in upstream CONTEXT when there is any,
+    but answer directly when the workflow runs with No Input (empty context).
+
+    Regression: a "No Input" workflow used to emit the grounding constraint
+    against "(No data provided.)", so the model would refuse with
+    "The provided context does not contain the information needed...".
+    """
+
+    def _run(self, data):
+        from app.services.workflow_engine import llm_chat_model
+
+        agent = MagicMock()
+        agent.run_sync.return_value = MagicMock(output="ok")
+        with patch(
+            "app.services.workflow_engine.create_chat_agent", return_value=agent
+        ):
+            llm_chat_model("gpt-4o", "Write three tips for a strong NSF proposal", data=data)
+        # The single positional arg to run_sync is the assembled prompt.
+        return agent.run_sync.call_args[0][0]
+
+    def test_no_input_prompt_omits_grounding_constraint(self):
+        for empty in (None, ""):
+            prompt = self._run(empty)
+            assert "ONLY the CONTEXT" not in prompt
+            assert "CONTEXT:" not in prompt
+            assert "(No data provided.)" not in prompt
+            assert "drawing on your own knowledge" in prompt
+            assert "Write three tips for a strong NSF proposal" in prompt
+
+    def test_with_context_keeps_grounding_constraint(self):
+        prompt = self._run("Prior step said the deadline is March 3.")
+        assert "ONLY the CONTEXT" in prompt
+        assert "Prior step said the deadline is March 3." in prompt

@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
-import { getKBQuality } from '../../api/knowledge'
-import { QualityTimeline } from '../shared/QualityTimeline'
+import { downloadKBValidationRunExport, getKBQuality } from '../../api/knowledge'
+import { QualityTimeline, type QualityRunExportFormat } from '../shared/QualityTimeline'
 
 interface Props {
   kbUuid: string
@@ -14,6 +14,11 @@ interface Props {
 /** Thin adapter over the shared QualityTimeline (Phase 4). */
 export function KBQualityHistoryTab({ kbUuid, onSwitchToAutovalidate, refreshKey, polling }: Props) {
   const fetchHistory = useCallback(() => getKBQuality(kbUuid), [kbUuid])
+  const exportRun = useCallback(
+    (runUuid: string, format: QualityRunExportFormat) =>
+      downloadKBValidationRunExport(kbUuid, runUuid, format),
+    [kbUuid],
+  )
   return (
     <QualityTimeline
       fetchHistory={fetchHistory}
@@ -23,6 +28,7 @@ export function KBQualityHistoryTab({ kbUuid, onSwitchToAutovalidate, refreshKey
       onSwitchToAutovalidate={onSwitchToAutovalidate}
       refreshKey={refreshKey}
       polling={polling}
+      onExportRun={exportRun}
     />
   )
 }

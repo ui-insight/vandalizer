@@ -22,6 +22,9 @@ def _make_user(user_id="alice", email="alice@example.com", password_hash="hashed
     u.is_demo_user = is_demo_user
     u.current_team = extra.get("current_team", None)
     u.organization_id = extra.get("organization_id", None)
+    # Explicit None: a bare MagicMock attribute is truthy, which would skew
+    # sso_provider-dependent branches.
+    u.sso_provider = extra.get("sso_provider", None)
     u.save = AsyncMock()
     u.insert = AsyncMock()
     u.delete = AsyncMock()
@@ -502,6 +505,80 @@ class TestResolveOAuthUser:
                 await resolve_oauth_user("user@corp.com", None, None)
 
         new_user.delete.assert_awaited_once()
+
+
+    @pytest.mark.asyncio
+    async def test_stamps_sso_provider_and_audits_email_sync(self):
+        user = _make_user(email="old@corp.com")
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service._auto_join_default_team", new_callable=AsyncMock),
+            patch("app.services.team_service.ensure_current_team", new_callable=AsyncMock),
+            patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            from app.services.auth_service import resolve_oauth_user
+
+            await resolve_oauth_user("alice@corp.com", "new@corp.com", "Alice")
+
+        assert user.sso_provider == "oauth"
+        assert user.email == "new@corp.com"
+        mock_log.assert_awaited_once()
+        kwargs = mock_log.await_args.kwargs
+        assert kwargs["action"] == "user.email_synced_from_provider"
+        assert kwargs["detail"]["old_email"] == "old@corp.com"
+        assert kwargs["detail"]["new_email"] == "new@corp.com"
+        assert kwargs["detail"]["provider"] == "oauth"
+
+    @pytest.mark.asyncio
+    async def test_no_email_sync_audit_when_email_unchanged(self):
+        user = _make_user(email="alice@corp.com", sso_provider="oauth")
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service._auto_join_default_team", new_callable=AsyncMock),
+            patch("app.services.team_service.ensure_current_team", new_callable=AsyncMock),
+            patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            from app.services.auth_service import resolve_oauth_user
+
+            await resolve_oauth_user("alice@corp.com", "alice@corp.com", "Alice")
+
+        mock_log.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# resolve_saml_user
+# ---------------------------------------------------------------------------
+
+
+class TestResolveSAMLUser:
+    @pytest.mark.asyncio
+    async def test_stamps_sso_provider_and_audits_email_sync(self):
+        user = _make_user(email="old@corp.com")
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service._auto_join_default_team", new_callable=AsyncMock),
+            patch("app.services.team_service.ensure_current_team", new_callable=AsyncMock),
+            patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            from app.services.auth_service import resolve_saml_user
+
+            await resolve_saml_user("alice", "new@corp.com", "Alice")
+
+        assert user.sso_provider == "saml"
+        assert user.email == "new@corp.com"
+        mock_log.assert_awaited_once()
+        kwargs = mock_log.await_args.kwargs
+        assert kwargs["action"] == "user.email_synced_from_provider"
+        assert kwargs["detail"]["provider"] == "saml"
 
 
 # ---------------------------------------------------------------------------

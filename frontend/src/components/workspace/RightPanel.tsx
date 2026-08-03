@@ -12,8 +12,13 @@ const TABS = ['assistant', 'library'] as const
 export function RightPanel() {
   const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId, openAutomationId } = useWorkspace()
 
-  // An open editor takes over the panel (no tab bar), but the Assistant must
-  // stay mounted underneath — see the comment on the tab content below.
+  // An open editor replaces the tab view visually, but everything underneath
+  // stays mounted (hidden): the live conversation (messages, in-flight
+  // results, scroll position) lives in ChatPanel/useChat and resets on
+  // unmount — mid-conversation editor work (e.g. a certification module
+  // built in the workflow editor) must come back to the same chat — and the
+  // Library's filters, search, folder selection, and scroll likewise survive
+  // opening and closing an editor.
   const editor = openAutomationId ? <AutomationEditorPanel />
     : openExtractionId ? <ExtractionEditorPanel />
     : openWorkflowId ? <WorkflowEditorPanel />
@@ -21,8 +26,9 @@ export function RightPanel() {
 
   return (
     <div className="flex h-full flex-col" style={{ boxShadow: '-7px 20px 25px -16px rgb(211, 211, 211)' }}>
-      {/* Tab bar - matches Flask .tab-menu */}
-      {!editor && (
+      {editor && <div className="flex min-h-0 flex-1 flex-col">{editor}</div>}
+      <div className={cn('flex min-h-0 flex-1 flex-col', editor && 'hidden')}>
+        {/* Tab bar - matches Flask .tab-menu */}
         <div className="flex bg-panel-dark border-b border-[#cccccc48]">
           {TABS.map((tab) => (
             <button
@@ -39,24 +45,18 @@ export function RightPanel() {
             </button>
           ))}
         </div>
-      )}
 
-      {/* Tab content - matches Flask .tab-content */}
-      <div className="flex-1 overflow-hidden bg-white">
-        {/* Keep the Assistant mounted and just hide it when the Library tab or
-            an editor (workflow/extraction/automation) is open, so the live
-            conversation (messages, in-flight results, scroll position)
-            survives instead of being torn down and lost. Its state lives in
-            ChatPanel/useChat, which reset on unmount — mid-conversation editor
-            work (e.g. a certification module built in the workflow editor)
-            must come back to the same chat. Library and the editors have no
-            ephemeral state of ours, so they can mount on demand. */}
-        <div className={cn('h-full', (editor || activeRightTab !== 'assistant') && 'hidden')}>
-          <AssistantTab />
+        {/* Tab content - matches Flask .tab-content */}
+        <div className="flex-1 overflow-hidden bg-white">
+          {/* Keep the Assistant mounted and just hide it when the Library tab
+              is open — see the keep-mounted comment above. Library mounts on
+              demand per tab switch but survives editor open/close via the
+              hidden wrapper. */}
+          <div className={cn('h-full', activeRightTab !== 'assistant' && 'hidden')}>
+            <AssistantTab />
+          </div>
+          {activeRightTab === 'library' && <LibraryTab />}
         </div>
-        {editor
-          ? <div className="h-full">{editor}</div>
-          : activeRightTab === 'library' && <LibraryTab />}
       </div>
     </div>
   )

@@ -252,6 +252,8 @@ Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyP
 
 In production, place a reverse proxy in front of the application to terminate TLS. Nginx, Caddy, and Traefik all work well. The example below uses nginx:
 
+> **Running production without TLS?** For an isolated/intranet install served over plain HTTP, keep `FRONTEND_URL` set to the `http://` URL — the backend then omits the `Secure` flag from auth/CSRF cookies so login works (browsers silently drop `Secure` cookies over HTTP). You can force the flag either way with `COOKIE_SECURE=true|false` in `backend/.env`. Never expose an HTTP-only deployment to the public internet.
+
 ```nginx
 server {
     listen 80;

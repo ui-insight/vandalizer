@@ -1,0 +1,178 @@
+PART 743—SPECIAL REPORTING AND NOTIFICATION
+
+Authority:50 U.S.C. 4801-4852; 50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; E.O. 13222, 66 FR 44025, 3 CFR, 2001 Comp., p. 783; E.O. 13637, 78 FR 16129, 3 CFR, 2014 Comp., p. 223; 78 FR 16129.
+
+§ 743.1 Wassenaar Arrangement.
+
+(a) Scope. This section outlines special reporting requirements for exports of certain commodities, software and technology controlled under the Wassenaar Arrangement. Such reports must be submitted to BIS semiannually in accordance with the provisions of paragraph (f) of this section, and records of all exports subject to the reporting requirements of this section must be kept in accordance with part 762 of the EAR. This section does not require reports for reexports. This section is limited to the Wassenaar Arrangement reporting requirements for items listed on the Wassenaar Arrangement's Dual-Use list. For reporting requirements for conventional arms listed on the Wassenaar Arrangement Munitions List that are subject to the EAR (i.e., “600 series” ECCNs), see § 743.4 of this part for Wassenaar Arrangement and United Nations reporting requirements.
+Note to paragraph (a) of this section: For purposes of part 743, the term “you” has the same meaning as the term “exporter”, as defined in part 772 of the EAR.
+(b) Requirements. You must submit two (2) copies of each report required under the provisions of this section and maintain accurate supporting records (see § 762.2(b) of the EAR) for all exports of items specified in paragraph (c) of this section for the following:
+(1) Exports authorized under License Exceptions GBS, CIV, TSR, LVS, APP, and the cooperating government portions (§ 740.11(c) of the EAR) of GOV (see part 740 of the EAR). Note that exports of technology and source code under License Exception TSR to foreign nationals located in the U.S. should not be reported; and
+(2) [Reserved]
+(3) Exports authorized under the Validated End-User authorization (see § 748.15 of the EAR).
+(4) Exports authorized under License Exception STA (See § 740.20 of the EAR).
+(c) Items for which reports are required. You must submit reports to BIS under the provisions of this section only for exports of items on the Sensitive List (see supplement no. 6 to part 774 of the EAR).
+(d) Country Exceptions. You must report each export subject to the provisions of this section, except for exports to Wassenaar member countries, as identified in supplement no. 1 to part 743.
+(e) Information that must be included in each report. (1) Each report submitted to BIS for items other than those identified in paragraph (e)(2) of this section must include the following information for each export during the time periods specified in paragraph (f) of this section:
+(i) Export Control Classification Number and paragraph reference as identified on the Commerce Control List;
+(ii) Number of units in the shipment; and
+Note to paragraph (e)(1)(ii): For exports of technology for which reports are required under § 743.1(c) of this section, the number of units in the shipment should be reported as one (1) for the initial export of the technology to a single ultimate consignee. Additional exports of the technology must be reported only when the type or scope of technology changes or exports are made to other ultimate consignees. Additionally, do not report the release of technology or source code subject to the EAR to foreign nationals in the U.S.
+(iii) Country of ultimate destination.
+(2) [Reserved]
+(f) Frequency and timing of reports. You must submit reports subject to the provisions of this section semiannually. The reports must be labeled with the exporting company's name and address at the top of each page and must include for each such export all the information specified in paragraph (e) of this section. The reports shall cover exports made during six month time periods spanning from January 1 through June 30 and July 1 through December 31.
+(1) The first report must be submitted to and received by BIS no later than August 1, 1998 for the partial reporting period beginning January 15, 1998 and ending June 30, 1998. Thereafter, reports are due according to the provisions of paragraphs (f)(2) and (f)(3) of this section.
+(2) Reports for the reporting period ending June 30 must be submitted to and received by BIS no later than August 1.
+(3) Reports for the reporting period ending December 31 must be submitted to and received by BIS no later than February 1.
+(g) Where to submit Wassenaar reports—(1) Email. Reports may be Emailed to WAreports@bis.doc.gov.
+(2) Mail. If mailed, two (2) copies of reports are required to be delivered via courier to: Bureau of Industry and Security, U.S. Department of Commerce, Attn: “Wassenaar Reports”, Room 2099B, 14th Street and Pennsylvania Ave. NW., Washington, DC 20230. BIS will not accept reports sent C.O.D.
+(3) Facsimile. Reports may also be sent by facsimile to: (202) 482-3345 or 202-482-1373, Attn: “Wassenaar Reports”.
+(h) Contacts. General information concerning the Wassenaar Arrangement and reporting obligations thereof is available from the Office of National Security and Technology Transfer Controls, Tel. (202) 482-4479, Fax: (202) 482-3345 or (202) 482-1373, or Email: WAreports@bis.doc.gov.
+[63 FR 2458, Jan. 15, 1998]
+
+Editorial Note:
+
+For Federal Register citations affecting § 743.1, see the List of CFR Sections Affected, which appears in the Finding Aids section of the printed volume and at www.govinfo.gov.
+
+§ 743.2 High performance computers: Post shipment verification reporting.
+
+(a) Scope. This section outlines special post-shipment reporting requirements for exports of certain computers to destinations in Computer Tier 3, see § 740.7(d) for a list of these destinations. Post-shipment reports must be submitted in accordance with the provisions of this section, and all relevant records of such exports must be kept in accordance with part 762 of the EAR.
+(b) Requirement. Exporters must file post-shipment reports and keep records in accordance with recordkeeping requirements in part 762 of the EAR for high performance computer exports to destinations in Computer Tier 3, as well as, exports of commodities used to enhance computers previously exported or reexported to Computer Tier 3 destinations, where the “Adjusted Peak Performance” (“APP”) is greater than that listed in ECCN 4A003.b in the Commerce Control List, supplement no. 1 to part 774 of the EAR.
+(c) Information that must be included in each post-shipment report. No later than the last day of the month following the month in which the export takes place, the exporter must submit the following information to BIS at the address listed in paragraph (d) of this section:
+(1) Exporter name, address, and telephone number;
+(2) License number;
+(3) Date of export;
+(4) End-user name, point of contact, address, telephone number;
+(5) Carrier;
+(6) Air waybill or bill of lading number;
+(7) Commodity description, quantities—listed by model numbers, serial numbers, and APP level in WT; and
+(8) Certification line for exporters to sign and date. The exporter must certify that the information contained in the report is accurate to the best of his or her knowledge.
+Note to paragraph (c) of this section: Exporters are required to provide the PRC End-User Certificate Number to BIS as part of their post-shipment report. When providing the PRC End-User Certificate Number to BIS, you must identify the transaction in the post shipment report to which that PRC End-User Certificate Number applies.
+(d) Address. A copy of the post-shipment report(s) required under paragraph (b) of this section shall be delivered, via courier, to: U.S. Department of Commerce, Office of Enforcement Analysis, HPC Team, 14th Street and Constitution Ave., NW., Room 4065, Washington, DC 20230. Note that BIS will not accept reports sent C.O.D.
+[71 FR 20886, Apr. 24, 2006, as amended at 73 FR 35, Jan. 2, 2008; 76 FR 36988, June 24, 2011; 77 FR 39369, July 2, 2012; 79 FR 45296, Aug. 4, 2014; 81 FR 64675, Sept. 20, 2016]
+
+§ 743.3 Thermal imaging camera reporting.
+
+(a) General requirement. Exports of thermal imaging cameras must be reported to BIS as provided in this section.
+(b) Transactions to be reported. Exports that are not authorized by an individually validated license of more than 100 thermal imaging cameras in a monocular, biocular, or binocular configuration controlled by ECCN 6A003.b.4.b to a destination in Country Group A:1 (see supplement no. 1 to part 740 of the EAR), except Australia, Canada, or the United Kingdom, must be reported to BIS.
+(c) Party responsible for reporting. The exporter as defined in § 772.1 of the EAR must ensure the reports required by this section are submitted to BIS.
+(d) Information to be included in the reports. For each export described in paragraph (b) of this section, the report must identify: the name, address, and telephone number of the exporter; the date of each export; the name, address and telephone number of the consignee or end user; the model number(s) of each camera exported; the serial number of each exported camera that has a serial number; and the quantity of each model number of camera exported. (Note: Technical specifications may be requested on an as needed basis and must be provided to BIS after any such request.)
+(e) Where to submit reports. Submit the reports via e-mail to UTICreport@bis.doc.gov.
+(f) Reporting periods and due dates. This reporting requirement applies to exports made on or after May 22, 2009. Exports must be reported within one month of the reporting period in which the export takes place. The first reporting period begins on May 22, 2009 and runs through June 30, 2009. Subsequent reporting periods shall begin on January 1 and July 1 of each year, and shall run through June 30, and December 31 respectively. Exports in each reporting period must be reported to BIS no later than the last day of the month following the month in which the reporting period ends.
+[74 FR 23947, May 22, 2009, as amended at 74 FR 68146, Dec. 23, 2009; 76 FR 58397, Sept. 21, 2011; 80 FR 29444, May 21, 2015; 80 FR 75635, Dec. 3, 2015; 85 FR 56299, Sept. 11, 2020; 89 FR 28600, Apr. 19, 2024]
+
+§ 743.4 Conventional arms reporting.
+
+(a) Scope. This section outlines special reporting requirements for exports of certain items included in the UN Register of Conventional Arms (UNRoCA) and Wassenaar Arrangement (WA) Munitions List. These reports cover substantially similar arms. States participating in the UNRoCA report annually on all transfers of arms (see www.disarmament.unoda.org/convarms/register/); Participating States of the Wassenaar Arrangement exchange information every six months on deliveries and transfers to non-WA governments of conventional arms set forth in the Wassenaar Arrangement's Basic Documents under Part II “Guideline and Procedures, including the Initial Elements”, Appendix 3: “Specific Information Exchange on Arms Content by Category”. Public Documents, Vol. 1—Founding Documents at https://www.wassenaar.org/app/uploads/2021/12/Public-Docs-Vol-I-Founding-Documents.pdf). BIS obtains the information needed for such conventional arms reporting from the information exporters are required to submit in the EEI submission in AES, pursuant to § 758.1(b)(9) and (g)(4)(ii) of the EAR. No additional reporting to BIS is required for purposes of this section. BIS does not submit reports for reexports or transfers (in-country) under this section. BIS does not include exports to Wassenaar member countries, identified in supplement no. 1 to part 743 in the Wassenaar reports. required under this section.
+(b) Information included in the reports—(1) Authorizations reported. Exports authorized under BIS licenses, License Exceptions TMP, RPL, STA, or GOV (see part 740 of the EAR) and under the Validated End User authorization (see § 748.15 of the EAR).
+(2) ECCNs reported. ECCNs 0A501.a and .b, 0A506.a. and .b, and 0A507.a and .b.
+(3) Quantity and recipient state reported. The quantity and the name of the recipient state.
+(c) Contacts. Information concerning the reporting requirements for items identified in paragraph (b)(2) of this section is available from the Office of Nonproliferation and Foreign Policy Controls (NFPC), Tel.: (202) 482-4188, Fax: (202) 482-4145.
+[89 FR 34706, Apr. 30, 2024]
+
+§ 743.5 Prior notifications to Congress of Exports of “600 Series Major Defense Equipment.”
+
+(a) General requirement. Applications to export items on the Commerce Control List that are “600 Series Major Defense Equipment” will be notified to Congress as provided in this section before licenses for such items are issued.
+(1) Exports of “600 Series Major Defense Equipment” to U.S. Government end users under License Exception GOV (§ 740.11(b) of the EAR) do not require such notification.
+(2) Exports of “600 Series Major Defense Equipment” that have been or will be described in a notification filed by the U.S. State Department under the Arms Export Control Act do not require such notification by BIS.
+(b) BIS will notify Congress prior to issuing a license authorizing the export of items to a country outside the countries listed in Country Group A:5 (see supplement no. 1 to part 740 of the EAR) that are sold under a contract that includes $14,000,000 or more of “600 Series Major Defense Equipment.”
+(c) BIS will notify Congress prior to issuing a license authorizing the export of items to a country listed in Country Group A:5 (see supplement no. 1 to part 740 of the EAR) that are sold under a contract that includes $25,000,000 or more of “600 Series Major Defense Equipment.”
+(d) In addition to information required on the application, the exporter must include a copy of the signed contract (including a statement of the value of the “600 Series Major Defense Equipment” items to be exported under the contract) for any proposed export described in paragraphs (b) or (c) of this section.
+(e) Address. Munitions Control Division at mcd_compliance@bis.doc.gov.
+[78 FR 22722, Apr. 16, 2013, as amended at 87 FR 32987, June 1, 2022]
+
+§ 743.6 [Reserved]
+
+§ 743.7 Reporting on GAAFET General License.
+
+(a) Transactions to be reported—(1) Annual reports. Annual reports are required for any export, reexport, or transfer (in-country) of “technology” specified in ECCN 3E905 that is not authorized by an individual validated license but is authorized pursuant to the GAAFET General License in General Order No. 6 paragraph (f)(1) or (f)(2) in supplement no. 1 to part 736 of the EAR.
+(2) Termination reports. Companies that use the GAAFET General License for deemed exports and reexports to current employees of “technology” specified in ECCN 3E905 must report to BIS the voluntary or involuntary termination of employment of foreign person employees whose most recent country of citizenship or permanent residency is a destination specified in Country Group D:1 or D:5 within 30 days of termination.
+(b) Party responsible for reporting. The entity who exported or reexported the items must ensure the reports required by this section are submitted to BIS.
+(c) Information to be included in the reports—(1) Annual report information. The annual report must include the following:
+(i) Description of the “technology”;
+(ii) All parties, including name and address, involved in the collaboration; and
+(iii) End item of the “technology,” including a description and ECCN of the end item (if known).
+(2) Termination report information. The termination report must include the following:
+(i) Name of foreign person;
+(ii) Name of host company;
+(iii) If they are leaving the United States to go to a destination specified in Country Group D:1 or D:5 (if known); and
+(iv) If they are leaving to change employers within the United States.
+(d) Annual reporting requirement. (1) You must submit the first report on November 5, 2024 subject to the provisions of this section. The report must be labeled with the exporting company's name and address at the top of each page and must include all the information specified in paragraph (c) of this section. The annual report shall cover collaboration occurring during the time between September 6, 2024 and October 28, 2024. Thereafter, reports are due according to the provisions of paragraph (d)(2) of this section.
+(2) Annual reports for the reporting period ending December 31 must be received by BIS no later than February 1.
+(e) Where to submit GAAFET General License reports—Report may be emailed to EAR.Reports@bis.doc.gov and must include “Annual report for GAAFET General License” or “Termination report for GAAFET General License” in the subject line, whichever is appropriate.
+(f) Contacts. General information concerning the GAAFET General License report is available from the Office of National Security Controls, Tel. (202) 482-0092, or Email: EAR.Reports@bis.doc.gov.
+[89 FR 72939, Sept. 6, 2024, as amended at 89 FR 105449, Dec. 27, 2024]
+
+§ 743.8 Reporting on quantum deemed exports and deemed reexports.
+
+(a) Requirement. A report must be submitted to BIS in accordance with this section for the deemed export or deemed reexport under General License in General Order no. 6 in paragraph (f)(3) of supplement no. 1 to part 736 of the EAR to foreign person employees whose most recent country of citizenship or permanent residency is a destination specified in Country Group D:1 or D:5 of quantum “software” or “technology” specified in the following ECCNs: 3D901 (for 3A901.b, 3B904), 3E901 (for 3A901, 3A904, 3B904, 3C907, 3C908, 3C909), 4D906, or 4E906.
+(b) Party responsible for reporting. The entity who released the specified “software” or “technology” must ensure the reports required by this section are properly submitted to BIS.
+(c) Information to be included in the reports. The report must include the following:
+(1) The name, address and point of contact of the entity that made the release;
+(2) Description of the “software” or “technology;”
+(3) Foreign person information, including all the information that would be provided in a deemed export license application, see guidelines for deemed export license applications under the learn and support tab of the BIS website at www.bis.gov;
+(4) End item of the “technology” or “software” including a description and ECCN of the end item (if known); and
+(5) The exporting company's name and address must appear at the top of each page.
+(d) Annual reporting requirement. (1) You must submit the first report on November 5, 2024 subject to the provisions of this section. The report shall cover any releases during the time between September 6, 2024 and October 28, 2024. Thereafter, reports are due according to the provisions of paragraph (d)(2) of this section.
+(2) Reports for the reporting period ending December 31 must be received by BIS no later than February 1.
+(e) Termination reporting. When a foreign person, who has had access to “software” or “technology” identified in paragraph (a) of this section, leaves your employment or academic institution, you must report the name, host company or university, and if known, if they are leaving the United States to go be employed in a destination specified in Country Group D;1 or D:5 or if they are leaving to change employer or university within the United States. This report is due within 30 days of the foreign person's last day with the host company or university.
+(f) Where to submit Quantum General License reports—Report may be emailed to EAR.Reports@bis.doc.gov and must include “Quantum General License Report” in the subject line.
+(g) Contacts. General information concerning the “Quantum General License Report” is available from the Office of National Security Controls, Tel. (202) 482-0092, or Email: EAR.Reports@bis.doc.gov.
+[89 FR 72939, Sept. 6, 2024]
+
+§ 743.9 Reporting requirements for “front-end fabricators” producing “applicable advanced logic integrated circuits” for authorized integrated circuit designers.
+
+(a) Requirement. “Front-end fabricators” producing any integrated circuit specified under ECCN 3A090.a or presumed to be specified under ECCN 3A090.a by Note 1 to 3A090 for any authorized integrated circuit designer must submit reports to BIS in accordance with this section. Reports need not, however, include information about exports, reexports, or in-country transfers to an entity that is both an approved integrated circuit designer listed in supplement no. 6 to part 740 of the EAR and an authorized integrated circuit designer, as described in Note 1 to ECCN 3A090.a.
+(b) Information to be included in the reports. The following information must be collected by the “front-end fabricator” and included in each report to BIS:
+(1) The name, address, and point of contact of the authorized integrated circuit designer;
+(2) The “front-end fabricator's” name and address must appear at the top of each page;
+(3) The end-user Know Your Customer (KYC) vetting form included in supplement no. 2 of this part;
+(4) Description of each category of integrated circuit classified under ECCN 3A090.a sold by the “front-end fabricator” to the authorized integrated circuit designer during the reporting quarter, including all of the following:
+(i) Designer of the integrated circuit classified under ECCN 3A090.a;
+(ii) Product names associated with the integrated circuit specified or presumed to be specified under ECCN 3A090.a, including model number (if known); and
+(iii) Quantity of the integrated circuits classified under ECCN 3A090.a sold by the “front-end fabricator” to the integrated circuit designer during the reporting quarter.
+(c) Quarterly reporting requirement. (1) You must submit the first report by May 31, 2025. The report shall cover any exports, reexports, or transfers (in-country) of integrated circuits classified under ECCN 3A090.a during the time between January 15, 2025 and April 30, 2025. Thereafter, reports are due according to the provisions of paragraph (c)(2) of this section.
+(2)(i) After May 31, 2025, you must submit a report for each reporting period. There are four reporting periods:
+(A) May 1 to July 31;
+(B) August 1 to October 31;
+(C) November 1 to January 31; and
+(D) February 1 to April 30.
+(ii) The report for a given period shall cover any exports, reexports, or transfers (in-country) of integrated circuits classified under ECCN 3A090.a during that period. Each report is due no later than 30 days after the end of the relevant reporting period.
+(d) Where to submit reports required under this section. Reports may be emailed to EAR.Reports@bis.doc.gov and must specify “Authorized integrated circuit designer” in the subject line.
+(e) Contacts. General information or questions about these reports can be directed to the Office of National Security Controls, Tel. (202) 482-0092, or Email: EAR.Reports@bis.doc.gov.
+[90 FR 5310, Jan. 16, 2025]
+
+Supplement No. 1 to Part 743—Wassenaar Arrangement Participating States
+
+[63 FR 55020, Oct. 14, 1998, as amended at 70 FR 41102, July 15, 2005; 71 FR 52964; Sept. 7, 2006; 77 FR 39369, July 2, 2012; 83 FR 38021, Aug. 3, 2018]
+
+Supplement No. 2 to Part 743 Authorized Integrated Circuit Designer Know Your Customer (KYC) Vetting Form
+
+This supplement contains a questionnaire that must be completed as part of the reporting requirements for authorized integrated circuit designers in § 743.9 of the EAR. The questions in the form are KYC best practices that are especially critical in this context where there is a risk of companies seeking advanced foundry services in circumvention of controls on advanced computing items. They are not an exhaustive list of due diligence requirements but provide important information that should be part of KYC screening.
+Vetting For Authorized Integrated Circuit Designer
+Yes/no | If yes, insert how you resolved column 2
+Section 1: Legitimacy of the authorized integrated circuit designer:
+1.A. Does the entity lack a website?
+1.B. Does the entity's website IP address correspond to a different geographical region than the entity's physical address?
+1.C. Is the country code of the entity's phone number different than the entity's physical address?
+1.D. Does the entity's email address not contain the company domain name?
+1.E. Is the entity's physical address invalid?
+1.F. Is the entity purportedly a civil end user but its address is co-located with a military “facility”?
+1.G. Do publicly available corporate records contradict the entity's assertions regarding its business (e.g., entity claims to be a large enterprise, but filings show only a small number of employees)?
+Section 2: Screening:
+2.A. Does the entity's name match an entry in the Consolidated Screening List?
+2.B. Does the entity's address match an entry in the Consolidated Screening List?
+2.C. Does the customer's senior management or technical leadership (e.g., process engineers that are team leaders or otherwise leading development or production activities) overlap with an entity on the Consolidated Screening List?
+Section 3: Additional Party Screening:
+3.A. Are any companies within the entity's corporate hierarchy (i.e., parent, subsidiary, ultimate beneficial owner) headquartered in Macau or Country Group D:5 in supplement no. 1 to part 740 of the EAR?
+3.B. Do any companies within the entity's corporate hierarchy (i.e., parent, subsidiary, ultimate beneficial owner) match an entry or address in the Consolidated Screening List?
+3.C. Are any other parties to the transaction (e.g., parties described in § 748.5 of the EAR) located or headquartered in Macau or Country Group D:5 in supplement no. 1 to part 740 of the EAR?
+Section 4: General Red Flags:
+4.A. Is the entity's stated end use inconsistent with the nature of their business?
+4.B. Is the requested quantity inconsistent with the entity's size?
+4.C. Is a freight forwarding firm listed as the final destination?
+4.D. Does the transaction involve multiple freight forwarders located in third countries?
+4.E. Has the entity refused to answer questions about the end users and end uses of the product?
+4.F. Do supporting documents such as commercial invoices list parties that are not the entity?
+4.G. Is the entity overpaying for a product based on known market prices?
+4.H Does the transaction involve payments from entities in third countries not otherwise involved in the transaction?
+[90 FR 5311, Jan. 16, 2025]

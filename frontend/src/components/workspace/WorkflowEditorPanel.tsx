@@ -5,7 +5,7 @@ import {
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
-  ChevronDown, ChevronRight, ArrowUp, ArrowDown,
+  ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
@@ -47,6 +47,7 @@ import { listItems as listSearchSetItems, suggestFields, getSearchSet } from '..
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
+import { computeReorderedIds } from '../../utils/reorder'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -101,8 +102,8 @@ const TASK_TYPES: TaskTypeDef[] = [
     description: 'Runs a small block of code against the step input for custom transforms.' },
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
-    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents, no URL needed.' },
+  { name: 'ResearchNode', label: 'Deep Analysis', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
+    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
     description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
@@ -211,7 +212,7 @@ export function WorkflowEditorPanel() {
   const { user } = useAuth()
   const shareLink = useShareLink()
   const confirm = useConfirm()
-  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
+  const { openWorkflowId, workflowOpenSignal, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -289,13 +290,16 @@ export function WorkflowEditorPanel() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  // Load results from a pending session (e.g. clicking a completed activity)
+  // Load results from a pending session (e.g. clicking a completed activity).
+  // workflowOpenSignal reruns this when a rail click re-opens the workflow
+  // that's already on screen (switching between two runs of it), since
+  // openWorkflowId alone doesn't change in that case.
   useEffect(() => {
     const sid = consumeWorkflowSession()
     if (sid) {
       runner.loadSession(sid)
     }
-  }, [openWorkflowId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openWorkflowId, workflowOpenSignal]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch quality status on mount
   useEffect(() => {
@@ -409,7 +413,11 @@ export function WorkflowEditorPanel() {
       setEditingTitle(false)
       return
     }
-    await updateWorkflow(openWorkflowId, { name: cleanName })
+    try {
+      await updateWorkflow(openWorkflowId, { name: cleanName })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to rename workflow', 'error')
+    }
     setEditingTitle(false)
     refresh()
   }
@@ -501,7 +509,12 @@ export function WorkflowEditorPanel() {
   }
 
   const handleSaveTask = async (taskId: string, data: Record<string, unknown>) => {
-    await updateTask(taskId, { data })
+    try {
+      await updateTask(taskId, { data })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save task', 'error')
+      return
+    }
     setEditingTask(null)
     refresh()
   }
@@ -524,6 +537,17 @@ export function WorkflowEditorPanel() {
     if (newIndex < 0 || newIndex >= steps.length) return
     ;[steps[stepIndex], steps[newIndex]] = [steps[newIndex], steps[stepIndex]]
     await reorderSteps(openWorkflowId, steps.map(s => s.id))
+    refresh()
+  }
+
+  // Drag-and-drop reorder: move dragId to sit before/after targetId. Operates
+  // on the full steps array (including hidden empty "Document" trigger steps)
+  // so hidden steps keep their position in the persisted order.
+  const handleDropStep = async (dragId: string, targetId: string, position: 'before' | 'after') => {
+    if (!workflow || !openWorkflowId) return
+    const ids = computeReorderedIds(workflow.steps.map(s => s.id), dragId, targetId, position)
+    if (!ids) return
+    await reorderSteps(openWorkflowId, ids)
     refresh()
   }
 
@@ -856,6 +880,7 @@ export function WorkflowEditorPanel() {
               onClickStep={setEditingStepId}
               onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
               onMoveStep={handleMoveStep}
+              onDropStep={handleDropStep}
               canManage={canManage}
             />
             {/* Quality Pulse card */}
@@ -1165,6 +1190,7 @@ export function WorkflowEditorPanel() {
           onClose={() => setEditingTask(null)}
           onSave={handleSaveTask}
           onRefreshWorkflow={refresh}
+          canManage={canManage}
         />
       )}
 
@@ -1280,6 +1306,7 @@ function DesignCanvas({
   onClickStep,
   onAddStep,
   onMoveStep,
+  onDropStep,
   canManage,
 }: {
   workflow: Workflow
@@ -1294,8 +1321,13 @@ function DesignCanvas({
   onClickStep: (stepId: string) => void
   onAddStep: () => void
   onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
+  onDropStep: (dragId: string, targetId: string, position: 'before' | 'after') => void
   canManage: boolean
 }) {
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ stepId: string; position: 'before' | 'after' } | null>(null)
+  const canDrag = canManage && !runnerRunning
+
   return (
     <div style={{
       ...checkerboardBg,
@@ -1362,8 +1394,36 @@ function DesignCanvas({
           .filter(({ step }) => !(step.name === 'Document' && step.tasks.length === 0))
         const hasExplicitOutput = visibleSteps.some(({ step }) => step.is_output)
         const lastDisplayIdx = visibleSteps.length - 1
+        // Insertion point relative to the hovered card's midpoint (used by
+        // both dragover highlight and drop).
+        const dropPositionFor = (e: React.DragEvent<HTMLDivElement>): 'before' | 'after' => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        }
         return visibleSteps.map(({ step, originalIdx }, displayIdx) => (
-          <div key={step.id}>
+          <div
+            key={step.id}
+            onDragOver={(e) => {
+              if (!draggingStepId || draggingStepId === step.id) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              const position = dropPositionFor(e)
+              setDropTarget(prev =>
+                prev?.stepId === step.id && prev.position === position ? prev : { stepId: step.id, position })
+            }}
+            onDragLeave={(e) => {
+              // Ignore transitions between this wrapper's own children
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return
+              setDropTarget(prev => (prev?.stepId === step.id ? null : prev))
+            }}
+            onDrop={(e) => {
+              if (!draggingStepId || draggingStepId === step.id) return
+              e.preventDefault()
+              onDropStep(draggingStepId, step.id, dropPositionFor(e))
+              setDraggingStepId(null)
+              setDropTarget(null)
+            }}
+          >
             <ConnectionLine />
             <StepCard
               step={step}
@@ -1374,6 +1434,11 @@ function DesignCanvas({
               onClick={() => onClickStep(step.id)}
               onMoveUp={() => onMoveStep(originalIdx, 'up')}
               onMoveDown={() => onMoveStep(originalIdx, 'down')}
+              draggable={canDrag}
+              isDragging={draggingStepId === step.id}
+              dropIndicator={dropTarget?.stepId === step.id ? dropTarget.position : null}
+              onDragStart={() => setDraggingStepId(step.id)}
+              onDragEnd={() => { setDraggingStepId(null); setDropTarget(null) }}
             />
           </div>
         ))
@@ -1470,7 +1535,7 @@ function Connector({ position }: { position: 'top' | 'bottom' }) {
 // Step card
 // ---------------------------------------------------------------------------
 
-function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick, onMoveUp, onMoveDown }: {
+function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick, onMoveUp, onMoveDown, draggable, isDragging, dropIndicator, onDragStart, onDragEnd }: {
   step: WorkflowStep
   index: number
   totalSteps: number
@@ -1479,11 +1544,18 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
   onClick: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  draggable: boolean
+  isDragging: boolean
+  dropIndicator: 'before' | 'after' | null
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   const isExplicitOutput = step.is_output
   const isDeliverable = isExplicitOutput || isImplicitOutput
+  const cardRef = useRef<HTMLDivElement>(null)
   return (
     <div
+      ref={cardRef}
       onClick={onClick}
       style={{
         position: 'relative',
@@ -1499,11 +1571,49 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             : '2px solid transparent',
         transition: 'border-color 0.2s',
         marginTop: 10, marginBottom: 10,
+        opacity: isDragging ? 0.4 : 1,
       }}
     >
       <Connector position="top" />
       <Connector position="bottom" />
+      {dropIndicator && (
+        <div style={{
+          position: 'absolute', left: 8, right: 8,
+          [dropIndicator === 'before' ? 'top' : 'bottom']: -8,
+          height: 4, borderRadius: 2,
+          backgroundColor: 'var(--highlight-color, #eab308)',
+          pointerEvents: 'none',
+        }} />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {draggable && (
+          <div
+            draggable
+            aria-label="Drag to reorder step"
+            title="Drag to reorder"
+            onClick={e => e.stopPropagation()}
+            onDragStart={(e) => {
+              e.stopPropagation()
+              e.dataTransfer.effectAllowed = 'move'
+              // Custom type: document drop zones in this file read text/plain
+              // as a doc uuid, so a step drag must not populate it.
+              e.dataTransfer.setData('application/x-vandalizer-step', step.id)
+              if (cardRef.current) {
+                const rect = cardRef.current.getBoundingClientRect()
+                e.dataTransfer.setDragImage(cardRef.current, e.clientX - rect.left, e.clientY - rect.top)
+              }
+              onDragStart()
+            }}
+            onDragEnd={onDragEnd}
+            style={{
+              display: 'flex', alignItems: 'center', cursor: 'grab',
+              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              flexShrink: 0, marginLeft: -6, marginRight: -6,
+            }}
+          >
+            <GripVertical style={{ width: 16, height: 16 }} />
+          </div>
+        )}
         <div style={{
           width: 36, height: 36, borderRadius: 6,
           backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : isImplicitOutput ? '#ede9fe' : '#f3f4f6',
@@ -1768,11 +1878,11 @@ function EditStepOverlay({
             />
           ) : (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}
-              onClick={() => { setNameValue(step.name); setEditingName(true) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1 }}
+              onClick={canManage ? () => { setNameValue(step.name); setEditingName(true) } : undefined}
             >
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124' }}>{step.name}</span>
-              <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+              {canManage && <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />}
             </div>
           )}
           <button type="button" aria-label="Close" onClick={onClose} style={{
@@ -1804,6 +1914,7 @@ function EditStepOverlay({
             aria-label="Mark step as workflow output"
             type="checkbox"
             checked={step.is_output}
+            disabled={!canManage}
             onChange={e => onToggleOutput(step.id, e.target.checked)}
             style={{ accentColor: '#7c3aed' }}
           />
@@ -1858,7 +1969,7 @@ function EditStepOverlay({
                       : task.name === 'DescribeImage' ? 'AI image description'
                       : task.name === 'CodeNode' ? 'Run Python code'
                       : task.name === 'CrawlerNode' ? 'Web crawler'
-                      : task.name === 'ResearchNode' ? 'Deep AI research'
+                      : task.name === 'ResearchNode' ? 'Two-pass document analysis'
                       : task.name === 'KnowledgeBaseQuery' ? 'Search knowledge base'
                       : task.name === 'APINode' ? 'HTTP API request'
                       : task.name === 'DocumentRenderer' ? 'Render document'
@@ -1869,11 +1980,13 @@ function EditStepOverlay({
                       : task.name}
                   </div>
                 </div>
-                <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
-                }}>
-                  <Trash2 style={{ width: 14, height: 14 }} />
-                </button>
+                {canManage && (
+                  <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
+                  }}>
+                    <Trash2 style={{ width: 14, height: 14 }} />
+                  </button>
+                )}
               </div>
             )
           })}
@@ -1908,16 +2021,18 @@ function EditStepOverlay({
         boxShadow: '0 0px 23px -8px rgb(211,211,211)',
         display: 'flex', justifyContent: 'space-between',
       }}>
-        <button
-          onClick={onDeleteStep}
-          style={{
-            padding: '10px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            border: '1px solid #fca5a5', borderRadius: 'var(--ui-radius, 8px)',
-            backgroundColor: '#fff', color: '#dc2626', cursor: 'pointer',
-          }}
-        >
-          Delete Step
-        </button>
+        {canManage ? (
+          <button
+            onClick={onDeleteStep}
+            style={{
+              padding: '10px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              border: '1px solid #fca5a5', borderRadius: 'var(--ui-radius, 8px)',
+              backgroundColor: '#fff', color: '#dc2626', cursor: 'pointer',
+            }}
+          >
+            Delete Step
+          </button>
+        ) : <div />}
         <button
           onClick={onClose}
           style={{
@@ -2255,14 +2370,15 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
 // Task edit modal (with Design/Input/Output sub-tabs + test step)
 // ---------------------------------------------------------------------------
 
-function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow }: {
+function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
   task: WorkflowTask
   selectedDocUuids: string[]
   workflow: Workflow | null
   workflowId: string | null
   onClose: () => void
-  onSave: (taskId: string, data: Record<string, unknown>) => void
+  onSave: (taskId: string, data: Record<string, unknown>) => Promise<void>
   onRefreshWorkflow: () => void
+  canManage: boolean
 }) {
   const { user } = useAuth()
   const { selectedDocNames } = useWorkspace()
@@ -2567,7 +2683,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         ...(inputSources.includes('select_document') ? { selected_document_uuid: selectedDocUuid } : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
       }
-      onSave(task.id, finalData)
+      await onSave(task.id, finalData)
     } finally {
       setSaving(false)
     }
@@ -2795,7 +2911,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   : task.name === 'DescribeImage' ? 'Describe an image using AI'
                   : task.name === 'CodeNode' ? 'Run Python code on input data'
                   : task.name === 'CrawlerNode' ? 'Crawl multiple pages from a starting URL'
-                  : task.name === 'ResearchNode' ? 'Deep multi-pass AI analysis'
+                  : task.name === 'ResearchNode' ? 'Two-pass AI analysis of the step input'
                   : task.name === 'KnowledgeBaseQuery' ? 'Search a knowledge base and inject results as context'
                   : task.name === 'APINode' ? 'Make HTTP API requests'
                   : task.name === 'DocumentRenderer' ? 'Render output as a downloadable file'
@@ -3436,7 +3552,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     type="text"
                     value={getTextValue('allowed_domains')}
                     onChange={e => setTextValue('allowed_domains', e.target.value)}
-                    placeholder="example.com, docs.example.com"
+                    placeholder="example.com, example.com/section"
                     style={{
                       width: '100%', padding: '8px 12px', fontSize: 13,
                       fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
@@ -3444,7 +3560,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    Comma-separated list. Defaults to the starting URL's domain.
+                    Comma-separated list. Include a path (e.g. example.com/docs) to limit
+                    the crawl to that section. Defaults to the starting URL's domain.
                   </div>
                 </div>
               </div>
@@ -3453,10 +3570,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             {task.name === 'ResearchNode' && (
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Research Question / Topic
+                  Analysis Question / Topic
                 </label>
                 <textarea
-                  aria-label="Research question or topic"
+                  aria-label="Analysis question or topic"
                   value={getTextValue('question')}
                   onChange={e => setTextValue('question', e.target.value)}
                   placeholder="e.g., What are the main themes and conclusions in this data?"
@@ -4633,20 +4750,30 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             {testing ? 'Testing...' : 'Test Step'}
           </button>
         )}
-        <button
-          onClick={handleUpdate}
-          disabled={saving}
-          style={{
-            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            border: 'none', borderRadius: 6,
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            opacity: saving ? 0.6 : 1,
-          }}
-        >
-          {saving ? 'Updating...' : 'Update'}
-        </button>
+        {canManage ? (
+          <button
+            onClick={handleUpdate}
+            disabled={saving}
+            style={{
+              flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              border: 'none', borderRadius: 6,
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? 'Updating...' : 'Update'}
+          </button>
+        ) : (
+          <div style={{
+            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600,
+            border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#f9fafb',
+            color: '#6b7280', textAlign: 'center',
+          }}>
+            View-only — use "Save a copy to my library" to edit this workflow
+          </div>
+        )}
       </div>
     </div>
   )
@@ -4992,6 +5119,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
                   { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
                   { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
+                  { fmt: 'markdown', label: 'Markdown', desc: 'Formatted text (.md)', parseStructured: false },
                   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
@@ -5836,9 +5964,10 @@ function OutputConfigCard({
               <option value="json">JSON</option>
               <option value="csv">CSV</option>
               <option value="pdf">PDF</option>
+              <option value="docx">Word (.docx)</option>
             </select>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-              Markdown is the most chainable format. PDFs and CSVs are saved as files but their text content is rendered as Markdown for downstream workflows.
+              Markdown is the most chainable format. PDF, Word, and CSV files are saved as-is but their text content is rendered as Markdown for downstream workflows.
             </div>
           </div>
 
@@ -6327,7 +6456,7 @@ function ValidateTab({
   }, [workflowId])
 
   const handleProposeTestCases = async () => {
-    if (!workflowId) return
+    if (!workflowId || !canManage) return
     setProposalsOpen(true)
     setProposalsLoading(true)
     setProposalsError(null)
@@ -6991,17 +7120,19 @@ function ValidateTab({
                 Saved outputs from past runs. The optimizer compares trial configurations against these.
               </div>
             </div>
-            <button
-              onClick={handleProposeTestCases}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
-                color: '#374151', cursor: 'pointer',
-              }}
-            >
-              <Sparkles style={{ width: 11, height: 11 }} /> Suggest from history
-            </button>
+            {canManage && (
+              <button
+                onClick={handleProposeTestCases}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <Sparkles style={{ width: 11, height: 11 }} /> Suggest from history
+              </button>
+            )}
           </div>
 
           {expectedOutputs.length === 0 ? (
@@ -7010,7 +7141,9 @@ function ValidateTab({
               padding: '14px 16px', border: '2px dashed #e5e7eb', borderRadius: 8, marginTop: 4,
             }}>
               <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
-                None saved yet. Run the workflow at least once, then "Suggest from history" to nominate candidates.
+                {canManage
+                  ? 'None saved yet. Run the workflow at least once, then "Suggest from history" to nominate candidates.'
+                  : 'None saved yet. Only the workflow owner or a team admin can add expected outputs.'}
               </div>
             </div>
           ) : (

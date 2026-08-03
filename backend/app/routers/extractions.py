@@ -20,7 +20,7 @@ from app.dependencies import get_api_key_user, get_current_user
 from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
-from app.services import access_control, activity_service
+from app.services import access_control, activity_service, audit_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
@@ -41,6 +41,7 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+from app.services.name_conflicts import DuplicateNameError
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +147,16 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 @router.post("/search-sets", response_model=SearchSetResponse)
 async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    ss = await svc.create_search_set(
-        req.title,
-        user.user_id,
-        req.set_type,
-        extraction_config=req.extraction_config,
-        team_id=team_id,
-    )
+    try:
+        ss = await svc.create_search_set(
+            req.title,
+            user.user_id,
+            req.set_type,
+            extraction_config=req.extraction_config,
+            team_id=team_id,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return await _ss_response(ss)
 
 
@@ -190,7 +194,10 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)):
     await _get_search_set_or_404(uuid, user, manage=True)
-    ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
+    try:
+        ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
     # Flag stale verification if this search set was verified
@@ -201,10 +208,18 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
 
 @router.delete("/search-sets/{uuid}")
 async def delete_search_set(uuid: str, user: User = Depends(get_current_user)):
-    await _get_search_set_or_404(uuid, user, manage=True)
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
     ok = await svc.delete_search_set(uuid)
     if not ok:
         raise HTTPException(status_code=404, detail="SearchSet not found")
+    await audit_service.log_event(
+        action="extraction.delete",
+        actor_user_id=user.user_id,
+        resource_type="extraction",
+        resource_id=uuid,
+        resource_name=ss.title,
+        team_id=ss.team_id,
+    )
     return {"ok": True}
 
 
@@ -966,19 +981,33 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 model=req.model,
                 extraction_config_override=req.extraction_config_override,
                 combined_context=req.combined_context,
+                capture_sources=True,
             )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        # Split the per-field source sidecar out of each entity so `results`
+        # keeps its historical flat {field: value} shape. `sources` stays
+        # index-aligned with `results`.
+        from app.services.extraction_sources import SOURCE_KEY
+        sources: list[dict] = []
+        for entity in results:
+            if isinstance(entity, dict):
+                sources.append(entity.pop(SOURCE_KEY, None) or {})
+            else:
+                sources.append({})
         # Merge all result entities into a single normalized map so the
         # activity rail can restore results when the user reopens the run.
         normalized: dict = {}
-        for entity in results:
+        merged_sources: dict = {}
+        for entity, entity_sources in zip(results, sources):
             if isinstance(entity, dict):
                 normalized.update(entity)
+                merged_sources.update(entity_sources)
         await activity_service.activity_update(
             activity.id,
             documents_touched=len(document_uuids),
             result_snapshot={
                 "normalized": normalized,
+                "sources": merged_sources,
                 "document_uuids": document_uuids,
                 "search_set_uuid": req.search_set_uuid,
             },
@@ -988,7 +1017,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         from app.tasks.quality_tasks import auto_validate_extraction
         auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
 
-        return {"results": results}
+        return {"results": results, "sources": sources}
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
@@ -2134,7 +2163,7 @@ async def apply_extraction_optimization(
             force=body.force,
         )
     except OptimizationActionError as e:
-        if e.code == "cross_field_below_threshold":
+        if e.code in ("cross_field_below_threshold", "tied_with_baseline"):
             raise HTTPException(
                 status_code=409,
                 detail={"code": e.code, "message": e.message, **e.detail},

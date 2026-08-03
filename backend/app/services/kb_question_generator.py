@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 from typing import Any
 
 from pydantic_ai import Agent
@@ -72,6 +73,52 @@ KB_QUESTION_GENERATION_SYSTEM_PROMPT = (
     "- expected_source_labels must be substrings of provided source names. Do not invent source names.\n"
     "- source_chunk_ids must be drawn from the provided chunk IDs.\n"
     "- Keep each expected_answer concise (1-3 sentences).\n"
+    "- Questions must be SELF-CONTAINED. Never refer to 'the provided excerpt',\n"
+    "  'this chunk', 'the passage above', or similar — at answer time the reader\n"
+    "  searches the whole knowledge base and never sees your sample. Name the\n"
+    "  document or topic instead ('the EBSCO article on X').\n"
+    "- ABSENCE CLAIMS: you only see small truncated samples of each source, so\n"
+    "  you cannot know that a fact is absent from the full document. Never write\n"
+    "  an expected_answer asserting information is 'not specified' / 'not\n"
+    "  mentioned' unless the fact would be entirely outside the knowledge\n"
+    "  base's subject matter. For boundary questions, prefer topics clearly\n"
+    "  foreign to the corpus over details that might appear in unsampled text.\n"
+)
+
+
+# Questions phrased against the generator's private sample ("the provided
+# excerpt") are unanswerable as written at validation time — the RAG pipeline
+# retrieves from the whole KB and the answering model reasonably reads "the
+# excerpt" as its retrieved context.
+_SAMPLE_SCOPED_QUERY_RE = re.compile(
+    r"\b(?:(?:provided|supplied|given|above|this|the)\s+)?(?:excerpt|passage|chunk|snippet)s?\b",
+    re.IGNORECASE,
+)
+
+# Expected answers claiming information is absent. Only these get the
+# full-KB verification pass — positive facts are grounded in a chunk the
+# generator actually saw.
+_ABSENCE_ANSWER_RE = re.compile(
+    r"not\s+(?:specified|stated|mentioned|provided|given|included|indicated)"
+    r"|does\s+not\s+(?:specify|state|mention|say|provide|include|indicate|give)"
+    r"|doesn'?t\s+(?:specify|state|mention|say|provide|include|indicate|give)"
+    r"|no\s+(?:mention|information|reference)\b"
+    r"|\bn/?a\b"
+    r"|\bunknown\b",
+    re.IGNORECASE,
+)
+
+
+KB_ABSENCE_VERIFICATION_SYSTEM_PROMPT = (
+    "You check whether a knowledge base really lacks a piece of information.\n"
+    "You are given a validation question, an expected answer claiming the\n"
+    "information is absent / not specified, and passages retrieved from the\n"
+    "FULL knowledge base for that question.\n\n"
+    "Decide whether the retrieved passages DO contain the information the\n"
+    "question asks about — which would make the expected answer wrong.\n\n"
+    'Return ONLY JSON (no markdown): {"contradicted": true|false, "evidence": "short quote or empty"}\n'
+    "- contradicted=true only when a passage explicitly provides the asked-for\n"
+    "  information. Inference, adjacent facts, or partial hints do not count.\n"
 )
 
 
@@ -152,6 +199,15 @@ class KBQuestionGenerator:
         # Cap to target_count to avoid runaway generators.
         questions = questions[:target_count]
 
+        # The generator only saw truncated samples, so an "information is
+        # absent" expected answer may be contradicted by unsampled text in the
+        # same document (the ticket case: "Accepted: January 14, 2024" lived
+        # past the 600-char sample cut). Check those claims against full-KB
+        # retrieval and drop the ones that don't hold.
+        questions = await self._filter_contradicted_absence_questions(
+            kb_uuid, questions, model_name, model,
+        )
+
         created: list[KBTestQuery] = []
         for q in questions:
             tq = KBTestQuery(
@@ -170,6 +226,62 @@ class KBQuestionGenerator:
         return created
 
     # ----- internals -----
+
+    async def _filter_contradicted_absence_questions(
+        self,
+        kb_uuid: str,
+        questions: list[dict[str, Any]],
+        model_name: str,
+        model: Any,
+    ) -> list[dict[str, Any]]:
+        """Drop questions whose 'not specified' expected answer is contradicted
+        by full-KB retrieval.
+
+        Keeps a question on any retrieval/LLM failure — verification is a
+        quality filter, and an infra blip must not gut generation.
+        """
+        flagged = [q for q in questions if _ABSENCE_ANSWER_RE.search(q["expected_answer"])]
+        if not flagged:
+            return questions
+
+        # Lazy import: kb_validation_service pulls in the whole RAG stack.
+        from app.services.kb_validation_service import retrieve_kb_chunks
+
+        checker = Agent(model, system_prompt=KB_ABSENCE_VERIFICATION_SYSTEM_PROMPT)
+        dropped: set[int] = set()
+        for q in flagged:
+            try:
+                results, _cfg, _tokens = await retrieve_kb_chunks(
+                    kb_uuid, q["query"], model_name,
+                )
+                context = "\n\n".join(
+                    ((r.get("metadata") or {}).get("source_name", "Unknown") + ":\n" + (r.get("content") or ""))
+                    for r in results
+                    if isinstance(r, dict) and r.get("content")
+                )
+                if not context:
+                    continue
+                run = await checker.run(
+                    f"Question:\n{q['query']}\n\n"
+                    f"Expected answer (claims absence):\n{q['expected_answer']}\n\n"
+                    f"Retrieved passages:\n{context[:12000]}"
+                )
+                verdict = _extract_json(run.output or "")
+                if isinstance(verdict, dict) and verdict.get("contradicted") is True:
+                    dropped.add(id(q))
+                    logger.info(
+                        "Dropping absence question contradicted by full-KB retrieval: "
+                        "%r (evidence: %r)",
+                        q["query"][:120], str(verdict.get("evidence", ""))[:200],
+                    )
+            except Exception as e:
+                logger.warning(
+                    "Absence verification failed for %r — keeping question: %s",
+                    q["query"][:120], e,
+                )
+        if not dropped:
+            return questions
+        return [q for q in questions if id(q) not in dropped]
 
     # Transient errors worth retrying on the inline LLM call. The Celery path
     # gets this via ``autoretry_for=TRANSIENT_EXCEPTIONS``; the synchronous
@@ -305,6 +417,9 @@ class KBQuestionGenerator:
             query = str(item.get("query", "")).strip()
             expected_answer = str(item.get("expected_answer", "")).strip()
             if not query or not expected_answer:
+                continue
+            if _SAMPLE_SCOPED_QUERY_RE.search(query):
+                logger.info("Dropping sample-scoped generated question: %s", query[:120])
                 continue
 
             raw_labels = item.get("expected_source_labels", []) or []

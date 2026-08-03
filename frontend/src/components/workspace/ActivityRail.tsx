@@ -1,6 +1,8 @@
 import { useCallback } from 'react'
+import { useNavigate } from '@tanstack/react-router'
 import {
   Award,
+  Sparkles,
   MessageSquare,
   Workflow,
   ListChecks,
@@ -16,6 +18,7 @@ import {
   SquarePen,
 } from 'lucide-react'
 import { useActivities } from '../../hooks/useActivities'
+import { useOptimizerInboxCount } from '../../hooks/useOptimizerInboxCount'
 import { deleteActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -80,6 +83,8 @@ function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
 export function ActivityRail() {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
+  const { counts: tuningCounts, actionable: tuningActionable } = useOptimizerInboxCount()
+  const navigate = useNavigate()
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
   const confirm = useConfirm()
@@ -146,7 +151,11 @@ export function ActivityRail() {
         const initialResults = normalized && typeof normalized === 'object' && Object.keys(normalized).length > 0
           ? Object.fromEntries(Object.entries(normalized).map(([k, v]) => [k, v === null ? 'N/A' : String(v)]))
           : undefined
-        openExtraction(activity.search_set_uuid, initialResults)
+        const snapSources = activity.result_snapshot?.sources as import('../../api/extractions').ExtractionSourceMap | undefined
+        const initialSources = snapSources && typeof snapSources === 'object' && Object.keys(snapSources).length > 0
+          ? snapSources
+          : undefined
+        openExtraction(activity.search_set_uuid, initialResults, initialSources)
       }
     },
     [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation],
@@ -198,6 +207,47 @@ export function ActivityRail() {
               <div className="text-[11px] leading-[1.4] text-[#111]">New chat</div>
             )}
           </div>
+
+          {/* Tuning suggestions — only when something is actually waiting, so
+              the rail stays quiet on a healthy account. The always-present
+              entry point is the account menu. */}
+          {tuningActionable > 0 && (
+            <div
+              onClick={() => navigate({ to: '/tuning' })}
+              title={`${tuningCounts?.needs_review || 0} tuning suggestion(s) to review${
+                tuningCounts?.failed ? `, ${tuningCounts.failed} failed run(s)` : ''
+              }`}
+              className={cn(
+                'flex items-center gap-2 rounded-lg cursor-pointer p-2',
+                'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
+                'transition-[background-color,box-shadow] duration-200',
+                railDocked ? 'justify-center' : '',
+              )}
+            >
+              <div className="relative shrink-0 w-4 text-center text-[#806600]">
+                <Sparkles className="h-4 w-4" />
+                {railDocked && (
+                  <span
+                    className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
+                    style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
+                  />
+                )}
+              </div>
+              {!railDocked && (
+                <>
+                  <div className="min-w-0 flex-1 text-[11px] leading-[1.4] text-[#111]">
+                    Tuning suggestions
+                  </div>
+                  <span
+                    className="shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
+                    style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
+                  >
+                    {tuningActionable}
+                  </span>
+                </>
+              )}
+            </div>
+          )}
           <div className="h-[5px]" />
 
           {activities.map((activity) => {

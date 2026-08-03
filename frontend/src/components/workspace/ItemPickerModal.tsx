@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
-import { Search, X, Workflow, FileText, Users, Compass, Loader2 } from 'lucide-react'
+import { Search, X, Workflow, FileText, Users, Compass, Loader2, Pin, Star } from 'lucide-react'
 import { listLibraries, listItems, listVerifiedItems } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
 import type { Library } from '../../types/library'
@@ -13,7 +13,12 @@ interface PickerItem {
   description?: string | null
   owner?: 'mine' | 'team' | 'explore'
   qualityTier?: string | null
+  pinned?: boolean
+  favorited?: boolean
 }
+
+// Pinned first, then favorited, then the rest; stable within each group.
+const pickerRank = (item: PickerItem) => (item.pinned ? 0 : item.favorited ? 1 : 2)
 
 // 'extraction', 'prompt', and 'formatter' are all backed by SearchSet records
 // (distinguished by set_type); 'workflow' is a Workflow. The picker maps these
@@ -120,7 +125,10 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               description: item.description,
               owner: scope as 'mine' | 'team',
               qualityTier: item.quality_tier,
+              pinned: item.pinned,
+              favorited: item.favorited,
             }))
+            result.sort((a, b) => pickerRank(a) - pickerRank(b))
           }
         }
 
@@ -340,11 +348,23 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                       }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        fontSize: 14, fontWeight: 600, color: '#111827',
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        {item.name}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 14, fontWeight: 600, color: '#111827',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {item.name}
+                        </div>
+                        {item.pinned && (
+                          <span title="Pinned" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                            <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)' }} aria-label="Pinned" />
+                          </span>
+                        )}
+                        {item.favorited && (
+                          <span title="Favorited" style={{ display: 'inline-flex', flexShrink: 0 }}>
+                            <Star size={12} fill="#fbbc04" style={{ color: '#fbbc04' }} aria-label="Favorited" />
+                          </span>
+                        )}
                       </div>
                       {item.description && (
                         <div style={{

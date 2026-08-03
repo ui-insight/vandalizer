@@ -16,7 +16,7 @@ from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_admin, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -58,6 +58,16 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
+
+    # Unique (kb, url) index for KB sources. Lives outside Beanie's index
+    # management because it self-heals: duplicates created by the old racy
+    # check-then-insert are deleted (chunks included) before the build is
+    # retried. Best-effort — never block startup on it.
+    try:
+        from app.services.knowledge_service import ensure_source_url_unique_index
+        await ensure_source_url_unique_index()
+    except Exception:
+        logger.warning("KB source unique-index ensure failed during startup", exc_info=True)
 
     # Seed default feedback prompts for trial check-ins
     if get_settings().enable_trial_system:
@@ -180,6 +190,14 @@ app.add_middleware(CSRFMiddleware)
 # CORS
 # ---------------------------------------------------------------------------
 settings = get_settings()
+if settings.is_production and not settings.use_secure_cookies:
+    logger.warning(
+        "Production deployment served over plain HTTP (frontend_url=%s): "
+        "auth/CSRF cookies will NOT carry the Secure attribute. This is "
+        "expected for isolated/intranet installs; put the site behind HTTPS "
+        "for anything internet-facing.",
+        settings.frontend_url,
+    )
 _cors_origins = [settings.frontend_url]
 if not settings.is_production:
     _cors_origins.append("http://localhost:5173")
@@ -211,6 +229,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(activity.router, prefix="/api/activity", tags=["activity"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
 app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
+app.include_router(feedback_admin.router, prefix="/api/feedback/admin", tags=["feedback-admin"])
 app.include_router(verification.router, prefix="/api/verification", tags=["verification"])
 app.include_router(verification_sessions.router, prefix="/api/verification-sessions", tags=["verification-sessions"])
 app.include_router(office.router, prefix="/api/office", tags=["office"])

@@ -11,6 +11,7 @@ import httpx
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS
+from app.utils.fetch_errors import describe_empty_fetch, describe_fetch_error
 
 logger = logging.getLogger(__name__)
 
@@ -287,7 +288,22 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         if not raw_text.strip():
             db.knowledge_base_sources.update_one(
                 {"uuid": source_uuid},
-                {"$set": {"status": "error", "error_message": "Failed to fetch URL content"}},
+                {"$set": {"status": "error", "error_message": describe_empty_fetch(result.status_code)}},
+            )
+            _recalculate_kb(db, kb_uuid)
+            return
+
+        from app.utils.bot_challenge import looks_like_bot_challenge
+
+        if looks_like_bot_challenge(raw_text):
+            # The site served a bot-verification interstitial instead of the
+            # page. Embedding it would poison retrieval with junk text.
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {
+                    "status": "error",
+                    "error_message": "Blocked by the site's bot protection (verification page returned instead of content)",
+                }},
             )
             _recalculate_kb(db, kb_uuid)
             return
@@ -299,6 +315,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 "$set": {
                     "content": raw_text[:500000],
                     "url_title": (url_title or "")[:500],
+                    "truncated": bool(getattr(result, "truncated", False)),
                 }
             },
         )
@@ -330,26 +347,26 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             logger.warning("URL source %s returned %d: %s", source_uuid, e.response.status_code, e.request.url)
             db.knowledge_base_sources.update_one(
                 {"uuid": source_uuid},
-                {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+                {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
             )
         else:
             logger.error("Error ingesting URL source %s: %s", source_uuid, e)
             db.knowledge_base_sources.update_one(
                 {"uuid": source_uuid},
-                {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+                {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
             )
             raise
     except (ValueError, httpx.RequestError) as e:
         logger.warning("URL source %s unreachable: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
-            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
         )
     except Exception as e:
         logger.error("Error ingesting URL source %s: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
-            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
         )
         raise
 

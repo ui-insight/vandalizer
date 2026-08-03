@@ -9,6 +9,7 @@ import {
   Pin, PinOff,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
@@ -18,6 +19,7 @@ import {
   listLibraries,
 } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
+import { ApiError } from '../../api/client'
 import { listTeams } from '../../api/teams'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -242,7 +244,8 @@ export function ItemDetailModal({
             {item.kind === 'knowledge_base' && item.source_uuid && onTryIt && (
               <button
                 onClick={() => onTryIt(item)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                disabled={item.total_chunks === 0}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:pointer-events-none"
               >
                 <ExternalLink className="h-4 w-4" />
                 Open in Chat
@@ -293,6 +296,13 @@ export function ItemDetailModal({
               </button>
             )}
           </div>
+          {/* A disabled button's tooltip is unreachable by keyboard and touch,
+              so say once, visibly, why chat is inert. */}
+          {item.kind === 'knowledge_base' && item.total_chunks === 0 && (
+            <p className="mt-2 text-xs text-gray-500">
+              This knowledge base has no indexed content yet, so chat is unavailable.
+            </p>
+          )}
         </div>
       </div>
       </FocusTrap>
@@ -486,6 +496,9 @@ export function ExploreTab() {
   // Data
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
   const [total, setTotal] = useState(0)
+  // Unfiltered catalog count for the "All Items" badge — `total` tracks the
+  // active query, so it shrinks whenever a kind/collection/search filter is on.
+  const [allTotal, setAllTotal] = useState<number | null>(null)
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
   const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
   const [libraries, setLibraries] = useState<Library[]>([])
@@ -560,6 +573,11 @@ export function ExploreTab() {
       })
       setItems(data.items)
       setTotal(data.total)
+      // Sort doesn't change the result count, so any fetch without narrowing
+      // filters carries the true "all items" total.
+      if (!kindFilter && !debouncedSearch && !qualityFilter && !tagFilter && !selectedCollectionId) {
+        setAllTotal(data.total)
+      }
     } catch {
       setError('Failed to load catalog items. Please try again.')
     } finally {
@@ -611,6 +629,7 @@ export function ExploreTab() {
   const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   // Saving a verified workflow/extraction from Explore creates a reference
   // to the verified item — not a copy. The reference carries the verified
@@ -623,32 +642,43 @@ export function ExploreTab() {
   const handleAdoptKB = async (kbUuid: string, teamId?: string | null) => {
     try {
       await adoptKnowledgeBase(kbUuid, undefined, teamId ?? undefined)
+      // The My/Team KB lists are TanStack Query-cached (useKnowledgeBases /
+      // useScopedKnowledgeBases) — without invalidation the new bookmark only
+      // appears after a full page reload.
+      queryClient.invalidateQueries({ queryKey: ['knowledgeBases'] })
       toast(
         teamId ? 'Added to your team’s knowledge bases' : 'Added to your knowledge bases',
         'success',
       )
-    } catch {
-      toast('Already in your knowledge bases', 'info')
+    } catch (err) {
+      // A true re-adopt returns 200 with the existing bookmark, so any error
+      // here is a real failure — never report it as "already added".
+      const message = err instanceof ApiError && err.message
+        ? err.message
+        : 'Could not add this knowledge base — please try again.'
+      toast(message, 'error')
     }
   }
 
+  // Keep tab: 'library' so closing the opened item returns to this Explore
+  // view instead of falling back to the default Assistant tab.
   const handleTryIt = (item: VerifiedCatalogItem) => {
     if (!item.source_uuid) return
     setDetailItem(null)
     if (item.kind === 'workflow') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'search_set') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'knowledge_base') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, project: undefined, workflow_share_token: undefined },
       })
     }
   }
@@ -689,7 +719,7 @@ export function ExploreTab() {
           >
             All Items
             <span className={`ml-1.5 text-xs ${!selectedCollectionId ? 'text-gray-300' : 'text-gray-500'}`}>
-              {total}
+              {allTotal ?? total}
             </span>
           </button>
 

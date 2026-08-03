@@ -1,16 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Sparkles } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
+import { useOptimizerInboxCount } from '../../hooks/useOptimizerInboxCount'
 import { VersionMenuFooter } from './VersionMenuFooter'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
   const { user, logout } = useAuth()
   const certPanel = useCertificationPanel()
+  const { actionable: tuningActionable } = useOptimizerInboxCount()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -27,6 +29,10 @@ export function TeamsDropdown() {
   }
 
   useEffect(() => {
+    // Only listen while the menu is open — an always-on handler steals focus
+    // on the next frame after any mousedown on non-focusable content, which
+    // cancels the browser's drag-to-select before it can extend.
+    if (!open) return
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false)
@@ -39,7 +45,7 @@ export function TeamsDropdown() {
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [open])
 
   // Move focus to the first menuitem when the menu opens.
   useEffect(() => {
@@ -171,6 +177,28 @@ export function TeamsDropdown() {
           >
             <KeyRound className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>Credentials</span>
+          </Link>
+
+          {/* Tuning suggestions — always listed (even at zero) so the surface
+              is discoverable; the rail badge is what draws attention when
+              something is actually waiting. */}
+          <Link
+            to="/tuning"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => closeMenu()}
+            className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+          >
+            <Sparkles className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+            <span>Tuning suggestions</span>
+            {tuningActionable > 0 && (
+              <span
+                className="ml-auto rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
+                style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
+              >
+                {tuningActionable}
+              </span>
+            )}
           </Link>
 
           {/* Certification */}

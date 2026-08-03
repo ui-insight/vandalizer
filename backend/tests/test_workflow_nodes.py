@@ -399,18 +399,32 @@ class TestWebsiteNode:
         node = WebsiteNode({"url": "http://metadata.google.internal"})
         result = node.process({"output": "prev"})
         assert "Blocked URL" in result["output"]
+        assert "Blocked URL" in result["error"]
 
     @patch("app.services.web_fetcher.fetch_url_sync")
     def test_http_error(self, mock_fetch):
         import httpx
-        mock_response = MagicMock()
-        mock_response.status_code = 404
+        request = httpx.Request("GET", "https://example.com/404")
+        response = httpx.Response(404, request=request)
         mock_fetch.side_effect = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_response
+            "Not Found", request=request, response=response
         )
         node = WebsiteNode({"url": "https://example.com/404"})
         result = node.process({"output": "prev"})
-        assert "HTTP error" in result["output"]
+        assert "Could not fetch" in result["output"]
+        assert "HTTP 404" in result["output"]
+
+    @patch("app.services.web_fetcher.fetch_url_sync")
+    def test_blocked_site_error_names_automated_access(self, mock_fetch):
+        import httpx
+        request = httpx.Request("GET", "https://www.usda.gov/terms.pdf")
+        response = httpx.Response(403, request=request)
+        mock_fetch.side_effect = httpx.HTTPStatusError(
+            "Forbidden", request=request, response=response
+        )
+        node = WebsiteNode({"url": "https://www.usda.gov/terms.pdf"})
+        result = node.process({"output": "prev"})
+        assert "refused automated access" in result["output"]
 
 
 # ---------------------------------------------------------------------------
@@ -477,6 +491,7 @@ class TestCodeExecutionNode:
         node = CodeExecutionNode({"code": "import os"})
         result = node.process({"output": "data"})
         assert "Code rejected" in result["output"]
+        assert "Code rejected" in result["error"]
 
     @patch("app.utils.code_sandbox.validate_sandbox_code",
            side_effect=SyntaxError("invalid syntax"))
@@ -562,6 +577,157 @@ class TestCrawlerNode:
         # Should only fetch 1 page despite link being present
         assert mock_client.get.call_count == 1
 
+    @staticmethod
+    def _client_serving(pages: dict):
+        """Mock httpx.Client whose GET returns per-URL canned HTML.
+
+        A value may be plain HTML, or a ``(final_url, html)`` tuple to model
+        a redirect: the response reports ``final_url`` as its landing URL.
+        """
+        def get(url):
+            resp = MagicMock()
+            page = pages[url]
+            final_url, html = page if isinstance(page, tuple) else (url, page)
+            resp.url = final_url
+            resp.text = html
+            resp.raise_for_status = MagicMock()
+            return resp
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.get.side_effect = get
+        return mock_client
+
+    CHALLENGE_HTML = (
+        "<html><body><h1>Robot or human?</h1><p>Activate and hold the button "
+        "to confirm that you're human.</p></body></html>"
+    )
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_url_spelling_variants_fetched_once(self, mock_client_cls, mock_validate):
+        """example.com, example.com/ and example.com#x are one page, one slot."""
+        mock_validate.return_value = "ok"
+        pages = {
+            "https://example.com": (
+                '<html><body><p>Home page</p>'
+                '<a href="#maincontent">skip</a>'
+                '<a href="/">home</a>'
+                '<a href="https://example.com/#footer">footer</a>'
+                '<a href="/page2">next</a>'
+                '<a href="/page2#section">next anchored</a></body></html>'
+            ),
+            "https://example.com/page2": "<html><body><p>Second page</p></body></html>",
+        }
+        mock_client = self._client_serving(pages)
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        # Only the two distinct pages were fetched — no variant refetches.
+        assert mock_client.get.call_count == 2
+        assert result["output"].count("Home page") == 1
+        assert result["output"].count("Second page") == 1
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_redirect_landing_url_not_refetched(self, mock_client_cls, mock_validate):
+        """A page reached via redirect isn't fetched again under the URL it
+        landed on (uidaho.edu → www.uidaho.edu, then a www.…/#fragment link)."""
+        mock_validate.return_value = "ok"
+        home_html = (
+            '<html><body><p>Home page</p>'
+            '<a href="https://www.example.com/#content">skip</a>'
+            '<a href="https://www.example.com/page2">next</a></body></html>'
+        )
+        pages = {
+            # Start URL redirects to the www spelling.
+            "https://example.com": ("https://www.example.com/", home_html),
+            # If dedup fails, the fragment link refetches the homepage here.
+            "https://www.example.com/#content": ("https://www.example.com/", home_html),
+            "https://www.example.com/page2": "<html><body><p>Second page</p></body></html>",
+        }
+        mock_client = self._client_serving(pages)
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({
+            "start_url": "https://example.com",
+            "max_pages": 5,
+            "allowed_domains": "example.com, www.example.com",
+        })
+        result = node.process({"output": "prev"})
+
+        assert mock_client.get.call_count == 2
+        assert result["output"].count("Home page") == 1
+        assert result["output"].count("Second page") == 1
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_challenge_pages_excluded_and_do_not_consume_slots(self, mock_client_cls, mock_validate):
+        """Blocked pages are skipped without a Max Pages slot; crawl continues."""
+        mock_validate.return_value = "ok"
+        pages = {
+            "https://example.com": (
+                '<html><body><p>Real home page content</p>'
+                '<a href="/blocked1">a</a><a href="/blocked2">b</a>'
+                '<a href="/real2">c</a></body></html>'
+            ),
+            "https://example.com/blocked1": self.CHALLENGE_HTML,
+            "https://example.com/blocked2": self.CHALLENGE_HTML,
+            "https://example.com/real2": "<html><body><p>Second real page</p></body></html>",
+        }
+        mock_client_cls.return_value = self._client_serving(pages)
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 2})
+        result = node.process({"output": "prev"})
+
+        # Both real pages made it in — the two blocked pages didn't use slots.
+        assert "Real home page content" in result["output"]
+        assert "Second real page" in result["output"]
+        # The junk verification text is excluded from the output body.
+        assert "Robot or human" not in result["output"]
+        # The user is told pages were skipped.
+        assert "2 page(s) skipped — blocked by bot protection" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_all_pages_blocked_reports_no_content(self, mock_client_cls, mock_validate):
+        mock_validate.return_value = "ok"
+        pages = {"https://example.com": self.CHALLENGE_HTML}
+        mock_client_cls.return_value = self._client_serving(pages)
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        assert "Robot or human" not in result["output"]
+        assert "No page content retrieved" in result["output"]
+        assert "1 page(s) skipped — blocked by bot protection" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_http_error_challenge_counts_as_blocked(self, mock_client_cls, mock_validate):
+        """Challenges served with 403/503 are recognized from the error body."""
+        import httpx as _httpx
+
+        mock_validate.return_value = "ok"
+        resp = MagicMock()
+        resp.text = self.CHALLENGE_HTML
+        resp.raise_for_status = MagicMock(side_effect=_httpx.HTTPStatusError(
+            "403", request=MagicMock(), response=resp,
+        ))
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.get.return_value = resp
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        assert "1 page(s) skipped — blocked by bot protection" in result["output"]
+
 
 # ---------------------------------------------------------------------------
 # ResearchNode
@@ -640,6 +806,57 @@ class TestAPICallNode:
         node = APICallNode({"url": "http://internal"})
         result = node.process({"output": "prev"})
         assert "Blocked URL" in result["output"]
+        assert "Blocked URL" in result["error"]
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_http_error_sets_error_and_request_preview(self, mock_client_cls, _mock_validate):
+        import httpx
+
+        request = httpx.Request("GET", "https://api.example.com/data")
+        response = httpx.Response(500, request=request, text="server exploded")
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "boom", request=request, response=response,
+        )
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({"url": "https://api.example.com/data", "method": "GET"})
+        result = node.process({"output": "prev"})
+        assert result["error"].startswith("HTTP error: 500")
+        # The full output keeps the request preview for debugging.
+        assert "--- Request sent ---" in result["output"]
+        assert result["request"]["url"] == "https://api.example.com/data"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_request_error_sets_error(self, mock_client_cls, _mock_validate):
+        import httpx
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.side_effect = httpx.ConnectError("connection refused")
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({"url": "https://api.example.com/data", "method": "GET"})
+        result = node.process({"output": "prev"})
+        assert result["error"].startswith("Request error:")
+        assert result["request"]["url"] == "https://api.example.com/data"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    def test_invalid_headers_json_sets_error(self, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com/data",
+            "method": "GET",
+            "headers": "{not json",
+        })
+        result = node.process({"output": "prev"})
+        assert "Invalid Headers JSON" in result["error"]
 
     @patch("app.utils.url_validation.validate_outbound_url")
     @patch("app.services.workflow_engine.httpx.Client")

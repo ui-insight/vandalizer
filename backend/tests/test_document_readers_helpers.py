@@ -8,7 +8,6 @@ sanitation, and DOCX-extras helpers that have no external side effects.
 from __future__ import annotations
 
 import datetime
-import io
 import zipfile
 
 import pytest
@@ -17,6 +16,7 @@ from app.services.document_readers import (
     _format_xlsx_cell,
     clean_markdown_nans,
     extract_docx_extras,
+    pdf_has_ocrable_content,
     remove_images_from_markdown,
 )
 
@@ -178,6 +178,149 @@ class TestExtractDocxExtras:
         source = dr.__loader__.get_source(dr.__name__) or ""
         assert "defusedxml.ElementTree" in source
         assert "import xml.etree.ElementTree as ET" not in source
+
+
+def _save_pdf(doc, tmp_path, name: str) -> str:
+    path = tmp_path / name
+    doc.save(str(path))
+    doc.close()
+    return str(path)
+
+
+class TestPdfHasOcrableContent:
+    """Blank-page precheck: the OCR endpoint is a vision LLM that fabricates
+    plausible text when handed a blank page, so PDFs must prove they have
+    something to read before OCR runs. Rendering is the ground truth — a page
+    that rasterizes to uniform white gives OCR nothing real to transcribe."""
+
+    def test_blank_page_has_no_content(self, tmp_path):
+        import pymupdf
+        doc = pymupdf.open()
+        doc.new_page()
+        path = _save_pdf(doc, tmp_path, "blank.pdf")
+        assert pdf_has_ocrable_content(path) is False
+
+    def test_multiple_blank_pages_have_no_content(self, tmp_path):
+        import pymupdf
+        doc = pymupdf.open()
+        for _ in range(3):
+            doc.new_page()
+        path = _save_pdf(doc, tmp_path, "blanks.pdf")
+        assert pdf_has_ocrable_content(path) is False
+
+    def test_text_layer_counts_as_content(self, tmp_path):
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Hello world")
+        path = _save_pdf(doc, tmp_path, "text.pdf")
+        assert pdf_has_ocrable_content(path) is True
+
+    def test_embedded_image_counts_as_content(self, tmp_path):
+        """A scanned page has no text layer but must still go to OCR."""
+        import pymupdf
+        img = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 10, 10))
+        img.clear_with(0)  # solid black square
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_image(pymupdf.Rect(72, 72, 172, 172), pixmap=img)
+        path = _save_pdf(doc, tmp_path, "scan.pdf")
+        assert pdf_has_ocrable_content(path) is True
+
+    def test_vector_ink_counts_as_content(self, tmp_path):
+        """Outlined/vector text has no text layer and no images — it is only
+        drawings. The raster pass must see its ink and let OCR run."""
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.draw_rect(
+            pymupdf.Rect(72, 72, 200, 100), color=(0, 0, 0), fill=(0, 0, 0)
+        )
+        path = _save_pdf(doc, tmp_path, "vector.pdf")
+        assert pdf_has_ocrable_content(path) is True
+
+    def test_white_background_rect_is_still_blank(self, tmp_path):
+        """A decorative white rectangle is a drawing, but renders as blank
+        paper — structurally non-empty, visually empty. Must not reach OCR."""
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.draw_rect(
+            pymupdf.Rect(0, 0, 612, 792), color=(1, 1, 1), fill=(1, 1, 1)
+        )
+        path = _save_pdf(doc, tmp_path, "white_rect.pdf")
+        assert pdf_has_ocrable_content(path) is False
+
+    def test_one_content_page_among_blanks_counts(self, tmp_path):
+        import pymupdf
+        doc = pymupdf.open()
+        doc.new_page()
+        page2 = doc.new_page()
+        page2.insert_text((72, 72), "Only page 2 has text")
+        path = _save_pdf(doc, tmp_path, "mixed.pdf")
+        assert pdf_has_ocrable_content(path) is True
+
+    def test_unreadable_file_fails_open(self, tmp_path):
+        """A file PyMuPDF can't open must not be declared blank — OCR still
+        gets its chance on odd-but-valid PDFs."""
+        junk = tmp_path / "junk.pdf"
+        junk.write_bytes(b"this is not a pdf")
+        assert pdf_has_ocrable_content(str(junk)) is True
+
+
+class TestBlankPdfSkipsOcr:
+    """Blank PDFs must return empty text WITHOUT calling the OCR endpoint,
+    so the empty-text guard in perform_extraction_and_update marks the
+    document as an error instead of storing fabricated content."""
+
+    def _blank_pdf(self, tmp_path) -> str:
+        import pymupdf
+        doc = pymupdf.open()
+        doc.new_page()
+        return _save_pdf(doc, tmp_path, "blank.pdf")
+
+    def test_extract_text_with_markers_skips_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._blank_pdf(tmp_path)
+        with patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            text, markers = dr.extract_text_with_markers(path, "pdf")
+
+        assert text == ""
+        assert markers == []
+        mock_ocr.assert_not_called()
+
+    def test_extract_text_from_file_skips_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._blank_pdf(tmp_path)
+        with patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            result = dr.extract_text_from_file(path, "pdf")
+
+        assert result == ""
+        mock_ocr.assert_not_called()
+
+    def test_pdf_with_text_still_reaches_ocr(self, tmp_path):
+        """Regression guard: the precheck must not block normal PDFs."""
+        from unittest.mock import patch
+        import pymupdf
+        import app.services.document_readers as dr
+
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "Real document text")
+        path = _save_pdf(doc, tmp_path, "real.pdf")
+
+        ocr_result = "x" * 200  # long enough to pass MIN_PDF_TEXT_LENGTH
+        with patch.object(
+            dr, "ocr_extract_text_from_pdf", return_value=ocr_result
+        ) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
 
 
 class TestExtractWithMarkersOcrFallback:

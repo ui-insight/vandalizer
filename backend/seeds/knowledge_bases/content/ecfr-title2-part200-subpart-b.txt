@@ -1,0 +1,129 @@
+Subpart B—General Provisions
+
+§ 200.100 Purpose.
+
+(a) Purpose. (1) This part establishes uniform administrative requirements, cost principles, and audit requirements for Federal awards. Federal agencies must not impose additional requirements except as allowed in §§ 200.102, 200.211, or unless specifically required by Federal statute, regulation, or Executive order.
+(2) This part provides Federal agencies with the policy for collecting and submitting information on all Federal financial assistance programs to the Office of Management and Budget (OMB) and communicating this information to the public. It also establishes Federal policies related to the delivery of this information to the public, including through the use of electronic media. It also sets forth how the General Services Administration (GSA), OMB, and Federal agencies implement the Federal Program Information Act (31 U.S.C. 6101-6106).
+(b) Administrative requirements. Subparts B through D set forth the uniform administrative requirements for Federal financial assistance. This includes establishing requirements for Federal agencies management of Federal financial assistance programs before a Federal award is made, and requirements that Federal agencies may impose on recipients and subrecipients throughout the lifecycle of a Federal award.
+(c) Cost principles. Subpart E establishes principles for determining allowable costs incurred by recipients and subrecipients under Federal awards. These principles are for the purpose of cost determination. They do not address the circumstances nor dictate the extent of Federal Government funding of a particular program or project.
+(d) Single Audit Requirements and Audit Follow-up. Subpart F is issued pursuant to the Single Audit Act Amendments of 1996 (31 U.S.C. 7501-7507). Subpart F sets forth the standards for achieving consistency and uniformity among Federal agencies for the audit of non-Federal entities expending Federal awards. Subpart F also provides the policies and procedures for Federal agencies or pass-through entities when using the results of these audits.
+
+§ 200.101 Applicability.
+
+(a) General applicability to Federal agencies. (1) Subparts A through F apply to Federal agencies that make Federal awards to non-Federal entities. As provided in paragraph (a)(2), subparts A through E may also apply to Federal agencies that make Federal awards to other entities.
+(2) Federal agencies must apply subparts A though F of this part to non-Federal entities unless a particular section of this part or Federal statute provides otherwise. Federal agencies may apply subparts A through E of this part to Federal agencies, for-profit organizations, foreign public entities, or foreign organizations as permitted in agency regulations or program statutes, except when a Federal agency determines that the application of these subparts would be inconsistent with the international responsibilities of the United States or the laws of a foreign government. Subpart F only applies to non-Federal entities as defined in the Single Audit Act Amendments of 1996 (31 U.S.C. 7501-7507). Federal agencies should apply the requirements to all recipients in a consistent and equitable manner to the extent permitted within applicable statutes, regulations, and policies.
+(3) Throughout subparts A through F, the word “must” indicates a requirement. The words “should” or “may” indicate a recommended approach and permit discretion.
+(4) Throughout subparts A through E, when the word “or” is used between the terms “recipient” and “subrecipient,” any requirements or recommendations in the relevant provisions of this part apply to the recipient, the subrecipient, or both, as applicable. The use of “or” between recipient and subrecipient does not mean that applicable requirements or recommendations only apply to one of these entities unless the context clearly indicates otherwise.
+(b) Applicability to Federal financial assistance. (1) Paragraphs (b)(2) through (b)(5) of this section describe what portions of this part apply to specific types of Federal financial assistance. Paragraphs (d) and (e) of this section explain additional exceptions related to governing provisions and Federal program applicability. The terms and conditions of Federal awards (including this part) flow down to subawards to subrecipients unless a particular section of this part or the terms and conditions of the Federal award specifically indicate otherwise. Pass-through entities must comply with the requirements described in subpart D, §§ 200.331 through 200.333, and any other sections of this part addressing pass-through entities.
+(2) Subpart A (Acronyms and Definitions) and subpart B (General Provisions) apply to all Federal financial assistance, except that §§ 200.111 (English language), 200.112 (Conflict of interest), and 200.113 (Mandatory disclosures) do not apply to agreements for loans, loan guarantees, interest subsidies, and insurance.
+(3) Subpart C (Pre-Federal Award Requirements and Contents of Federal Awards) and subpart D (Post Federal Award Requirements) only apply to grants and cooperative agreements with the following exceptions:
+(i) Section 200.203 (Requirement to provide public notice of Federal financial assistance programs) also applies to agreements for loans, loan guarantees, interest subsidies, and insurance;
+(ii) Section 200.216 (Prohibition on certain telecommunications and video surveillance equipment or services) applies to loans and grants (see Pub. L. 115-232, Div. A, Title VIII, § 889, as amended); and
+(iii) Sections 200.303 (Internal controls) and 200.331 through 200.333 (Subrecipient monitoring and management) also apply to all types of Federal financial assistance.
+(4) Subpart E (Cost Principles) applies to grants and cooperative agreements, but does not apply to the following:
+(i) Food commodities provided through grants and cooperative agreements;
+(ii) Fixed amount awards, except for §§ 200.400(g), 200.402 through 200.405, and 200.407(d), which do apply;
+(iii) Agreements for loans, loan guarantees, interest subsidies, and insurance; and
+(iv) Federal awards to hospitals (see Appendix IX—Hospital Cost Principles).
+(5) Subpart F (Audit Requirements) only applies to the following items when awarded to a non-Federal entity:
+(i) Grants and cooperative agreements (including fixed amount awards);
+(ii) Contracts and subcontracts awarded under the FAR (except for fixed price contracts and subcontracts);
+(iii) Agreements for loans, loan guarantees, interest subsidies, and insurance; and
+(iv) Any other form of Federal financial assistance as defined by the Single Audit Act Amendment of 1996 (codified at 31 U.S.C. 7501-7507).
+(c) Applicability to different types of contracts and subcontracts awarded by a Federal agency to a non-Federal entity under the Federal Acquisition Regulations (FAR). (1) Paragraphs (c)(2) and (c)(3) of this section describe what portions of this part apply to specific types of contracts and subcontracts awarded by a Federal agency to a non-Federal entity. See also paragraph (b)(5)(ii) on audit requirements. For both paragraphs (c)(2) and (c)(3):
+(i) In cases of conflict between the requirements of applicable portions of this part and the terms and conditions of the contract, the terms and conditions of the contract and the FAR prevail.
+(ii) When the Cost Accounting Standards (CAS) are applicable to the contract or subcontract, they also take precedence over this part.
+(iii) In addition, costs that are identified as unallowable under 41 U.S.C. 4304(a) and as stated in the FAR (48 CFR part 31, subpart 31.2, and 48 CFR 31.603) are always unallowable.
+(2) Cost-reimbursement contract under the FAR awarded to a non-Federal entity. When a non-Federal entity is awarded a cost-reimbursement contract under the FAR, only subpart D, §§ 200.331 through 200.333, and subparts E and F are applicable.
+(3) Fixed-price contract or subcontract under the FAR awarded to a non-Federal entity. When a non-Federal entity is awarded a fixed-price contract or subcontract under the FAR, only subpart A, subpart B (except for §§ 200.111, 200.112, and 200.113), subpart D (only at § 200.303 and §§ 200.331 through 200.333), and subpart E are applicable to the contract, except that subpart E is not applicable to fixed-price contracts and subcontracts that are not negotiated.
+(d) Governing provisions. With the exception of subpart F, which is required by the Single Audit Act, Federal statutes or regulations govern in any circumstances where they conflict with the provisions of this part. For agreements with Indian Tribes, this includes the provisions of the Indian Self-Determination and Education and Assistance Act (ISDEAA), as amended (see 25 U.S.C. 5301-5423).
+(e) Program applicability. Except for §§ 200.203, 200.216, and 200.331 through 200.333, the requirements in subparts C, D, and E do not apply to the following programs:
+(1) The block grant awards authorized by the Omnibus Budget Reconciliation Act of 1981 (including Community Services), except to the extent that subpart E apply to subrecipients of Community Services Block Grant funds pursuant to 42 U.S.C. 9916(a)(1)(B);
+(2) Federal awards to local education agencies under 20 U.S.C. 7702-7703b, (portions of the Impact Aid program);
+(3) Payments under the Department of Veterans Affairs' State Home Per Diem Program (38 U.S.C. 1741); and
+(4) Federal awards authorized under the Child Care and Development Block Grant Act of 1990, as amended:
+(i) Child Care and Development Block Grant (42 U.S.C. 9858).
+(ii) Child Care Mandatory and Matching Funds of the Child Care and Development Fund (42 U.S.C. 9858).
+(f) Additional program applicability. Except for §§ 200.203 and 200.216, the guidance in subpart C does not apply to the following programs:
+(1) Entitlement Federal awards to carry out the following programs of the Social Security Act:
+(i) Temporary Assistance for Needy Families (Title IV-A of the Social Security Act, 42 U.S.C. 601-619);
+(ii) Child Support Enforcement and Establishment of Paternity (Title IV-D of the Social Security Act, 42 U.S.C. 651-669b);
+(iii) Federal Payments for Foster Care, Prevention, and Permanency (Title IV-E of the Act, 42 U.S.C. 670-679c);
+(iv) Aid to the Aged, Blind, and Disabled (Titles I, X, XIV, and XVI-AABD of the Act, as amended);
+(v) Medical Assistance (Medicaid) (Title XIX of the Act, 42 U.S.C. 1396-1396w-5) not including the State Medicaid Fraud Control program authorized by Section 1903(a)(6)(B) of the Social Security Act (42 U.S.C. 1396b(a)(6)(B)); and
+(vi) Children's Health Insurance Program (Title XXI of the Act, 42 U.S.C. 1397aa-1397mm).
+(2) A Federal award for an experimental, pilot, or demonstration project that is also supported by a Federal award listed in paragraph (f)(1) of this section.
+(3) Federal awards under subsection 412(e) of the Immigration and Nationality Act and subsection 501(a) of the Refugee Education Assistance Act of 1980 (Pub. L. 96-422, 94 Stat. 1809), for cash assistance, medical assistance, and supplemental security income benefits to refugees and entrants and the administrative costs of providing the assistance and benefits (8 U.S.C. 1522(e)).
+(4) Entitlement awards under the following programs of The National School Lunch Act:
+(i) National School Lunch Program (Section 4 of the Act, 42 U.S.C. 1753);
+(ii) Commodity Assistance (Section 6 of the Act, 42 U.S.C. 1755);
+(iii) Special Meal Assistance (Section 11 of the Act, 42 U.S.C. 1759a);
+(iv) Summer Food Service Program for Children (Section 13 of the Act, 42 U.S.C. 1761); and
+(v) Child and Adult Care Food Program (Section 17 of the Act, 42 U.S.C. 1766).
+(5) Entitlement awards under the following programs of The Child Nutrition Act of 1966:
+(i) Special Milk Program (Section 3 of the Act, 42 U.S.C. 1772);
+(ii) School Breakfast Program (Section 4 of the Act, 42 U.S.C. 1773); and
+(iii) State Administrative Expenses (Section 7 of the Act, 42 U.S.C. 1776).
+(6) Entitlement awards for State Administrative Expenses under The Food and Nutrition Act of 2008 (Section 16 of the Act, 7 U.S.C. 2025).
+(7) Non-discretionary Federal awards under the following non-entitlement programs:
+(i) Special Supplemental Nutrition Program for Women, Infants and Children (Section 17 of the Child Nutrition Act of 1966) 42 U.S.C. 1786;
+(ii) The Emergency Food Assistance Programs (Emergency Food Assistance Act of 1983) 7 U.S.C. 7501 note; and
+(iii) Commodity Supplemental Food Program (Section 5 of the Agriculture and Consumer Protection Act of 1973) 7 U.S.C. 612c note.
+
+§ 200.102 Exceptions.
+
+(a) OMB class exceptions. Except for subpart F, OMB may allow exceptions from requirements of this part for classes of Federal awards, recipients, or subrecipients when the exceptions are not prohibited by statute. For example, Federal agencies may request exceptions in support of innovative program designs that apply a risk-based, data-driven framework to alleviate select compliance requirements and hold recipients accountable for good performance. See also § 200.206. Federal agencies may also request exceptions in emergency situations. When OMB allows an exception to requirements of this part, the Federal agency remains responsible for ensuring the exception is applied to Federal awards in a manner consistent with Federal statutes and regulations.
+(b) Statutory and regulatory exceptions. A Federal agency may adjust requirements to a class of Federal awards, recipients, or subrecipients when required by Federal statutes or regulations, except for the requirements in subpart F. Except for provisions in subpart F, when a Federal statute requires exceptions to requirements of this part for a class of Federal awards, recipients, or subrecipients, a Federal agency does not need OMB approval to allow those exceptions. See also § 200.106.
+(c) Federal agency exceptions. Federal agencies may allow exceptions to requirements of this part on a case-by-case basis for individual Federal awards, recipients, or subrecipients, except when the exceptions are prohibited by law or other approval is expressly required by this part. Only the cognizant agency for indirect costs may authorize exceptions related to cost allocation plans or indirect cost rate proposals. A Federal agency may also apply less restrictive requirements when issuing fixed amount awards (see § 200.1), except for those requirements imposed by statute or in subpart F.
+
+§ 200.103 Authorities.
+
+This part is issued under the following authorities.
+(a) Subparts B through D are authorized under 31 U.S.C. 503 (the Chief Financial Officers Act, Functions of the Deputy Director for Management); the Federal Program Information Act (Pub, L. 95-220 and Pub. L. 98-169, as amended, codified at 31 U.S.C. 6101-6106); the Federal Grant and Cooperative Agreement Act of 1977 (Pub. L. 95-224, as amended, codified at 31 U.S.C. 6301-6309); 41 U.S.C. 1101-1131 (the Office of Federal Procurement Policy Act); Reorganization Plan No. 2 of 1970 and Executive Order 11541 (“Prescribing the Duties of the Office of Management and Budget and the Domestic Policy Council in the Executive Office of the President”); and the Single Audit Act Amendments of 1996 (31 U.S.C. 7501-7507).
+(b) Subpart E is authorized under the Budget and Accounting Act of 1921, as amended; the Budget and Accounting Procedures Act of 1950, as amended (31 U.S.C. 1101-1126); the Chief Financial Officers Act of 1990 (31 U.S.C. 503-504); Reorganization Plan No. 2 of 1970; and Executive Order 11541, “Prescribing the Duties of the Office of Management and Budget and the Domestic Policy Council in the Executive Office of the President.” OMB also relies on authority under 31 U.S.C. 503 and 31 U.S.C. 6307.
+(c) Subpart F is authorized under the Single Audit Act Amendments of 1996 (codified at 31 U.S.C. 7501-7507). OMB also relies on authority under 31 U.S.C. 503 and 31 U.S.C. 6307.
+
+§ 200.104 Supersession.
+
+This part superseded previous OMB guidance issued under Title 2, subtitle A, chapter II of the Code of Federal Regulations and certain OMB circulars related to uniform administrative requirements, cost principles, and audit requirements for Federal awards.
+
+§ 200.105 Effect on other issuances.
+
+(a) Superseding inconsistent requirements. For Federal awards made subject to this part by a Federal agency, this part takes precedence over any administrative requirements, program manuals, handbooks, and other non-regulatory materials that are inconsistent with the requirements of this part upon implementation by the Federal agency, except to the extent that they are required by statute or authorized in accordance with § 200.102.
+(b) Imposition of requirements on recipients. Agencies may only impose legally binding requirements on recipients and subrecipients through:
+(1) Notice and public comment procedures through an approved agency process, including as authorized by this part, other statutes, or regulations; or
+(2) Incorporating requirements into the terms and conditions of a Federal award as permitted by Federal statute, regulation, or this part.
+
+§ 200.106 Agency implementation.
+
+The specific requirements and responsibilities of Federal agencies, non-Federal entities, recipients, and subrecipients are set forth in this part. Federal agencies making Federal awards to non-Federal entities must implement the language in subparts C through F of this part in codified regulations unless different provisions are required by Federal statute or are approved by OMB.
+
+§ 200.107 OMB responsibilities.
+
+OMB will review Federal agency regulations and implementation of this part. OMB will provide interpretations of policy requirements and assistance to ensure effective, efficient, and consistent implementation. Any exceptions will be subject to approval by OMB and only with adequate justification from the Federal agency.
+
+§ 200.108 Inquiries.
+
+Inquiries from Federal agencies concerning this part may be directed to OMB. Inquiries from recipients or subrecipients should be addressed to the Federal agency, the cognizant agency for indirect costs, the cognizant agency for audit, or the pass-through entity as appropriate.
+
+§ 200.109 Review date.
+
+OMB will review this part periodically.
+
+§ 200.110 Effective date.
+
+(a) The standards set forth in this part affecting the administration of Federal awards by Federal agencies become effective once implemented by Federal agencies or when any future amendment to this part becomes final.
+(b) Existing negotiated indirect cost rates will remain in place until they expire. The effective date of changes to indirect cost rates must be based upon the date a newly re-negotiated rate goes into effect for the recipient's or subrecipient's fiscal year. Therefore, for indirect cost rates and cost allocation plans, the revisions to this part (as of the publication date for revisions to this guidance) become effective in generating proposals and negotiating a new rate (when the rate is re-negotiated).
+
+§ 200.111 English language.
+
+(a) All Federal financial assistance announcements, applications, and Federal award information should be in the English language and must be in terms of U.S. dollars. However, Federal agencies, recipients, and subrecipients may issue or translate a Federal award or other documents into another language. A Federal agency may translate formal or informal announcements of the availability of Federal funding through a financial assistance program, such as a notice of funding opportunity, when translations may serve to increase the pool of applicants or the participation of a specific community (for example, programs administered in foreign countries where the primary language is not English). Federal agencies must maintain an official controlling English version of the Federal financial assistance announcement and the Federal award, including the terms and conditions.(b) Applications, reports, and official correspondence may be submitted in languages other than English if specified in the notice of funding opportunity or the terms and conditions of the Federal award.
+(c) In the event of inconsistency between English and another language, the English language meaning will control. When a significant portion of the recipient's or subrecipient's employees administering a Federal award are not fluent in English, the Federal award should be provided in English and the language(s) with which employees are more familiar.
+
+§ 200.112 Conflict of interest.
+
+Federal agencies must establish conflict of interest policies for Federal awards. A recipient or subrecipient must disclose in writing any potential conflict of interest to the Federal agency or pass-through entity in accordance with the established Federal agency policies.
+
+§ 200.113 Mandatory disclosures.
+
+An applicant, recipient, or subrecipient of a Federal award must promptly disclose whenever, in connection with the Federal award (including any activities or subawards thereunder), it has credible evidence of the commission of a violation of Federal criminal law involving fraud, conflict of interest, bribery, or gratuity violations found in Title 18 of the United States Code or a violation of the civil False Claims Act (31 U.S.C. 3729-3733). The disclosure must be made in writing to the Federal agency, the agency's Office of Inspector General, and pass-through entity (if applicable). Recipients and subrecipients are also required to report matters related to recipient integrity and performance in accordance with Appendix XII of this part. Failure to make required disclosures can result in any of the remedies described in § 200.339. (See also 2 CFR part 180, 31 U.S.C. 3321, and 41 U.S.C. 2313.)

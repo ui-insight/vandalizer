@@ -28,7 +28,9 @@ ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
     SENTRY_PROJECT=${SENTRY_PROJECT}
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# package-lock.json is generated with npm 11 (dev machines, dependabot);
+# npm 10 (bundled with Node 22) rejects its optional-dep shape (@emnapi/*).
+RUN npm install -g npm@11 && npm ci
 
 COPY . .
 RUN npm run build

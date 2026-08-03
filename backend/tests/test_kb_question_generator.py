@@ -65,6 +65,23 @@ def test_parse_questions_normalises_invalid_category():
     assert out[0]["category"] == "factual"
 
 
+def test_parse_questions_drops_sample_scoped_queries():
+    """Questions referencing the generator's private sample ('the provided
+    excerpt') are unanswerable as written at validation time — drop them."""
+    raw = {"questions": [
+        {"query": "Does the provided excerpt specify the year in which the paper was accepted?",
+         "expected_answer": "No, the excerpt does not specify the acceptance year."},
+        {"query": "According to this passage, who is the PI?",
+         "expected_answer": "Dr. Smith."},
+        {"query": "What year was the paper in EBSCO-FullText.pdf accepted?",
+         "expected_answer": "2024."},
+    ]}
+    out = KBQuestionGenerator._parse_questions(raw, set(), set())
+    assert [q["query"] for q in out] == [
+        "What year was the paper in EBSCO-FullText.pdf accepted?"
+    ]
+
+
 def test_parse_questions_handles_list_at_top_level():
     raw = [
         {"query": "Q1", "expected_answer": "A1"},
@@ -72,6 +89,88 @@ def test_parse_questions_handles_list_at_top_level():
     ]
     out = KBQuestionGenerator._parse_questions(raw, set(), set())
     assert len(out) == 2
+
+
+# ---------------------------------------------------------------------------
+# Absence-claim verification against full-KB retrieval
+# ---------------------------------------------------------------------------
+
+
+def _absence_q(query="Does the article state the acceptance year?",
+               expected="The document does not specify the acceptance year."):
+    return {"query": query, "expected_answer": expected,
+            "expected_source_labels": [], "source_chunk_ids": [], "category": "boundary"}
+
+
+def _positive_q():
+    return {"query": "When is the Q1 deadline?", "expected_answer": "March 15.",
+            "expected_source_labels": [], "source_chunk_ids": [], "category": "factual"}
+
+
+@pytest.mark.asyncio
+async def test_absence_filter_drops_contradicted_question():
+    """The ticket case: the generator's 600-char sample lacked the acceptance
+    date, but full-KB retrieval finds it — the question must be dropped."""
+    chunks = [{"content": "Accepted: January 14, 2024.",
+               "metadata": {"source_name": "EBSCO-FullText.pdf"}}]
+    checker_run = MagicMock()
+    checker_run.output = '{"contradicted": true, "evidence": "Accepted: January 14, 2024"}'
+    checker = MagicMock()
+    checker.run = AsyncMock(return_value=checker_run)
+
+    with patch("app.services.kb_validation_service.retrieve_kb_chunks",
+               new=AsyncMock(return_value=(chunks, MagicMock(), 0))), \
+         patch("app.services.kb_question_generator.Agent", return_value=checker):
+        out = await KBQuestionGenerator()._filter_contradicted_absence_questions(
+            "kb-1", [_absence_q(), _positive_q()], "test-model", MagicMock(),
+        )
+
+    assert [q["query"] for q in out] == [_positive_q()["query"]]
+    # Only the absence question is verified — one retrieval-backed LLM call.
+    checker.run.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_absence_filter_keeps_question_when_not_contradicted():
+    chunks = [{"content": "The study covers Idaho wheat yields.",
+               "metadata": {"source_name": "EBSCO-FullText.pdf"}}]
+    checker_run = MagicMock()
+    checker_run.output = '{"contradicted": false, "evidence": ""}'
+    checker = MagicMock()
+    checker.run = AsyncMock(return_value=checker_run)
+
+    with patch("app.services.kb_validation_service.retrieve_kb_chunks",
+               new=AsyncMock(return_value=(chunks, MagicMock(), 0))), \
+         patch("app.services.kb_question_generator.Agent", return_value=checker):
+        out = await KBQuestionGenerator()._filter_contradicted_absence_questions(
+            "kb-1", [_absence_q()], "test-model", MagicMock(),
+        )
+
+    assert len(out) == 1
+
+
+@pytest.mark.asyncio
+async def test_absence_filter_keeps_question_on_verification_error():
+    """Verification is a quality filter — an infra blip must not gut generation."""
+    with patch("app.services.kb_validation_service.retrieve_kb_chunks",
+               new=AsyncMock(side_effect=RuntimeError("chroma down"))), \
+         patch("app.services.kb_question_generator.Agent", return_value=MagicMock()):
+        out = await KBQuestionGenerator()._filter_contradicted_absence_questions(
+            "kb-1", [_absence_q()], "test-model", MagicMock(),
+        )
+
+    assert len(out) == 1
+
+
+@pytest.mark.asyncio
+async def test_absence_filter_skips_llm_entirely_without_absence_claims():
+    """Positive-fact questions must not trigger retrieval or checker calls."""
+    with patch("app.services.kb_question_generator.Agent") as agent_cls:
+        out = await KBQuestionGenerator()._filter_contradicted_absence_questions(
+            "kb-1", [_positive_q()], "test-model", MagicMock(),
+        )
+    assert len(out) == 1
+    agent_cls.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

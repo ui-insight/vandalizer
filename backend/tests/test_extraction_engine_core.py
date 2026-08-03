@@ -677,3 +677,65 @@ class TestSerializeOutput:
         result = _serialize_output([1, 2, 3])
         parsed = json.loads(result)
         assert parsed == [1, 2, 3]
+
+
+# ---------------------------------------------------------------------------
+# vLLM-protocol structured output mode
+# ---------------------------------------------------------------------------
+
+class TestVllmStructuredOutputMode:
+    """vllm-protocol models must request server-side schema enforcement via
+    pydantic-ai's NativeOutput (the standard OpenAI ``response_format``
+    parameter), not vLLM's proprietary ``structured_outputs`` extra-body —
+    OpenAI-compatible gateways silently drop unknown extra-body fields,
+    which quietly loses schema enforcement."""
+
+    def _config(self, protocol):
+        return {
+            "available_models": [
+                {"name": "local-model", "api_protocol": protocol,
+                 "endpoint": "http://inference.local:8000"},
+            ],
+            "extraction_config": {
+                "mode": "one_pass",
+                "one_pass": {"thinking": False, "structured": True},
+            },
+        }
+
+    @patch("app.services.extraction_engine.Agent")
+    @patch("app.services.extraction_engine.get_agent_model")
+    def test_vllm_protocol_uses_native_output(self, mock_get_model, mock_agent_cls):
+        from pydantic_ai import NativeOutput
+
+        mock_get_model.return_value = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.run_sync.return_value = _make_structured_result([{"Name": "Alice"}])
+        mock_agent_cls.return_value = mock_agent
+
+        engine = ExtractionEngine(system_config_doc=self._config("vllm"))
+        result = engine.extract(
+            extract_keys=["Name"], full_text="Alice.", model="local-model",
+        )
+
+        assert result == [{"Name": "Alice"}]
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert isinstance(output_type, NativeOutput)
+        settings = mock_agent.run_sync.call_args.kwargs.get("model_settings") or {}
+        assert "structured_outputs" not in (settings.get("extra_body") or {})
+
+    @patch("app.services.extraction_engine.Agent")
+    @patch("app.services.extraction_engine.get_agent_model")
+    def test_openai_protocol_keeps_default_output_mode(self, mock_get_model, mock_agent_cls):
+        from pydantic_ai import NativeOutput
+
+        mock_get_model.return_value = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.run_sync.return_value = _make_structured_result([{"Name": "Alice"}])
+        mock_agent_cls.return_value = mock_agent
+
+        engine = ExtractionEngine(system_config_doc=self._config("openai"))
+        engine.extract(extract_keys=["Name"], full_text="Alice.", model="local-model")
+
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert not isinstance(output_type, NativeOutput)
+        assert isinstance(output_type, type)

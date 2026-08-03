@@ -1,0 +1,784 @@
+PART 93—PUBLIC HEALTH SERVICE POLICIES ON RESEARCH MISCONDUCT
+
+Authority:42 U.S.C. 216 and 289b
+Source:89 FR 76295, Sept. 17, 2024, unless otherwise noted.
+
+§ 93.25 Organization of this part.
+
+This part is subdivided into five subparts. Each subpart contains information related to a broad topic or specific audience with special responsibilities as shown in the following table.
+Table 1 to § 93.25
+In subpart . . . | You will find sections related to . . .
+A | General information about this part.
+B | Definitions used in this part.
+C | Responsibilities of institutions with PHS support.
+D | Responsibilities of the U.S. Department of Health and Human Services and the Office of Research Integrity.
+E | Information on how to contest ORI research misconduct findings and proposed HHS administrative actions.
+
+§ 93.50 Special terms.
+
+This part uses terms throughout the text that have special meaning. Those terms are defined in subpart B of this part.
+
+§ 93.75 Application of effective date to research misconduct proceedings.
+
+(a) An institution must follow this part for allegations received by the institution on or after January 1, 2026, except for the policies and procedures required under §§ 93.300(a) and 93.302(b), which must be implemented and submitted by due date of the annual report covering the 2025 reporting year, as specified by ORI.
+(b) For allegations received by an institution before January 1, 2026, unless the institution and the respondent both elect in writing to follow this part, an institution must follow this part as published in the 2005 edition of the Code of Federal Regulations.
+
+Subpart A—General
+
+§ 93.100 General policy.
+
+(a) Research misconduct involving Public Health Service (PHS) support is contrary to the interests of the PHS and the Federal Government, to the health and safety of the public, to the integrity of research, and to the conservation of public funds.
+(b) The U.S. Department of Health and Human Services (HHS) and institutions that apply for or receive PHS support for biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training share responsibility for the integrity of the research process. HHS has ultimate oversight authority for PHS-supported research, and for taking other actions as appropriate or necessary, including the right to assess allegations and to perform inquiries or investigations at any time. Institutions and institutional members have an affirmative duty to protect PHS funds from misuse by ensuring the integrity of all PHS-supported work, and primary responsibility for responding to and reporting allegations of research misconduct, as provided in this part.
+
+§ 93.101 Purpose.
+
+The purpose of this part is to—
+(a) Establish the responsibilities of HHS, the Office of Research Integrity (ORI), and institutions in addressing allegations of research misconduct;
+(b) Define what constitutes research misconduct in PHS-supported research;
+(c) Establish the requirements for a finding of research misconduct;
+(d) Define the general types of administrative actions HHS may take in response to research misconduct;
+(e) Require institutions to:
+(1) Develop and implement policies and procedures for reporting and addressing allegations of research misconduct covered by this part;
+(2) Provide HHS with the assurances necessary to permit institutions to participate in PHS-supported research;
+(f) Protect the health and safety of the public, promote the integrity of PHS-supported research and the research process, and conserve public funds.
+
+§ 93.102 Applicability.
+
+(a) Every extramural or intramural institution that applies for or receives PHS support for biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training must comply with this part.
+(b) This part applies to allegations of research misconduct involving:
+(1) Applications or proposals for PHS support for biomedical or behavioral extramural or intramural research, biomedical or behavioral research training, or activities related to that research or research training;
+(2) PHS-supported biomedical or behavioral extramural or intramural research;
+(3) PHS-supported biomedical or behavioral extramural or intramural research training programs;
+(4) PHS-supported extramural or intramural activities that are related to biomedical or behavioral research or research training, such as, but not limited to, the operation of tissue and data banks or the dissemination of research information;
+(5) Research records produced during PHS-supported research, research training, or activities related to that research or research training; and
+(6) Research proposed, performed, reviewed, or reported, as well as any research record generated from that research, regardless of whether an application or proposal for PHS funds resulted in an awarded grant, contract, cooperative agreement, subaward, or other form of PHS support.
+(c) This part does not supersede or establish an alternative to any applicable statutes, regulations, policies, or procedures for handling fiscal improprieties, the ethical treatment of human or animal subjects, criminal matters, personnel actions against Federal employees, or addressing whistleblowers and/or retaliation.
+(d) This part does not supersede or establish an alternative to the HHS suspension and debarment regulations set forth at 2 CFR part 180, as implemented by HHS at 2 CFR part 376; and 48 CFR part 9, subpart 9.4, as supplemented by HHS at 48 CFR part 309, subpart 309.4. The Suspension and Debarment Official SDO and ORI may coordinate actions to the extent consistent with the SDO's and ORI's respective authorities. Such coordination includes jointly issuing notices or seeking settlements of actions and proceedings.
+(e) This part does not prohibit or otherwise limit how institutions handle allegations of misconduct that do not fall within this part's definition of research misconduct or that do not involve PHS support.
+
+§ 93.103 Requirements for findings of research misconduct.
+
+A finding of research misconduct made under this part requires that:
+(a) There be a significant departure from accepted practices of the relevant research community; and
+(b) The misconduct be committed intentionally, knowingly, or recklessly; and
+(c) The allegation be proven by a preponderance of the evidence.
+
+§ 93.104 Time limitations.
+
+(a) Six-year limitation. This part applies only to research misconduct occurring within six years of the date HHS or an institution receives an allegation of research misconduct.
+(b) Exceptions to the six-year limitation. Paragraph (a) of this section does not apply in the following instances:
+(1) Subsequent use exception. The respondent continues or renews any incident of alleged research misconduct that occurred before the six-year limitation through the use of, republication of, or citation to the portion(s) of the research record (e.g., processed data, journal articles, funding proposals, data repositories) alleged to have been fabricated, falsified, or plagiarized, for the potential benefit of the respondent.
+(i) When the respondent uses, republishes, or cites to the portion(s) of the research record that is alleged to have been fabricated, falsified, or plagiarized, in submitted or published manuscripts, submitted PHS grant applications, progress reports submitted to PHS funding components, posters, presentations, or other research records within six years of when the allegations were received by HHS or an institution, this exception applies.
+(ii) For research misconduct that appears subject to the subsequent use exception, institutions must document their determination that the subsequent use exception does not apply. Such documentation must be retained in accordance with § 93.318.
+(2) Exception for the health or safety of the public. If ORI or the institution, following consultation with ORI, determines that the alleged research misconduct, if it occurred, would possibly have a substantial adverse effect on the health or safety of the public, this exception applies.
+
+§ 93.105 Evidentiary standards.
+
+(a) Standard of proof. An institutional or HHS finding of research misconduct must be proved by a preponderance of the evidence.
+(b) Burden of proof. (1) The institution or HHS has the burden of proof for making a finding of research misconduct. A respondent's destruction of research records documenting the questioned research is evidence of research misconduct where the institution or HHS establishes by a preponderance of the evidence that the respondent intentionally or knowingly destroyed records after being informed of the research misconduct allegations. A respondent's failure to provide research records documenting the questioned research is evidence of research misconduct where the respondent claims to possess the records but refuses to provide them upon request.
+(2) The respondent has the burden of going forward with and proving, by a preponderance of the evidence, all affirmative defenses raised. In determining whether HHS or the institution has carried the burden of proof imposed by this part, the finder of fact shall give due consideration to admissible, credible evidence of honest error or difference of opinion presented by the respondent.
+(3) The respondent has the burden of going forward with and proving, by a preponderance of the evidence, any mitigating factors relevant to a decision to impose administrative actions after a research misconduct proceeding.
+
+§ 93.106 Confidentiality.
+
+(a) Disclosure of the identity of respondents, complainants, and witnesses while conducting the research misconduct proceedings is limited, to the extent possible, to those who need to know, as determined by the institution, consistent with a thorough, competent, objective, and fair research misconduct proceeding, and as allowed by law. Those who need to know may include institutional review boards, journals, editors, publishers, co-authors, and collaborating institutions. This limitation on disclosure of the identity of respondents, complainants, and witnesses no longer applies once an institution has made a final determination of research misconduct findings. The institution, however, must disclose the identity of respondents, complainants, or other relevant persons to ORI pursuant to an ORI review of research misconduct proceedings under this part.
+(b) Except as may otherwise be prescribed by applicable law, confidentiality must be maintained for any records or evidence from which research subjects might be identified. Disclosure is limited to those who need to know to carry out a research misconduct proceeding.
+(c) This section does not prohibit institutions from managing published data or acknowledging that data may be unreliable.
+
+§ 93.107 Coordination with other agencies.
+
+(a) When more than one agency of the Federal Government has jurisdiction over a research misconduct allegation, HHS will cooperate with the other agencies in designating a lead agency to coordinate the response of the agencies to the allegation. Where HHS is not the lead agency, it may, in consultation with the lead agency, take appropriate action.
+(b) In research misconduct proceedings involving more than one agency, HHS may refer to the other agency's (or agencies') evidence or reports if HHS determines that the evidence or reports will assist in resolving HHS issues. In appropriate cases, HHS may seek to resolve allegations jointly with the other agency or agencies.
+
+Subpart B—Definitions
+
+§ 93.200 Accepted practices of the relevant research community.
+
+Accepted practices of the relevant research community means those practices established by 42 CFR part 93 and by PHS funding components, as well as commonly accepted professional codes or norms within the overarching community of researchers and institutions that apply for and receive PHS awards.
+
+§ 93.201 Administrative action.
+
+Administrative action means an HHS action, consistent with § 93.407, taken in response to a research misconduct proceeding to protect the health and safety of the public, to promote the integrity of PHS-supported biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training, or to conserve public funds.
+
+§ 93.202 Administrative record.
+
+Administrative record comprises: the institutional record; any information provided by the respondent to ORI, including but not limited to the transcript of any virtual or in-person meetings under § 93.403(b) between the respondent and ORI, and correspondence between the respondent and ORI; any additional information provided to ORI while the case is pending before ORI; and any analysis or additional information generated or obtained by ORI. Any analysis or additional information generated or obtained by ORI will also be made available to the respondent.
+
+§ 93.203 Allegation.
+
+Allegation means a disclosure of possible research misconduct through any means of communication and brought directly to the attention of an institutional or HHS official.
+
+§ 93.204 Assessment.
+
+Assessment means a consideration of whether an allegation of research misconduct appears to fall within the definition of research misconduct; appears to involve PHS-supported biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training; and is sufficiently credible and specific so that potential evidence of research misconduct may be identified. The assessment only involves the review of readily accessible information relevant to the allegation.
+
+§ 93.205 Charge letter.
+
+Charge letter means the written notice, as well as any amendments to the notice, sent to the respondent stating the findings of research misconduct and any proposed HHS administrative actions.
+
+§ 93.206 Complainant.
+
+Complainant means an individual who in good faith makes an allegation of research misconduct.
+
+§ 93.207 Contract.
+
+Contract means an acquisition instrument awarded under the Federal Acquisition Regulation (FAR), 48 CFR chapter 1.
+
+§ 93.208 Day.
+
+Day means calendar day unless otherwise specified. If a deadline falls on a Saturday, Sunday, or Federal holiday, the deadline will be extended to the next day that is not a Saturday, Sunday, or Federal holiday.
+
+§ 93.209 Departmental Appeals Board or DAB.
+
+Departmental Appeals Board or DAB means the organization, within the HHS Office of the Secretary, established to conduct hearings and provide impartial review of disputed decisions made by HHS operating components.
+
+§ 93.210 Evidence.
+
+Evidence means anything offered or obtained during a research misconduct proceeding that tends to prove or disprove the existence of an alleged fact. Evidence includes documents, whether in hard copy or electronic form, information, tangible items, and testimony.
+
+§ 93.211 Fabrication.
+
+Fabrication means making up data or results and recording or reporting them.
+
+§ 93.212 Falsification.
+
+Falsification means manipulating research materials, equipment, or processes, or changing or omitting data or results such that the research is not accurately represented in the research record.
+
+§ 93.213 Funding component.
+
+Funding component means any organizational unit of the PHS authorized to award grants, contracts, or cooperative agreements for any activity covered by this part involving research or research training; funding components may be agencies, bureaus, centers, institutes, divisions, offices, or other awarding units within the PHS.
+
+§ 93.214 Good faith.
+
+(a) Good faith as applied to a complainant or witness means having a reasonable belief in the truth of one's allegation or testimony, based on the information known to the complainant or witness at the time. An allegation or cooperation with a research misconduct proceeding is not in good faith if made with knowledge of or reckless disregard for information that would negate the allegation or testimony.
+(b) Good faith as applied to an institutional or committee member means cooperating with the research misconduct proceeding by impartially carrying out the duties assigned for the purpose of helping an institution meet its responsibilities under this part. An institutional or committee member does not act in good faith if their acts or omissions during the research misconduct proceedings are dishonest or influenced by personal, professional, or financial conflicts of interest with those involved in the research misconduct proceeding.
+
+§ 93.215 Inquiry.
+
+Inquiry means preliminary information-gathering and preliminary fact-finding that meets the criteria and follows the procedures of § 93.307 through § 93.309.
+
+§ 93.216 Institution.
+
+Institution means any person that applies for or receives PHS support for any activity or program that involves the conduct of biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or training. This includes, but is not limited to, colleges and universities, PHS intramural biomedical or behavioral research laboratories, research and development centers, national user facilities, industrial laboratories or other research institutes, research institutions, and independent researchers.
+
+§ 93.217 Institutional Certifying Official.
+
+Institutional Certifying Official means the institutional official responsible for assuring on behalf of an institution that the institution has written policies and procedures for addressing allegations of research misconduct, in compliance with this part; and complies with its own policies and procedures and the requirements of this part. The Institutional Certifying Official is responsible for certifying the content of the institution's annual report, which contains information specified by ORI on the institution's compliance with this part, and ensuring the report is submitted to ORI, as required.
+
+§ 93.218 Institutional Deciding Official.
+
+Institutional Deciding Official means the institutional official who makes final determinations on allegations of research misconduct and any institutional actions. The same individual cannot serve as the Institutional Deciding Official and the Research Integrity Officer.
+
+§ 93.219 Institutional member.
+
+Institutional member or members means an individual (or individuals) who is employed by, is an agent of, or is affiliated by contract or agreement with an institution. Institutional members may include, but are not limited to, officials, tenured and untenured faculty, teaching and support staff, researchers, research coordinators, technicians, postdoctoral and other fellows, students, volunteers, subject matter experts, consultants, or attorneys, or employees or agents of contractors, subcontractors, or sub-awardees.
+
+§ 93.220 Institutional record.
+
+The institutional record comprises:
+(a) The records that the institution compiled or generated during the research misconduct proceeding, except records the institution did not consider or rely on. These records include, but are not limited to:
+(1) Documentation of the assessment as required by § 93.306(c).
+(2) If an inquiry is conducted, the inquiry report and all records (other than drafts of the report) considered or relied on during the inquiry, including, but not limited to, research records and the transcripts of any transcribed interviews conducted during the inquiry, information the respondent provided to the institution, and the documentation of any decision not to investigate as required by § 93.309(c).
+(3) If an investigation is conducted, the investigation report and all records (other than drafts of the report) considered or relied on during the investigation, including, but not limited to, research records, the transcripts of each interview conducted pursuant to § 93.310(g), and information the respondent provided to the institution.
+(4) Decision(s) by the Institutional Deciding Official, such as the written decision from the Institutional Deciding Official under § 93.314.
+(5) The complete record of any institutional appeal consistent with § 93.315.
+(b) A single index listing all the research records and evidence that the institution compiled during the research misconduct proceeding, except records the institution did not consider or rely on.
+(c) A general description of the records that were sequestered but not considered or relied on.
+
+§ 93.221 Intentionally.
+
+To act intentionally means to act with the aim of carrying out the act.
+
+§ 93.222 Investigation.
+
+Investigation means the formal development of a factual record and the examination of that record that meets the criteria and follows the procedures of §§ 93.310 through 93.317.
+
+§ 93.223 Knowingly.
+
+To act knowingly means to act with awareness of the act.
+
+§ 93.224 Notice.
+
+Notice means a written or electronic communication served in person or sent by mail or its equivalent to the last known street address, facsimile number, or email address of the addressee.
+
+§ 93.225 Office of Research Integrity or ORI.
+
+Office of Research Integrity or ORI means the office established by Public Health Service Act section 493 (42 U.S.C. 289b) and to which the HHS Secretary has delegated responsibility for addressing research integrity and misconduct issues related to PHS-supported activities.
+
+§ 93.226 Person.
+
+Person means any individual, corporation, partnership, institution, association, unit of government, or other legal entity, however organized.
+
+§ 93.227 Plagiarism.
+
+Plagiarism means the appropriation of another person's ideas, processes, results, or words, without giving appropriate credit.
+(a) Plagiarism includes the unattributed verbatim or nearly verbatim copying of sentences and paragraphs from another's work that materially misleads the reader regarding the contributions of the author. It does not include the limited use of identical or nearly identical phrases that describe a commonly used methodology.
+(b) Plagiarism does not include self-plagiarism or authorship or credit disputes, including disputes among former collaborators who participated jointly in the development or conduct of a research project. Self-plagiarism and authorship disputes do not meet the definition of research misconduct.
+
+§ 93.228 Preponderance of the evidence.
+
+Preponderance of the evidence means proof by evidence that, compared with evidence opposing it, leads to the conclusion that the fact at issue is more likely true than not.
+
+§ 93.229 Public Health Service or PHS.
+
+Public Health Service or PHS consists of the following components within HHS: the Office of the Assistant Secretary for Health, the Office of Global Affairs, the Administration for Strategic Preparedness and Response, the Advanced Research Projects Agency for Health, the Agency for Healthcare Research and Quality, the Agency for Toxic Substances and Disease Registry, the Centers for Disease Control and Prevention, the Food and Drug Administration, the Health Resources and Services Administration, the Indian Health Service, the National Institutes of Health, the Substance Abuse and Mental Health Services Administration, and any other components of HHS designated or established as components of the Public Health Service.
+
+§ 93.230 PHS support.
+
+PHS support means PHS funding, or applications or proposals for PHS funding, for biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or training, that may be provided through: funding for PHS intramural research; PHS grants, cooperative agreements, or contracts; subawards, contracts, or subcontracts under those PHS funding instruments; or salary or other payments under PHS grants, cooperative agreements, or contracts.
+
+§ 93.231 Recklessly.
+
+To act recklessly means to propose, perform, or review research, or report research results, with indifference to a known risk of fabrication, falsification, or plagiarism.
+
+§ 93.232 Research.
+
+Research means a systematic experiment, study, evaluation, demonstration, or survey designed to develop or contribute to general knowledge (basic research) or specific knowledge (applied research) by establishing, discovering, developing, elucidating, or confirming information or underlying mechanisms related to biological causes, functions, or effects; diseases; treatments; or related matters to be studied.
+
+§ 93.233 Research Integrity Officer or RIO.
+
+Research Integrity Officer or RIO refers to the institutional official responsible for administering the institution's written policies and procedures for addressing allegations of research misconduct in compliance with this part.
+
+§ 93.234 Research misconduct.
+
+Research misconduct means fabrication, falsification, or plagiarism in proposing, performing, or reviewing research, or in reporting research results. Research misconduct does not include honest error or differences of opinion.
+
+§ 93.235 Research misconduct proceeding.
+
+Research misconduct proceeding means any actions related to alleged research misconduct taken under this part, including allegation assessments, inquiries, investigations, ORI oversight reviews, and appeals under subpart E of this part.
+
+§ 93.236 Research record.
+
+Research record means the record of data or results that embody the facts resulting from scientific inquiry. Data or results may be in physical or electronic form. Examples of items, materials, or information that may be considered part of the research record include, but are not limited to, research proposals, raw data, processed data, clinical research records, laboratory records, study records, laboratory notebooks, progress reports, manuscripts, abstracts, theses, records of oral presentations, online content, lab meeting reports, and journal articles.
+
+§ 93.237 Respondent.
+
+Respondent means the individual against whom an allegation of research misconduct is directed or who is the subject of a research misconduct proceeding.
+
+§ 93.238 Retaliation.
+
+Retaliation means an adverse action taken against a complainant, witness, or committee member by an institution or one of its members in response to:
+(a) A good faith allegation of research misconduct; or
+(b) Good faith cooperation with a research misconduct proceeding.
+
+§ 93.239 Secretary or HHS.
+
+Secretary or HHS means the Secretary of HHS or any other official or employee of HHS to whom the Secretary delegates authority.
+
+§ 93.240 Small institution.
+
+Small institution means an institution that may be too small to conduct an inquiry or investigation into an allegation of research misconduct as required by this part without actual or apparent conflicts of interest.
+
+§ 93.241 Suspension and Debarment Official or SDO.
+
+Suspension and Debarment Official (SDO) means the HHS official authorized to impose suspension and debarment, which are the actions that Federal agencies take to disqualify persons deemed not presently responsible from doing business with the Federal Government.
+
+Subpart C—Responsibilities of Institutions
+
+Compliance and Assurances
+
+§ 93.300 General responsibilities for compliance.
+
+Institutions must:
+(a) Have written policies and procedures for addressing allegations of research misconduct that meet the requirements of this part;
+(b) Respond to each allegation of research misconduct for which the institution is responsible under this part in a thorough, competent, objective, and fair manner, including taking precautions to ensure that individuals responsible for carrying out any part of the research misconduct proceeding do not have unresolved personal, professional, or financial conflicts of interest with the complainant, respondent, or witnesses;
+(c) Foster a research environment that promotes research integrity and the responsible conduct of research, discourages research misconduct, and deals promptly with allegations or evidence of possible research misconduct;
+(d) Take all reasonable and practical steps to protect the positions and reputations of good faith complainants, witnesses, and committee members and to protect these individuals from retaliation by respondents and/or other institutional members;
+(e) Provide confidentiality consistent with § 93.106 to all respondents, complainants, and witnesses in a research misconduct proceeding, and to research subjects identifiable from research records or other evidence;
+(f) Take all reasonable and practical steps to ensure the cooperation of respondents and other institutional members with research misconduct proceedings, including, but not limited to, their providing information, research records, and other evidence;
+(g) Cooperate with HHS during any research misconduct proceeding or compliance review, including addressing deficiencies or additional allegations in the institutional record if directed by ORI;
+(h) Assist in administering and enforcing any HHS administrative actions imposed on its institutional members; and
+(i) Have an active research integrity assurance.
+
+§ 93.301 Research integrity assurances.
+
+(a) General policy. (1) An institution that applies for or receives PHS support for biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training, must provide HHS with an assurance of compliance with this part by establishing and then maintaining an active research integrity assurance.
+(2) PHS funding components may only authorize release of funds for extramural biomedical and behavioral research, biomedical and behavioral research training, or activities related to that research or research training, to institutions with an active research integrity assurance on file with ORI.
+(b) Research integrity assurance. The Institutional Certifying Official must assure on behalf of the institution, initially and then annually thereafter, that the institution:
+(1) Has written policies and procedures for addressing allegations of research misconduct, in compliance with this part.
+(2) Complies with its policies and procedures for addressing allegations of research misconduct.
+(3) Complies with all provisions of this part.
+
+§ 93.302 Maintaining active research integrity assurances.
+
+(a) Compliance with this part. ORI considers an institution in compliance with this part when it:
+(1) Has policies and procedures for addressing allegations of research misconduct according to this part, keeps those policies in compliance with this part, and upon request, provides them to ORI and other HHS components.
+(2) Complies with its policies and procedures for addressing allegations of research misconduct.
+(3) Complies with all provisions of this part.
+(4) Takes all reasonable and practical specific steps to foster research integrity consistent with § 93.300, including but not limited to:
+(i) Informing the institution's members about its policies and procedures for addressing allegations of research misconduct, and the institution's commitment to compliance with the policies and procedures; and
+(ii) Making its policies and procedures for addressing allegations of research misconduct publicly available.
+(b) Annual report. An institution must file an annual report with ORI, which contains information specified by ORI, on the institution's compliance with this part. The Institutional Certifying Official is responsible for certifying the content of this report and for ensuring the report is submitted as required.
+(c) Additional information. Along with its annual report, an institution must send ORI such other information as ORI may request on the institution's research misconduct proceedings covered by this part and the institution's compliance with the requirements of this part.
+
+§ 93.303 Research integrity assurances for small institutions.
+
+(a) Small institutions may file a Small Institution Statement with ORI in place of the institutional policies and procedures required by §§ 93.300(a), 93.301, and 93.304, upon approval by ORI.
+(b) The Small Institution Statement does not relieve the institution from complying with any other provision of this part.
+(c) By submitting a Small Institution Statement, the institution agrees to report all allegations of research misconduct to ORI. ORI or another appropriate HHS office will work with the institution to develop and/or advise on a process for handling allegations of research misconduct consistent with this part.
+(d) If a small institution has or believes it has a conflict of interest during any phase of a research misconduct proceeding, the small institution may contact ORI for guidance.
+
+§ 93.304 Institutional policies and procedures.
+
+Institutions seeking an approved research integrity assurance must have written policies and procedures for addressing allegations of research misconduct. Such policies and procedures must:
+(a) Address and be consistent with all applicable requirements pertaining to institutional responsibilities included in this part;
+(b) Include and be consistent with applicable definitions in this part; and
+(c) Provide for all reasonable and practical efforts, if requested and as appropriate, to protect or restore the reputation of persons alleged to have engaged in research misconduct but against whom no finding of research misconduct is made.
+
+§ 93.305 General conduct of research misconduct proceedings.
+
+(a) Sequestration of research records and other evidence. An institution must promptly take all reasonable and practical steps to obtain all research records and other evidence, which may include copies of the data or other evidence so long as those copies are substantially equivalent in evidentiary value, needed to conduct the research misconduct proceeding; inventory the research records and other evidence; and sequester them in a secure manner. Where the research records or other evidence are located on or encompass scientific instruments shared by multiple users, institutions may obtain copies of the data or other evidence from such instruments, so long as those copies are substantially equivalent in evidentiary value to the instruments. Whenever possible, the institution must obtain the research records or other evidence:
+(1) Before or at the time the institution notifies the respondent of the allegation(s); and
+(2) Whenever additional items become known or relevant to the inquiry or investigation.
+(b) Access to research records. Where appropriate, an institution must give the respondent copies of, or reasonable supervised access to, the research records that are sequestered in accordance with paragraph (a) of this section.
+(c) Maintenance of sequestered research records and other evidence. An institution must maintain the sequestered research records and other evidence as required by § 93.318.
+(d) Multiple respondents. If an institution identifies additional respondents during an inquiry or investigation, the institution is not required to conduct a separate inquiry for each new respondent. However, each additional respondent must be provided notice of and an opportunity to respond to the allegations, consistent with this subpart.
+(e) Multiple institutions. When allegations involve research conducted at multiple institutions, one institution must be designated as the lead institution if a joint research misconduct proceeding is conducted. In a joint research misconduct proceeding, the lead institution should obtain research records and other evidence pertinent to the proceeding, including witness testimony, from the other relevant institutions. By mutual agreement, the joint research misconduct proceeding may include committee members from the institutions involved. The determination of whether further inquiry and/or investigation is warranted, whether research misconduct occurred, and the institutional actions to be taken may be made by the institutions jointly or tasked to the lead institution.
+(f) Using a committee, consortium, or other person for research misconduct proceedings. (1) An institution must address any potential, perceived, or actual personal, professional, or financial conflicts of interest between members of the committee or consortium, or other person, and the complainant, respondent, or witnesses.
+(2) An institution must ensure that a committee, consortium, or person acting on its behalf conducts research misconduct proceedings in compliance with the requirements of this part.
+(g) Notifying ORI of special circumstances. At any time during a research misconduct proceeding, as defined in § 93.235, an institution must notify ORI immediately if it has reason to believe that any of the following conditions exist:
+(1) Health or safety of the public is at risk, including an immediate need to protect human or animal subjects.
+(2) HHS resources or interests are threatened.
+(3) Research activities should be suspended.
+(4) There is reasonable indication of possible violations of civil or criminal law.
+(5) Federal action is required to protect the interests of those involved in the research misconduct proceeding.
+(6) HHS may need to take appropriate steps to safeguard evidence and protect the rights of those involved.
+
+The Institutional Assessment
+
+§ 93.306 Institutional assessment.
+
+(a) Purpose. An assessment's purpose is to determine whether an allegation warrants an inquiry.
+(b) Conducting the institutional assessment. Upon receiving an allegation of research misconduct, the RIO or another designated institutional official must promptly assess the allegation to determine whether the allegation:
+(1) Falls within the definition of research misconduct under this part;
+(2) Is within the applicability criteria of § 93.102; and
+(3) Is sufficiently credible and specific so that potential evidence of research misconduct may be identified.
+(c) Assessment results. (1) An inquiry must be conducted if the allegation meets the three assessment criteria in paragraph (b) of this section.
+(2) If the RIO or another designated institutional official determines that requirements for an inquiry are met, they must:
+(i) Document the assessment; and
+(ii) Promptly sequester all research records and other evidence, consistent with § 93.305(a), and promptly initiate the inquiry.
+(3) If the RIO or another designated institutional official determines that requirements for an inquiry are not met, they must keep sufficiently detailed documentation of the assessment to permit a later review by ORI of the reasons why the institution did not conduct an inquiry. Such documentation must be retained in accordance with § 93.318.
+
+The Institutional Inquiry
+
+§ 93.307 Institutional inquiry.
+
+(a) Criteria warranting an inquiry. An inquiry is warranted if the allegation meets the following three criteria:
+(1) Falls within the definition of research misconduct under this part;
+(2) Is within the applicability criteria of § 93.102; and
+(3) Is sufficiently credible and specific so that potential evidence of research misconduct may be identified.
+(b) Purpose. An inquiry's purpose is to conduct an initial review of the evidence to determine whether an allegation warrants an investigation. An inquiry does not require a full review of the evidence related to the allegation.
+(c) Notice to the respondent. At the time of or before beginning an inquiry, an institution must make a good faith effort to notify in writing the presumed respondent, if any. If the inquiry subsequently identifies additional respondents, the institution must notify them. Only allegations specific to a particular respondent are to be included in the notification to that respondent. If additional allegations are raised, the respondent(s) must be notified in writing of the additional allegations raised against them.
+(d) Sequestration of records. An institution must obtain all research records and other evidence needed to conduct the research misconduct proceeding, consistent with § 93.305(a).
+(e) Conducting the inquiry—(1) Multiple institutions. A joint research misconduct proceeding must be conducted consistent with § 93.305(e).
+(2) Person conducting the inquiry. Institutions may convene committees of experts to conduct reviews at the inquiry stage to determine whether an investigation is warranted. The inquiry review may be done by a RIO or another designated institutional official in lieu of a committee, with the caveat that if needed, these individuals may utilize one or more subject matter experts to assist them in the inquiry.
+(3) Interviews. Institutions may interview witnesses or respondents that would provide additional information for the institution's review.
+(f) Inquiry results—(1) Criteria warranting an investigation. An investigation is warranted if:
+(i) There is a reasonable basis for concluding that the allegation falls within the definition of research misconduct under this part and involves PHS-supported biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training, as provided in § 93.102; and
+(ii) Preliminary information-gathering and fact-finding from the inquiry indicates that the allegation may have substance.
+(2) Findings of research misconduct. Findings of research misconduct, including the determination of whether the alleged misconduct is intentional, knowing, or reckless, cannot be made at the inquiry stage.
+(g) Inquiry report. (1) The institution must prepare a written report that meets the requirements of this section and § 93.309.
+(2) If there is potential evidence of honest error or difference of opinion, the institution must note this in the inquiry report.
+(3) The institution must provide the respondent an opportunity to review and comment on the inquiry report and attach any comments received to the report.
+(h) Time for completion. (1) The institution must complete the inquiry within 90 days of its initiation unless circumstances warrant a longer period.
+(2) If the inquiry takes longer than 90 days to complete, the inquiry report must document the reasons for exceeding the 90-day period.
+
+§ 93.308 Notice of the results of the inquiry.
+
+(a) Notice to respondent. The institution must notify the respondent whether the inquiry found that an investigation is warranted. The notice must include a copy of the inquiry report and include a copy of or refer to this part and the institution's policies and procedures adopted under its research integrity assurance.
+(b) Notice to complainant. The institution is not required to notify a complainant whether the inquiry found that an investigation is warranted. The institution may, but is not required to, provide relevant portions of the report to a complainant for comment. If an institution provides notice to one complainant in a case, it must provide notice, to the extent possible, to all complainants in the case.
+
+§ 93.309 Reporting to ORI on the decision to initiate an investigation.
+
+(a) Within 30 days of determining that an investigation is warranted, the institution must provide ORI with a copy of the inquiry report, which includes the following information:
+(1) The names, professional aliases, and positions of the respondent and complainant;
+(2) A description of the allegation(s) of research misconduct;
+(3) The PHS support, including, for example, grant numbers, grant applications, contracts, and publications listing PHS support;
+(4) The composition of the inquiry committee, if used, including name(s), position(s), and subject matter expertise;
+(5) Inventory of sequestered research records and other evidence and description of how sequestration was conducted;
+(6) Transcripts of any transcribed interviews;
+(7) Timeline and procedural history;
+(8) Any scientific or forensic analyses conducted;
+(9) The basis for recommending that the allegation(s) warrant an investigation;
+(10) The basis on which any allegation(s) do not merit an investigation;
+(11) Any comments on the inquiry report by the respondent or the complainant; and
+(12) Any institutional actions implemented, including communications with journals or funding agencies.
+(b) The institution must provide the following information to ORI whenever requested:
+(1) The institutional policies and procedures under which the inquiry was conducted; and
+(2) The research records and other evidence reviewed, and copies of all relevant documents.
+(c) Institutions must keep detailed documentation of inquiries to permit a later assessment by ORI of the reasons why the institution decided not to investigate. Such documentation must be retained in accordance with § 93.318.
+(d) In accordance with § 93.305(g), institutions must notify ORI of any special circumstances that may exist.
+
+The Institutional Investigation
+
+§ 93.310 Institutional investigation.
+
+Institutions conducting research misconduct investigations must:
+(a) Time. Begin the investigation within 30 days after deciding an investigation is warranted.
+(b) Notice to ORI. Notify ORI of the decision to begin an investigation on or before the date the investigation begins and provide an inquiry report that meets the requirements of §§ 93.307 and § 93.309.
+(c) Notice to the respondent. Notify the respondent in writing of the allegation(s) within a reasonable amount of time after determining that an investigation is warranted, but before the investigation begins.
+(1) The institution must give the respondent written notice of any allegation(s) of research misconduct not addressed during the inquiry or in the initial notice of investigation within a reasonable amount of time of deciding to pursue such allegation(s).
+(2) If the institution identifies additional respondents during the investigation, the institution may but is not required to conduct a separate inquiry for each new respondent. If any additional respondent(s) are identified during the investigation, the institution must notify them of the allegation(s) and provide them an opportunity to respond consistent with this subpart.
+(3) While an investigation into multiple respondents can convene with the same investigation committee members, separate investigation reports and research misconduct determinations are required for each respondent.
+(d) Sequestration of records. Obtain all research records and other evidence needed to conduct the investigation, consistent with § 93.305(a).
+(e) Documentation. Use diligent efforts to ensure that the investigation is thorough and sufficiently documented and includes examination of all research records and other evidence relevant to reaching a decision on the merits of the allegation(s).
+(f) Ensuring a fair investigation. Take reasonable steps to ensure an impartial and unbiased investigation to the maximum extent practicable, including participation of persons with appropriate scientific expertise who do not have unresolved personal, professional, or financial conflicts of interest relevant to the investigation. An institution may use the same committee members from the inquiry in their subsequent investigation.
+(g) Interviews. During the investigation, an institution must interview each respondent, complainant, and any other available person who has been reasonably identified as having information regarding any relevant aspects of the investigation, including witnesses identified by the respondent.
+(1) Interviews during the investigation must be recorded and transcribed.
+(2) Any exhibits shown to the interviewee during the interview must be numbered and referred to by that number in the interview.
+(3) The transcript of the interview must be made available to the relevant interviewee for correction.
+(4) The transcript(s) with any corrections and numbered exhibits must be included in the institutional record of the investigation.
+(5) The respondent must not be present during the witnesses' interviews but must be provided a transcript of the interview.
+(h) Multiple respondents. Consider, consistent with § 93.305(d), the prospect of additional researchers being responsible for the alleged research misconduct.
+(i) Multiple institutions. A research misconduct proceeding involving multiple institutions must be conducted consistent with § 93.305(e).
+(j) Pursue leads. Pursue diligently all significant issues and leads discovered that are determined relevant to the investigation, including any evidence of additional instances of possible research misconduct, and continue the investigation to completion. If additional allegations are raised, the respondent(s) must be notified in writing of the additional allegations raised against them.
+
+§ 93.311 Investigation time limits.
+
+(a) Time limit for completing an investigation. An institution must complete all aspects of an investigation within 180 days of beginning it, including conducting the investigation, preparing the draft investigation report for each respondent, providing the draft report to each respondent for comment in accordance with § 93.312, and transmitting the institutional record including the final investigation report and decision by the Institutional Deciding Official to ORI in accordance with § 93.316.
+(b) Extension of time limit. If unable to complete the investigation in 180 days, the institution must ask ORI for an extension in writing that includes the circumstances or issues warranting additional time.
+(c) Progress reports. If ORI grants an extension, it may direct the institution to file periodic progress reports.
+(d) Investigation report. If the investigation takes longer than 180 days to complete, the investigation report must include the reasons for exceeding the 180-day period.
+
+§ 93.312 Opportunity to comment on the draft investigation report.
+
+(a) The institution must give the respondent a copy of the draft investigation report and, concurrently, a copy of, or supervised access to, the research records and other evidence that the investigation committee considered or relied on. The respondent must submit any comments on the draft report to the institution within 30 days of receiving the draft investigation report.
+(b) The institution may provide the complainant a copy of the draft investigation report or relevant portions of that report. The comments of the complainant, if any, must be submitted within 30 days of the date on which the complainant received the draft investigation report or relevant portions of it.
+
+§ 93.313 Investigation report.
+
+A final investigation report for each respondent must be in writing and include:
+(a) Description of the nature of the allegation(s) of research misconduct, including any additional allegation(s) addressed during the research misconduct proceeding.
+(b) Description and documentation of the PHS support, including, for example, any grant numbers, grant applications, contracts, and publications listing PHS support.
+(c) Description of the specific allegation(s) of research misconduct for consideration in the investigation of the respondent.
+(d) Composition of investigation committee, including name(s), position(s), and subject matter expertise.
+(e) Inventory of sequestered research records and other evidence, except records the institution did not consider or rely on; and a description of how any sequestration was conducted during the investigation. This inventory must include manuscripts and funding proposals that were considered or relied on during the investigation.
+(f) Transcripts of all interviews conducted, as described in § 93.310(g).
+(g) Identification of the specific published papers, manuscripts submitted but not accepted for publication (including online publication), PHS funding applications, progress reports, presentations, posters, or other research records that allegedly contained the falsified, fabricated, or plagiarized material.
+(h) Any scientific or forensic analyses conducted.
+(i) If not already provided to ORI, the institutional policies and procedures under which the investigation was conducted.
+(j) Any comments made by the respondent and complainant on the draft investigation report and the investigation committee's consideration of those comments.
+(k) A statement for each separate allegation of whether the investigation committee recommends a finding of research misconduct.
+(1) If the investigation committee recommends a finding of research misconduct for an allegation, the investigation report must, for that allegation:
+(i) Identify the individual(s) who committed the research misconduct.
+(ii) Indicate whether the research misconduct was falsification, fabrication, and/or plagiarism.
+(iii) Indicate whether the research misconduct was committed intentionally, knowingly, or recklessly.
+(iv) State whether the other requirements for a finding of research misconduct, as described in § 93.103, have been met.
+(v) Summarize the facts and the analysis which support the conclusion and consider the merits of any explanation by the respondent.
+(vi) Identify the specific PHS support.
+(vii) Identify whether any publications need correction or retraction.
+(2) If the investigation committee does not recommend a finding of research misconduct for an allegation, the investigation report must provide a detailed rationale.
+(3) List of any current support or known applications or proposals for support that the respondent has pending with PHS and non-PHS Federal agencies.
+
+§ 93.314 Decision by the Institutional Deciding Official.
+
+The Institutional Deciding Official is responsible for making a final determination of research misconduct findings. This determination must be provided in a written decision that includes:
+(a) Whether the institution found research misconduct and, if so, who committed the misconduct; and
+(b) A description of relevant institutional actions taken or to be taken.
+
+§ 93.315 Institutional appeals.
+
+(a) If a respondent appeals an institution's finding(s) of research misconduct or institutional actions, the institution must promptly notify ORI.
+(b) If the institution has not transmitted its institutional record to ORI in accordance with § 93.316 prior to the appeal, the institution must wait until the appeal is concluded to transmit its institutional record. The institution must ensure that the complete record of the appeal is included in the institutional record consistent with § 93.220(a)(5).
+(c) If the institution has transmitted its institutional record to ORI in accordance with § 93.316 prior to the appeal, the institution must provide ORI a complete record of the appeal once the appeal is concluded.
+
+§ 93.316 Transmittal of the institutional record to ORI.
+
+After the Institutional Deciding Official has made a final determination of research misconduct findings in accordance with § 93.314, the institution must transmit the institutional record to ORI. The institutional record must be consistent with § 93.220 and logically organized.
+
+§ 93.317 Completing the research misconduct process.
+
+(a) ORI expects institutions to carry inquiries and investigations through to completion and to pursue diligently all significant issues and credible allegations of research misconduct. Institutions must notify ORI in advance if the institution plans to close a research misconduct proceeding at the assessment, inquiry, investigation, or appeal stage on the basis that the respondent has admitted to committing research misconduct or a settlement with the respondent has been reached.
+(b) A respondent's admission of research misconduct must be made in writing and signed by the respondent. An admission must specify the falsification, fabrication, and/or plagiarism that occurred and which research records were affected. The admission statement must meet all elements required for a research misconduct finding under § 93.103 and must be provided to ORI before the institution closes its research misconduct proceeding. The institution must also provide a statement to ORI describing how it determined that the scope of the misconduct was fully addressed by the admission and confirmed the respondent's culpability.
+(c) After consulting with the institution on its basis for closing a case under paragraph (a) of this section, ORI may conduct an oversight review of the institution's handling of the case and take appropriate action including:
+(1) Approving or conditionally approving closure of the case;
+(2) Directing the institution to complete its process;
+(3) Directing the institution to address deficiencies in the institutional record;
+(4) Referring the matter for further investigation by HHS; or
+(5) Taking a compliance action.
+
+Other Institutional Responsibilities
+
+§ 93.318 Retention and custody of the institutional record and all sequestered evidence.
+
+(a) Maintenance of institutional record and all sequestered evidence. An institution must maintain the institutional record and all sequestered evidence including physical objects (regardless of whether the evidence is part of the institutional record) in a secure manner for seven years after completion of the proceeding or the completion of any HHS proceeding involving the research misconduct allegation under subparts D and E of this part, whichever is later, unless custody has been transferred to HHS under paragraph (b) of this section or ORI advises otherwise in writing.
+(b) Provision for HHS custody. On request, institutions must transfer custody, or provide copies, to HHS of the institutional record or any component of the institutional record and any sequestered evidence (regardless of whether the evidence is included in the institutional record) for ORI to conduct its oversight review, develop the administrative record, or present the administrative record in any proceeding under subparts D and E of this part.
+
+§ 93.319 Institutional standards of conduct.
+
+Institutions may have standards of conduct different from the standards for research misconduct under this part. ORI findings of research misconduct or HHS settlements of research misconduct proceedings, or the absence thereof, do not affect institutional findings or actions taken based on an institution's standards of conduct.
+
+Subpart D—Responsibilities of the U.S. Department of Health and Human Services
+
+General Information
+
+§ 93.400 General statement of ORI authority.
+
+(a) ORI review. ORI may respond directly to any allegation of research misconduct at any time before, during, or after an institution's response to the matter. The ORI response may include but is not limited to:
+(1) Conducting allegation assessments;
+(2) Determining independently whether jurisdiction exists under this part;
+(3) Forwarding allegations of research misconduct to the appropriate institution or HHS component for inquiry or investigation;
+(4) Requesting clarification or additional information, documentation, research records, or other evidence as necessary from an institution or its members or other persons or sources to carry out ORI's review;
+(5) Notifying or requesting assistance and information from PHS funding components, other affected Federal and state offices and agencies, or institutions;
+(6) Reviewing the institutional record and directing the institution to address deficiencies or additional allegations in the institutional record;
+(7) Making a finding of research misconduct; and
+(8) Taking actions as necessary to protect the health and safety of the public, to promote the integrity of PHS-supported biomedical or behavioral research, biomedical or behavioral research training, or activities related to that research or research training, or to conserve public funds.
+(b) ORI assistance to institutions. ORI may:
+(1) Provide information, technical assistance, and procedural advice to institutional officials as needed regarding an institution's research misconduct proceedings and the sufficiency of the institutional record; and
+(2) Issue guidance and provide information to support institutional implementation of and/or compliance with the requirements of this part.
+(c) Review of institutional research integrity assurances. ORI will review institutional research integrity assurances and policies and procedures for compliance with this part.
+(d) Institutional compliance. ORI may make findings and impose ORI compliance actions related to an institution's compliance with this part and with its policies and procedures, including an institution's participation in research misconduct proceedings.
+
+§ 93.401 Interaction with other entities and interim actions.
+
+(a) ORI may notify and consult with other entities, including government funding agencies, institutions, journals, publishers, and editors, at any time if those entities have a need to know about or have information relevant to a research misconduct proceeding.
+(b) If ORI believes that a criminal or civil fraud violation may have occurred, it shall promptly refer the matter to the Department of Justice (DOJ), the HHS Office of Inspector General (OIG), or other appropriate investigative body.
+(c) ORI may provide expertise and assistance to the DOJ, OIG, PHS offices, other Federal offices, and state or local offices involved in investigating or otherwise pursuing research misconduct allegations or related matters.
+(d) ORI may notify affected PHS offices and funding components at any time to enable them to take appropriate interim actions.
+(e) The information provided will not be disclosed as part of the peer review and advisory committee review processes but may be used by the Secretary in making decisions about the award or continuation of funding.
+(f) ORI may refer a research misconduct matter to the SDO at any time for consideration under the HHS suspension and debarment regulations. ORI may provide technical assistance and share other information that the SDO needs to know to consider the referred matter.
+
+Research Misconduct Issues
+
+§ 93.402 ORI allegation assessments.
+
+(a) When ORI receives an allegation, it may conduct an assessment or refer the matter to the relevant institution for an assessment, inquiry, or other appropriate actions.
+(b) If ORI conducts an assessment and determines an inquiry is warranted, it forwards the matter to the appropriate institution or HHS component.
+(c) If ORI conducts an assessment and determines an inquiry is not warranted, it will close the case and forward the allegation in accordance with paragraph (d) in this section.
+(d) ORI may refer allegations that do not fall within the jurisdiction of this part to the appropriate HHS component, Federal or state agency, institution, organization, journal, or other appropriate entity.
+
+§ 93.403 ORI review of research misconduct proceedings.
+
+(a) In conducting its review of research misconduct proceedings, ORI will:
+(1) Determine whether this part applies;
+(2) Consider the institutional record and determine whether the institutional record is sufficient, provide instructions to the institution(s) if ORI determines that revisions are needed or additional allegations of research misconduct should be addressed, and require institutions to provide the respondent with an opportunity to respond to information or allegations added to the institutional record;
+(3) Determine whether the institution conducted the proceedings in a timely and fair manner in accordance with this part with sufficient thoroughness, objectivity, and competence to support the conclusions; and
+(4) After reviewing in accordance with paragraphs (a)(1) through (3) of this section, determine whether to close the case without further action or proceed with the case.
+(b) If ORI determines to proceed with the case, ORI will:
+(1) Obtain additional information or materials from the institution, the respondent, complainants, or other sources, as needed;
+(2) Conduct additional analyses, as needed;
+(3) Provide the respondent the opportunity to access the institutional record, any additional information provided to ORI while the case is pending before ORI, and any analysis or additional information generated or obtained by ORI;
+(4) Provide the respondent the opportunity to submit information to ORI;
+(5) Allow the respondent and the respondent's attorney, if represented, to meet virtually or in person with ORI to discuss the information that the respondent has provided to ORI;
+(6) Have ORI's virtual or in-person meeting(s) with the respondent transcribed and provide a copy of the transcript to the respondent for review and suggested correction;
+(7) Close the administrative record following paragraphs (b)(3) through (6) of this section;
+(8) Provide the respondent the opportunity to access the complete administrative record; and
+(9) Take any other actions necessary to complete ORI's review of the research misconduct proceedings.
+
+§ 93.404 Findings of research misconduct and proposed HHS administrative actions.
+
+(a) After completing its review of the administrative record, ORI may:
+(1) Close the case without a separate ORI finding of research misconduct;
+(2) Make findings of research misconduct and propose and take HHS administrative actions based on the administrative record; or
+(3) Seek to settle the case.
+(b) The lack of an ORI finding of research misconduct does not overturn an institution's determination that the conduct constituted professional or research misconduct warranting remediation under the institution's policy.
+
+§ 93.405 Notifying the respondent of findings of research misconduct and proposed HHS administrative actions.
+
+(a) When ORI makes a finding of research misconduct or proposes HHS administrative actions, it notifies the respondent in a charge letter. The charge letter:
+(1) Includes ORI's findings of research misconduct, including the basis for such findings in the administrative record, and any proposed HHS administrative actions;
+(2) Advises the respondent how to access the administrative record; and
+(3) Informs the respondent of the opportunity to contest the findings and proposed HHS administrative actions under subpart E of this part.
+(b) ORI sends the charge letter by certified mail, private delivery service, or electronic mail or other electronic means to the last known address of the respondent or the last known principal place of business of the respondent's attorney, if represented.
+
+§ 93.406 Final HHS actions.
+
+Unless the respondent contests the findings and/or the proposed HHS administrative actions contained in the charge letter within the 30-day period prescribed in § 93.501(a), the ORI findings and HHS administrative actions are final.
+
+§ 93.407 HHS administrative actions.
+
+(a) Based on the administrative record, HHS may impose administrative actions that include but are not limited to:
+(1) Clarification, correction, or retraction of the research record.
+(2) Letter(s) of reprimand.
+(3) Imposition of special certification or research integrity assurance requirements to ensure compliance with applicable regulations or terms of HHS grants, contracts, or cooperative agreements.
+(4) Suspension of award activities under, or termination of, a PHS grant, contract, or cooperative agreement.
+(5) Restriction on specific activities or expenditures under an active PHS grant, contract, or cooperative agreement.
+(6) Special review of all the respondent's requests for PHS funding.
+(7) Imposition of supervision requirements on a PHS grant, contract, or cooperative agreement.
+(8) Certification of attribution or authenticity in all requests for support and reports to PHS.
+(9) Prohibition of the respondent in participating in any advisory capacity with the PHS.
+(10) Recommending that the relevant agency take adverse personnel action(s), if the respondent is a Federal employee, in compliance with relevant Federal personnel policies and laws.
+(b) In connection with research misconduct findings, HHS also may seek to recover PHS funds spent supporting activities involving research misconduct.
+(c) Any authorized HHS component may impose, administer, or enforce administrative actions separately or in coordination with other HHS components, including, but not limited to ORI, OIG, and the PHS funding component.
+(d) HHS administrative actions under this part do not include suspension or debarment. Regardless of whether HHS administrative actions are imposed under this part, HHS may pursue suspension and debarment under the HHS suspension and debarment regulations.
+
+§ 93.408 Mitigating and aggravating factors in HHS administrative actions.
+
+The purpose of HHS administrative actions is remedial. The appropriate administrative action is commensurate with the seriousness of the misconduct and the need to protect the health and safety of the public, promote the integrity of the PHS-supported research and research process, and conserve public funds. ORI considers the following aggravating and mitigating factors in determining appropriate HHS administrative actions and their terms. The existence or nonexistence of any factor is not determinative.
+(a) Knowing, intentional, or reckless. Were the respondent's actions knowing or intentional or were the actions reckless?
+(b) Pattern. Was the research misconduct an isolated event or part of a continuing or prior pattern of dishonest conduct?
+(c) Impact. Did the misconduct have significant impact on the proposed or reported research record, research subjects, other researchers, institutions, or the public health or welfare?
+(d) Acceptance of responsibility. Has the respondent accepted responsibility for the misconduct by:
+(1) Admitting the conduct;
+(2) Cooperating with the research misconduct proceedings;
+(3) Demonstrating remorse and awareness of the significance and seriousness of the research misconduct; and
+(4) Taking steps to correct or prevent the recurrence of the research misconduct?
+(e) Failure to accept responsibility. Does the respondent blame others rather than accepting responsibility for the actions?
+(f) Retaliation. Did the respondent retaliate against complainants, witnesses, committee members, or other individuals?
+(g) Continued risk to PHS funding. Does the respondent demonstrate responsible stewardship of research resources?
+(h) Other factors. Are other factors relevant to the circumstances of a particular case?
+
+§ 93.409 Settlement of research misconduct proceedings.
+
+(a) HHS may settle a research misconduct proceeding at any time it determines that settlement is in the best interests of the Federal Government and the public health or welfare.
+(b) Settlement agreements are publicly available, regardless of whether ORI made a finding of research misconduct.
+(c) A settlement agreement precludes the respondent from contesting any ORI findings of research misconduct, HHS administrative actions, or ORI's jurisdiction in handling the research misconduct proceeding.
+
+§ 93.410 Final HHS action with no settlement or finding of research misconduct.
+
+When the final HHS action does not result in a settlement or finding of research misconduct, ORI may provide written notice to the respondent, the relevant institution, the complainant, and HHS officials.
+
+§ 93.411 Final HHS action with a settlement or finding of research misconduct.
+
+When a final HHS action results in a settlement or research misconduct finding(s), ORI may:
+(a) Provide final notification of any research misconduct findings and HHS administrative actions to the respondent, the relevant institution, and appropriate HHS officials.
+(b) Provide final notification of any research misconduct findings and HHS administrative actions to the complainant(s).
+(c) Send a notice to the relevant journal, publisher, data repository, or other similar entity identifying publications or research records that require correction or retraction.
+(d) Publish notice of the research misconduct findings.
+(e) Notify the respondent's current employer if the employer is an institution subject to this part.
+
+Institutional Compliance Issues
+
+§ 93.412 Making decisions on institutional noncompliance.
+
+ORI may determine an institution is not compliant with this part if the institution does not implement and follow the requirements of this part and its own research integrity assurance. In making this decision, ORI may consider, but is not limited to the following factors:
+(a) Failure to establish and comply with policies and procedures under this part;
+(b) Failure to respond appropriately when allegations of research misconduct arise;
+(c) Failure to report to ORI all investigations and findings of research misconduct under this part;
+(d) Failure to cooperate with ORI's review of research misconduct proceedings; or
+(e) Other actions or omissions that have a material, adverse effect on reporting and responding to allegations of research misconduct.
+
+§ 93.413 ORI compliance actions.
+
+(a) If ORI determines an institution is not compliant with this part, it may take a compliance action against the institution.
+(b) If ORI determines an institution is not compliant with this part, ORI may take any or all of the following compliance actions:
+(1) Require the institution to accept and/or implement technical assistance provided by ORI.
+(2) Issue a letter of reprimand.
+(3) Require the institution to take corrective actions.
+(4) Place the institution on special review status. For a designated period, ORI will closely monitor the institution's activities for compliance with this part. Monitoring may consist of, but is not limited to, compliance reviews and/or audits.
+(5) Direct that research misconduct proceedings be handled by HHS.
+(6) Any other action appropriate to the circumstances.
+(c) If an institution fails to comply with the requirements of this part, ORI may refer the institution to the SDO for consideration under the HHS suspension and debarment regulations.
+(d) If the institution's actions constitute a substantial or recurrent failure to comply with this part, ORI may revoke the institution's research integrity assurance under § 93.301 or § 93.303.
+(e) ORI may make public any findings of institutional noncompliance and ORI compliance actions.
+
+Disclosure of Information
+
+§ 93.414 Notice.
+
+(a) ORI may disclose information to other persons for the purpose of providing or obtaining information about research misconduct as permitted under the Privacy Act, 5 U.S.C. 552a and ORI's system of records notice for research misconduct proceedings.
+(b) ORI may disclose or publish a notice regarding settlements, ORI findings of research misconduct, and HHS administrative actions, and release or withhold information as permitted by the Privacy Act and the Freedom of Information Act, 5 U.S.C. 552.
+
+Subpart E—Opportunity To Contest ORI Findings of Research Misconduct and Proposed HHS Administrative Actions
+
+General Information
+
+§ 93.500 General policy.
+
+(a) This subpart provides a respondent an opportunity to contest ORI findings of research misconduct and/or proposed HHS administrative actions included in a charge letter.
+(b) A respondent may contest ORI's research misconduct findings and proposed HHS administrative actions by filing a notice of appeal with an Administrative Law Judge (ALJ) at the DAB.
+(c) Based on the administrative record, the ALJ shall rule on whether ORI's research misconduct findings and any proposed HHS administrative actions are reasonable and not based on a material error of law or fact. The ALJ's ruling constitutes a recommended decision to the Assistant Secretary for Health (ASH) in accordance with § 93.511(b).
+(d) A respondent must exhaust all available administrative remedies under this subpart before seeking judicial review of ORI's findings and/or HHS administrative actions. The contested findings and/or administrative actions shall be inoperative while the respondent is pursuing administrative remedies under this subpart.
+
+Process for Contesting Research Misconduct Findings and/or Proposed HHS Administrative Actions
+
+§ 93.501 Notice of appeal.
+
+(a) Time to file. A respondent may contest ORI's findings of research misconduct and/or proposed HHS administrative actions by filing a notice of appeal within 30 days of receipt of the charge letter provided under § 93.405.
+(b) Form of a notice of appeal. The respondent's notice of appeal must be:
+(1) In writing;
+(2) Signed by the respondent or by the respondent's attorney; and
+(3) Submitted to the DAB Chair through the DAB electronic filing system, with a copy sent to ORI by certified mail, electronic mail, or other equivalent (i.e., with a verified method of delivery).
+(c) Contents of a notice of appeal. The notice of appeal must:
+(1) Admit or deny each ORI finding of research misconduct and each factual assertion made in support of each finding;
+(2) Accept or challenge each proposed HHS administrative action;
+(3) Provide detailed, substantive reasons for each denial or challenge with references to the administrative record;
+(4) Identify any legal issues or defenses that the respondent intends to raise during the proceeding, with references to the administrative record; and
+(5) Identify any mitigating factors in the administrative record.
+
+§ 93.502 Appointment of the Administrative Law Judge.
+
+(a) Within 30 days of receiving a notice of appeal, the DAB Chair, in consultation with the Chief ALJ, must designate an ALJ to determine whether the notice of appeal is timely filed and within the ALJ's jurisdiction under this subpart. If the appeal is determined to be timely and within the ALJ's jurisdiction, the ALJ shall decide the reasonableness of the ORI research misconduct findings and proposed HHS administrative actions in accordance with this subpart. The ALJ shall dismiss an appeal if it is untimely or not within the ALJ's jurisdiction under this subpart.
+(b) No ALJ may serve in any proceeding under this subpart if they have any actual or apparent conflict of interest, bias, or prejudice that might reasonably impair their objectivity in the proceeding.
+(c) Any party to the proceeding may request the ALJ to withdraw from the proceeding because of an actual or apparent conflict of interest, bias, or prejudice under paragraph (b) of this section. The motion to disqualify must be timely and state with particularity the grounds for disqualification. The ALJ may rule upon the motion or certify it to the Chief ALJ for decision. If the ALJ rules upon the motion, either party may appeal the decision to the Chief ALJ.
+(d) An ALJ must withdraw from any proceeding for any reason found by the ALJ or Chief ALJ to be disqualifying.
+
+§ 93.503 Filing of the administrative record.
+
+(a) For appeals that are not dismissed under § 93.502(a), ORI will file the administrative record for the appeal.
+(b) The ALJ's review will be based on the administrative record.
+(c) The parties have no right to supplement the administrative record.
+
+§ 93.504 Standard of review.
+
+(a) The ALJ shall review the administrative record to determine whether the ORI research misconduct findings and proposed HHS administrative actions reflected in the charge letter are reasonable and not based on a material error of law or fact.
+(b) The ALJ may permit the parties to file briefs making legal and factual arguments based on the administrative record.
+
+§ 93.505 Rights of the parties.
+
+(a) The parties to the appeal are the respondent and ORI. The investigating institution is not a party to the case unless it is a respondent.
+(b) Except as otherwise limited by this subpart, the parties may:
+(1) Be accompanied, represented, and advised by an attorney;
+(2) Participate in any case-related conference held by the ALJ; and
+(3) File motions or briefs in writing before the ALJ.
+(c) The parties have no right to discovery before the ALJ.
+
+§ 93.506 Authority of the Administrative Law Judge.
+
+(a) The ALJ assigned to the case must conduct a fair and impartial proceeding, avoid unnecessary delay, maintain order, and assure that a complete and accurate record of the proceeding is properly made. The ALJ is bound by, and may not refuse to follow or find invalid, all Federal statutes and regulations, Secretarial delegations of authority, and applicable HHS policies, as provided in paragraph (c)(5) of this section.
+(b) Subject to review as provided elsewhere in this subpart, the ALJ may:
+(1) Hold conferences with the parties to identify or simplify the issues, or to consider other matters that may aid in the prompt disposition of the proceeding;
+(2) Rule on motions and other procedural matters;
+(3) Except for the respondent's notice of appeal, modify the time for the filing of any document required or authorized under the rules in this subpart;
+(4) Upon motion of a party, decide cases, in whole or in part, by summary judgment where there is no disputed issue of material fact;
+(5) Regulate the course of the appeal and the conduct of representatives and parties; and
+(6) Take action against any party for failing to follow an order or procedure or for disruptive conduct.
+(c) The ALJ does not have the authority to:
+(1) Enter an order in the nature of a directed verdict;
+(2) Compel settlement negotiations;
+(3) Enjoin any act of the Secretary;
+(4) Review suspension or proposed debarment;
+(5) Find invalid or refuse to follow Federal statutes or regulations, Secretarial delegations of authority, or HHS policies;
+(6) Authorize the parties to engage in discovery; and
+(7) Modify the time for filing the respondent's notice of appeal.
+(d) The Federal Rules of Evidence and the Federal Rules of Civil Procedure do not govern the proceedings under this subpart.
+
+§ 93.507 Ex parte communications.
+
+(a) No party, attorney, or other party representative may communicate ex parte with the ALJ on any matter at issue in a case, unless both parties have notice and an opportunity to participate in the communication.
+(b) If an ex parte communication occurs, the ALJ will disclose it to the other party and offer the other party an opportunity to comment.
+(c) The provisions of this section do not apply to communications between an employee or contractor of the DAB and the ALJ.
+
+§ 93.508 Filing, format, and service.
+
+(a) Filing. (1) Unless the ALJ provides otherwise, all submissions required or authorized to be filed in the proceeding must be filed with the ALJ.
+(2) Submissions are considered filed when they are filed with the DAB according to the DAB's filing guidance.
+(b) Format. (1) The ALJ may designate the format for copies of nondocumentary materials such as videotapes, computer disks, or physical evidence. This provision does not apply to the charge letter or other written notice provided under § 93.405.
+(2) Every submission filed in the proceeding must include the title of the case, the docket number, and a designation of the nature of the submission.
+(3) Every submission filed in the proceeding must be signed by and contain the address and telephone number of the party on whose behalf the document or paper was filed, or the attorney of record for the party.
+(c) Service. Service of a submission on other parties is accomplished by filing the submission with the ALJ through the DAB electronic filing system.
+
+§ 93.509 Filing motions.
+
+(a) Parties must file all motions and requests for an order or ruling with the ALJ, serve them on the other party, state the nature of the relief requested, provide the legal authority relied upon, and state the facts alleged in support of the motion or request.
+(b) All motions must be in writing.
+(c) Within 10 days after being served with a motion, or other time as set by the ALJ, a party may file a response to the motion. The moving party may not file a reply to the response unless allowed by the ALJ.
+(d) The ALJ may not grant a motion before the time for filing a response has expired, except with the parties' consent. However, the ALJ may overrule or deny any motion without awaiting a response.
+(e) The ALJ must make a reasonable effort to dispose of all motions promptly.
+
+§ 93.510 Conferences.
+
+(a) The ALJ must schedule an initial conference with the parties within 30 days of the DAB Chair's assignment of the case.
+(b) The ALJ may use the initial conference to discuss:
+(1) Identification and simplification of the issues, specification of genuine disputes of fact and their materiality to the ORI findings of research misconduct, and any proposed HHS administrative actions;
+(2) Identification of material legal issues and any need for briefing;
+(3) Scheduling dates for the filing of briefs based on the administrative record; and
+(4) Other matters that may encourage the fair, just, and prompt disposition of the proceedings.
+(c) The ALJ may schedule additional conferences as appropriate, upon reasonable notice to or request of the parties.
+(d) All conferences will be recorded with copies provided to the parties upon request.
+(e) Whenever possible, the ALJ shall memorialize in writing any oral rulings within 10 days after a conference is held.
+
+§ 93.511 The Administrative Law Judge's ruling.
+
+(a) Based on the administrative record, the ALJ shall issue a ruling in writing within 60 days after the last submission by the parties in the case, setting forth whether ORI's research misconduct findings and proposed HHS administrative actions reflected in the charge letter are reasonable and not based on a material error of law or fact. If the ALJ is unable to meet the 60-day deadline, the ALJ must set a new deadline and promptly notify the parties. The ALJ shall serve a copy of the ruling upon the parties and the ASH.
+(b) The ruling of the ALJ constitutes a recommended decision to the ASH. The ASH may review the ALJ's recommended decision and adopt, modify, or reject it (in whole or in part) as needed to ensure that the decision is reasonable and not based on a material error of law or fact. Within 30 days after service of the ALJ's recommended decision, the ASH shall notify the parties of the ASH's intent to review or not to review the ALJ's recommended decision. If the ASH does not provide notice of intent within the 30-day period or notifies the parties that the ASH does not intend to review the ALJ's recommended decision, the ALJ's recommended decision shall become final. An ALJ's recommended decision that becomes final in that manner or the ASH's decision after review constitutes the final HHS action on both ORI's findings of research misconduct and any HHS administrative actions.

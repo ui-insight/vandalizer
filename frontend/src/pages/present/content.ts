@@ -5,8 +5,8 @@
  * edit this file, keep it honest — if a capability isn't exposed to a real user,
  * it doesn't belong here. Quick "claim → where it lives" map for reviewers:
  *
- *   Structured extraction ........ Workflows editor + extraction tasks   (/workflows, Docs "User Guide")
- *   Workflow DAG engine .......... Workflow editor, batch runs           (/workflows/$id)
+ *   Structured extraction ........ Workflows editor + extraction tasks   (workspace Library tab, Docs "User Guide")
+ *   Workflow DAG engine .......... Workflow editor panel, batch runs     (/workflows/$id → workspace)
  *   RAG chat with citations ...... Workspace chat mode                   (/?mode=chat)
  *   Knowledge bases .............. Workspace knowledge mode              (/?mode=knowledge)
  *   Projects (scoped workspace) .. Workspace Projects drawer             (/?project=…)

@@ -26,6 +26,7 @@ def _make_user(user_id="user1", is_admin=False, current_team=None):
     user.is_examiner = False
     user.current_team = current_team
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     user.organization_id = None
     user.api_token_hash = None

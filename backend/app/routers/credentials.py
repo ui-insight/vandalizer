@@ -15,7 +15,7 @@ from app.schemas.credentials import (
     CredentialResponse,
     UpdateCredentialRequest,
 )
-from app.services import credentials_service
+from app.services import audit_service, credentials_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -201,6 +201,15 @@ async def delete_credential(credential_id: str, user: User = Depends(get_current
     cred_id = str(cred.id)
     await cred.delete()
     credentials_service.invalidate_cached_token(cred_id)
+    await audit_service.log_event(
+        action="credential.delete",
+        actor_user_id=user.user_id,
+        resource_type="credential",
+        resource_id=cred_id,
+        resource_name=cred.name,
+        team_id=cred.team_id,
+        detail={"credential_type": cred.type},
+    )
     return {"status": "deleted", "id": cred_id}
 
 

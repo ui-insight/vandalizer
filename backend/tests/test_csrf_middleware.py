@@ -26,6 +26,7 @@ def _make_user(**overrides):
         "organization_id": None,
         "is_demo_user": False,
         "demo_status": None,
+        "token_version": 0,
     }
     defaults.update(overrides)
     user = MagicMock()
@@ -287,6 +288,36 @@ class TestCSRFMiddleware:
         assert resp.status_code != 403
 
     @pytest.mark.asyncio
+    async def test_insecure_mode_accepts_stale_modern_cookie(self, client):
+        """HTTP (insecure) server + a leftover ``__Host-`` cookie from HTTPS.
+
+        A box that was ever visited over HTTPS can retain the ``__Host-``
+        cookie in the jar. The SPA prefers that name, so the header carries
+        its value — the server must accept it even though the legacy name is
+        primary in insecure mode, or every POST 403s until the jar is cleared.
+        """
+        user = _make_user()
+        token = create_access_token("testuser", _TEST_SETTINGS)
+        modern_value = secrets.token_urlsafe(32)
+
+        with patch("app.dependencies.get_settings", return_value=_TEST_SETTINGS), \
+             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/search",
+                json={"query": "test"},
+                cookies={
+                    "access_token": token,
+                    "__Host-csrf_token": modern_value,
+                },
+                headers={"X-CSRF-Token": modern_value},
+            )
+
+        assert resp.status_code != 403, resp.text
+
+    @pytest.mark.asyncio
     async def test_stale_spa_with_both_cookies_accepts_legacy_header(self, client):
         """Stale OLD-SPA tab post-deploy: both cookies set, header from legacy.
 
@@ -299,7 +330,9 @@ class TestCSRFMiddleware:
         long-lived tabs 403s until the user reloads.
         """
         prod_settings = Settings(
-            jwt_secret_key="test-secret-key", environment="production"
+            jwt_secret_key="test-secret-key",
+            environment="production",
+            frontend_url="https://vandalizer.example.edu",
         )
         user = _make_user()
         token = create_access_token("testuser", prod_settings)
@@ -337,7 +370,9 @@ class TestCSRFMiddleware:
         value present in the raw cookie header, not just the dedup'd one.
         """
         prod_settings = Settings(
-            jwt_secret_key="test-secret-key", environment="production"
+            jwt_secret_key="test-secret-key",
+            environment="production",
+            frontend_url="https://vandalizer.example.edu",
         )
         user = _make_user()
         token = create_access_token("testuser", prod_settings)
@@ -378,7 +413,9 @@ class TestCSRFMiddleware:
         jar with a different random value.
         """
         prod_settings = Settings(
-            jwt_secret_key="test-secret-key", environment="production"
+            jwt_secret_key="test-secret-key",
+            environment="production",
+            frontend_url="https://vandalizer.example.edu",
         )
         user = _make_user()
         token = create_access_token("testuser", prod_settings)

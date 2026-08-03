@@ -26,6 +26,22 @@ export function getCsrfToken(): string | null {
   return parseCsrfToken(document.cookie)
 }
 
+// A request that dies before any response arrives (connection refused/reset,
+// DNS failure, backend restarting mid-deploy) surfaces as a bare TypeError
+// whose message is the browser's "Failed to fetch" — alarming and useless to
+// an end user. Translate it into something actionable.
+export const NETWORK_ERROR_MESSAGE =
+  "Couldn't reach the server — check your connection and try again."
+
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError
+}
+
+// One quiet retry for GETs that hit a transient network failure (backend
+// container mid-restart, brief wifi/VPN blip). Only GETs: they're safe to
+// repeat, while a retried POST could double-apply a mutation.
+const NETWORK_RETRY_DELAY_MS = 500
+
 // Self-heal stale tabs whose CSRF cookie/header pairing is broken (old SPA
 // bundle still in cache, browser extension stripping the cookie, etc.).
 // A reload pulls a fresh index.html (which nginx serves with no-cache), the
@@ -83,11 +99,17 @@ export async function rawFetch(
   const csrf = getCsrfToken()
   if (csrf && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = csrf
 
-  const res = await fetch(url, {
-    ...init,
-    credentials: 'include',
-    headers,
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      ...init,
+      credentials: 'include',
+      headers,
+    })
+  } catch (err) {
+    if (isNetworkError(err)) throw new ApiError(0, NETWORK_ERROR_MESSAGE)
+    throw err
+  }
 
   if (res.status === 403) {
     // Clone so the caller can still read the body if self-heal doesn't fire.
@@ -106,21 +128,46 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const { timeoutMs = 60_000, ...fetchOptions } = options
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  // A caller-provided signal must still cancel the request even though the
+  // fetch itself is wired to the internal timeout controller.
+  const callerSignal = fetchOptions.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort()
+    else callerSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
 
-  let res: Response
-  try {
-    res = await fetch(url, {
+  const method = (fetchOptions.method ?? 'GET').toUpperCase()
+  const attempt = () =>
+    fetch(url, {
       ...fetchOptions,
       credentials: 'include',
       headers: buildHeaders(fetchOptions),
       signal: controller.signal,
     })
+
+  let res: Response
+  try {
+    try {
+      res = await attempt()
+    } catch (err) {
+      if (!isNetworkError(err) || method !== 'GET' || controller.signal.aborted) {
+        throw err
+      }
+      await new Promise((resolve) => setTimeout(resolve, NETWORK_RETRY_DELAY_MS))
+      res = await attempt()
+    }
   } catch (err) {
     clearTimeout(timer)
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new ApiError(0, 'Request timed out')
+      if (timedOut) throw new ApiError(0, 'Request timed out')
+      throw err // caller-initiated abort — let the caller recognize its own cancel
     }
+    if (isNetworkError(err)) throw new ApiError(0, NETWORK_ERROR_MESSAGE)
     throw err
   }
   clearTimeout(timer)
@@ -130,14 +177,16 @@ export async function apiFetch<T>(
     const detail = body401?.detail
     // Only attempt token refresh for authenticated endpoints (not login itself)
     if (!detail || detail === 'Not authenticated') {
-      const refreshed = await refreshToken()
+      // A network failure during refresh/retry falls through to the plain
+      // 401 below rather than leaking a raw "Failed to fetch" TypeError.
+      const refreshed = await refreshToken().catch(() => false)
       if (refreshed) {
         const retry = await fetch(url, {
           ...options,
           credentials: 'include',
           headers: buildHeaders(options),
-        })
-        if (retry.ok) return retry.json()
+        }).catch(() => null)
+        if (retry?.ok) return retry.json()
       }
     }
     throw new ApiError(401, typeof detail === 'string' ? detail : 'Not authenticated')

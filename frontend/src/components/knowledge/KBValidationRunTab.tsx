@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Play, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
+import { Play, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import {
+  type KBValidationExportFormat,
   type KBValidationMode,
   type KBValidationResult,
   type KBValidationDetail,
@@ -16,9 +17,12 @@ interface Props {
   running: boolean
   error: string | null
   onRun: (mode: KBValidationMode) => void
+  /** Downloads the displayed run's per-query results. Absent until the run's
+   * persisted uuid is known (i.e. before any run has landed this session). */
+  onExport?: (format: KBValidationExportFormat) => void | Promise<void>
 }
 
-export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun }: Props) {
+export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun, onExport }: Props) {
   const [mode, setMode] = useState<KBValidationMode>('judge+baseline')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -93,6 +97,19 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
         </div>
       ) : (
         <div>
+          {/* Export the displayed run for outside-Vandalizer analysis */}
+          {onExport && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <Download size={11} style={{ color: '#888' }} aria-hidden="true" />
+              <span style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Export results
+              </span>
+              {(['csv', 'xlsx', 'json'] as const).map(f => (
+                <ExportButton key={f} format={f} onExport={onExport} />
+              ))}
+            </div>
+          )}
+
           {/* Certified quality headline — same score as the KB quality tile */}
           <CertifiedQualityCard run={latestRun} />
 
@@ -133,6 +150,37 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
         </div>
       )}
     </div>
+  )
+}
+
+function ExportButton({ format, onExport }: {
+  format: KBValidationExportFormat
+  onExport: (format: KBValidationExportFormat) => void | Promise<void>
+}) {
+  const [busy, setBusy] = useState(false)
+  const label = format === 'csv' ? 'CSV' : format === 'xlsx' ? 'Excel' : 'JSON'
+  const click = async () => {
+    setBusy(true)
+    try {
+      await onExport(format)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => void click()}
+      style={{
+        fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
+        padding: '2px 8px', borderRadius: 4,
+        color: busy ? '#555' : '#7dd3fc', background: 'transparent',
+        border: '1px solid #2e3a52', cursor: busy ? 'wait' : 'pointer',
+      }}
+    >
+      {busy ? '…' : label}
+    </button>
   )
 }
 

@@ -1,6 +1,7 @@
 """Knowledge Base API routes."""
 
 import asyncio
+import datetime
 import logging
 import re
 
@@ -12,6 +13,8 @@ from app.rate_limit import limiter
 from app.models.user import User
 from app.models.validation_run import ValidationRun
 from app.models.kb_optimization_run import KBOptimizationRun
+from app.models.library import LibraryItemKind
+from app.models.verification import VerifiedItemMetadata
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
@@ -33,7 +36,9 @@ from app.schemas.knowledge import (
     UpdateKBRequest,
     UpdateSourceRequest,
 )
+from app.services import access_control
 from app.services import knowledge_service as svc
+from app.services.name_conflicts import DuplicateNameError
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +93,14 @@ class _TrustSummary:
         self.at = at
 
 
-def _kb_response(kb, *, scope: str | None = None, trust: "_TrustSummary | None" = None) -> KBResponse:
+def _kb_response(
+    kb,
+    *,
+    scope: str | None = None,
+    trust: "_TrustSummary | None" = None,
+    last_used_at: datetime.datetime | None = None,
+    can_manage: bool = True,
+) -> KBResponse:
     import datetime as _dt
     override = getattr(kb, "rag_config_override", None)
     # Only consider this a real applied override if the value is dict-shaped.
@@ -130,7 +142,36 @@ def _kb_response(kb, *, scope: str | None = None, trust: "_TrustSummary | None" 
         last_validation_baseline_score=last_baseline,
         last_validation_lift=last_lift,
         last_validated_at=last_validated_at_str,
+        last_used_at=(
+            last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
+        ),
+        can_manage=can_manage,
     )
+
+
+async def _manage_flags_by_kb(
+    kbs: list, user: User, user_org_ancestry: list[str],
+) -> dict[str, bool]:
+    """Per-KB manage rights for the requesting user, keyed by KB uuid.
+
+    Mirrors the gate ``_require_manageable_kb`` applies on write endpoints, so
+    the UI can disable manage affordances (add sources, rename, share, delete)
+    up front rather than surfacing a 403 at the end of the flow. One team-access
+    lookup covers the whole batch.
+    """
+    if not kbs:
+        return {}
+    team_access = await access_control.get_team_access_context(user)
+    return {
+        kb.uuid: access_control.can_manage_knowledge_base(
+            kb,
+            user,
+            team_access,
+            user_org_ancestry=user_org_ancestry,
+            allow_admin=True,
+        )
+        for kb in kbs
+    }
 
 
 async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
@@ -204,6 +245,7 @@ def _source_response(s, *, document_title: str | None = None) -> KBSourceRespons
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
+        truncated=bool(getattr(s, "truncated", False)),
         created_at=s.created_at.isoformat() if s.created_at else None,
     )
 
@@ -222,7 +264,11 @@ async def list_knowledge_bases_legacy(user: User = Depends(get_current_user)):
     kbs = await svc.list_knowledge_bases_flat(
         user.user_id, team_id=team_id, user_org_ancestry=user_org_ancestry,
     )
-    return [_kb_response(kb) for kb in kbs]
+    manage_flags = await _manage_flags_by_kb(kbs, user, user_org_ancestry)
+    return [
+        _kb_response(kb, can_manage=manage_flags.get(kb.uuid, False))
+        for kb in kbs
+    ]
 
 
 def _classify_scope(kb, user_id: str, team_id: str | None) -> str:
@@ -262,7 +308,13 @@ async def list_knowledge_bases_v2(
 
     # Pre-load latest ValidationRun for every KB we'll render (including those
     # reached via references), so the AI-trust chip renders in one pass.
+    # A reference whose source KB no longer resolves (deleted, un-verified,
+    # retired from the catalog, or org-scoped away) is kept as a "broken"
+    # bookmark and rendered as an unavailable stub rather than silently
+    # dropped — otherwise the KB vanishes from My KBs with no explanation and
+    # the orphaned bookmark can never be cleaned up from the UI.
     ref_kbs: list = []
+    broken_refs: list = []
     if scope in (None, "mine"):
         for ref in await svc.list_references(user.user_id, team_id=team_id):
             source_kb = await svc.resolve_reference(
@@ -270,22 +322,71 @@ async def list_knowledge_bases_v2(
             )
             if source_kb:
                 ref_kbs.append((ref, source_kb))
+            else:
+                broken_refs.append(ref)
 
-    latest_runs = await _latest_runs_by_kb(
-        [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
+    # The Explore tab renders the catalog's curated display name
+    # (VerifiedItemMetadata.display_name) over the KB's own title, so adopted
+    # references must show the same name or a KB appears to rename itself
+    # between Explore and My KBs.
+    catalog_names: dict[str, str] = {}
+    if ref_kbs:
+        metas = await VerifiedItemMetadata.find({
+            "item_kind": LibraryItemKind.KNOWLEDGE_BASE.value,
+            "item_id": {"$in": [str(src.id) for _, src in ref_kbs]},
+        }).to_list()
+        catalog_names = {m.item_id: m.display_name for m in metas if m.display_name}
+
+    all_uuids = [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
+    latest_runs = await _latest_runs_by_kb(all_uuids)
+    usage_map = await svc.get_kb_usage_map(user.user_id, all_uuids)
+    manage_flags = await _manage_flags_by_kb(
+        list(kbs) + [src for _, src in ref_kbs], user, user_org_ancestry,
     )
 
     items: list[KBResponse] = []
     for kb in kbs:
         kb_scope = scope or _classify_scope(kb, user.user_id, team_id)
-        items.append(_kb_response(kb, scope=kb_scope, trust=latest_runs.get(kb.uuid)))
+        items.append(_kb_response(
+            kb,
+            scope=kb_scope,
+            trust=latest_runs.get(kb.uuid),
+            last_used_at=usage_map.get(kb.uuid),
+            can_manage=manage_flags.get(kb.uuid, False),
+        ))
 
     for ref, source_kb in ref_kbs:
-        resp = _kb_response(source_kb, scope="reference", trust=latest_runs.get(source_kb.uuid))
+        resp = _kb_response(
+            source_kb,
+            scope="reference",
+            trust=latest_runs.get(source_kb.uuid),
+            last_used_at=usage_map.get(source_kb.uuid),
+            can_manage=manage_flags.get(source_kb.uuid, False),
+        )
+        resp.title = catalog_names.get(str(source_kb.id), resp.title)
         resp.is_reference = True
         resp.source_kb_uuid = ref.source_kb_uuid
         resp.reference_uuid = ref.uuid
         items.append(resp)
+
+    for ref in broken_refs:
+        # Deliberately no title lookup on the source KB: the user may have
+        # lost view access, and echoing the title would leak it.
+        items.append(KBResponse(
+            uuid=ref.source_kb_uuid,
+            title="Knowledge base no longer available",
+            description=(
+                "This bookmark points to a knowledge base that was removed "
+                "from the catalog or is no longer shared with you."
+            ),
+            status="unavailable",
+            scope="reference",
+            is_reference=True,
+            source_kb_uuid=ref.source_kb_uuid,
+            reference_uuid=ref.uuid,
+            can_manage=False,
+            created_at=ref.created_at.isoformat() if ref.created_at else None,
+        ))
 
     return KBListResponse(items=items, total=total + len([i for i in items if i.is_reference]))
 
@@ -303,10 +404,13 @@ async def remove_reference(ref_uuid: str, user: User = Depends(get_current_user)
 async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_current_user)):
     # Title is validated (required, length, normalized) by CreateKBRequest's EntityName field.
     team_id = str(user.current_team) if user.current_team else None
-    kb = await svc.create_knowledge_base(
-        title=req.title, user_id=user.user_id,
-        team_id=team_id, description=req.description,
-    )
+    try:
+        kb = await svc.create_knowledge_base(
+            title=req.title, user_id=user.user_id,
+            team_id=team_id, description=req.description,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return _kb_response(kb)
 
 
@@ -336,6 +440,14 @@ async def convert_documents_to_kb(
             title = "Reference documents"
 
     team_id = str(user.current_team) if user.current_team else None
+    # This is a one-click recovery flow with an auto-picked title — suffix on
+    # collision instead of failing like the explicit create path does.
+    from app.services import name_conflicts
+    title = await name_conflicts.next_available_name(
+        title,
+        lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+        max_length=300,
+    )
     kb = await svc.create_knowledge_base(
         title=title, user_id=user.user_id, team_id=team_id, description=None,
     )
@@ -400,8 +512,13 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
     sources = await svc.get_kb_sources(kb.uuid)
     titles = await _resolve_document_titles(sources)
     latest_runs = await _latest_runs_by_kb([kb.uuid])
+    manage_flags = await _manage_flags_by_kb([kb], user, user_org_ancestry)
     return KBDetailResponse(
-        **_kb_response(kb, trust=latest_runs.get(kb.uuid)).model_dump(),
+        **_kb_response(
+            kb,
+            trust=latest_runs.get(kb.uuid),
+            can_manage=manage_flags.get(kb.uuid, False),
+        ).model_dump(),
         sources=[
             _source_response(s, document_title=titles.get(s.document_uuid or ""))
             for s in sources
@@ -416,16 +533,19 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
     # KB) returns a logged 403, not the bare 404 the service emits for both
     # "not found" and "not authorized".
     await _require_manageable_kb(uuid, user, user_org_ancestry)
-    kb = await svc.update_knowledge_base(
-        uuid,
-        user,
-        title=req.title,
-        description=req.description,
-        shared_with_team=req.shared_with_team,
-        organization_ids=req.organization_ids,
-        tags=req.tags,
-        user_org_ancestry=user_org_ancestry,
-    )
+    try:
+        kb = await svc.update_knowledge_base(
+            uuid,
+            user,
+            title=req.title,
+            description=req.description,
+            shared_with_team=req.shared_with_team,
+            organization_ids=req.organization_ids,
+            tags=req.tags,
+            user_org_ancestry=user_org_ancestry,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True}
@@ -633,6 +753,7 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         max_crawl_pages=int(source.max_crawl_pages or 5),
         parent_source_uuid=source.parent_source_uuid,
         crawled_urls=source.crawled_urls,
+        skipped_urls=source.skipped_urls,
         child_sources=[
             _source_response(c, document_title=child_titles.get(c.document_uuid or ""))
             for c in children
@@ -755,6 +876,117 @@ async def get_kb_quality(uuid: str, user: User = Depends(get_current_user)):
     return {"history": history, "contract": contract}
 
 
+@router.get("/{uuid}/validation-runs/{run_uuid}/export")
+async def export_kb_validation_run(
+    uuid: str,
+    run_uuid: str,
+    format: str = Query("csv", pattern="^(csv|xlsx|json)$"),
+    user: User = Depends(get_current_user),
+):
+    """Download the per-query results of a KB validation run so evaluators can
+    analyze, document, and compare runs outside Vandalizer.
+
+    One row per test query: question, expected answer (re-joined from the
+    current test queries — the snapshot doesn't store it), actual and baseline
+    answers, judge score/verdict/reasoning, retrieved sources, and run-level
+    metadata (judge model, mode, catalog version, run date).
+
+    ``run_uuid`` may be ``latest`` to export the most recent full validation
+    run. ``format`` is ``csv`` (default), ``xlsx``, or ``json``. Uses the same
+    view gate as the quality history — evaluators don't need manage rights.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    def _has_details(run: ValidationRun) -> bool:
+        return bool((run.result_snapshot or {}).get("retrieval_precision"))
+
+    if run_uuid == "latest":
+        recent = await (
+            ValidationRun.find(
+                ValidationRun.item_kind == "knowledge_base",
+                ValidationRun.item_id == kb.uuid,
+                ValidationRun.run_type == "kb_validation",
+            )
+            .sort("-created_at")
+            .limit(30)
+            .to_list()
+        )
+        vr = next((r for r in recent if _has_details(r)), None)
+        if not vr:
+            raise HTTPException(
+                status_code=404,
+                detail="No validation results found. Run a validation first.",
+            )
+    else:
+        vr = await ValidationRun.find_one(
+            ValidationRun.uuid == run_uuid,
+            ValidationRun.item_kind == "knowledge_base",
+            ValidationRun.item_id == kb.uuid,
+        )
+        if not vr:
+            raise HTTPException(status_code=404, detail="Validation run not found")
+        if not _has_details(vr):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "This timeline entry has no per-query results to export "
+                    "(it records an optimizer apply, not a validation run)."
+                ),
+            )
+
+    from app.models.kb_test_query import KBTestQuery
+    from app.models.system_config import SystemConfig
+    from app.services.kb_validation_export import (
+        build_kb_validation_results_export,
+        render_results_csv,
+        render_results_xlsx,
+    )
+
+    test_queries = await KBTestQuery.find(
+        {"knowledge_base_uuid": kb.uuid},
+    ).to_list()
+    sys_cfg = await SystemConfig.get_config()
+
+    payload, run_meta, rows = build_kb_validation_results_export(
+        kb=kb,
+        vr=vr,
+        test_queries=test_queries,
+        catalog_version=getattr(sys_cfg, "catalog_version", None),
+        exported_by_user_id=user.user_id,
+        exported_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    )
+
+    safe_title = re.sub(r"[^A-Za-z0-9_.-]+", "_", kb.title or "knowledge_base").strip("_")
+    stamp = vr.created_at.strftime("%Y%m%d-%H%M%S") if vr.created_at else "run"
+    base_name = f"{safe_title or 'knowledge_base'}-validation-{stamp}-{vr.uuid[:8]}"
+
+    if format == "json":
+        return JSONResponse(
+            content=payload,
+            headers={"Content-Disposition": f'attachment; filename="{base_name}.json"'},
+        )
+    if format == "xlsx":
+        from fastapi.responses import Response
+
+        return Response(
+            content=render_results_xlsx(run_meta, rows),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f'attachment; filename="{base_name}.xlsx"'},
+        )
+    from fastapi.responses import PlainTextResponse
+
+    return PlainTextResponse(
+        content=render_results_csv(run_meta, rows),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{base_name}.csv"'},
+    )
+
+
 @router.get("/{uuid}/feedback-impact")
 async def get_kb_feedback_impact(uuid: str, user: User = Depends(get_current_user)):
     """Thumbs-up rate on chat answers grounded in this KB, before vs after the
@@ -842,6 +1074,8 @@ def _serialize_test_query(q) -> dict:
         "expected_answer_contains": q.expected_answer_contains,
         "expected_answer": q.expected_answer,
         "category": q.category,
+        "notes": getattr(q, "notes", None),
+        "external_id": getattr(q, "external_id", None),
         "auto_generated": q.auto_generated,
         "source_chunk_ids": q.source_chunk_ids,
         "last_judged_score": q.last_judged_score,
@@ -882,10 +1116,119 @@ async def create_test_query(uuid: str, request: Request, user: User = Depends(ge
         expected_answer_contains=body.get("expected_answer_contains"),
         expected_answer=body.get("expected_answer"),
         category=body.get("category"),
+        notes=body.get("notes"),
+        external_id=body.get("external_id"),
         user_id=user.user_id,
     )
     await tq.insert()
     return _serialize_test_query(tq)
+
+
+# Uploads are sent base64-encoded in a JSON body (the codebase's file-upload
+# convention — see files.py). 5 MB of encoded spreadsheet is far beyond any
+# real 500-row test set, so treat larger payloads as a mistake.
+_TEST_QUERY_IMPORT_MAX_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/{uuid}/test-queries/import")
+async def import_test_queries(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    """Bulk-import test queries from an uploaded CSV/XLSX file.
+
+    Body: ``{"filename": str, "content_base64": str}``.
+
+    Rows with an ID matching an existing query's ``external_id`` update that
+    query in place, so evaluators can re-import the same spreadsheet across KB
+    versions without duplicating the set. Rows without an ID that exactly match
+    an existing question are skipped for the same reason. Row-level problems
+    (e.g. a missing question) are reported per-row without failing the import;
+    file-level problems (wrong format, no question column) return 400.
+    """
+    import base64
+    import datetime as _datetime
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+
+    body = await request.json()
+    filename = (body.get("filename") or "").strip()
+    content_b64 = body.get("content_base64") or ""
+    if not filename or not content_b64:
+        raise HTTPException(status_code=400, detail="filename and content_base64 are required")
+    try:
+        data = base64.b64decode(content_b64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="content_base64 is not valid base64")
+    if len(data) > _TEST_QUERY_IMPORT_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File is too large (5 MB limit)")
+
+    from app.services.kb_test_query_import import (
+        TestQueryImportError,
+        parse_test_query_import,
+    )
+    try:
+        rows, row_errors = parse_test_query_import(filename, data)
+    except TestQueryImportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.models.kb_test_query import KBTestQuery
+    existing = await KBTestQuery.find(
+        KBTestQuery.knowledge_base_uuid == kb.uuid,
+    ).to_list()
+    by_external_id = {
+        q.external_id: q for q in existing if getattr(q, "external_id", None)
+    }
+    seen_questions = {q.query.strip().lower() for q in existing}
+
+    created = updated = skipped = 0
+    now = _datetime.datetime.now(tz=_datetime.timezone.utc)
+    for row in rows:
+        target = by_external_id.get(row["external_id"]) if row["external_id"] else None
+        if target is not None:
+            target.query = row["query"]
+            target.expected_answer = row["expected_answer"]
+            target.expected_answer_contains = row["expected_answer_contains"]
+            target.expected_source_labels = row["expected_source_labels"]
+            target.category = row["category"]
+            target.notes = row["notes"]
+            target.updated_at = now
+            await target.save()
+            seen_questions.add(row["query"].strip().lower())
+            updated += 1
+            continue
+        if not row["external_id"] and row["query"].strip().lower() in seen_questions:
+            skipped += 1
+            continue
+        tq = KBTestQuery(
+            knowledge_base_uuid=kb.uuid,
+            query=row["query"],
+            expected_answer=row["expected_answer"],
+            expected_answer_contains=row["expected_answer_contains"],
+            expected_source_labels=row["expected_source_labels"],
+            category=row["category"],
+            notes=row["notes"],
+            external_id=row["external_id"],
+            user_id=user.user_id,
+        )
+        await tq.insert()
+        seen_questions.add(row["query"].strip().lower())
+        if row["external_id"]:
+            # A later row repeating the same ID updates this record instead of
+            # inserting a duplicate.
+            by_external_id[row["external_id"]] = tq
+        created += 1
+
+    logger.info(
+        "Test-query import for KB %s by user %s: %d created, %d updated, "
+        "%d skipped, %d row errors (%s)",
+        kb.uuid, user.user_id, created, updated, skipped, len(row_errors), filename,
+    )
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "total_rows": len(rows) + len(row_errors),
+        "errors": row_errors,
+    }
 
 
 async def _require_manageable_kb(uuid: str, user: User, user_org_ancestry: list[str]):
@@ -1101,6 +1444,10 @@ async def update_test_query(
         tq.expected_source_labels = body.get("expected_source_labels") or []
     if "category" in body:
         tq.category = body.get("category") or None
+    if "notes" in body:
+        tq.notes = body.get("notes") or None
+    if "external_id" in body:
+        tq.external_id = body.get("external_id") or None
     tq.updated_at = _datetime.datetime.now(tz=_datetime.timezone.utc)
     await tq.save()
     return _serialize_test_query(tq)
@@ -1197,6 +1544,7 @@ def _serialize_optimization_run(run) -> dict:
         "cross_judge": getattr(run, "cross_judge", None),
         "optimized_score_train": getattr(run, "optimized_score_train", None),
         "holdout_default_score": getattr(run, "holdout_default_score", None),
+        "holdout_optimized_score": getattr(run, "holdout_optimized_score", None),
         "train_query_uuids": getattr(run, "train_query_uuids", []) or [],
         "holdout_query_uuids": getattr(run, "holdout_query_uuids", []) or [],
         "overfitting_warning": getattr(run, "overfitting_warning", False),
@@ -1405,12 +1753,27 @@ async def cancel_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(
 
 
 @router.post("/{uuid}/optimize/{run_uuid}/apply")
-async def apply_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(get_current_user)):
+async def apply_kb_optimization(
+    uuid: str,
+    run_uuid: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
     """Apply a completed optimization's best config to the KB's rag_config_override.
 
     This is for users who want to review trial results before applying. Runs
     started with apply_on_finish=True don't need to call this.
+
+    Optional body: ``{"force": true}`` overrides the tied-with-baseline gate —
+    for callers who reviewed the data and still want the tied config (e.g. it
+    scored the same on a cheaper model).
     """
+    # The UI calls this with no body; only API callers opting into force send one.
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    force = bool(body.get("force", False)) if isinstance(body, dict) else False
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_optimization_run import KBOptimizationRun
@@ -1423,8 +1786,13 @@ async def apply_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(g
 
     from app.services.optimization_actions import OptimizationActionError, apply_kb_optimization as _apply
     try:
-        return await _apply(kb, run, user.user_id)
+        return await _apply(kb, run, user.user_id, force=force)
     except OptimizationActionError as e:
+        if e.code == "tied_with_baseline":
+            raise HTTPException(
+                status_code=409,
+                detail={"code": e.code, "message": e.message},
+            )
         raise HTTPException(status_code=400, detail=e.message)
 
 
@@ -1574,6 +1942,8 @@ async def clone_knowledge_base(uuid: str, request: Request, user: User = Depends
     new_title = body.get("title")
     try:
         clone = await svc.clone_knowledge_base(kb, user, new_title=new_title)
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return _kb_response(clone)

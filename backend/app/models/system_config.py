@@ -1,6 +1,7 @@
 """SystemConfig model  - singleton for runtime-editable settings."""
 
 import datetime
+import uuid
 from copy import deepcopy
 from typing import Optional
 
@@ -104,6 +105,23 @@ DEFAULT_EXTRACTION_CONFIG = {
     "repetition": {"enabled": False},
     "use_images": False,
 }
+
+
+def ensure_stable_ids(entries: list[dict]) -> bool:
+    """Assign a stable uuid4 `id` to any dict in `entries` that lacks one.
+
+    Mutates the dicts in place (so callers pass e.g. `cfg.available_models` or
+    `cfg.oauth_providers` directly). An existing `id` is never touched, so IDs
+    stay stable once assigned — calling this repeatedly on already-backfilled
+    entries is a no-op. Returns True if any entry was changed, so callers know
+    whether the config needs to be persisted.
+    """
+    changed = False
+    for entry in entries:
+        if isinstance(entry, dict) and not entry.get("id"):
+            entry["id"] = str(uuid.uuid4())
+            changed = True
+    return changed
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

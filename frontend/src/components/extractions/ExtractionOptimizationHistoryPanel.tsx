@@ -87,9 +87,10 @@ export function ExtractionOptimizationHistoryPanel({
               <div style={{ fontSize: 12, color: '#999', lineHeight: 1.55 }}>
                 Each run scores your extraction against test cases and lands here, so
                 you can see whether model or strategy changes are actually helping.
-                A run takes <b style={{ color: '#bbb' }}>5–15 minutes</b> and costs
-                about <b style={{ color: '#bbb' }}>$1–$5</b>. Nothing changes until
-                you click Apply on a recipe.
+                A run takes <b style={{ color: '#bbb' }}>5–15 minutes</b> and uses
+                about <b style={{ color: '#bbb' }}>$1–$5</b> worth of LLM tokens
+                (an estimate of AI usage, not a charge to you) — nothing changes
+                until you click Apply on a recipe.
               </div>
             </div>
           )}

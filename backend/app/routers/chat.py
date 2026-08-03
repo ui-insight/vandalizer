@@ -35,7 +35,7 @@ from app.schemas.chat import (
     TruncateContextRequest,
 )
 from app.services import access_control, organization_service
-from app.services import activity_service
+from app.services import activity_service, audit_service
 from app.services.chat_service import chat_stream
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,13 @@ async def chat(
         )
         if not kb:
             raise HTTPException(status_code=404, detail="Knowledge base not found")
+        try:
+            from app.services import knowledge_service
+
+            await knowledge_service.record_kb_usage(user_id, kb.uuid)
+        except Exception:
+            # Usage tracking is best-effort — never block chat on it.
+            logger.warning("Failed to record KB usage", exc_info=True)
 
     if body.project_uuid:
         from app.services import project_service
@@ -326,12 +333,18 @@ async def add_link(
         )
         raise HTTPException(status_code=400, detail=f"Blocked URL: {e}")
     except Exception as e:
+        from app.utils.fetch_errors import describe_fetch_error
+
+        reason = describe_fetch_error(e)
         await activity_service.activity_finish(
-            activity.id, status=ActivityStatus.FAILED, error=str(e)
+            activity.id, status=ActivityStatus.FAILED, error=reason
         )
         raise HTTPException(
             status_code=400,
-            detail="Couldn't fetch that link. Check the URL is correct and publicly reachable, then try again.",
+            detail=(
+                f"Couldn't fetch that link ({reason}). Check the URL is "
+                "correct and publicly reachable, then try again."
+            ),
         )
 
     url_attachment = UrlAttachment(
@@ -610,6 +623,8 @@ async def delete_chat_history(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
+    message_count = len(conversation.messages or [])
+
     # Delete messages
     if conversation.messages:
         await ChatMessage.find({"_id": {"$in": conversation.messages}}).delete()
@@ -625,6 +640,15 @@ async def delete_chat_history(
         ).delete()
 
     await conversation.delete()
+    await audit_service.log_event(
+        action="chat.delete",
+        actor_user_id=user.user_id,
+        resource_type="chat",
+        resource_id=conversation_uuid,
+        resource_name=conversation.title,
+        team_id=conversation.team_id,
+        detail={"messages_deleted": message_count},
+    )
     return {"success": True, "message": "Conversation deleted successfully"}
 
 

@@ -15,8 +15,10 @@ import pytest
 
 from app.services.notification_service import (
     _COALESCE_KINDS,
+    FAILURE_KINDS,
     _to_dict,
     create_notification,
+    create_notification_sync,
     list_notifications,
     mark_all_read,
     mark_read,
@@ -46,10 +48,13 @@ def _notif(
         title=title,
         body=body,
         link=link,
+        severity="info",
         item_kind=item_kind,
         item_id=item_id,
         item_name=item_name,
         request_uuid=None,
+        coalesce_key=None,
+        occurrences=1,
         read=read,
         created_at=created_at or datetime.datetime(2026, 3, 5, 12, 0, 0),
     )
@@ -74,6 +79,17 @@ class TestToDict:
         assert d["item_name"] == "Ticket #1"
         assert d["read"] is False
         assert d["created_at"] == now.isoformat()
+        assert d["severity"] == "info"
+        assert d["occurrences"] == 1
+
+    def test_legacy_row_without_new_fields_gets_defaults(self):
+        # Rows written before severity/occurrences existed must still serialize.
+        n = _notif()
+        del n.severity
+        del n.occurrences
+        d = _to_dict(n)
+        assert d["severity"] == "info"
+        assert d["occurrences"] == 1
 
     def test_missing_created_at_is_none(self):
         n = _notif()
@@ -92,6 +108,16 @@ class TestCoalesceKinds:
     def test_non_support_kinds_are_not_coalesced(self):
         assert "verification_passed" not in _COALESCE_KINDS
         assert "workflow_complete" not in _COALESCE_KINDS
+
+    def test_every_failure_kind_is_registered(self):
+        # FAILURE_KINDS drives the default severity, which is what makes the
+        # bell render a failure in red. A kind missing here looks like news.
+        assert FAILURE_KINDS == {
+            "workflow_failed",
+            "extraction_failed",
+            "document_failed",
+            "automation_failed",
+        }
 
 
 class TestCreateNotification:
@@ -175,6 +201,178 @@ class TestCreateNotification:
 
         MockN.find_one.assert_not_called()
         new_n.insert.assert_awaited_once()
+
+
+class TestGroupCoalescing:
+    """`coalesce_key` folds repeats into one unread row and counts them."""
+
+    @pytest.mark.asyncio
+    async def test_repeat_bumps_occurrences_and_rewrites_title(self):
+        existing = _notif(kind="automation_failed", title="Automation failed: Nightly")
+        existing.occurrences = 4
+
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=existing)
+
+            result = await create_notification(
+                user_id="alice",
+                kind="automation_failed",
+                title="Automation failed: Nightly",
+                coalesce_key="automation_failed:a-1",
+                group_title="Automation failed {count}×: Nightly",
+            )
+
+        assert existing.occurrences == 5
+        assert existing.title == "Automation failed 5×: Nightly"
+        assert result["occurrences"] == 5
+
+    @pytest.mark.asyncio
+    async def test_first_occurrence_keeps_the_singular_title(self):
+        new_n = _notif(kind="document_failed", title="Document failed to process: a.pdf")
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=None)
+            MockN.return_value = new_n
+
+            await create_notification(
+                user_id="alice",
+                kind="document_failed",
+                title="Document failed to process: a.pdf",
+                coalesce_key="document_failed:alice",
+                group_title="{count} documents failed to process",
+            )
+
+        new_n.insert.assert_awaited_once()
+        assert MockN.call_args.kwargs["title"] == "Document failed to process: a.pdf"
+
+    @pytest.mark.asyncio
+    async def test_read_notification_does_not_absorb_new_failures(self):
+        # Only unread rows coalesce — a dismissed failure must not silently
+        # swallow the next one and leave the bell empty.
+        new_n = _notif(kind="workflow_failed")
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=None)
+            MockN.return_value = new_n
+
+            await create_notification(
+                user_id="alice",
+                kind="workflow_failed",
+                title="Workflow failed: WF",
+                coalesce_key="workflow_failed:wf-1",
+            )
+
+        MockN.find_one.assert_awaited_once()
+        new_n.insert.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_failure_kind_defaults_to_error_severity(self):
+        new_n = _notif(kind="workflow_failed")
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=None)
+            MockN.return_value = new_n
+
+            await create_notification(
+                user_id="alice", kind="workflow_failed", title="Workflow failed: WF",
+            )
+
+        assert MockN.call_args.kwargs["severity"] == "error"
+
+    @pytest.mark.asyncio
+    async def test_ordinary_kind_defaults_to_info_severity(self):
+        new_n = _notif(kind="team_share")
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=None)
+            MockN.return_value = new_n
+
+            await create_notification(
+                user_id="alice", kind="team_share", title="Shared with you",
+            )
+
+        assert MockN.call_args.kwargs["severity"] == "info"
+
+    @pytest.mark.asyncio
+    async def test_malformed_group_title_falls_back(self):
+        existing = _notif(kind="workflow_failed", title="old")
+        existing.occurrences = 2
+        with patch("app.services.notification_service.Notification") as MockN:
+            MockN.find_one = AsyncMock(return_value=existing)
+
+            await create_notification(
+                user_id="alice",
+                kind="workflow_failed",
+                title="Workflow failed: WF",
+                coalesce_key="workflow_failed:wf-1",
+                group_title="Failed {nope}×",
+            )
+
+        assert existing.title == "Workflow failed: WF"
+
+
+class TestCreateNotificationSync:
+    """The pymongo path Celery workers use — same semantics, no event loop."""
+
+    def test_inserts_a_new_row(self):
+        db = MagicMock()
+        db.notification.find_one.return_value = None
+
+        create_notification_sync(
+            db,
+            user_id="alice",
+            kind="workflow_failed",
+            title="Workflow failed: WF",
+            body="boom",
+            link="/?workflow=wf-1",
+            coalesce_key="workflow_failed:wf-1",
+        )
+
+        doc = db.notification.insert_one.call_args.args[0]
+        assert doc["user_id"] == "alice"
+        assert doc["kind"] == "workflow_failed"
+        assert doc["severity"] == "error"
+        assert doc["occurrences"] == 1
+        assert doc["read"] is False
+        assert doc["uuid"]
+
+    def test_repeat_updates_instead_of_inserting(self):
+        db = MagicMock()
+        db.notification.find_one.return_value = {"_id": "n-1", "occurrences": 2}
+
+        create_notification_sync(
+            db,
+            user_id="alice",
+            kind="automation_failed",
+            title="Automation failed: Nightly",
+            coalesce_key="automation_failed:a-1",
+            group_title="Automation failed {count}×: Nightly",
+        )
+
+        db.notification.insert_one.assert_not_called()
+        update = db.notification.update_one.call_args.args[1]["$set"]
+        assert update["occurrences"] == 3
+        assert update["title"] == "Automation failed 3×: Nightly"
+
+    def test_without_coalesce_key_every_call_inserts(self):
+        db = MagicMock()
+
+        create_notification_sync(
+            db, user_id="alice", kind="approval_request", title="Approval needed",
+        )
+
+        db.notification.find_one.assert_not_called()
+        db.notification.insert_one.assert_called_once()
+
+    def test_never_raises_when_mongo_is_down(self):
+        # Callers are tasks that already did real work; a failed bell write
+        # must not fail (or retry) the task.
+        db = MagicMock()
+        db.notification.find_one.side_effect = RuntimeError("mongo down")
+
+        create_notification_sync(
+            db,
+            user_id="alice",
+            kind="workflow_failed",
+            title="Workflow failed: WF",
+            coalesce_key="workflow_failed:wf-1",
+        )  # must not raise
 
 
 class TestListNotifications:

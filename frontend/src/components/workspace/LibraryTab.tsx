@@ -17,7 +17,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { ApiError } from '../../api/client'
-import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
+import { MAX_NAME_LENGTH, getNameError, isDuplicateName, normalizeName } from '../../utils/nameValidation'
 import { createWorkflow, importWorkflow } from '../../api/workflows'
 import { createSearchSet, importSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
@@ -39,7 +39,7 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import type { VerifiedCollection } from '../../types/library'
+import type { LibraryItem, VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
 
 type ScopeTab = 'mine' | 'team' | 'explore' | 'quality'
@@ -58,7 +58,7 @@ function matchesKindFilter(item: { kind: string; set_type: string | null }, filt
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
-  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids } = useWorkspace()
+  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids, openWorkflowId, openExtractionId, openAutomationId } = useWorkspace()
   const { toast } = useToast()
   const confirm = useConfirm()
   const { user } = useAuth()
@@ -184,6 +184,26 @@ export function LibraryTab() {
     },
   )
 
+  // The tab stays mounted (hidden) while a workflow/extraction/automation
+  // editor is open in the right panel, so filters and search survive the
+  // round-trip — but edits made in the editor (renames, deletes) won't be
+  // reflected here. Refetch when the editor closes.
+  const editorOpen = Boolean(openWorkflowId || openExtractionId || openAutomationId)
+  const prevEditorOpen = useRef(editorOpen)
+  useEffect(() => {
+    if (prevEditorOpen.current && !editorOpen) {
+      refreshItems()
+      refreshFolders()
+    }
+    prevEditorOpen.current = editorOpen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorOpen])
+
+  // Delete-choice dialog: set when the user can permanently delete the
+  // underlying workflow/extraction (not just remove the bookmark).
+  const [deleteTarget, setDeleteTarget] = useState<LibraryItem | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
   // Actions
   const handlePin = async (itemId: string, pinned: boolean) => {
     await update(itemId, { pinned })
@@ -206,33 +226,95 @@ export function LibraryTab() {
   }
   const confirmShare = async (comment: string) => {
     if (!shareDialogItem || !teamId) return
+    const { id, name } = shareDialogItem
+    setShareDialogItem(null)
     try {
-      await shareToTeam(shareDialogItem.id, teamId, comment || undefined)
+      await shareToTeam(id, teamId, comment || undefined)
       toast('Shared to team library', 'success')
       refreshItems()
     } catch (err) {
+      // 409: this item was already shared to the team — re-sharing would
+      // create an independent duplicate, so ask before forcing it.
+      if (err instanceof ApiError && err.status === 409) {
+        const ok = await confirm({
+          title: 'Already shared to team',
+          message: (
+            <>
+              <strong>{name}</strong> is already in this team's library. Sharing again
+              creates a separate copy that can be edited independently of the first.
+            </>
+          ),
+          confirmLabel: 'Share a copy',
+        })
+        if (!ok) return
+        try {
+          await shareToTeam(id, teamId, comment || undefined, true)
+          toast('Shared a new copy to team library', 'success')
+          refreshItems()
+        } catch (err2) {
+          const msg = err2 instanceof ApiError ? err2.message : 'Failed to share to team'
+          toast(msg, 'error')
+        }
+        return
+      }
       const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
       toast(msg, 'error')
-    } finally {
-      setShareDialogItem(null)
     }
   }
+  // Prompts/formatters are search_set items — label them by set_type.
+  const itemKindLabel = (item: { kind: string; set_type: string | null }) =>
+    item.kind === 'search_set' ? (item.set_type || 'extraction') : (KIND_LABEL[item.kind] ?? 'item')
+
   const handleRemove = async (itemId: string) => {
     const item = items.find((i) => i.id === itemId)
-    const kindLabel = item ? (KIND_LABEL[item.kind] ?? 'item') : 'item'
+    // Removing a bookmark leaves the underlying workflow/extraction alive (and
+    // its name reserved). When the user may delete the real object, open the
+    // choice dialog; otherwise be honest that only the bookmark goes away.
+    if (item?.can_delete_underlying) {
+      setDeleteTarget(item)
+      return
+    }
+    const kindLabel = item ? itemKindLabel(item) : 'item'
     const ok = await confirm({
-      title: `Delete ${kindLabel}?`,
+      title: `Remove ${kindLabel} from library?`,
       message: (
         <>
-          Are you sure you want to delete <strong>{item?.name ?? 'this item'}</strong>? This action cannot be undone.
+          Remove <strong>{item?.name ?? 'this item'}</strong> from this library? Only the
+          bookmark is removed — the {kindLabel} itself is kept by its owner.
         </>
       ),
-      confirmLabel: 'Delete',
+      confirmLabel: 'Remove',
       destructive: true,
     })
     if (!ok) return
-    await remove(itemId)
-    refreshFolders()
+    try {
+      await remove(itemId)
+      refreshFolders()
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Failed to remove from library', 'error')
+    }
+  }
+
+  const handleDeleteChoice = async (deleteUnderlying: boolean) => {
+    if (!deleteTarget || deleting) return
+    const { id, name } = deleteTarget
+    const kindLabel = itemKindLabel(deleteTarget)
+    setDeleting(true)
+    try {
+      await remove(id, deleteUnderlying ? { deleteUnderlying: true } : undefined)
+      setDeleteTarget(null)
+      refreshFolders()
+      toast(
+        deleteUnderlying
+          ? `Deleted "${name}" permanently`
+          : `Removed "${name}" from library — the ${kindLabel} itself was kept`,
+        'success',
+      )
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : `Failed to delete ${kindLabel}`, 'error')
+    } finally {
+      setDeleting(false)
+    }
   }
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
     await moveFolderItems([itemId], folderUuid)
@@ -340,29 +422,41 @@ export function LibraryTab() {
     }
   }
 
-  // Edit modal state (prompts / formatters)
+  // Preview/Edit modal state (prompts / formatters). A row click opens the
+  // modal in 'preview' (read-only body + Use in Assistant); the row menu's
+  // Edit opens straight to 'edit'.
   const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
+  const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
+  const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
-  const openEditModal = async (item: import('../../types/library').LibraryItem) => {
+  const openPromptModal = async (item: import('../../types/library').LibraryItem, mode: 'preview' | 'edit') => {
     setEditingItem(item)
+    setEditMode(mode)
     setEditTitle(item.name)
+    // Freshly created prompts keep their body in extraction_config.content
+    // (surfaced as `description`); edited ones store it on
+    // SearchSetItem.searchphrase. Show the description while the
+    // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditError(null)
     setEditItemId(null)
-    // Load the SearchSetItem content (the actual prompt text)
     if (item.item_uuid) {
+      setEditLoading(true)
       try {
         const items = await listSearchSetItems(item.item_uuid)
         if (items.length > 0) {
-          setEditContent(items[0].searchphrase)
           setEditItemId(items[0].id)
+          if (items[0].searchphrase?.trim() || !(item.description || '').trim()) {
+            setEditContent(items[0].searchphrase)
+          }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore — keep the description fallback */ }
+      setEditLoading(false)
     }
   }
 
@@ -374,6 +468,21 @@ export function LibraryTab() {
     setEditError(null)
   }
 
+  const markUsed = (libraryItemId: string) => {
+    touchItem(libraryItemId).then(() => refreshItems()).catch(() => {})
+  }
+
+  const usePromptInAssistant = () => {
+    if (!editingItem) return
+    const content = editContent.trim()
+    if (!content) return
+    markUsed(editingItem.id)
+    const docs = selectedDocUuids
+    const folderUuids = selectedFolderUuids
+    closeEditModal()
+    sendChatMessage(content, { documentUuids: docs, folderUuids })
+  }
+
   const handleEditSave = async () => {
     if (!editingItem?.item_uuid) return
     const titleError = getNameError(editTitle, 'Title')
@@ -382,6 +491,14 @@ export function LibraryTab() {
       return
     }
     const cleanTitle = normalizeName(editTitle)
+    const editKind = (editingItem.set_type || 'extraction') as 'extraction' | 'prompt' | 'formatter'
+    const siblingNames = items
+      .filter((i) => i.id !== editingItem.id && matchesKindFilter(i, editKind))
+      .map((i) => i.name)
+    if (isDuplicateName(cleanTitle, siblingNames)) {
+      setEditError(`You already have a ${editKind} named "${cleanTitle}". Choose a different name.`)
+      return
+    }
     setEditSaving(true)
     setEditError(null)
     try {
@@ -413,6 +530,10 @@ export function LibraryTab() {
       return
     }
     const cleanName = normalizeName(createName)
+    if (createModalType && isDuplicateName(cleanName, items.filter((i) => matchesKindFilter(i, createModalType)).map((i) => i.name))) {
+      setCreateError(`You already have a ${createModalType} named "${cleanName}". Choose a different name.`)
+      return
+    }
     setCreating(true)
     setCreateError(null)
     const personalLib = libraries.find((l) => l.scope === 'personal')
@@ -1206,57 +1327,22 @@ export function LibraryTab() {
                   onClone={handleClone}
                   onShare={handleShare}
                   onRemove={handleRemove}
-                  onEdit={openEditModal}
+                  onEdit={(it) => openPromptModal(it, 'edit')}
                   onMoveToFolder={handleMoveToFolder}
                   folders={folders}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
-                  onOpen={async (it) => {
-                    touchItem(it.id).then(() => refreshItems()).catch(() => {})
+                  onOpen={(it) => {
                     if (it.kind === 'workflow') {
+                      markUsed(it.id)
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
-                      // Capture selection synchronously so an awaited fetch
-                      // below can't lose it to a tab-swap remount.
-                      const docs = selectedDocUuids
-                      const folders = selectedFolderUuids
-                      // Edited prompts store their body on SearchSetItem.searchphrase;
-                      // freshly created ones store it in extraction_config.content
-                      // (surfaced as `description`). Try searchphrase first.
-                      let content = ''
-                      let source = 'none'
-                      if (it.item_uuid) {
-                        try {
-                          const items = await listSearchSetItems(it.item_uuid)
-                          if (items.length > 0 && items[0].searchphrase?.trim()) {
-                            content = items[0].searchphrase.trim()
-                            source = 'searchphrase'
-                          }
-                        } catch { /* ignore */ }
-                      }
-                      if (!content && (it.description || '').trim()) {
-                        content = (it.description || '').trim()
-                        source = 'description'
-                      }
-                      console.debug('[Library] launching prompt', {
-                        name: it.name,
-                        item_uuid: it.item_uuid,
-                        set_type: it.set_type,
-                        source,
-                        contentLength: content.length,
-                      })
-                      if (!content) {
-                        toast(
-                          `"${it.name}" has no prompt body. Open it from the menu and add one.`,
-                          'error',
-                        )
-                        return
-                      }
-                      sendChatMessage(content, {
-                        documentUuids: docs,
-                        folderUuids: folders,
-                      })
+                      // Preview first — the prompt only launches into the
+                      // Assistant (an LLM call) from the modal's Use button,
+                      // which is also what bumps last-used.
+                      openPromptModal(it, 'preview')
                     } else if (it.set_type === 'extraction' && it.item_uuid) {
+                      markUsed(it.id)
                       openExtraction(it.item_uuid)
                     }
                   }}
@@ -1266,6 +1352,101 @@ export function LibraryTab() {
           </div>
         </div>
       </div>
+      )}
+
+      {/* Delete-choice Modal: remove bookmark vs. permanently delete the object */}
+      {deleteTarget && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '8%',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={() => { if (!deleting) setDeleteTarget(null) }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Delete ${itemKindLabel(deleteTarget)}?`}
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: 'var(--ui-radius, 12px)',
+              padding: '28px 32px',
+              width: '90%',
+              maxWidth: 480,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 600, color: '#202124', textAlign: 'left' }}>
+              Delete {itemKindLabel(deleteTarget)}?
+            </h2>
+            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#5f6368', lineHeight: 1.5 }}>
+              <strong style={{ color: '#202124' }}>{deleteTarget.name}</strong> can be removed from
+              this library only — it still exists, keeps its name, and can be added back later.
+              Or delete it permanently, which removes the {itemKindLabel(deleteTarget)} and its run
+              history everywhere and cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => handleDeleteChoice(true)}
+                disabled={deleting}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: '#dc2626',
+                  color: '#fff',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  opacity: deleting ? 0.5 : 1,
+                }}
+              >
+                {deleting ? 'Deleting...' : 'Delete permanently'}
+              </button>
+              <button
+                onClick={() => handleDeleteChoice(false)}
+                disabled={deleting}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  borderRadius: 8,
+                  border: '1px solid #dadce0',
+                  backgroundColor: '#fff',
+                  color: '#202124',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  opacity: deleting ? 0.5 : 1,
+                }}
+              >
+                Remove from library only
+              </button>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: 'transparent',
+                  color: '#5f6368',
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Creation Modal (workflow / extraction / prompt / formatter) */}
@@ -1425,7 +1606,7 @@ export function LibraryTab() {
         </div>
       )}
 
-      {/* Edit Modal (prompts / formatters) */}
+      {/* Preview / Edit Modal (prompts / formatters) */}
       {editingItem && (
         <div
           style={{
@@ -1451,6 +1632,89 @@ export function LibraryTab() {
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
+            {editMode === 'preview' ? (
+              <>
+                <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
+                  {editingItem.name}
+                </h2>
+                <div style={{ fontSize: 12, color: '#70757a', marginBottom: 16 }}>
+                  {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
+                </div>
+                <div
+                  style={{
+                    marginBottom: 20,
+                    padding: '12px 14px',
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    color: !editLoading && editContent.trim() ? '#3c4043' : '#9aa0a6',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e8eaed',
+                    borderRadius: 8,
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    maxHeight: '45vh',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {editLoading
+                    ? 'Loading…'
+                    : editContent.trim()
+                      ? editContent
+                      : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'prompt'} has no content yet — click Edit to add some.`}
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={usePromptInAssistant}
+                    disabled={editLoading || !editContent.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: 'none',
+                      backgroundColor: 'var(--highlight-color, #eab308)',
+                      color: 'var(--highlight-text-color, #000)',
+                      cursor: editLoading || !editContent.trim() ? 'not-allowed' : 'pointer',
+                      opacity: editLoading || !editContent.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    Use in Assistant
+                  </button>
+                  <button
+                    onClick={() => setEditMode('edit')}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: '1px solid #dadce0',
+                      backgroundColor: '#fff',
+                      color: '#5f6368',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={closeEditModal}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: '1px solid #dadce0',
+                      backgroundColor: '#fff',
+                      color: '#5f6368',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124' }}>
               Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
             </h2>
@@ -1533,6 +1797,8 @@ export function LibraryTab() {
                 Cancel
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}

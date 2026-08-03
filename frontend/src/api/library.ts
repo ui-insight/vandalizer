@@ -43,8 +43,9 @@ export function updateItem(itemId: string, data: { note?: string; tags?: string[
   return apiFetch<LibraryItem>(`/api/library/items/${itemId}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
-export function removeItem(libraryId: string, itemId: string) {
-  return apiFetch<{ ok: boolean }>(`/api/library/${libraryId}/items/${itemId}`, { method: 'DELETE' })
+export function removeItem(libraryId: string, itemId: string, opts?: { deleteUnderlying?: boolean }) {
+  const qs = opts?.deleteUnderlying ? '?delete_underlying=true' : ''
+  return apiFetch<{ ok: boolean }>(`/api/library/${libraryId}/items/${itemId}${qs}`, { method: 'DELETE' })
 }
 
 export function touchItem(itemId: string) {
@@ -57,10 +58,15 @@ export function cloneToPersonal(itemId: string) {
   return apiFetch<LibraryItem>('/api/library/clone', { method: 'POST', body: JSON.stringify({ item_id: itemId }) })
 }
 
-export function shareToTeam(itemId: string, teamId: string, comment?: string) {
+export function shareToTeam(itemId: string, teamId: string, comment?: string, force?: boolean) {
   return apiFetch<LibraryItem>('/api/library/share', {
     method: 'POST',
-    body: JSON.stringify({ item_id: itemId, team_id: teamId, comment: comment || undefined }),
+    body: JSON.stringify({
+      item_id: itemId,
+      team_id: teamId,
+      comment: comment || undefined,
+      force: force || undefined,
+    }),
   })
 }
 
@@ -333,12 +339,14 @@ export function removeFromCollection(collectionId: string, itemId: string) {
 
 // Verification - Featured Collections (available to all users)
 
-export function listFeaturedCollections() {
-  return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections/featured')
+export function listFeaturedCollections(kind?: string) {
+  const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
+  return apiFetch<{ collections: VerifiedCollection[] }>(`/api/verification/collections/featured${qs}`)
 }
 
-export function browseCollections() {
-  return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections/browse')
+export function browseCollections(kind?: string) {
+  const qs = kind ? `?kind=${encodeURIComponent(kind)}` : ''
+  return apiFetch<{ collections: VerifiedCollection[] }>(`/api/verification/collections/browse${qs}`)
 }
 
 // Verification - Try verified item

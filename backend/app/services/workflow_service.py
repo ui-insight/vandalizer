@@ -28,6 +28,7 @@ from app.services.access_control import (
     get_authorized_workflow,
     get_team_access_context,
 )
+from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
 
 if TYPE_CHECKING:
@@ -55,6 +56,7 @@ def _sanitize_for_json(value):
 
 
 async def create_workflow(name: str, user_id: str, description: str | None = None, team_id: str | None = None) -> Workflow:
+    await name_conflicts.ensure_workflow_name_available(name, user_id, team_id)
     wf = Workflow(
         name=name,
         description=description,
@@ -187,6 +189,10 @@ async def update_workflow(
     if not wf:
         return None
     if name is not None:
+        if name != wf.name:
+            await name_conflicts.ensure_workflow_name_available(
+                name, wf.user_id, wf.team_id, exclude_id=str(wf.id),
+            )
         wf.name = name
     if description is not None:
         wf.description = description
@@ -299,8 +305,12 @@ async def duplicate_workflow(
         validation_plan = original_wf.validation_plan or []
         validation_inputs = original_wf.validation_inputs or []
 
+    copy_name = await name_conflicts.next_available_name(
+        f"{original['name']} (Copy)",
+        lambda n: name_conflicts.workflow_name_taken(n, user_id, team_id),
+    )
     new_wf = Workflow(
-        name=f"{original['name']} (Copy)",
+        name=copy_name,
         description=original.get("description"),
         user_id=user_id,
         team_id=team_id,
@@ -819,13 +829,27 @@ async def test_step(task_name: str, task_data: dict, document_uuids: list[str], 
 
 def get_test_status(task_id: str) -> dict:
     """Poll a step test Celery task."""
+    from app.services.workflow_engine import WorkflowStepError
+
     result = AsyncResult(task_id, app=celery_app)
     if not result.ready():
         return {"status": result.state}
     if result.successful():
-        return {"status": "completed", "result": result.result}
+        payload = result.result
+        # A deterministic step failure is returned (not raised) by the test
+        # task so it doesn't retry or land in Sentry — surface it as a failure.
+        if isinstance(payload, dict) and payload.get("step_test_failed"):
+            return {
+                "status": "failed",
+                "error": payload.get("error") or "Test failed",
+                "output": payload.get("output"),
+            }
+        return {"status": "completed", "result": payload}
     payload = result.result
-    if isinstance(payload, BaseException):
+    if isinstance(payload, WorkflowStepError):
+        # Step failures carry a user-facing message already — no class prefix.
+        error_text = str(payload)
+    elif isinstance(payload, BaseException):
         error_text = f"{type(payload).__name__}: {payload}"
     else:
         error_text = str(payload) if payload else "Test failed"
@@ -2978,15 +3002,34 @@ async def _build_result(
 
     quality_score = min(100.0, max(0.0, quality_score_raw))
 
-    # -- Stability score (how consistent are the actual outputs?) --
-    # This measures output-to-output similarity, not evaluator consistency.
-    stability_score_val = None
-    if stability_data and stability_data.get("stability_score") is not None:
-        stability_score_val = stability_data["stability_score"] * 100  # convert 0-1 → 0-100
-
-    # Evaluator consistency is kept as a diagnostic signal
+    # Evaluator consistency: how consistently each check's verdict held across
+    # runs (1.0 = the check reached the same PASS/FAIL every run). Computed for
+    # every run and used below as the substance-level stability signal.
     consistencies = [c.get("consistency", 1.0) for c in checks if c["status"] != "SKIP"]
     avg_evaluator_consistency = sum(consistencies) / len(consistencies) if consistencies else 0.0
+
+    # -- Stability score (how consistent is the SUBSTANCE across runs?) --
+    # Prefer substance-level stability over raw output text-similarity. A
+    # synthesizing workflow legitimately rewords its prose run-to-run, so text
+    # similarity runs low (~45-60%) even when every fact and every check verdict
+    # is identical — scoring on it systematically under-grades correct
+    # workflows (a perfect-quality prose deliverable is capped at ~C). Preference
+    # order: structured field-level stability (value-level, most precise) →
+    # evaluator/check-verdict consistency → text similarity (last resort). The
+    # raw text similarity is still reported in stability_detail either way.
+    stability_score_val = None
+    stability_basis = None
+    if num_runs > 1:
+        field_stability = (stability_data or {}).get("structured_field_stability")
+        if isinstance(field_stability, (int, float)):
+            stability_score_val = field_stability * 100
+            stability_basis = "structured_field_stability"
+        elif consistencies:
+            stability_score_val = avg_evaluator_consistency * 100
+            stability_basis = "evaluator_consistency"
+        elif stability_data and stability_data.get("stability_score") is not None:
+            stability_score_val = stability_data["stability_score"] * 100
+            stability_basis = "text_similarity"
 
     # -- Combined score --
     if stability_score_val is not None:
@@ -3046,6 +3089,7 @@ async def _build_result(
         "score": round(score, 1),
         "quality_score": round(quality_score, 1),
         "stability_score": round(stability_score_val, 1) if stability_score_val is not None else None,
+        "stability_basis": stability_basis,
         "stability_detail": stability_data,
         "check_pass_rate": round(check_pass_rate, 4),
         "weighted_pass_rate": round(weighted_pass_rate, 4),

@@ -23,6 +23,7 @@ def _make_user(user_id="user1"):
     user.is_examiner = False
     user.current_team = None
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     user.api_token_hash = None
     user.api_token_created_at = None
@@ -34,6 +35,23 @@ def _auth(user_id="user1"):
     token = create_access_token(user_id, _TEST_SETTINGS)
     csrf = secrets.token_urlsafe(32)
     return {"access_token": token, "csrf_token": csrf}, {"X-CSRF-Token": csrf}
+
+
+@pytest.fixture(autouse=True)
+def stub_team_access():
+    """KB responses carry a per-user ``can_manage`` flag, computed from the
+    caller's team memberships. Beanie isn't initialized under the ASGI test
+    client, so the real ``TeamMembership`` query can't run — stub it to "no
+    teams". Ownership/verified/admin branches of the gate still run for real.
+    """
+    from app.services.access_control import TeamAccessContext
+
+    with patch(
+        "app.routers.knowledge.access_control.get_team_access_context",
+        new_callable=AsyncMock,
+        return_value=TeamAccessContext(),
+    ):
+        yield
 
 
 @pytest.fixture
@@ -332,6 +350,7 @@ class TestKnowledgeListEndpoints:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.list_knowledge_bases = AsyncMock(return_value=([kb], 1))
             mock_svc.list_references = AsyncMock(return_value=[])
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
             MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
             MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
@@ -345,6 +364,195 @@ class TestKnowledgeListEndpoints:
         data = resp.json()
         assert data["total"] == 1
         assert data["items"][0]["uuid"] == "kb-uuid-1"
+        assert data["items"][0]["last_used_at"] is None
+
+    @pytest.mark.asyncio
+    async def test_list_v2_includes_per_user_last_used_at(self, client):
+        """A usage record for the requesting user surfaces as last_used_at."""
+        user = _make_user()
+        cookies, headers = _auth()
+        used_kb = _mock_kb(uuid="kb-used")
+        unused_kb = _mock_kb(uuid="kb-unused")
+        used_at = datetime.datetime(2026, 7, 20, 12, 0, tzinfo=datetime.timezone.utc)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([used_kb, unused_kb], 2))
+            mock_svc.list_references = AsyncMock(return_value=[])
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={"kb-used": used_at})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        by_uuid = {item["uuid"]: item for item in resp.json()["items"]}
+        assert by_uuid["kb-used"]["last_used_at"] == used_at.isoformat()
+        assert by_uuid["kb-unused"]["last_used_at"] is None
+        # The usage lookup is scoped to the requesting user.
+        mock_svc.get_kb_usage_map.assert_awaited_once_with("user1", ["kb-used", "kb-unused"])
+
+    @pytest.mark.asyncio
+    async def test_list_v2_reference_uses_catalog_display_name(self, client):
+        """Adopted references show the catalog's display-name override.
+
+        The Explore tab renders VerifiedItemMetadata.display_name over the
+        KB's own title, so My KBs must do the same for adopted references or
+        the KB appears under two different names.
+        """
+        user = _make_user()
+        cookies, headers = _auth()
+        source_kb = _mock_kb(uuid="kb-src", title="Raw KB Title", user_id="owner", verified=True)
+        source_kb.id = "oid-123"
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-src"
+        meta = MagicMock()
+        meta.item_id = "oid-123"
+        meta.display_name = "Curated Catalog Name"
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            patch("app.routers.knowledge.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([], 0))
+            mock_svc.list_references = AsyncMock(return_value=[ref])
+            mock_svc.resolve_reference = AsyncMock(return_value=source_kb)
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[meta])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        assert items[0]["is_reference"] is True
+        assert items[0]["title"] == "Curated Catalog Name"
+        # Adopting a verified catalog KB doesn't confer manage rights on it.
+        assert items[0]["can_manage"] is False
+        # The catalog lookup is scoped to KB items for the adopted source KBs.
+        MockMeta.find.assert_called_once_with({
+            "item_kind": "knowledge_base",
+            "item_id": {"$in": ["oid-123"]},
+        })
+
+    @pytest.mark.asyncio
+    async def test_list_v2_reference_without_override_keeps_kb_title(self, client):
+        """A reference to a catalog KB with no display_name keeps the KB title."""
+        user = _make_user()
+        cookies, headers = _auth()
+        source_kb = _mock_kb(uuid="kb-src", title="Raw KB Title")
+        source_kb.id = "oid-123"
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-src"
+        meta = MagicMock()
+        meta.item_id = "oid-123"
+        meta.display_name = None
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            patch("app.routers.knowledge.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([], 0))
+            mock_svc.list_references = AsyncMock(return_value=[ref])
+            mock_svc.resolve_reference = AsyncMock(return_value=source_kb)
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[meta])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        assert items[0]["title"] == "Raw KB Title"
+
+    @pytest.mark.asyncio
+    async def test_list_v2_broken_reference_surfaces_as_unavailable_stub(self, client):
+        """A bookmark whose source KB no longer resolves (deleted, un-verified,
+        retired from the catalog, or org-scoped away) renders as an
+        'unavailable' stub with the reference uuid intact — not silently
+        dropped — so the user sees what happened and can remove it."""
+        user = _make_user()
+        cookies, headers = _auth()
+        ref = MagicMock()
+        ref.uuid = "ref-broken"
+        ref.source_kb_uuid = "kb-gone"
+        ref.created_at = datetime.datetime(2026, 7, 1, tzinfo=datetime.timezone.utc)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([], 0))
+            mock_svc.list_references = AsyncMock(return_value=[ref])
+            mock_svc.resolve_reference = AsyncMock(return_value=None)
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        stub = items[0]
+        assert stub["status"] == "unavailable"
+        assert stub["is_reference"] is True
+        assert stub["reference_uuid"] == "ref-broken"
+        assert stub["source_kb_uuid"] == "kb-gone"
+        assert stub["can_manage"] is False
+        assert stub["title"] == "Knowledge base no longer available"
+        # The stub counts toward the total like any other reference row.
+        assert resp.json()["total"] == 1
 
 
 class TestKnowledgeCRUD:
@@ -444,6 +652,56 @@ class TestKnowledgeCRUD:
         assert data["uuid"] == "kb-uuid-1"
         assert len(data["sources"]) == 1
         assert data["sources"][0]["document_title"] == "Some Document.pdf"
+        # The owner manages their own KB.
+        assert data["can_manage"] is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "is_examiner,is_admin,expected",
+        [
+            (False, False, False),  # regular user: view only
+            (True, False, True),    # examiners curate verified KBs
+            (False, True, True),    # admins manage everything
+        ],
+    )
+    async def test_get_detail_can_manage_on_foreign_verified_kb(
+        self, client, is_examiner, is_admin, expected,
+    ):
+        """A verified catalog KB the user doesn't own is viewable by everyone but
+        manageable only by an examiner or admin. The detail response must say so,
+        so the UI can disable Add Documents / Add URLs instead of letting the user
+        finish the flow and collect a 403.
+        """
+        user = _make_user("viewer")
+        user.is_examiner = is_examiner
+        user.is_admin = is_admin
+        cookies, headers = _auth("viewer")
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            patch(
+                "app.routers.knowledge._resolve_document_titles",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get("/api/knowledge/kb-uuid-1", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        assert resp.json()["can_manage"] is expected
 
     @pytest.mark.asyncio
     async def test_get_detail_not_found(self, client):
@@ -1190,6 +1448,7 @@ class TestConvertDocumentsToKB:
             patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.services.name_conflicts.kb_title_taken", new_callable=AsyncMock, return_value=False),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
@@ -1261,6 +1520,7 @@ class TestConvertDocumentsToKB:
             patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.services.name_conflicts.kb_title_taken", new_callable=AsyncMock, return_value=False),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
@@ -1784,3 +2044,407 @@ class TestKnowledgeReingest:
             )
 
         assert resp.status_code == 403
+
+
+class TestTestQueryImport:
+    """Bulk CSV/XLSX import of validation test queries."""
+
+    @staticmethod
+    def _payload(csv_text, filename="set.csv"):
+        import base64
+
+        return {
+            "filename": filename,
+            "content_base64": base64.b64encode(csv_text.encode("utf-8")).decode(),
+        }
+
+    @staticmethod
+    def _existing_query(**overrides):
+        # Beanie Documents can't be constructed without an initialized
+        # collection, so stand-ins carry the exact attrs the endpoint touches
+        # (explicit values — a bare MagicMock's auto-attrs are truthy and
+        # would satisfy the external_id lookup by accident).
+        from types import SimpleNamespace
+
+        defaults = {
+            "knowledge_base_uuid": "kb-uuid-1",
+            "query": "Old question?",
+            "expected_answer": None,
+            "expected_answer_contains": None,
+            "expected_source_labels": [],
+            "category": None,
+            "notes": None,
+            "external_id": None,
+            "updated_at": None,
+            "user_id": "user1",
+        }
+        defaults.update(overrides)
+        q = SimpleNamespace(**defaults)
+        q.save = AsyncMock()
+        return q
+
+    @staticmethod
+    def _fake_query_cls(existing):
+        """Stand-in for the KBTestQuery class: find() returns ``existing``,
+        constructing an instance records it and gives it an AsyncMock insert."""
+        from types import SimpleNamespace
+
+        created = []
+
+        def construct(**kwargs):
+            inst = SimpleNamespace(uuid="new-uuid", **kwargs)
+            inst.insert = AsyncMock()
+            created.append(inst)
+            return inst
+
+        cls = MagicMock(side_effect=construct)
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=existing)
+        cls.find.return_value = find_result
+        return cls, created
+
+    @pytest.mark.asyncio
+    async def test_import_creates_updates_and_skips(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        # One row matched by stable ID (updated in place), one existing
+        # ID-less question repeated verbatim in the file (skipped).
+        existing_by_id = self._existing_query(external_id="EXIST-1")
+        existing_dup = self._existing_query(query="Duplicate question?")
+
+        csv_text = (
+            "Question,Expected Answer,Category,Source,Notes,ID\n"
+            "New question?,New answer,factual,Doc A,fresh,NEW-1\n"
+            "Updated question?,Better answer,summary,Doc B,,EXIST-1\n"
+            "Duplicate question?,,,,,\n"
+        )
+
+        fake_cls, created = self._fake_query_cls([existing_by_id, existing_dup])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload(csv_text),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 1
+        assert body["updated"] == 1
+        assert body["skipped"] == 1
+        assert body["total_rows"] == 3
+        assert body["errors"] == []
+        assert len(created) == 1
+        assert created[0].query == "New question?"
+        assert created[0].external_id == "NEW-1"
+        created[0].insert.assert_awaited_once()
+        existing_by_id.save.assert_awaited_once()
+        existing_dup.save.assert_not_awaited()
+        # The ID-matched row was rewritten from the spreadsheet.
+        assert existing_by_id.query == "Updated question?"
+        assert existing_by_id.expected_answer == "Better answer"
+        assert existing_by_id.category == "summary"
+        assert existing_by_id.expected_source_labels == ["Doc B"]
+        assert existing_by_id.updated_at is not None
+
+    @pytest.mark.asyncio
+    async def test_import_reports_row_errors_without_failing(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        csv_text = "Question,Answer\nQ1,A1\n,orphan answer\n"
+        fake_cls, created = self._fake_query_cls([])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload(csv_text),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 1
+        assert body["errors"] == [{"row": 3, "error": "Missing question"}]
+
+    @pytest.mark.asyncio
+    async def test_import_bad_file_type_is_400(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question\nQ1\n", filename="set.txt"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "Unsupported" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_import_invalid_base64_is_400(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json={"filename": "set.csv", "content_base64": "%%% not base64 %%%"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_import_view_only_user_gets_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        async def gated_lookup(uuid, u, manage=False, **kw):
+            return None if manage else kb
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(side_effect=gated_lookup)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question\nQ1\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+
+
+class TestValidationRunExport:
+    """GET /{uuid}/validation-runs/{run_uuid}/export — per-query results."""
+
+    def _kb(self):
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        kb.title = "NSF PAPPG"
+        kb.tags = []
+        kb.total_sources = 1
+        kb.total_chunks = 10
+        kb.resource_config = {"seed_id": "kb-nsf"}
+        kb.rag_config_override = None
+        return kb
+
+    def _vr(self, snapshot):
+        vr = MagicMock()
+        vr.uuid = "run-abcdef123456"
+        vr.score = 80.0
+        vr.score_breakdown = {}
+        vr.created_at = datetime.datetime(2026, 8, 1, tzinfo=datetime.timezone.utc)
+        vr.result_snapshot = snapshot
+        return vr
+
+    def _full_snapshot(self):
+        return {
+            "mode": "judge",
+            "judge_model": "claude-x",
+            "retrieval_precision": {
+                "details": [
+                    {
+                        "query": "Q1?",
+                        "query_uuid": "q-1",
+                        "precision": 1.0,
+                        "actual_answer": "A1.",
+                        "judge": {"score": 0.9, "verdict": "PASS", "reasoning": "ok"},
+                    },
+                ],
+            },
+        }
+
+    @pytest.mark.asyncio
+    async def test_export_csv_happy_path(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        kb = self._kb()
+        vr = self._vr(self._full_snapshot())
+        cfg = MagicMock()
+        cfg.catalog_version = "1.3.1"
+        tq_query = MagicMock()
+        tq_query.to_list = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=tq_query),
+            patch("app.models.system_config.SystemConfig.get_config", new_callable=AsyncMock, return_value=cfg),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=vr)
+
+            resp = await client.get(
+                "/api/knowledge/kb-1/validation-runs/run-abcdef123456/export",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/csv")
+        assert 'filename="NSF_PAPPG-validation-20260801-000000-run-abcd.csv"' in (
+            resp.headers["content-disposition"]
+        )
+        lines = resp.text.splitlines()
+        assert lines[0].startswith("run_uuid,run_created_at,kb_uuid,kb_title")
+        assert "Q1?" in lines[1]
+        assert "PASS" in lines[1]
+
+    @pytest.mark.asyncio
+    async def test_export_json_carries_format_tag(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        kb = self._kb()
+        vr = self._vr(self._full_snapshot())
+        cfg = MagicMock()
+        cfg.catalog_version = None
+        tq_query = MagicMock()
+        tq_query.to_list = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=tq_query),
+            patch("app.models.system_config.SystemConfig.get_config", new_callable=AsyncMock, return_value=cfg),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=vr)
+
+            resp = await client.get(
+                "/api/knowledge/kb-1/validation-runs/run-abcdef123456/export?format=json",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["format"] == "vandalizer.kb-validation-results.v1"
+        assert body["validation_run"]["judge_model"] == "claude-x"
+        assert len(body["results"]) == 1
+
+    @pytest.mark.asyncio
+    async def test_export_optimizer_apply_row_is_400(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        kb = self._kb()
+        # Apply rows persist a lightweight snapshot with no per-query details.
+        vr = self._vr({"source": "optimizer_apply", "score": 90.0})
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock(return_value=vr)
+
+            resp = await client.get(
+                "/api/knowledge/kb-1/validation-runs/run-abcdef123456/export",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "optimizer apply" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_export_foreign_kb_is_404(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=None),
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockRun.find_one = AsyncMock()
+
+            resp = await client.get(
+                "/api/knowledge/kb-1/validation-runs/run-abcdef123456/export",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        MockRun.find_one.assert_not_awaited()

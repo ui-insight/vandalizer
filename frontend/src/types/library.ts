@@ -42,6 +42,8 @@ export interface LibraryItem {
   quality_score?: number | null
   last_validated_at?: string | null
   created_by?: AuthorRef | null
+  /** Whether the current user may permanently delete the backing workflow/extraction. */
+  can_delete_underlying?: boolean
 }
 
 export interface LibraryFolder {

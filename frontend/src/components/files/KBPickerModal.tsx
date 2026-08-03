@@ -20,7 +20,8 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
 
   useEffect(() => {
     listKnowledgeBasesV2({ scope: 'mine' })
-      .then(res => setKbs(res.items))
+      // Broken bookmarks ('unavailable') have no underlying KB to add docs to.
+      .then(res => setKbs(res.items.filter(kb => kb.status !== 'unavailable')))
       .catch(() => setError('Could not load knowledge bases.'))
   }, [])
 

@@ -168,6 +168,10 @@ class ExtractionOptimizationRun(Document):
     options: dict = Field(default_factory=dict)
     # Shape: {"apply_on_finish": bool, "include_judge": bool, "advanced": {...}}
 
+    # Optimizer-inbox triage — see the same fields on ``KBOptimizationRun``.
+    dismissed_at: Optional[datetime.datetime] = None
+    dismissed_by: Optional[str] = None
+
     error_message: Optional[str] = None
 
     class Settings:

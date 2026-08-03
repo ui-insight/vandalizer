@@ -14,10 +14,10 @@ from copy import deepcopy
 from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
-from pydantic_ai import Agent, BinaryContent
-from app.services._json_schema_utils import inline_defs
+from pydantic_ai import Agent, BinaryContent, NativeOutput
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
+from app.services.extraction_sources import SOURCE_KEY, resolve_entity_sources
 from app.services.llm_service import (
     build_thinking_model_settings,
     create_chat_agent,
@@ -123,6 +123,8 @@ class ExtractionEngine:
         doc_texts: list[str] | None = None,
         field_metadata: list[dict] | None = None,
         doc_file_paths: list[str] | None = None,
+        capture_sources: bool = False,
+        doc_metadata: list[dict] | None = None,
     ) -> list:
         """Run extraction. Returns list of entity dicts.
 
@@ -135,6 +137,12 @@ class ExtractionEngine:
             doc_texts: Pre-loaded document texts.
             field_metadata: Per-field metadata (is_optional, enum_values) from search set items.
             doc_file_paths: File paths for image-based extraction (used when use_images is enabled).
+            capture_sources: Also ask the LLM for a verbatim supporting passage
+                per field, verified against the document text and attached to
+                each entity under ``SOURCE_KEY``.
+            doc_metadata: Index-aligned with doc_texts; per-doc
+                ``{"uuid", "title", "text_markers"}`` used to resolve source
+                passages to pages. Only consulted when capture_sources is set.
         """
         # Normalize keys
         if isinstance(extract_keys, str):
@@ -161,20 +169,31 @@ class ExtractionEngine:
                 content = self._load_file_content(file_path, model_supports_pdf)
                 if content is not None:
                     doc_results = self._extract_document(
-                        content, key_chunks, model, extraction_cfg, use_repetition, meta_map
+                        content, key_chunks, model, extraction_cfg, use_repetition, meta_map,
+                        capture_sources=capture_sources,
                     )
-                    all_results.extend(doc_results)
                 else:
                     # Fallback to OCR text if file can't be loaded for images
+                    doc_results = []
                     texts = doc_texts or []
                     if idx < len(texts) and texts[idx]:
                         logger.warning(
                             "Image loading failed for %s, falling back to text", file_path
                         )
                         doc_results = self._extract_document(
-                            texts[idx], key_chunks, model, extraction_cfg, use_repetition, meta_map
+                            texts[idx], key_chunks, model, extraction_cfg, use_repetition, meta_map,
+                            capture_sources=capture_sources,
                         )
-                        all_results.extend(doc_results)
+                if doc_results and capture_sources:
+                    # Verify quotes against the doc's extracted text even in
+                    # image mode — an unverifiable quote stays verified=False.
+                    texts = doc_texts or []
+                    self._resolve_sources(
+                        doc_results,
+                        texts[idx] if idx < len(texts) else "",
+                        (doc_metadata or []), idx,
+                    )
+                all_results.extend(doc_results)
             return all_results
 
         # Text-based extraction (default path)
@@ -186,13 +205,21 @@ class ExtractionEngine:
             return []
 
         all_results = []
-        for doc_text in texts:
+        for idx, doc_text in enumerate(texts):
             doc_results = self._extract_document(
-                doc_text, key_chunks, model, extraction_cfg, use_repetition, meta_map
+                doc_text, key_chunks, model, extraction_cfg, use_repetition, meta_map,
+                capture_sources=capture_sources,
             )
+            if doc_results and capture_sources:
+                self._resolve_sources(doc_results, doc_text, (doc_metadata or []), idx)
             all_results.extend(doc_results)
 
         return all_results
+
+    @staticmethod
+    def _resolve_sources(entities: list, doc_text: str, doc_metadata: list[dict], idx: int) -> None:
+        meta = doc_metadata[idx] if idx < len(doc_metadata) else {}
+        resolve_entity_sources(entities, doc_text or "", meta or {})
 
     def build_from_documents(self, doc_texts: list[str], model: str) -> dict | None:
         """Generate extraction entities from document text using LLM."""
@@ -362,13 +389,14 @@ class ExtractionEngine:
         self, content: ExtractionContent, key_chunks: list[list[str]],
         model: str, cfg: dict, use_repetition: bool,
         meta_map: dict[str, dict] | None = None,
+        capture_sources: bool = False,
     ) -> list:
         doc_results = []
         for chunk_keys in key_chunks:
             if use_repetition:
-                chunk_result = self._extract_with_consensus(content, chunk_keys, model, cfg, meta_map)
+                chunk_result = self._extract_with_consensus(content, chunk_keys, model, cfg, meta_map, capture_sources)
             else:
-                chunk_result = self._dispatch_extraction(content, chunk_keys, model, cfg, meta_map)
+                chunk_result = self._dispatch_extraction(content, chunk_keys, model, cfg, meta_map, capture_sources)
             doc_results.extend(chunk_result)
 
         if len(key_chunks) > 1:
@@ -379,7 +407,7 @@ class ExtractionEngine:
     # Dispatch layer (unified for text and multimodal)
     # ------------------------------------------------------------------
 
-    def _dispatch_extraction(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
+    def _dispatch_extraction(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None, capture_sources: bool = False) -> list:
         mode = config.get("mode", "two_pass")
         prompt_variant = config.get("prompt_variant", "default")
 
@@ -388,30 +416,32 @@ class ExtractionEngine:
             thinking = one_pass.get("thinking", True)
             structured = one_pass.get("structured", True)
             pass_model = one_pass.get("model", "") or model_name
-            return self._execute_single_pass(content, keys, pass_model, thinking, structured, meta_map, prompt_variant)
+            return self._execute_single_pass(content, keys, pass_model, thinking, structured, meta_map, prompt_variant, capture_sources)
 
         # two_pass (default)
         two_pass = config.get("two_pass", {})
         pass_1_cfg = two_pass.get("pass_1", {})
         pass_2_cfg = two_pass.get("pass_2", {})
-        return self._execute_two_pass(content, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map, prompt_variant)
+        return self._execute_two_pass(content, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map, prompt_variant, capture_sources)
 
     def _execute_single_pass(
         self, content: ExtractionContent, keys: list[str], model_name: str,
         thinking: bool, structured: bool,
         meta_map: dict[str, dict] | None = None,
         prompt_variant: str = "default",
+        capture_sources: bool = False,
     ) -> list:
         if structured:
-            return self._extract_structured(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant)
+            return self._extract_structured(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
         else:
-            return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant)
+            return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
 
     def _execute_two_pass(
         self, content: ExtractionContent, keys: list[str], model_name: str,
         pass_1_cfg: dict, pass_2_cfg: dict,
         meta_map: dict[str, dict] | None = None,
         prompt_variant: str = "default",
+        capture_sources: bool = False,
     ) -> list:
         p1_model = pass_1_cfg.get("model", "") or model_name
         p1_thinking = pass_1_cfg.get("thinking", True)
@@ -423,9 +453,9 @@ class ExtractionEngine:
 
         # Pass 1
         if p1_structured:
-            draft = self._extract_structured(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
+            draft = self._extract_structured(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
         else:
-            draft = self._extract_fallback_json(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
+            draft = self._extract_fallback_json(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
 
         draft_hint = self._build_draft_hint(draft)
 
@@ -437,6 +467,11 @@ class ExtractionEngine:
         else:
             p2_content = content
 
+        # When pass 2 only sees the draft summary (multimodal refinement),
+        # any "verbatim passage" it returned would be copied from the draft,
+        # not the document — rely on pass 1's quotes instead.
+        p2_capture = capture_sources and p2_content is content
+
         if p2_structured:
             final = self._extract_structured(
                 p2_content, keys, p2_model,
@@ -445,11 +480,32 @@ class ExtractionEngine:
                 allow_fallback=False,
                 meta_map=meta_map,
                 prompt_variant=prompt_variant,
+                capture_sources=p2_capture,
             )
         else:
-            final = self._extract_fallback_json(p2_content, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
+            final = self._extract_fallback_json(p2_content, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=p2_capture)
 
+        if capture_sources and final and draft:
+            self._backfill_sources(final, draft)
         return final or draft or []
+
+    @staticmethod
+    def _backfill_sources(final: list, draft: list) -> None:
+        """Fill final entities' missing per-field quotes from the draft pass."""
+        draft_sources: dict = {}
+        for entity in draft:
+            if isinstance(entity, dict) and isinstance(entity.get(SOURCE_KEY), dict):
+                for field, src in entity[SOURCE_KEY].items():
+                    draft_sources.setdefault(field, src)
+        if not draft_sources:
+            return
+        for entity in final:
+            if not isinstance(entity, dict):
+                continue
+            sidecar = entity.setdefault(SOURCE_KEY, {})
+            for field, src in draft_sources.items():
+                if field in entity and field not in sidecar:
+                    sidecar[field] = src
 
     @staticmethod
     def _format_draft_as_text(draft: dict, keys: list[str]) -> str:
@@ -477,6 +533,12 @@ class ExtractionEngine:
         for item in results:
             if isinstance(item, dict):
                 for k, v in item.items():
+                    if k == SOURCE_KEY:
+                        if isinstance(v, dict):
+                            sidecar = merged.setdefault(SOURCE_KEY, {})
+                            for field, src in v.items():
+                                sidecar.setdefault(field, src)
+                        continue
                     if k not in merged or merged[k] in (None, "", [], {}):
                         merged[k] = v
         return [merged] if merged else []
@@ -485,24 +547,51 @@ class ExtractionEngine:
     # Repetition / Consensus
     # ------------------------------------------------------------------
 
-    def _extract_with_consensus(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
+    def _extract_with_consensus(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None, capture_sources: bool = False) -> list:
         with ThreadPoolExecutor(max_workers=2) as executor:
-            future_1 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map)
-            future_2 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map)
+            future_1 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map, capture_sources)
+            future_2 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map, capture_sources)
             result_1 = future_1.result()
             result_2 = future_2.result()
 
-        norm_1 = self._normalize_to_dict(result_1)
-        norm_2 = self._normalize_to_dict(result_2)
+        # Quotes legitimately vary between replicates, so the source sidecar
+        # must not participate in the agreement check or the vote.
+        norm_1 = self._strip_sources(self._normalize_to_dict(result_1))
+        norm_2 = self._strip_sources(self._normalize_to_dict(result_2))
 
         if norm_1 == norm_2:
             return result_1 if result_1 else result_2
 
-        result_3 = self._dispatch_extraction(content, keys, model_name, config, meta_map)
-        norm_3 = self._normalize_to_dict(result_3)
+        result_3 = self._dispatch_extraction(content, keys, model_name, config, meta_map, capture_sources)
+        norm_3 = self._strip_sources(self._normalize_to_dict(result_3))
 
         consensus = self._majority_vote(keys, [norm_1, norm_2, norm_3])
+        if capture_sources:
+            sidecar = self._sidecar_for_consensus(
+                consensus, [norm_1, norm_2, norm_3],
+                [self._normalize_to_dict(r) for r in (result_1, result_2, result_3)],
+            )
+            if sidecar:
+                consensus[SOURCE_KEY] = sidecar
         return [consensus]
+
+    @staticmethod
+    def _strip_sources(entity: dict) -> dict:
+        return {k: v for k, v in entity.items() if k != SOURCE_KEY}
+
+    @staticmethod
+    def _sidecar_for_consensus(consensus: dict, norms: list[dict], fulls: list[dict]) -> dict:
+        """Per field, take the quote from a replicate that voted with the winner."""
+        sidecar: dict = {}
+        for field, value in consensus.items():
+            for norm, full in zip(norms, fulls):
+                if norm.get(field) != value:
+                    continue
+                src = (full.get(SOURCE_KEY) or {}).get(field) if isinstance(full.get(SOURCE_KEY), dict) else None
+                if src:
+                    sidecar[field] = src
+                    break
+        return sidecar
 
     def _normalize_to_dict(self, results: list) -> dict:
         if not results:
@@ -538,15 +627,17 @@ class ExtractionEngine:
         if not draft_entities:
             return None
         if isinstance(draft_entities, dict):
-            return draft_entities
+            return self._strip_sources(draft_entities) or None
         if isinstance(draft_entities, list):
             if len(draft_entities) == 1 and isinstance(draft_entities[0], dict):
-                return draft_entities[0]
+                return self._strip_sources(draft_entities[0]) or None
             merged = {}
             for entity in draft_entities:
                 if not isinstance(entity, dict):
                     continue
                 for key, value in entity.items():
+                    if key == SOURCE_KEY:
+                        continue
                     if key in merged:
                         continue
                     if value in (None, "", [], {}):
@@ -676,6 +767,7 @@ class ExtractionEngine:
         allow_fallback: bool = True,
         meta_map: dict[str, dict] | None = None,
         prompt_variant: str = "default",
+        capture_sources: bool = False,
     ) -> list:
         # Build dynamic Pydantic model
         field_definitions = {}
@@ -683,8 +775,13 @@ class ExtractionEngine:
             safe_key = "".join(c if c.isalnum() else "_" for c in key)
             if not safe_key:
                 safe_key = "field"
-            if safe_key[0].isdigit():
-                safe_key = f"_{safe_key}"
+            # pydantic forbids field names with a leading underscore (private
+            # attrs) and Python forbids a leading digit, so names like
+            # "2 CFR Part 200" or "$ Amount" must get a letter prefix. The
+            # internal name never leaks: the LLM-facing schema and the output
+            # dict both use the original key via the alias.
+            if not safe_key[0].isalpha():
+                safe_key = f"f_{safe_key}"
             original_safe_key = safe_key
             counter = 1
             while safe_key in field_definitions:
@@ -706,9 +803,22 @@ class ExtractionEngine:
             **field_definitions,
         )
 
+        # Source quotes reuse the same safe-key/alias mapping but are always
+        # plain strings (a verbatim passage, even for enum fields).
+        DynamicSources = create_model(
+            "DynamicSources",
+            __config__=ConfigDict(extra="allow", populate_by_name=True),
+            **{
+                safe_key: (Optional[str], Field(default=None, alias=defn[1].alias))
+                for safe_key, defn in field_definitions.items()
+            },
+        )
+
         class ExtractionModel(BaseModel):
             model_config = ConfigDict(extra="allow")
             entities: List[DynamicEntity]
+            if capture_sources:
+                sources: Optional[List[DynamicSources]] = None
 
             @model_validator(mode="before")
             @classmethod
@@ -729,17 +839,22 @@ class ExtractionEngine:
                     return {"entities": [value]}
                 return value
 
-        def _build_structured_output_schema() -> dict:
-            schema = ExtractionModel.model_json_schema(by_alias=True)
-            if "$defs" in schema:
-                schema = inline_defs(schema)
-            return schema
-
         api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
         structured_retries = 3
 
         source_label = self._describe_content(content)
         system_prompt = _resolve_prompt(prompt_variant, source_label)
+        if capture_sources:
+            # Appended as a separate clause — the variant prompts themselves
+            # are pinned to the optimizer's tuned baselines (see PROMPT_VARIANTS).
+            system_prompt += (
+                " Additionally return a 'sources' key: a list aligned one-to-one with 'entities', "
+                "where each item maps the same field names to the exact contiguous passage from the "
+                "document that the field's value came from — copied character-for-character, including "
+                "punctuation and capitalization, at most a few hundred characters (the sentence or line "
+                "containing the value). For yes/no or judgment fields, give the passage that best supports "
+                "the answer. Use null when a field was not found. Never paraphrase these passages."
+            )
         system_prompt += self._get_domain_supplement()
 
         try:
@@ -749,17 +864,24 @@ class ExtractionEngine:
             model_settings = build_thinking_model_settings(
                 model_name, thinking_override, self._sys_cfg,
             )
-            if api_protocol == "vllm":
-                schema = _build_structured_output_schema()
-                extra_body = dict(model_settings.get("extra_body") or {})
-                extra_body["structured_outputs"] = {"json": schema}
-                model_settings["extra_body"] = extra_body
+            # vLLM enforces JSON schemas server-side through the standard
+            # OpenAI ``response_format`` parameter, which is exactly what
+            # pydantic-ai's NativeOutput mode emits. This works both against
+            # vLLM directly and through OpenAI-compatible gateways. The
+            # previous approach injected vLLM's proprietary
+            # ``structured_outputs`` extra-body field, which gateways drop
+            # silently, quietly losing schema enforcement.
+            output_type = (
+                NativeOutput(ExtractionModel)
+                if api_protocol == "vllm"
+                else ExtractionModel
+            )
 
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)
             agent = Agent(
                 model,
                 system_prompt=system_prompt,
-                output_type=ExtractionModel,
+                output_type=output_type,
                 retries=structured_retries,
                 output_retries=structured_retries,
             )
@@ -778,6 +900,15 @@ class ExtractionEngine:
                 elif isinstance(entity, dict):
                     raw_entities.append(entity)
 
+            if capture_sources:
+                raw_sources = []
+                for src in getattr(result.output, "sources", None) or []:
+                    if hasattr(src, "model_dump"):
+                        raw_sources.append(src.model_dump(by_alias=True))
+                    elif isinstance(src, dict):
+                        raw_sources.append(src)
+                self._attach_source_quotes(raw_entities, raw_sources)
+
             return self._filter_empty_entities(raw_entities)
 
         except Exception as e:
@@ -785,15 +916,36 @@ class ExtractionEngine:
             if ("output validation" in error_msg or "retries" in error_msg.lower()
                     or "validation error" in error_msg.lower()):
                 if allow_fallback:
-                    return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map, prompt_variant=prompt_variant)
+                    return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
                 return []
             return []
+
+    @staticmethod
+    def _attach_source_quotes(entities: list, sources: list) -> None:
+        """Attach raw per-field quotes as the SOURCE_KEY sidecar, index-aligned."""
+        for i, entity in enumerate(entities):
+            if not isinstance(entity, dict):
+                continue
+            src = sources[i] if i < len(sources) else (sources[0] if len(sources) == 1 else None)
+            if not isinstance(src, dict):
+                continue
+            sidecar = {
+                field: {"quote": quote.strip()}
+                for field, quote in src.items()
+                if isinstance(quote, str) and quote.strip() and field in entity
+            }
+            if sidecar:
+                entity[SOURCE_KEY] = sidecar
 
     def _filter_empty_entities(self, entities: list) -> list:
         def is_non_empty(e: dict) -> bool:
             if not isinstance(e, dict) or not e:
                 return False
-            return any(v not in (None, "", [], {}) for v in e.values())
+            return any(
+                v not in (None, "", [], {})
+                for k, v in e.items()
+                if k != SOURCE_KEY
+            )
         return [e for e in entities if is_non_empty(e)]
 
     # ------------------------------------------------------------------
@@ -808,6 +960,7 @@ class ExtractionEngine:
         thinking_override: Optional[bool] = None,
         meta_map: dict[str, dict] | None = None,
         prompt_variant: str = "default",
+        capture_sources: bool = False,
     ) -> list:
         try:
             source_label = self._describe_content(content)
@@ -821,6 +974,15 @@ class ExtractionEngine:
             system_prompt += (
                 " Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations."
             )
+            if capture_sources:
+                system_prompt += (
+                    ' Also include a "_sources" key in the JSON object: an object mapping each '
+                    "field name to the exact contiguous passage from the document that the "
+                    "field's value came from — copied character-for-character, at most a few "
+                    "hundred characters. For yes/no or judgment fields, give the passage that "
+                    "best supports the answer. Use null when a field was not found. Never "
+                    "paraphrase these passages."
+                )
             system_prompt += self._get_domain_supplement()
 
             chat_agent = create_chat_agent(
@@ -842,6 +1004,14 @@ class ExtractionEngine:
                 parsed = json.loads(output.strip())
                 if isinstance(parsed, dict):
                     entity = {key: parsed.get(key) for key in keys}
+                    if capture_sources and isinstance(parsed.get("_sources"), dict):
+                        sidecar = {
+                            field: {"quote": quote.strip()}
+                            for field, quote in parsed["_sources"].items()
+                            if isinstance(quote, str) and quote.strip() and field in entity
+                        }
+                        if sidecar:
+                            entity[SOURCE_KEY] = sidecar
                     return [entity]
                 elif isinstance(parsed, list):
                     return parsed

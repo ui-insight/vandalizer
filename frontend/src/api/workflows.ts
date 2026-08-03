@@ -250,7 +250,7 @@ export function downloadResults(sessionId: string, format: string = 'json', opts
   return `/api/workflows/download?${params.toString()}`
 }
 
-export type SaveOutputFormat = 'pdf' | 'markdown' | 'csv' | 'json' | 'text'
+export type SaveOutputFormat = 'pdf' | 'docx' | 'markdown' | 'csv' | 'json' | 'text'
 
 export function saveResultToFolder(
   sessionId: string,

@@ -57,9 +57,9 @@ export function useLibraryItems(libraryId: string | null, filters?: { kind?: str
     return item
   }
 
-  const remove = async (itemId: string) => {
+  const remove = async (itemId: string, opts?: { deleteUnderlying?: boolean }) => {
     if (!libraryId) return
-    await api.removeItem(libraryId, itemId)
+    await api.removeItem(libraryId, itemId, opts)
     setItems(prev => prev.filter(i => i.id !== itemId))
   }
 

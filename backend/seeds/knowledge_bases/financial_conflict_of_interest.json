@@ -1,0 +1,29 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-fcoi",
+    "display_name": "Financial Conflict of Interest (FCOI)",
+    "description": "PHS financial conflict-of-interest regulations (42 CFR 50 Subpart F): investigator disclosure, significant financial interests, and institutional review, management, and reporting.",
+    "quality_tier": "gold",
+    "collections": [
+      "compliance",
+      "reference-knowledge"
+    ]
+  },
+  "items": [
+    {
+      "title": "Financial Conflict of Interest (FCOI)",
+      "description": "PHS financial conflict-of-interest regulations (42 CFR 50 Subpart F): investigator disclosure, significant financial interests, and institutional review, management, and reporting.",
+      "sources": [
+        {
+          "source_type": "url",
+          "url": "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-50/subpart-F",
+          "content_file": "content/ecfr-title42-part50-subpart-f.txt",
+          "url_title": "Subpart F\u2014Promoting Objectivity in Research"
+        }
+      ]
+    }
+  ]
+}

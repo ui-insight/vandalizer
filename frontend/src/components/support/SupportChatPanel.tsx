@@ -7,6 +7,7 @@ import {
   Circle,
   Clock,
   Eye,
+  Heart,
   Loader2,
   Lock,
   MessageSquare,
@@ -14,6 +15,8 @@ import {
   Pencil,
   Plus,
   Send,
+  Sparkles,
+  Trash2,
   Upload,
   UserPlus,
   X,
@@ -22,6 +25,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import * as supportApi from '../../api/support'
+import { submitProductFeedback } from '../../api/feedback'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
 
 const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
@@ -145,7 +149,7 @@ const CLASSIFICATION_LABELS = {
 // Views
 // ---------------------------------------------------------------------------
 
-type View = 'list' | 'new' | 'chat'
+type View = 'list' | 'new' | 'chat' | 'praise'
 
 function TicketListView({
   tickets,
@@ -154,6 +158,7 @@ function TicketListView({
   currentUserId,
   onSelect,
   onNew,
+  onPraise,
 }: {
   tickets: SupportTicketSummary[]
   loading: boolean
@@ -161,6 +166,7 @@ function TicketListView({
   currentUserId: string
   onSelect: (uuid: string) => void
   onNew: () => void
+  onPraise: () => void
 }) {
   const open = tickets.filter((t) => t.status !== 'closed')
   const closed = tickets.filter((t) => t.status === 'closed')
@@ -207,10 +213,23 @@ function TicketListView({
               const isWatching = t.user_id !== currentUserId
                 && (t.watcher_ids ?? []).includes(currentUserId)
               return (
-                <button
+                // Not a <button>: browsers block text selection inside buttons,
+                // and users need to copy the subject/preview text from the row.
+                <div
                   key={t.uuid}
-                  onClick={() => onSelect(t.uuid)}
-                  className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 ${
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    if (window.getSelection()?.toString()) return
+                    onSelect(t.uuid)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      onSelect(t.uuid)
+                    }
+                  }}
+                  className={`flex w-full cursor-pointer items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 ${
                     attention ? 'bg-blue-50/50' : ''
                   }`}
                 >
@@ -255,7 +274,7 @@ function TicketListView({
                       <span className="text-[10px] font-medium text-red-500">High</span>
                     )}
                   </div>
-                </button>
+                </div>
               )
             })}
             {closed.length > 0 && (
@@ -264,10 +283,21 @@ function TicketListView({
                   {closed.length} closed ticket{closed.length !== 1 ? 's' : ''}
                 </summary>
                 {closed.map((t) => (
-                  <button
+                  <div
                     key={t.uuid}
-                    onClick={() => onSelect(t.uuid)}
-                    className="flex w-full items-start gap-3 border-b border-gray-50 px-4 py-2.5 text-left opacity-60 hover:bg-gray-50 hover:opacity-100"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (window.getSelection()?.toString()) return
+                      onSelect(t.uuid)
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        onSelect(t.uuid)
+                      }
+                    }}
+                    className="flex w-full cursor-pointer items-start gap-3 border-b border-gray-50 px-4 py-2.5 text-left opacity-60 hover:bg-gray-50 hover:opacity-100"
                   >
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT.closed}`} />
                     <div className="min-w-0 flex-1">
@@ -279,7 +309,7 @@ function TicketListView({
                       </p>
                     </div>
                     <span className="text-[10px] text-gray-500">{timeAgo(t.updated_at)}</span>
-                  </button>
+                  </div>
                 ))}
               </details>
             )}
@@ -287,17 +317,135 @@ function TicketListView({
         )}
       </div>
 
-      {!isSupportAgent && tickets.length > 0 && (
-        <div className="border-t p-3">
+      {!isSupportAgent && (
+        <div className="space-y-2 border-t p-3">
+          {tickets.length > 0 && (
+            <button
+              onClick={onNew}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />
+              New Ticket
+            </button>
+          )}
           <button
-            onClick={onNew}
-            className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            onClick={onPraise}
+            className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 px-3 py-2 text-sm font-medium text-pink-700 hover:bg-pink-100"
           >
-            <Plus className="h-4 w-4" />
-            New Ticket
+            <Heart className="h-4 w-4" />
+            Something working well?
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+// Off-ticket positive feedback. Deliberately NOT a support ticket: praise and
+// ideas shouldn't enter the triage queue or fire the ticket notification
+// fan-out. Writes to ProductFeedback and surfaces in the "What's Working" feed.
+function PraiseView({ onBack }: { onBack: () => void }) {
+  const [sentiment, setSentiment] = useState<'positive' | 'idea'>('positive')
+  const [message, setMessage] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [sent, setSent] = useState(false)
+  const { toast } = useToast()
+
+  const handleSubmit = async () => {
+    if (!message.trim()) return
+    setSubmitting(true)
+    try {
+      await submitProductFeedback({
+        message: message.trim(),
+        sentiment,
+        source: 'support_panel',
+      })
+      setSent(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to send feedback'
+      toast(msg, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="flex flex-1 flex-col">
+        <div className="flex items-center gap-2 border-b px-4 py-2">
+          <span className="text-sm font-medium text-gray-900">Thank you</span>
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">
+          <Heart className="h-10 w-10 text-pink-500" />
+          <p className="text-sm font-medium text-gray-900">This makes our day.</p>
+          <p className="text-xs text-gray-500">
+            Thanks for taking a moment to tell us what&rsquo;s working — it genuinely helps.
+          </p>
+          <button
+            onClick={onBack}
+            className="mt-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          >
+            Done
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex items-center gap-2 border-b px-4 py-2">
+        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <ArrowLeft className="h-4 w-4" />
+        </button>
+        <span className="text-sm font-medium text-gray-900">Share what&rsquo;s working</span>
+      </div>
+      <div className="flex-1 overflow-y-auto space-y-3 p-4">
+        <p className="text-xs text-gray-500">
+          Something you love, or an idea to make it even better? We&rsquo;d love to hear it — this
+          isn&rsquo;t a ticket, just a note to the team.
+        </p>
+        <div className="flex gap-2">
+          {([['positive', 'Something I love'], ['idea', 'An idea']] as const).map(([val, label]) => {
+            const active = sentiment === val
+            return (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setSentiment(val)}
+                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
+                  active
+                    ? 'border-pink-300 bg-pink-50 text-pink-700'
+                    : 'border-gray-300 bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                {val === 'positive' ? <Heart className="mr-1 inline h-3.5 w-3.5" /> : <Sparkles className="mr-1 inline h-3.5 w-3.5" />}
+                {label}
+              </button>
+            )
+          })}
+        </div>
+        <textarea
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={5}
+          autoFocus
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-pink-400 focus:outline-none focus:ring-2 focus:ring-pink-300"
+          placeholder={sentiment === 'positive'
+            ? 'What worked well for you?'
+            : 'What would make Vandalizer better?'}
+        />
+      </div>
+      <div className="border-t p-3">
+        <button
+          onClick={handleSubmit}
+          disabled={submitting || !message.trim()}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-pink-600 px-3 py-2 text-sm font-medium text-white hover:bg-pink-700 disabled:opacity-50"
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Heart className="h-4 w-4" />}
+          Send
+        </button>
+      </div>
     </div>
   )
 }
@@ -380,7 +528,7 @@ function NewTicketView({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Brief summary of your issue"
+            placeholder="Brief summary — a problem, or something you'd like"
             autoFocus
           />
         </div>
@@ -418,7 +566,7 @@ function NewTicketView({
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Describe your issue..."
+            placeholder="Tell us what's happening, or what you'd like to see..."
           />
         </div>
         <div>
@@ -578,12 +726,14 @@ function ChatView({
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`
   }, [message])
 
-  const loadTicket = useCallback(async () => {
+  // Error toasts persist until dismissed, so the 15s refresh stays silent on
+  // failure — only the initial load reports.
+  const loadTicket = useCallback(async (isPoll = false) => {
     try {
       const data = await supportApi.getTicket(ticketUuid)
       setTicket(data)
     } catch {
-      toast('Failed to load ticket', 'error')
+      if (!isPoll) toast('Failed to load ticket', 'error')
     } finally {
       setLoading(false)
     }
@@ -596,7 +746,7 @@ function ChatView({
     import('../../api/notifications').then(({ markReadForItem }) => {
       markReadForItem('support_ticket', ticketUuid).catch(() => {})
     }).catch(() => {})
-    const interval = setInterval(loadTicket, 15000)
+    const interval = setInterval(() => loadTicket(true), 15000)
     return () => clearInterval(interval)
   }, [loadTicket, ticketUuid])
 
@@ -685,6 +835,23 @@ function ChatView({
       toast('Attachment removed', 'success')
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to remove attachment', 'error')
+    }
+  }
+
+  const handleDeleteMessage = async (messageUuid: string) => {
+    if (!(await confirm({
+      title: 'Delete this comment?',
+      message: "This can't be undone.",
+      confirmLabel: 'Delete',
+      destructive: true,
+    }))) return
+    try {
+      const updated = await supportApi.deleteMessage(ticketUuid, messageUuid)
+      setTicket(updated)
+      toast('Message deleted', 'success')
+      onTicketUpdated()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete message', 'error')
     }
   }
 
@@ -899,6 +1066,9 @@ function ChatView({
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {ticket.messages.map((msg) => {
           const isMe = msg.user_id === user?.user_id
+          // Author or admin — regular support agents can't delete other
+          // people's messages (mirrors the backend gate).
+          const canDeleteMsg = !!user && (user.is_admin || msg.user_id === user.user_id)
           const isInternal = msg.is_internal_note
           const isEditing = editingMessageUuid === msg.uuid
           const msgAttachments = ticket.attachments.filter(a => a.message_uuid === msg.uuid)
@@ -994,15 +1164,29 @@ function ChatView({
                   {msg.edited_at && <span className="ml-1 italic">(edited)</span>}
                 </p>
               </div>
-              {isMe && !isEditing && (
-                <button
-                  onClick={() => startEdit(msg)}
-                  className="mt-0.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
-                  title="Edit message"
-                >
-                  <Pencil className="h-2.5 w-2.5" />
-                  Edit
-                </button>
+              {(isMe || canDeleteMsg) && !isEditing && (
+                <div className="mt-0.5 flex items-center gap-0.5">
+                  {isMe && (
+                    <button
+                      onClick={() => startEdit(msg)}
+                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                      title="Edit message"
+                    >
+                      <Pencil className="h-2.5 w-2.5" />
+                      Edit
+                    </button>
+                  )}
+                  {canDeleteMsg && (
+                    <button
+                      onClick={() => handleDeleteMessage(msg.uuid)}
+                      className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                      title="Delete message"
+                    >
+                      <Trash2 className="h-2.5 w-2.5" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               )}
               {msgAttachments.length > 0 && (
                 <div className={`flex flex-col gap-1.5 mt-1.5 max-w-[85%] ${isMe ? 'items-end' : 'items-start'}`}>
@@ -1405,7 +1589,12 @@ export function SupportChatPanel({
             setView('chat')
           }}
           onNew={() => setView('new')}
+          onPraise={() => setView('praise')}
         />
+      )}
+
+      {view === 'praise' && (
+        <PraiseView onBack={() => setView('list')} />
       )}
 
       {view === 'new' && (

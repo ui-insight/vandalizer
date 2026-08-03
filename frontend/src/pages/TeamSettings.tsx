@@ -5,6 +5,7 @@ import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
 import { useConfirm } from '../components/shared/useConfirm'
+import { nameWithoutEmail } from '../lib/displayName'
 import type { TeamMember, TeamInvite, TeamJoinLink } from '../types/user'
 import {
   getTeamMembers,
@@ -354,7 +355,7 @@ export function TeamSettings() {
                   <tr key={m.user_id}>
                     <td className="px-4 py-3">
                       <div className="text-sm font-medium text-gray-900">
-                        {m.name || m.user_id}
+                        {nameWithoutEmail(m.name, m.email) || m.user_id}
                       </div>
                       {m.email && <div className="text-xs text-gray-500">{m.email}</div>}
                     </td>

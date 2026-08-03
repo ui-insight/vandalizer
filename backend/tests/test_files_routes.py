@@ -27,6 +27,7 @@ def _make_user(user_id="testuser", **overrides):
         "current_team": None,
         "is_demo_user": False,
         "demo_status": None,
+        "token_version": 0,
     }
     defaults.update(overrides)
     user = MagicMock()
@@ -206,6 +207,36 @@ class TestRangeHeaderParser:
         assert self._parse("bytes=-", 1000) is None
         assert self._parse("", 1000) is None
         assert self._parse("bytes=1000-2000", 1000) is None  # start beyond total
+
+
+class TestResolveMediaType:
+    """Unit tests for extension → Content-Type resolution on downloads."""
+
+    def _resolve(self, extension: str, title: str) -> str:
+        from app.routers.files import _resolve_media_type
+        return _resolve_media_type(extension, title)
+
+    def test_known_extension(self):
+        assert self._resolve("xlsx", "budget.xlsx").startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml"
+        )
+        assert self._resolve("pdf", "report.pdf") == "application/pdf"
+
+    def test_extension_case_and_dot_normalized(self):
+        assert self._resolve("XLSX", "budget.xlsx") == self._resolve("xlsx", "budget.xlsx")
+        assert self._resolve(".pdf", "report.pdf") == "application/pdf"
+
+    def test_stale_extension_falls_back_to_title_suffix(self):
+        # Legacy Flask records: Excel uploads rewritten to extension="html"
+        # while the title still names the real format.
+        assert self._resolve("html", "Budget_Gap_Assessment.xlsx").startswith(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml"
+        )
+        assert self._resolve("html", "Old_Budget.XLS") == "application/vnd.ms-excel"
+
+    def test_unknown_everything_is_octet_stream(self):
+        assert self._resolve("bin", "mystery.bin") == "application/octet-stream"
+        assert self._resolve("", "no-suffix") == "application/octet-stream"
 
 
 class TestFileDeleteAuth:

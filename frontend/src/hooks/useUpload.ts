@@ -2,12 +2,18 @@ import { useCallback, useState } from 'react'
 import { uploadFile } from '../api/files'
 
 export interface UploadProgress {
+  id: number
   fileName: string
   progress: number // 0–100
   done: boolean
   error?: string
   uuid?: string
 }
+
+// Keep in sync with the accept list in UploadZone / FileBrowser file inputs.
+export const SUPPORTED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md']
+
+let nextUploadId = 0
 
 export function useUpload(folderId: string | null, onComplete: () => void) {
   const [uploads, setUploads] = useState<UploadProgress[]>([])
@@ -16,23 +22,38 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
   const upload = useCallback(
     async (files: FileList | File[]) => {
       const fileArray = Array.from(files)
-      const initial: UploadProgress[] = fileArray.map((f) => ({
-        fileName: f.name,
-        progress: 0,
-        done: false,
-      }))
-      setUploads(initial)
+      const batch = fileArray.map((file) => {
+        const ext = (file.name.split('.').pop() || '').toLowerCase()
+        const supported = file.name.includes('.') && SUPPORTED_EXTENSIONS.includes(ext)
+        const item: UploadProgress = supported
+          ? { id: nextUploadId++, fileName: file.name, progress: 0, done: false }
+          : {
+              id: nextUploadId++,
+              fileName: file.name,
+              progress: 0,
+              done: true,
+              error: `Unsupported file type${ext ? ` (.${ext})` : ''} — supported: ${SUPPORTED_EXTENSIONS.join(', ')}`,
+            }
+        return { file, item, supported }
+      })
+
+      // Keep failed and still-uploading entries from earlier batches visible.
+      setUploads((prev) => [
+        ...prev.filter((u) => u.error || !u.done),
+        ...batch.map((b) => b.item),
+      ])
       let firstUuid: string | null = null
 
-      for (let i = 0; i < fileArray.length; i++) {
-        const file = fileArray[i]
+      const updateItem = (id: number, patch: Partial<UploadProgress>) =>
+        setUploads((prev) => prev.map((u) => (u.id === id ? { ...u, ...patch } : u)))
+
+      for (const { file, item, supported } of batch) {
+        if (!supported) continue
         try {
           const ext = file.name.split('.').pop() || ''
           const base64 = await fileToBase64(file)
 
-          setUploads((prev) =>
-            prev.map((u, idx) => (idx === i ? { ...u, progress: 50 } : u)),
-          )
+          updateItem(item.id, { progress: 50 })
 
           const result = await uploadFile({
             contentAsBase64String: base64,
@@ -44,30 +65,31 @@ export function useUpload(folderId: string | null, onComplete: () => void) {
           const uuid = result.uuid
           if (uuid && !firstUuid) firstUuid = uuid
 
-          setUploads((prev) =>
-            prev.map((u, idx) => (idx === i ? { ...u, progress: 100, done: true, uuid } : u)),
-          )
+          updateItem(item.id, { progress: 100, done: true, uuid })
         } catch (err) {
-          setUploads((prev) =>
-            prev.map((u, idx) =>
-              idx === i
-                ? { ...u, done: true, error: err instanceof Error ? err.message : 'Upload failed' }
-                : u,
-            ),
-          )
+          updateItem(item.id, {
+            done: true,
+            error: err instanceof Error ? err.message : 'Upload failed',
+          })
         }
       }
 
       if (firstUuid) setLastUploadedUuid(firstUuid)
       onComplete()
-      setTimeout(() => setUploads([]), 3000)
+      // Auto-clear successes only; failures stay until the user dismisses them.
+      setTimeout(() => setUploads((prev) => prev.filter((u) => u.error || !u.done)), 3000)
     },
     [folderId, onComplete],
   )
 
+  const dismissUpload = useCallback(
+    (id: number) => setUploads((prev) => prev.filter((u) => u.id !== id)),
+    [],
+  )
+
   const clearLastUploaded = useCallback(() => setLastUploadedUuid(null), [])
 
-  return { uploads, upload, lastUploadedUuid, clearLastUploaded }
+  return { uploads, upload, dismissUpload, lastUploadedUuid, clearLastUploaded }
 }
 
 function fileToBase64(file: File): Promise<string> {

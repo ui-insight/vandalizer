@@ -11,18 +11,7 @@ import {
   type RetentionDashboard,
   type RetentionPolicy,
 } from '../../api/admin'
-
-function formatDateTime(iso: string | null): string {
-  if (!iso) return '-'
-  const d = iso.endsWith('Z') || iso.includes('+') ? new Date(iso) : new Date(iso + 'Z')
-  return d.toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
+import { formatDateTime } from './shared/format'
 
 function formatRetention(days?: number): string {
   if (!days) return '-'

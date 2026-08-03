@@ -10,6 +10,7 @@ export interface User {
   is_demo_user: boolean
   current_team: string | null
   current_team_uuid: string | null
+  sso_provider: string | null
 }
 
 export interface Team {

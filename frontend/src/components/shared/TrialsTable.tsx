@@ -28,13 +28,15 @@ export function scoreColor(s: number): string {
 }
 
 /**
- * The score/lift/duration sort triad both KB and extraction use. Each domain
- * can extend with its own options if it has extra columns worth sorting by.
+ * The score/duration sort pair every domain uses. Each domain can extend with
+ * its own options if it has extra columns worth sorting by. There's no "Lift"
+ * option on purpose: lift_vs_default is score minus a per-run constant, so it
+ * would order identically to Score. Duration earns its place because trials
+ * are often statistically tied and the fastest tied config is the one to pick.
  */
 export function makeStandardSortOptions<T extends StandardTrialFields>(): SortOption<T>[] {
   return [
     { key: 'score', label: 'Score', compare: (a, b) => (b.score ?? 0) - (a.score ?? 0) },
-    { key: 'lift', label: 'Lift', compare: (a, b) => (b.lift_vs_default ?? 0) - (a.lift_vs_default ?? 0) },
     { key: 'duration', label: 'Duration', compare: (a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0) },
   ]
 }
@@ -97,6 +99,9 @@ interface TrialsTableProps<TTrial> {
   renderRow: (trial: TTrial) => ReactNode
   getRowKey: (trial: TTrial) => string
   title?: string
+  /** Optional one-liner under the header — e.g. which eval slice the trial
+   * scores were measured on, so they aren't mistaken for the headline score. */
+  caption?: ReactNode
   maxHeight?: number | string
   /** When provided, rows become clickable (pointer cursor + hover + keyboard)
    * and invoke this with the clicked trial. Omit for a static, read-only list. */
@@ -115,6 +120,7 @@ export function TrialsTable<TTrial>({
   defaultSortKey,
   renderRow, getRowKey,
   title = 'Trials',
+  caption,
   maxHeight = 320,
   onRowClick,
 }: TrialsTableProps<TTrial>) {
@@ -150,6 +156,11 @@ export function TrialsTable<TTrial>({
           </>
         )}
       </div>
+      {caption && (
+        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+          {caption}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight, overflowY: 'auto' }}>
         {sorted.map(t => (
           onRowClick ? (

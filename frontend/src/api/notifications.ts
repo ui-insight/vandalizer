@@ -7,6 +7,10 @@ export interface Notification {
   title: string
   body: string | null
   link: string | null
+  /** 'info' for the ordinary event stream, 'error' for failures. */
+  severity: string
+  /** Repeat count for coalesced events — 1 for a one-off. */
+  occurrences: number
   item_kind: string | null
   item_id: string | null
   item_name: string | null

@@ -934,6 +934,41 @@ def test_usage_tokens_returns_zero_when_usage_unavailable():
     assert kb_validation_service._usage_tokens(run2) == 0
 
 
+def test_resolve_rubric_key_maps_generator_categories():
+    """KBQuestionGenerator's category vocabulary must land on the matching
+    judge rubric — 'boundary' (negative/absence questions) especially, which
+    previously fell through to the factoid rubric."""
+    assert kb_validation_service._resolve_rubric_key("boundary") == "absence"
+    assert kb_validation_service._resolve_rubric_key("factual") == "factoid"
+    assert kb_validation_service._resolve_rubric_key("summary") == "summarization"
+    assert kb_validation_service._resolve_rubric_key("enumeration") == "partial_coverage"
+    # Native rubric keys and unknowns keep the old behaviour.
+    assert kb_validation_service._resolve_rubric_key("absence") == "absence"
+    assert kb_validation_service._resolve_rubric_key(None) == "factoid"
+    assert kb_validation_service._resolve_rubric_key("other") == "factoid"
+
+
+def test_judge_prompt_includes_expected_answer_conflict_rule():
+    """A context-grounded claim that contradicts the expected answer must be
+    judged as an expected-answer conflict (WARN), not a hallucination."""
+    assert "expected-answer conflict" in kb_validation_service.KB_JUDGE_SYSTEM_PROMPT
+
+
+@pytest.mark.asyncio
+async def test_judge_answer_rubric_reflects_aliased_category():
+    fake_run = _make_mock_run('{"score": 1.0, "verdict": "PASS"}')
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(return_value=fake_run)
+    with patch.object(kb_validation_service, "_get_or_build_agent", return_value=fake_agent) as gob:
+        verdict = await kb_validation_service._judge_answer(
+            query="Is X mentioned?", expected_answer="Not specified.",
+            actual_answer="Not specified.", model_name="test-model",
+            category="boundary",
+        )
+    assert verdict["rubric"] == "absence"
+    assert gob.call_args[0][0] == "kb_judge:absence"
+
+
 @pytest.mark.asyncio
 async def test_judge_answer_records_token_usage():
     """_judge_answer must include tokens_used in its return dict."""

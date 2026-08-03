@@ -549,3 +549,103 @@ class TestOpenDocumentsBlock:
         assert "✕" in out
         # Must not imply the model can clear the conversation itself.
         assert "no tool to clear the conversation" in out
+
+
+# ---------------------------------------------------------------------------
+# No-document grounding
+# ---------------------------------------------------------------------------
+
+
+class TestNoDocumentPromptContent:
+    """The no-document prompt must say the four things the branch depends on.
+
+    Asserted as behavioural clauses rather than exact strings so the wording can
+    be revised without breaking the suite.
+    """
+
+    def _prompt(self) -> str:
+        from app.services.llm_service import NO_DOCUMENT_SYSTEM_PROMPT
+        return NO_DOCUMENT_SYSTEM_PROMPT.lower()
+
+    def test_states_that_no_document_is_available(self):
+        assert "no document" in self._prompt()
+
+    def test_forbids_inventing_document_specific_content(self):
+        prompt = self._prompt()
+        assert "invent" in prompt or "fabricat" in prompt
+
+    def test_tells_the_model_to_ask_for_the_source(self):
+        assert "attach" in self._prompt()
+
+    def test_still_permits_general_knowledge_answers(self):
+        assert "general" in self._prompt()
+
+    def test_carries_the_shared_identity_preamble(self):
+        from app.services.llm_service import (
+            NO_DOCUMENT_SYSTEM_PROMPT,
+            VANDALIZER_IDENTITY_PREAMBLE,
+        )
+        assert NO_DOCUMENT_SYSTEM_PROMPT.startswith(VANDALIZER_IDENTITY_PREAMBLE)
+
+
+class TestNoDocumentGroundingEveryTurn:
+    """The no-document grounding must survive follow-up turns.
+
+    Same failure mode as TestChatAgentGroundingEveryTurn: a static
+    ``system_prompt`` is injected by pydantic-ai only when message_history is
+    empty, so a grounding rule delivered that way silently disappears on the
+    second question — exactly when a user follows up on a fabricated answer.
+    """
+
+    @pytest.mark.asyncio
+    async def test_no_document_prompt_delivered_on_followup_turn(self, monkeypatch):
+        from pydantic_ai.models.function import FunctionModel
+        from pydantic_ai.messages import ModelResponse, TextPart
+        from app.services import llm_service
+
+        seen: list = []
+
+        def fn(messages, info):
+            seen.append(getattr(messages[-1], "instructions", "NO_ATTR"))
+            return ModelResponse(parts=[TextPart("ok")])
+
+        monkeypatch.setattr(llm_service, "get_agent_model", lambda *a, **k: FunctionModel(fn))
+        monkeypatch.setattr(llm_service, "build_thinking_model_settings", lambda *a, **k: {})
+        agent = llm_service.create_chat_agent(
+            "test-model", system_prompt=llm_service.NO_DOCUMENT_SYSTEM_PROMPT,
+        )
+
+        first = await agent.run("what is the total requested in this proposal?")
+        await agent.run("what page did you get that from?", message_history=first.new_messages())
+
+        # pydantic-ai strips surrounding whitespace from instructions, so compare
+        # stripped rather than asserting the constant verbatim.
+        expected = llm_service.NO_DOCUMENT_SYSTEM_PROMPT.strip()
+        assert len(seen) == 2, f"expected two model requests; saw {len(seen)}"
+        assert seen[0] == expected, "grounding missing on the first turn"
+        assert seen[1] == expected, (
+            "grounding must persist onto the follow-up turn — this is the turn "
+            f"where a user challenges a fabricated answer; saw {seen[1]!r}"
+        )
+
+
+class TestNoDocumentChatRulesContent:
+    """The reminder-block variant used by the streaming chat path must carry
+    the same behavioural clauses as the standalone prompt."""
+
+    def _rules(self) -> str:
+        from app.services.llm_service import NO_DOCUMENT_CHAT_RULES
+        return NO_DOCUMENT_CHAT_RULES.lower()
+
+    def test_states_that_no_document_is_available(self):
+        assert "no document" in self._rules()
+
+    def test_forbids_inventing_document_specific_content(self):
+        rules = self._rules()
+        assert "invent" in rules or "fabricat" in rules
+
+    def test_tells_the_model_to_ask_for_the_source(self):
+        assert "attach" in self._rules()
+
+    def test_still_permits_general_knowledge_answers(self):
+        assert "general" in self._rules()

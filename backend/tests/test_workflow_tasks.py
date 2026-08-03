@@ -166,6 +166,47 @@ class TestExecuteWorkflowTask:
 
     @patch("app.tasks.workflow_tasks._get_db")
     @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_step_failure_marks_run_failed_without_retry(self, mock_build, mock_get_db):
+        """A failed step (blocked URL, HTTP error, ...) must fail the run —
+        not surface the error text as a completed deliverable — and must not
+        re-raise (deterministic failure, no Celery retry)."""
+        from app.services.workflow_engine import WorkflowStepError
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.side_effect = WorkflowStepError(
+            "API", "Blocked URL: URL resolves to blocked IP range: 127.0.0.1",
+        )
+        mock_build.return_value = mock_engine
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": []},
+            model="gpt-4o",
+        )
+
+        assert result["status"] == "error"
+        error_calls = [c for c in db.workflow_result.update_one.call_args_list
+                       if c[0][1].get("$set", {}).get("status") == "error"]
+        assert len(error_calls) == 1
+        error_msg = error_calls[0][0][1]["$set"]["error"]
+        assert "API step failed" in error_msg
+        assert "blocked IP range" in error_msg
+        # Never marked completed, and no final_output written.
+        completed_calls = [c for c in db.workflow_result.update_one.call_args_list
+                           if c[0][1].get("$set", {}).get("status") == "completed"]
+        assert completed_calls == []
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
     def test_approval_pause(self, mock_build, mock_get_db):
         from app.tasks.workflow_tasks import execute_workflow_task
 
@@ -494,6 +535,96 @@ class TestResumeWorkflowAfterApproval:
         assert exec_kwargs["start_index"] == 2
         assert exec_kwargs["initial_output"]["output"] == {"extracted": "data"}
         db.workflow.update_one.assert_called_once()
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_pauses_again_at_second_approval(self, mock_build, mock_get_db):
+        """A workflow with two gates must pause a second time. The resume path
+        used to ignore the sentinel and mark the run completed, so the second
+        reviewer was never asked to approve anything."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ({
+            "_approval_pause": True,
+            "_paused_step_index": 3,
+            "_review_instructions": "Second review",
+            "_assigned_to_user_ids": ["reviewer2"],
+            "_data_for_review": {"key": "value"},
+            "output": {"key": "value"},
+        }, [])
+        mock_build.return_value = mock_engine
+
+        result = resume_workflow_after_approval("a1")
+
+        assert result["status"] == "pending_approval"
+        db.approval_request.insert_one.assert_called_once()
+        approval_data = db.approval_request.insert_one.call_args[0][0]
+        assert approval_data["status"] == "pending"
+        assert approval_data["step_index"] == 3
+        assert approval_data["review_instructions"] == "Second review"
+        assert approval_data["assigned_to_user_ids"] == ["reviewer2"]
+
+        statuses = [c[0][1].get("$set", {}).get("status")
+                    for c in db.workflow_result.update_one.call_args_list]
+        assert "completed" not in statuses
+        assert "pending_approval" in statuses
+        # A run still awaiting review must not count as an execution.
+        db.workflow.update_one.assert_not_called()
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_pause_without_stamped_index_scans_forward(self, mock_build, mock_get_db):
+        """Fallback path for a sentinel with no stamped index: the name scan is
+        floored at the resume point so it can't re-select the first gate."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        def _node(name):
+            n = MagicMock()
+            n.name = name
+            return n
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ({
+            "_approval_pause": True,
+            "_assigned_to_user_ids": ["reviewer2"],
+            "_data_for_review": {"key": "value"},
+            "output": {"key": "value"},
+        }, [])
+        mock_engine.get_topological_order.return_value = [
+            _node("Document"), _node("Approval"), _node("Prompt"),
+            _node("Approval"), _node("AddDocument"),
+        ]
+        mock_build.return_value = mock_engine
+
+        result = resume_workflow_after_approval("a1")
+
+        assert result["status"] == "pending_approval"
+        assert db.approval_request.insert_one.call_args[0][0]["step_index"] == 3
 
     @patch("app.tasks.workflow_tasks._get_db")
     def test_missing_approval_raises(self, mock_get_db):

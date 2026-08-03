@@ -15,7 +15,6 @@ import { Workspace } from './pages/Workspace'
 import { TeamSettings } from './pages/TeamSettings'
 
 const Landing = lazy(() => import('./pages/Landing'))
-const Workflows = lazy(() => import('./pages/Workflows'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Account = lazy(() => import('./pages/Account'))
@@ -33,6 +32,7 @@ const JoinProjectAccept = lazy(() => import('./pages/JoinProjectAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const Credentials = lazy(() => import('./pages/Credentials'))
 const Reviews = lazy(() => import('./pages/Reviews'))
+const TuningSuggestions = lazy(() => import('./pages/TuningSuggestions'))
 const ReviewDetail = lazy(() => import('./pages/ReviewDetail'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
@@ -68,12 +68,12 @@ function CertificationRedirect() {
 // Per-route document titles (WCAG 2.4.2). Longest-prefix match; the workspace
 // root falls back to the bare org name. Titles read "<Page> — <Org>".
 const ROUTE_TITLES: Array<[string, string]> = [
-  ['/workflows', 'Workflows'],
   ['/admin', 'Admin'],
   ['/account', 'Account'],
   ['/teams', 'Teams'],
   ['/organizations', 'Organizations'],
   ['/verification', 'Verification'],
+  ['/tuning', 'Tuning suggestions'],
   ['/support', 'Support'],
   ['/automation', 'Automations'],
   ['/docs', 'Docs'],
@@ -213,14 +213,12 @@ const teamsRoute = createRoute({
 })
 
 
+// The standalone workflows list is retired — the workspace Library tab is the
+// canonical surface for workflows. Redirect old URLs like /chat and /library.
 const workflowsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/workflows',
-  component: () => (
-    <ProtectedRoute>
-      <Workflows />
-    </ProtectedRoute>
-  ),
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />,
 })
 
 const workflowEditorRoute = createRoute({
@@ -400,6 +398,16 @@ const reviewsRoute = createRoute({
   ),
 })
 
+const tuningRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/tuning',
+  component: () => (
+    <ProtectedRoute>
+      <TuningSuggestions />
+    </ProtectedRoute>
+  ),
+})
+
 const reviewDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/reviews/$uuid',
@@ -478,6 +486,7 @@ const routeTree = rootRoute.addChildren([
   reviewsRoute,
   reviewDetailRoute,
   approvalsRoute,
+  tuningRoute,
 ])
 
 export const router = createRouter({ routeTree })
