@@ -335,7 +335,7 @@ class TestExtractWithMarkersOcrFallback:
         with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
              patch.object(dr, "_pymupdf_extract_with_pages",
                           side_effect=FileNotFoundError("no such file: 'gone.pdf'")), \
-             patch.object(dr, "_pdf_page_count", return_value=1):
+             patch.object(dr, "pdf_page_count", return_value=1):
             text, markers = dr.extract_text_with_markers("gone.pdf", "pdf")
 
         assert text == "short ocr text"
