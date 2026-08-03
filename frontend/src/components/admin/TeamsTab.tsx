@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 
 import { useConfirm } from '../shared/useConfirm'
+import { nameWithoutEmail } from '../../lib/displayName'
 import { useToast } from '../../contexts/ToastContext'
 import { getTeamMembers } from '../../api/teams'
 import {
@@ -86,7 +87,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
             d.workflows_completed, d.workflows_failed, d.tokens_in, d.tokens_out, d.active_users,
           ])
           const memberRows = data.members.map(m => [
-            m.name || m.user_id, m.email || '', m.role,
+            nameWithoutEmail(m.name, m.email) || m.user_id, m.email || '', m.role,
             m.tokens_total, m.workflows_run, m.conversations, m.last_active,
           ])
           downloadCSV(
@@ -163,9 +164,9 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
                 <tr key={m.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ padding: '10px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <UserAvatar name={m.name || m.email} />
+                      <UserAvatar name={nameWithoutEmail(m.name, m.email) || m.email} />
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 500 }}>{m.name || 'Unknown'}</div>
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{nameWithoutEmail(m.name, m.email) || 'Unknown'}</div>
                         <div style={{ fontSize: 12, color: '#6b7280' }}>{m.email || m.user_id}</div>
                       </div>
                     </div>
@@ -642,7 +643,7 @@ export function TeamsTab() {
                         {(teamMembers[team.uuid] || []).map(m => (
                           <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#fff', borderRadius: 6, border: '1px solid #f3f4f6' }}>
                             <div style={{ flex: 1 }}>
-                              <span style={{ fontSize: 13, fontWeight: 500 }}>{m.name || m.user_id}</span>
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{nameWithoutEmail(m.name, m.email) || m.user_id}</span>
                               {m.email && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{m.email}</span>}
                             </div>
                             <span style={{
@@ -784,7 +785,7 @@ export function TeamsTab() {
           ) : isolated.map(u => (
             <div key={u.user_id} style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 500 }}>{u.name || u.user_id}</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{nameWithoutEmail(u.name, u.email) || u.user_id}</div>
                 {u.email && <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.email}</div>}
               </div>
               <select

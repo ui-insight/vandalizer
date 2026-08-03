@@ -250,20 +250,20 @@ async def list_tickets(
     effective_tag = tag if is_support else None
     effective_category = category if is_support else None
     if scope == "mine" or not is_support:
-        tickets = await support_service.list_tickets(
+        tickets, total = await support_service.list_tickets(
             user_id=user.user_id, status=status, priority=priority,
             classification=classification, tag=effective_tag,
             category=effective_category,
             search=search, limit=limit, offset=offset,
         )
     else:
-        tickets = await support_service.list_all_tickets(
+        tickets, total = await support_service.list_all_tickets(
             status=status, priority=priority, classification=classification,
             tag=effective_tag, category=effective_category, search=search,
             limit=limit, offset=offset,
         )
     tickets = [_view(t, is_support) for t in tickets]
-    return {"tickets": tickets}
+    return {"tickets": tickets, "total": total, "limit": limit, "offset": offset}
 
 
 @router.get("/tickets/{ticket_uuid}")

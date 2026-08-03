@@ -37,7 +37,7 @@ def _set_tokens(response: Response, user: User, settings: Settings) -> None:
         access,
         httponly=True,
         samesite="lax",
-        secure=settings.is_production,
+        secure=settings.use_secure_cookies,
         path="/",
         max_age=settings.jwt_access_expire_minutes * 60,
     )
@@ -46,7 +46,7 @@ def _set_tokens(response: Response, user: User, settings: Settings) -> None:
         refresh,
         httponly=True,
         samesite="lax",
-        secure=settings.is_production,
+        secure=settings.use_secure_cookies,
         path="/",
         max_age=settings.jwt_refresh_expire_days * 86400,
     )

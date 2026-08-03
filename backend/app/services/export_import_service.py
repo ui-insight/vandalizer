@@ -582,7 +582,10 @@ async def import_knowledge_base(
             document_uuid=src_data.get("document_uuid"),
             content=src_data.get("content"),
         )
-        await src.insert()
+        # Exports taken before the unique (kb, url) index may repeat a URL —
+        # import it once instead of failing the whole import.
+        if not await knowledge_service._insert_source_unless_duplicate(src):
+            continue
 
         # Ingest from cached content or re-fetch
         if src.content:

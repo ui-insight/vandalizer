@@ -327,6 +327,103 @@ class TestWorkflowStepAuthz:
 
 
 # ---------------------------------------------------------------------------
+# Task mutation authorization (update/delete task)
+# ---------------------------------------------------------------------------
+
+class TestTaskMutationAuthz:
+    """PATCH/DELETE /api/workflows/tasks/{id} distinguish 403 from 404.
+
+    The service collapses "task missing" and "no permission" into the same
+    falsy return; the router re-walks the lookups via
+    ``_diagnose_task_mutation_failure`` so view-only users get a 403 with a
+    clear message instead of a misleading "Task not found".
+    """
+
+    _TASK_OID = "6600000000000000000000bb"  # Valid 24-char hex for PydanticObjectId
+
+    @pytest.mark.asyncio
+    async def test_update_task_without_permission_returns_403(self, client):
+        user = _make_user("user2")
+        cookies, headers = _auth("user2")
+
+        task = MagicMock()
+        task.id = self._TASK_OID
+        parent_wf = _mock_workflow(user_id="user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user2", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.access_control") as mock_ac, \
+             patch("app.models.workflow.WorkflowStepTask.get", new_callable=AsyncMock, return_value=task):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.update_task = AsyncMock(return_value=None)
+            mock_svc._get_workflow_for_task = AsyncMock(return_value=parent_wf)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_workflow = MagicMock(return_value=False)
+
+            resp = await client.patch(
+                f"/api/workflows/tasks/{self._TASK_OID}",
+                json={"data": {"prompt": "rewritten"}},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        assert "permission" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_update_task_missing_returns_404(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.models.workflow.WorkflowStepTask.get", new_callable=AsyncMock, return_value=None):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.update_task = AsyncMock(return_value=None)
+
+            resp = await client.patch(
+                f"/api/workflows/tasks/{self._TASK_OID}",
+                json={"data": {}},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert "not found" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_delete_task_without_permission_returns_403(self, client):
+        user = _make_user("user2")
+        cookies, headers = _auth("user2")
+
+        task = MagicMock()
+        task.id = self._TASK_OID
+        parent_wf = _mock_workflow(user_id="user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user2", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.access_control") as mock_ac, \
+             patch("app.models.workflow.WorkflowStepTask.get", new_callable=AsyncMock, return_value=task):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.delete_task = AsyncMock(return_value=False)
+            mock_svc._get_workflow_for_task = AsyncMock(return_value=parent_wf)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_workflow = MagicMock(return_value=False)
+
+            resp = await client.delete(
+                f"/api/workflows/tasks/{self._TASK_OID}",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        assert "permission" in resp.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
 # Workflow run authorization
 # ---------------------------------------------------------------------------
 

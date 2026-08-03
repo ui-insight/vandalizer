@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 
@@ -21,12 +21,21 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Ref, not state: a double-click's second event can fire before React
+  // re-renders the disabled button, and two POSTs enqueue two ingest runs
+  // that race each other (the duplicate-source support ticket).
+  const submittedRef = useRef(false)
+  const [submitted, setSubmitted] = useState(false)
+
   const handleSubmit = () => {
+    if (submittedRef.current) return
     const urls = text
       .split('\n')
       .map(u => u.trim())
       .filter(u => u.length > 0)
     if (urls.length > 0) {
+      submittedRef.current = true
+      setSubmitted(true)
       onSubmit(urls, crawlEnabled, maxCrawlPages, allowedDomains)
     }
   }
@@ -146,16 +155,16 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={!text.trim()}
+            disabled={!text.trim() || submitted}
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
               border: 'none', borderRadius: 6,
-              cursor: text.trim() ? 'pointer' : 'default',
-              opacity: text.trim() ? 1 : 0.5,
+              cursor: text.trim() && !submitted ? 'pointer' : 'default',
+              opacity: text.trim() && !submitted ? 1 : 0.5,
             }}
           >
-            Add URLs
+            {submitted ? 'Adding…' : 'Add URLs'}
           </button>
         </div>
       </div>

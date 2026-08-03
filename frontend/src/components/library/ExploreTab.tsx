@@ -9,6 +9,7 @@ import {
   Pin, PinOff,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
@@ -628,6 +629,7 @@ export function ExploreTab() {
   const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
 
   // Saving a verified workflow/extraction from Explore creates a reference
   // to the verified item — not a copy. The reference carries the verified
@@ -640,6 +642,10 @@ export function ExploreTab() {
   const handleAdoptKB = async (kbUuid: string, teamId?: string | null) => {
     try {
       await adoptKnowledgeBase(kbUuid, undefined, teamId ?? undefined)
+      // The My/Team KB lists are TanStack Query-cached (useKnowledgeBases /
+      // useScopedKnowledgeBases) — without invalidation the new bookmark only
+      // appears after a full page reload.
+      queryClient.invalidateQueries({ queryKey: ['knowledgeBases'] })
       toast(
         teamId ? 'Added to your team’s knowledge bases' : 'Added to your knowledge bases',
         'success',

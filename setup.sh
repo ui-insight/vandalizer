@@ -539,6 +539,11 @@ configure_env() {
     prompt "Public URL (e.g. https://vandalizer.example.edu)" "http://localhost" FRONTEND_URL
     sed -i.bak "s|^FRONTEND_URL=.*|FRONTEND_URL=${FRONTEND_URL}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
     echo -e "  ${SYM_CHECK}  Frontend URL set to ${BOLD}${FRONTEND_URL}${RESET}"
+    if [[ "$FRONTEND_URL" == http://* ]]; then
+      echo -e "  ${SYM_WARN}  ${YELLOW}Production over plain HTTP:${RESET} auth cookies will be set without"
+      echo -e "  ${DIM}     the Secure flag so login works. Fine for an isolated/intranet box;${RESET}"
+      echo -e "  ${DIM}     use an https:// URL for anything internet-facing.${RESET}"
+    fi
   else
     echo -e "  ${SYM_CHECK}  Environment set to ${BOLD}development${RESET}"
   fi

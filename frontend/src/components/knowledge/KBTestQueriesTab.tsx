@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil } from 'lucide-react'
+import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil, Upload } from 'lucide-react'
 import {
   createKBTestQuery,
   updateKBTestQuery,
@@ -8,6 +8,7 @@ import {
   type KBTestQuery,
 } from '../../api/knowledge'
 import { GenerateTestQueriesModal } from './GenerateTestQueriesModal'
+import { ImportTestQueriesModal } from './ImportTestQueriesModal'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -24,6 +25,7 @@ export type DraftShape = {
   expected_answer: string
   expected_source_labels: string
   category: string
+  notes: string
 }
 
 export const EMPTY_DRAFT: DraftShape = {
@@ -31,6 +33,7 @@ export const EMPTY_DRAFT: DraftShape = {
   expected_answer: '',
   expected_source_labels: '',
   category: 'factual',
+  notes: '',
 }
 
 const CATEGORIES = ['factual', 'summary', 'enumeration', 'boundary']
@@ -44,6 +47,7 @@ export function queryToDraft(q: KBTestQuery): DraftShape {
     expected_answer: q.expected_answer ?? '',
     expected_source_labels: q.expected_source_labels.join(', '),
     category: q.category ?? 'factual',
+    notes: q.notes ?? '',
   }
 }
 
@@ -55,6 +59,7 @@ export function draftToUpdatePayload(draft: DraftShape) {
     expected_source_labels: draft.expected_source_labels
       .split(',').map(s => s.trim()).filter(Boolean),
     category: draft.category,
+    notes: draft.notes.trim() || null,
   }
 }
 
@@ -62,6 +67,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
   const confirm = useConfirm()
   const { toast } = useToast()
   const [showGen, setShowGen] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [adding, setAdding] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -82,6 +88,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         expected_source_labels: draft.expected_source_labels
           .split(',').map(s => s.trim()).filter(Boolean),
         category: draft.category,
+        notes: draft.notes.trim() || undefined,
       })
       setDraft(EMPTY_DRAFT)
       setShowAdd(false)
@@ -152,6 +159,16 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         </button>
         <button
           type="button"
+          onClick={() => setShowImport(true)}
+          disabled={!!disabledReason}
+          style={btn(!disabledReason, '#0ea5e9')}
+          title={disabledReason || 'Bulk-import test queries from a CSV or Excel file'}
+        >
+          <Upload size={12} aria-hidden="true" />
+          Import CSV/Excel
+        </button>
+        <button
+          type="button"
           onClick={() => setShowGen(true)}
           disabled={!!disabledReason || generating}
           style={btn(!disabledReason && !generating, '#7c3aed')}
@@ -218,7 +235,13 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                         <span style={{ color: '#666' }}>Expected: </span>{q.expected_answer}
                       </div>
                     )}
+                    {q.notes && (
+                      <div style={{ fontSize: 11, color: '#888', marginBottom: 2, fontStyle: 'italic' }}>
+                        <span style={{ color: '#666', fontStyle: 'normal' }}>Notes: </span>{q.notes}
+                      </div>
+                    )}
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#666', marginTop: 4, flexWrap: 'wrap' }}>
+                      {q.external_id && <span>· ID: {q.external_id}</span>}
                       {q.category && <span>· {q.category}</span>}
                       {q.expected_source_labels.length > 0 && (
                         <span>· sources: {q.expected_source_labels.join(', ')}</span>
@@ -263,6 +286,14 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         <GenerateTestQueriesModal
           onConfirm={handleGenerate}
           onClose={() => setShowGen(false)}
+        />
+      )}
+
+      {showImport && (
+        <ImportTestQueriesModal
+          kbUuid={kbUuid}
+          onImported={onChange}
+          onClose={() => setShowImport(false)}
         />
       )}
     </div>
@@ -310,6 +341,13 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
           <option key={c} value={c}>{c}</option>
         ))}
       </select>
+      <input
+        aria-label="Notes"
+        placeholder="Notes (optional — rationale, provenance, caveats)"
+        value={draft.notes}
+        onChange={e => onChange({ ...draft, notes: e.target.value })}
+        style={input()}
+      />
     </>
   )
 }

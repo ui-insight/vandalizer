@@ -42,6 +42,12 @@ class KnowledgeBaseSource(Document):
 
     class Settings:
         name = "knowledge_base_sources"
+        # A unique (knowledge_base_uuid, url) index also exists but is NOT
+        # listed here: it must not be Beanie-managed, because building it over
+        # legacy duplicate rows would crash every process at init. The web app
+        # creates it at startup via
+        # knowledge_service.ensure_source_url_unique_index(), which dedupes
+        # first and then builds.
         indexes = ["uuid", "knowledge_base_uuid"]
 
     def __init__(self, **data):

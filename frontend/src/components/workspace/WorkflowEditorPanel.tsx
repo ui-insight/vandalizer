@@ -509,7 +509,12 @@ export function WorkflowEditorPanel() {
   }
 
   const handleSaveTask = async (taskId: string, data: Record<string, unknown>) => {
-    await updateTask(taskId, { data })
+    try {
+      await updateTask(taskId, { data })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save task', 'error')
+      return
+    }
     setEditingTask(null)
     refresh()
   }
@@ -1185,6 +1190,7 @@ export function WorkflowEditorPanel() {
           onClose={() => setEditingTask(null)}
           onSave={handleSaveTask}
           onRefreshWorkflow={refresh}
+          canManage={canManage}
         />
       )}
 
@@ -1872,11 +1878,11 @@ function EditStepOverlay({
             />
           ) : (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}
-              onClick={() => { setNameValue(step.name); setEditingName(true) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1 }}
+              onClick={canManage ? () => { setNameValue(step.name); setEditingName(true) } : undefined}
             >
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124' }}>{step.name}</span>
-              <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+              {canManage && <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />}
             </div>
           )}
           <button type="button" aria-label="Close" onClick={onClose} style={{
@@ -1908,6 +1914,7 @@ function EditStepOverlay({
             aria-label="Mark step as workflow output"
             type="checkbox"
             checked={step.is_output}
+            disabled={!canManage}
             onChange={e => onToggleOutput(step.id, e.target.checked)}
             style={{ accentColor: '#7c3aed' }}
           />
@@ -1973,11 +1980,13 @@ function EditStepOverlay({
                       : task.name}
                   </div>
                 </div>
-                <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
-                }}>
-                  <Trash2 style={{ width: 14, height: 14 }} />
-                </button>
+                {canManage && (
+                  <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
+                  }}>
+                    <Trash2 style={{ width: 14, height: 14 }} />
+                  </button>
+                )}
               </div>
             )
           })}
@@ -2012,16 +2021,18 @@ function EditStepOverlay({
         boxShadow: '0 0px 23px -8px rgb(211,211,211)',
         display: 'flex', justifyContent: 'space-between',
       }}>
-        <button
-          onClick={onDeleteStep}
-          style={{
-            padding: '10px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            border: '1px solid #fca5a5', borderRadius: 'var(--ui-radius, 8px)',
-            backgroundColor: '#fff', color: '#dc2626', cursor: 'pointer',
-          }}
-        >
-          Delete Step
-        </button>
+        {canManage ? (
+          <button
+            onClick={onDeleteStep}
+            style={{
+              padding: '10px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              border: '1px solid #fca5a5', borderRadius: 'var(--ui-radius, 8px)',
+              backgroundColor: '#fff', color: '#dc2626', cursor: 'pointer',
+            }}
+          >
+            Delete Step
+          </button>
+        ) : <div />}
         <button
           onClick={onClose}
           style={{
@@ -2359,14 +2370,15 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
 // Task edit modal (with Design/Input/Output sub-tabs + test step)
 // ---------------------------------------------------------------------------
 
-function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow }: {
+function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
   task: WorkflowTask
   selectedDocUuids: string[]
   workflow: Workflow | null
   workflowId: string | null
   onClose: () => void
-  onSave: (taskId: string, data: Record<string, unknown>) => void
+  onSave: (taskId: string, data: Record<string, unknown>) => Promise<void>
   onRefreshWorkflow: () => void
+  canManage: boolean
 }) {
   const { user } = useAuth()
   const { selectedDocNames } = useWorkspace()
@@ -2671,7 +2683,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         ...(inputSources.includes('select_document') ? { selected_document_uuid: selectedDocUuid } : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
       }
-      onSave(task.id, finalData)
+      await onSave(task.id, finalData)
     } finally {
       setSaving(false)
     }
@@ -4738,20 +4750,30 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             {testing ? 'Testing...' : 'Test Step'}
           </button>
         )}
-        <button
-          onClick={handleUpdate}
-          disabled={saving}
-          style={{
-            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            border: 'none', borderRadius: 6,
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            cursor: saving ? 'not-allowed' : 'pointer',
-            opacity: saving ? 0.6 : 1,
-          }}
-        >
-          {saving ? 'Updating...' : 'Update'}
-        </button>
+        {canManage ? (
+          <button
+            onClick={handleUpdate}
+            disabled={saving}
+            style={{
+              flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              border: 'none', borderRadius: 6,
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)',
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? 'Updating...' : 'Update'}
+          </button>
+        ) : (
+          <div style={{
+            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600,
+            border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#f9fafb',
+            color: '#6b7280', textAlign: 'center',
+          }}>
+            View-only — use "Save a copy to my library" to edit this workflow
+          </div>
+        )}
       </div>
     </div>
   )
@@ -5097,6 +5119,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
                   { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
                   { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
+                  { fmt: 'markdown', label: 'Markdown', desc: 'Formatted text (.md)', parseStructured: false },
                   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
@@ -5941,9 +5964,10 @@ function OutputConfigCard({
               <option value="json">JSON</option>
               <option value="csv">CSV</option>
               <option value="pdf">PDF</option>
+              <option value="docx">Word (.docx)</option>
             </select>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-              Markdown is the most chainable format. PDFs and CSVs are saved as files but their text content is rendered as Markdown for downstream workflows.
+              Markdown is the most chainable format. PDF, Word, and CSV files are saved as-is but their text content is rendered as Markdown for downstream workflows.
             </div>
           </div>
 

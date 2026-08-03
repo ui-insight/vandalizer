@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
+    # Explicit override for the Secure attribute on auth/CSRF cookies. Leave
+    # unset to derive it from environment + frontend_url (see
+    # use_secure_cookies): Secure in production, EXCEPT when the deployment is
+    # served over plain http:// — a browser silently drops Secure cookies on
+    # HTTP, so login would "succeed" and every following request would 401.
+    cookie_secure: bool | None = None
     # Human-readable name for THIS deployment, shown in the UI version footer so
     # users can tell environments apart (e.g. "U of I Prod", "National Trial Prod").
     # `environment` alone can't: both prods report "production". Falls back to
@@ -182,3 +188,18 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment == "production"
+
+    @property
+    def use_secure_cookies(self) -> bool:
+        """Whether auth/CSRF cookies should carry the Secure attribute.
+
+        COOKIE_SECURE, when set, always wins. Otherwise: Secure in production
+        unless frontend_url says the site is served over plain HTTP (an
+        air-gapped / intranet box without TLS) — Secure cookies never reach
+        the server there, which breaks login silently.
+        """
+        if self.cookie_secure is not None:
+            return self.cookie_secure
+        return self.is_production and not self.frontend_url.lower().startswith(
+            "http://"
+        )

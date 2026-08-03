@@ -40,12 +40,18 @@ from app.schemas.workflows import (
 )
 from app.rate_limit import limiter
 from app.services import workflow_service as svc
+from app.services.docx_service import data_to_docx_bytes
 from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Formats offered by both result-export surfaces (Download and Save to folder).
+# Keep in sync with the frontend menus in WorkflowEditorPanel/RunHistoryTab/
+# SaveWorkflowOutputDialog and the dispatch in output_handlers.save_results_to_folder.
+VALID_EXPORT_FORMATS = frozenset({"json", "csv", "text", "markdown", "pdf", "docx"})
 
 
 async def _check_validation_input_documents_exist(uuids: list[str]) -> dict[str, bool]:
@@ -133,309 +139,6 @@ def _parse_structured_string(text: str):
             return rows
 
     return None
-
-
-_INLINE_BOLD = re.compile(r"\*\*(.+?)\*\*")
-_INLINE_ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
-_INLINE_CODE = re.compile(r"`(.+?)`")
-_MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
-
-
-def _add_runs_with_formatting(paragraph, text: str) -> None:
-    """Add runs to a docx paragraph, parsing inline **bold**, *italic*, `code`, [link](url)."""
-    # Drop markdown link syntax — keep the visible text only (URLs in LLM output
-    # are often hallucinated and useless in a Word doc).
-    text = _MD_LINK.sub(r"\1", text)
-
-    pos = 0
-    # Combined scan: find the next inline marker and emit the preceding plain run.
-    while pos < len(text):
-        next_match = None
-        next_kind = None
-        for kind, pattern in (("bold", _INLINE_BOLD), ("code", _INLINE_CODE), ("italic", _INLINE_ITALIC)):
-            m = pattern.search(text, pos)
-            if m and (next_match is None or m.start() < next_match.start()):
-                next_match = m
-                next_kind = kind
-        if next_match is None:
-            paragraph.add_run(text[pos:])
-            return
-        if next_match.start() > pos:
-            paragraph.add_run(text[pos:next_match.start()])
-        run = paragraph.add_run(next_match.group(1))
-        if next_kind == "bold":
-            run.bold = True
-        elif next_kind == "italic":
-            run.italic = True
-        elif next_kind == "code":
-            run.font.name = "Consolas"
-        pos = next_match.end()
-
-
-# Separator row of a GitHub-flavored markdown table (e.g. ``|---|:--:|-|``).
-# One-or-more dashes per column matches the GFM spec (and remark-gfm, which the
-# UI renders with), so a model emitting ``|--|--|`` still yields a real table.
-# Kept identical to pdf_service so DOCX and PDF detect the same tables.
-_MD_TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$")
-# Horizontal rule: 3+ repeats of the same -, * or _ (e.g. ``---``). Mirrors
-# pdf_service so a standalone rule renders as a line, not literal text.
-_MD_HR_RE = re.compile(r"^\s{0,3}([-*_])(\s*\1){2,}\s*$")
-
-
-def _split_md_table_row(line: str) -> list[str]:
-    """Split a markdown table row into trimmed cell strings."""
-    line = line.strip()
-    if line.startswith("|"):
-        line = line[1:]
-    if line.endswith("|"):
-        line = line[:-1]
-    # Honor backslash-escaped pipes by stashing them behind a placeholder.
-    line = line.replace(r"\|", "\x00")
-    return [c.strip().replace("\x00", "|") for c in line.split("|")]
-
-
-# Downloaded-table theme — matches the gold PDF header in pdf_service so Word and
-# PDF downloads share the Vandalizer brand look (UI highlight color #eab308).
-_DOCX_TABLE_HEADER_FILL = "EAB308"   # brand gold header fill
-_DOCX_TABLE_STRIPE_FILL = "FDF9EB"   # faint gold tint for zebra striping
-_DOCX_TABLE_BORDER = "E5E7EB"        # light-gray grid
-_DOCX_HEADING_HEX = "191919"         # charcoal headings (override Word's blue)
-
-
-def _shade_docx_cell(cell, fill_hex: str) -> None:
-    """Set a table cell's background fill (python-docx has no high-level API)."""
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    shd = OxmlElement("w:shd")
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), fill_hex)
-    cell._tc.get_or_add_tcPr().append(shd)
-
-
-def _set_docx_table_borders(table, color_hex: str) -> None:
-    """Apply a thin single-line grid border (color_hex) to every table edge."""
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    borders = OxmlElement("w:tblBorders")
-    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
-        el = OxmlElement(f"w:{edge}")
-        el.set(qn("w:val"), "single")
-        el.set(qn("w:sz"), "4")       # 4 eighths-of-a-point = 0.5pt
-        el.set(qn("w:space"), "0")
-        el.set(qn("w:color"), color_hex)
-        borders.append(el)
-    table._tbl.tblPr.append(borders)
-
-
-def _add_docx_hr(doc) -> None:
-    """Render a markdown horizontal rule as an empty paragraph with a thin,
-    light-gray bottom border (Word has no native ``<hr>``)."""
-    from docx.oxml import OxmlElement
-    from docx.oxml.ns import qn
-
-    p = doc.add_paragraph()
-    p_pr = p._p.get_or_add_pPr()
-    borders = OxmlElement("w:pBdr")
-    bottom = OxmlElement("w:bottom")
-    bottom.set(qn("w:val"), "single")
-    bottom.set(qn("w:sz"), "6")
-    bottom.set(qn("w:space"), "1")
-    bottom.set(qn("w:color"), _DOCX_TABLE_BORDER)
-    borders.append(bottom)
-    p_pr.append(borders)
-
-
-def _apply_docx_table_theme(table) -> None:
-    """Apply the Vandalizer gold table theme to a Word table.
-
-    Gold (#eab308) header row with bold black text, faint gold zebra striping on
-    body rows, and a light-gray grid. Replaces the built-in (blue) ``Light Grid
-    Accent 1`` style so DOCX downloads match the gold-headed PDF tables.
-    """
-    table.style = "Table Grid"
-    _set_docx_table_borders(table, _DOCX_TABLE_BORDER)
-    rows = table.rows
-    if not rows:
-        return
-    for cell in rows[0].cells:
-        _shade_docx_cell(cell, _DOCX_TABLE_HEADER_FILL)
-        for para in cell.paragraphs:
-            for run in para.runs:
-                run.bold = True
-    for idx, row in enumerate(rows[1:], start=1):
-        if idx % 2 == 0:  # zebra-stripe every other body row
-            for cell in row.cells:
-                _shade_docx_cell(cell, _DOCX_TABLE_STRIPE_FILL)
-
-
-def _add_markdown_table_to_docx(doc, headers: list[str], rows: list[list[str]]) -> None:
-    """Render parsed markdown-table cells as a real Word table.
-
-    Uses the shared gold table theme (see ``_apply_docx_table_theme``), with
-    inline **bold**/*italic*/`code` honored inside every cell.
-    """
-    col_count = max(len(headers), max((len(r) for r in rows), default=0)) or 1
-    headers = headers + [""] * (col_count - len(headers))
-
-    table = doc.add_table(rows=1, cols=col_count)
-
-    hdr_cells = table.rows[0].cells
-    for i, h in enumerate(headers):
-        _add_runs_with_formatting(hdr_cells[i].paragraphs[0], h)
-
-    for row in rows:
-        row = row + [""] * (col_count - len(row))
-        cells = table.add_row().cells
-        for i in range(col_count):
-            _add_runs_with_formatting(cells[i].paragraphs[0], row[i])
-
-    _apply_docx_table_theme(table)
-
-
-def _markdown_to_docx(text: str):
-    """Render a markdown-ish string into a python-docx Document.
-
-    Handles ATX headings, unordered/ordered lists, GitHub-flavored tables,
-    blank-line paragraphs, and inline bold/italic/code. Unknown syntax falls
-    back to a plain paragraph.
-    """
-    from docx import Document
-    from docx.shared import Inches, Pt, RGBColor
-
-    heading_color = RGBColor.from_string(_DOCX_HEADING_HEX)
-
-    doc = Document()
-    for section in doc.sections:
-        section.top_margin = Inches(1)
-        section.bottom_margin = Inches(1)
-        section.left_margin = Inches(1)
-        section.right_margin = Inches(1)
-
-    style = doc.styles["Normal"]
-    style.font.name = "Arial"
-    style.font.size = Pt(11)
-
-    lines = (text or "").splitlines()
-    n = len(lines)
-    i = 0
-    while i < n:
-        line = lines[i].rstrip()
-        if not line.strip():
-            doc.add_paragraph()
-            i += 1
-            continue
-
-        # Markdown table — a header row followed by a dash-separator row. Consume
-        # the header, separator, and all contiguous body rows into a real table.
-        if "|" in line and i + 1 < n and _MD_TABLE_SEP_RE.match(lines[i + 1].rstrip()):
-            headers = _split_md_table_row(line)
-            i += 2  # skip header + separator
-            rows: list[list[str]] = []
-            while i < n:
-                body = lines[i].rstrip()
-                if not body.strip() or "|" not in body:
-                    break
-                rows.append(_split_md_table_row(body))
-                i += 1
-            _add_markdown_table_to_docx(doc, headers, rows)
-            continue
-
-        # Horizontal rule (``---`` / ``***`` / ``___``) → a thin border, not text.
-        if _MD_HR_RE.match(line):
-            _add_docx_hr(doc)
-            i += 1
-            continue
-
-        heading = re.match(r"^(#{1,6})\s+(.+)$", line)
-        if heading:
-            level = min(len(heading.group(1)), 4)
-            h = doc.add_heading(heading.group(2).strip(), level=level)
-            for run in h.runs:
-                run.font.color.rgb = heading_color  # charcoal, not Word's blue
-            i += 1
-            continue
-
-        bullet = re.match(r"^\s*[-*+]\s+(.+)$", line)
-        if bullet:
-            p = doc.add_paragraph(style="List Bullet")
-            _add_runs_with_formatting(p, bullet.group(1).strip())
-            i += 1
-            continue
-
-        numbered = re.match(r"^\s*\d+\.\s+(.+)$", line)
-        if numbered:
-            p = doc.add_paragraph(style="List Number")
-            _add_runs_with_formatting(p, numbered.group(1).strip())
-            i += 1
-            continue
-
-        p = doc.add_paragraph()
-        _add_runs_with_formatting(p, line)
-        i += 1
-
-    return doc
-
-
-def _data_to_docx_bytes(data) -> bytes:
-    """Serialize workflow output (str/dict/list) to a .docx byte payload."""
-    from docx import Document
-    from docx.shared import Inches, Pt
-
-    if isinstance(data, str):
-        try:
-            parsed = json.loads(data)
-        except (json.JSONDecodeError, ValueError):
-            parsed = None
-        if isinstance(parsed, (dict, list)):
-            data = parsed
-
-    if isinstance(data, str):
-        doc = _markdown_to_docx(data)
-    elif isinstance(data, list) and data and isinstance(data[0], dict):
-        doc = Document()
-        for section in doc.sections:
-            section.top_margin = section.bottom_margin = Inches(1)
-            section.left_margin = section.right_margin = Inches(1)
-        doc.styles["Normal"].font.name = "Arial"
-        doc.styles["Normal"].font.size = Pt(11)
-        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-        table = doc.add_table(rows=1, cols=len(headers))
-        hdr_cells = table.rows[0].cells
-        for i, h in enumerate(headers):
-            hdr_cells[i].text = str(h)
-        for row in data:
-            cells = table.add_row().cells
-            for i, h in enumerate(headers):
-                val = row.get(h, "")
-                cells[i].text = json.dumps(val, default=str) if isinstance(val, (dict, list)) else str(val if val is not None else "")
-        _apply_docx_table_theme(table)
-    elif isinstance(data, dict):
-        doc = Document()
-        for section in doc.sections:
-            section.top_margin = section.bottom_margin = Inches(1)
-            section.left_margin = section.right_margin = Inches(1)
-        doc.styles["Normal"].font.name = "Arial"
-        doc.styles["Normal"].font.size = Pt(11)
-        table = doc.add_table(rows=1, cols=2)
-        hdr = table.rows[0].cells
-        hdr[0].text = "Field"
-        hdr[1].text = "Value"
-        for k, v in data.items():
-            cells = table.add_row().cells
-            cells[0].text = str(k)
-            cells[1].text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
-        _apply_docx_table_theme(table)
-    elif isinstance(data, list):
-        doc = _markdown_to_docx("\n".join(f"- {item}" for item in data))
-    else:
-        doc = _markdown_to_docx("" if data is None else str(data))
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    return buf.getvalue()
 
 
 async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
@@ -616,6 +319,9 @@ async def download_results(
     response is a ZIP bundle containing one file per marked step. With 0 or 1
     marked steps the single-output formatting paths below apply.
     """
+    if format not in VALID_EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(VALID_EXPORT_FORMATS)}")
+
     status = await svc.get_workflow_status(session_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
@@ -739,6 +445,16 @@ async def download_results(
             headers={"Content-Disposition": f'attachment; filename="{base_filename}.txt"'},
         )
 
+    if format == "markdown":
+        from app.services.output_handlers import render_workflow_markdown
+
+        md_text = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
+        return StreamingResponse(
+            io.BytesIO(md_text.encode()),
+            media_type="text/markdown",
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.md"'},
+        )
+
     if format == "pdf":
         from app.services.pdf_service import render_workflow_pdf
 
@@ -750,7 +466,7 @@ async def download_results(
         )
 
     if format == "docx":
-        docx_bytes = _data_to_docx_bytes(output_data)
+        docx_bytes = data_to_docx_bytes(output_data)
         return StreamingResponse(
             io.BytesIO(docx_bytes),
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -768,7 +484,7 @@ async def download_results(
 
 class SaveOutputToFolderRequest(BaseModel):
     folder_uuid: str
-    format: str = "pdf"  # pdf | markdown | csv | json | text
+    format: str = "pdf"  # any member of VALID_EXPORT_FORMATS
     file_name: str | None = None
 
 
@@ -787,9 +503,8 @@ async def save_session_output_to_folder(
     from app.services.access_control import get_authorized_folder
     from app.services.output_handlers import save_results_to_folder
 
-    valid_formats = {"pdf", "markdown", "csv", "json", "text"}
-    if req.format not in valid_formats:
-        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(valid_formats)}")
+    if req.format not in VALID_EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(VALID_EXPORT_FORMATS)}")
 
     result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
     if not result or not result.workflow:
@@ -1088,11 +803,36 @@ async def _diagnose_step_mutation_failure(step_id: str, user: User) -> tuple[int
     return 500, "Failed to update step"
 
 
+async def _diagnose_task_mutation_failure(task_id: str, user: User) -> tuple[int, str]:
+    """Why did a task-scoped mutation return None/False?
+
+    Mirrors ``_diagnose_step_mutation_failure``: the service collapses "task
+    missing", "orphan workflow", and "user lacks permission" into the same
+    falsy return. Walk the same lookups to pick a clearer status + detail.
+    """
+    from app.models.workflow import WorkflowStepTask
+
+    try:
+        task = await WorkflowStepTask.get(PydanticObjectId(task_id))
+    except Exception:
+        return 404, "Task not found"
+    if not task:
+        return 404, "Task not found"
+    parent = await svc._get_workflow_for_task(task.id)
+    if not parent:
+        return 404, "Task's workflow not found"
+    team_access = await access_control.get_team_access_context(user)
+    if not access_control.can_manage_workflow(parent, user, team_access):
+        return 403, "You don't have permission to edit this workflow"
+    return 500, "Failed to update task"
+
+
 @router.patch("/tasks/{task_id}")
 async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)):
     task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
     if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
+        status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
+        raise HTTPException(status_code=status_code, detail=detail)
     # Flag stale verification on parent workflow
     from app.services.verification_service import check_and_flag_stale_verification
     wf = await svc._get_workflow_for_task(PydanticObjectId(task_id))
@@ -1105,7 +845,8 @@ async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends
 async def delete_task(task_id: str, user: User = Depends(get_current_user)):
     ok = await svc.delete_task(task_id, user=user)
     if not ok:
-        raise HTTPException(status_code=404, detail="Task not found")
+        status_code, detail = await _diagnose_task_mutation_failure(task_id, user)
+        raise HTTPException(status_code=status_code, detail=detail)
     return {"ok": True}
 
 

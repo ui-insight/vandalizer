@@ -56,6 +56,8 @@ const CLASSIFICATION_LABELS: Record<string, string> = {
 
 type Stats = { total: number; open: number; in_progress: number; closed: number }
 
+const PAGE_SIZE = 200
+
 const statCardStyle = (color: string): React.CSSProperties => ({
   flex: 1, padding: '16px 20px', background: '#fff', borderRadius: 'var(--ui-radius, 12px)',
   border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
@@ -69,6 +71,10 @@ export default function SupportCenter() {
 
   const [view, setView] = useState<View>('list')
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
+  // Total tickets matching the active filters server-side — may exceed the
+  // number fetched so far; drives the "Showing X of Y" label and Load more.
+  const [totalMatching, setTotalMatching] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
   // Default to "open" — agents care about the active queue, not the archive.
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
@@ -99,13 +105,14 @@ export default function SupportCenter() {
       const [s, t, tagList] = await Promise.all([
         supportApi.getTicketStats(),
         supportApi.listTickets(
-          statusParam, 200, 0, undefined, tagParam, undefined,
+          statusParam, PAGE_SIZE, 0, undefined, tagParam, undefined,
           searchParam, priorityParam, classificationParam,
         ),
         supportApi.listAllTags(),
       ])
       setStats(s)
       setTickets(t.tickets)
+      setTotalMatching(t.total)
       setAllTags(tagList.tags)
     } catch {
       toast('Failed to load tickets', 'error')
@@ -113,6 +120,32 @@ export default function SupportCenter() {
       setLoading(false)
     }
   }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
+
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true)
+    try {
+      const statusParam = statusFilter === 'all' ? undefined : statusFilter
+      const priorityParam = priorityFilter === 'all' ? undefined : priorityFilter
+      const classificationParam = classificationFilter === 'all' ? undefined : classificationFilter
+      const tagParam = tagFilter || undefined
+      const searchParam = search || undefined
+      const t = await supportApi.listTickets(
+        statusParam, PAGE_SIZE, tickets.length, undefined, tagParam, undefined,
+        searchParam, priorityParam, classificationParam,
+      )
+      // Tickets can shift between pages as they're updated (the sort is by
+      // updated_at), so dedupe on append rather than trusting the offset.
+      setTickets((prev) => {
+        const seen = new Set(prev.map((x) => x.uuid))
+        return [...prev, ...t.tickets.filter((x) => !seen.has(x.uuid))]
+      })
+      setTotalMatching(t.total)
+    } catch {
+      toast('Failed to load more tickets', 'error')
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search, tickets.length])
 
   useEffect(() => { load() }, [load])
 
@@ -150,6 +183,9 @@ export default function SupportCenter() {
       {view === 'list' && (
         <ListView
           tickets={tickets}
+          totalMatching={totalMatching}
+          onLoadMore={loadMore}
+          loadingMore={loadingMore}
           stats={stats}
           loading={loading}
           statusFilter={statusFilter}
@@ -334,7 +370,8 @@ function WhatsWorkingView({ onBack }: { onBack: () => void }) {
 // ---------------------------------------------------------------------------
 
 function ListView({
-  tickets, stats, loading, statusFilter, onStatusFilterChange,
+  tickets, totalMatching, onLoadMore, loadingMore,
+  stats, loading, statusFilter, onStatusFilterChange,
   priorityFilter, onPriorityFilterChange,
   classificationFilter, onClassificationFilterChange,
   tagFilter, onTagFilterChange, allTags,
@@ -342,6 +379,9 @@ function ListView({
   currentUserId, onNew, onSelect, onWhatsWorking,
 }: {
   tickets: SupportTicketSummary[]
+  totalMatching: number
+  onLoadMore: () => void
+  loadingMore: boolean
   stats: Stats | null
   loading: boolean
   statusFilter: StatusFilter
@@ -440,9 +480,11 @@ function ListView({
               <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
               {!loading && (
                 <span style={{ fontSize: 13, color: '#6b7280' }}>
-                  {hasFilters
-                    ? `Showing ${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`
-                    : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
+                  {tickets.length < totalMatching
+                    ? `Showing ${tickets.length} of ${totalMatching} tickets`
+                    : hasFilters
+                      ? `Showing ${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`
+                      : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
                 </span>
               )}
             </div>
@@ -701,6 +743,29 @@ function ListView({
                 </div>
               )
             })}
+            {tickets.length < totalMatching && (
+              <div style={{ padding: '14px 20px', textAlign: 'center', borderTop: '1px solid #f3f4f6' }}>
+                <button
+                  onClick={onLoadMore}
+                  disabled={loadingMore}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    padding: '6px 16px', fontSize: 13, fontWeight: 600,
+                    borderRadius: 9999, border: '1px solid #e5e7eb',
+                    background: '#fff', color: '#374151',
+                    cursor: loadingMore ? 'default' : 'pointer', fontFamily: 'inherit',
+                    opacity: loadingMore ? 0.6 : 1,
+                  }}
+                >
+                  {loadingMore && (
+                    <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  )}
+                  {loadingMore
+                    ? 'Loading…'
+                    : `Load more (${totalMatching - tickets.length} remaining)`}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -471,6 +471,97 @@ class TestDownloadResults:
 
         assert resp.status_code == 404
 
+    async def test_download_markdown_string(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(
+                return_value=self._mock_status("## Findings\n\nAll good.")
+            )
+
+            resp = await client.get(
+                "/api/workflows/download?session_id=sess1&format=markdown",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert "text/markdown" in resp.headers["content-type"]
+        assert '.md"' in resp.headers["content-disposition"]
+        assert "## Findings" in resp.content.decode()
+
+    async def test_download_markdown_list_of_dicts(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(
+                return_value=self._mock_status([
+                    {"Name": "Alice", "Age": "30"},
+                    {"Name": "Bob", "Role": "PI"},
+                ])
+            )
+
+            resp = await client.get(
+                "/api/workflows/download?session_id=sess1&format=markdown",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        content = resp.content.decode()
+        # Header row collects keys from ALL rows, rendered as a markdown table
+        assert "| Name | Age | Role |" in content
+        assert "| Alice |" in content
+        assert "| Bob |" in content
+
+    async def test_download_docx(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(
+                return_value=self._mock_status("# Report\n\nBody text.")
+            )
+
+            resp = await client.get(
+                "/api/workflows/download?session_id=sess1&format=docx",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert "wordprocessingml" in resp.headers["content-type"]
+        # .docx is a ZIP container — check the magic bytes
+        assert resp.content[:4] == b"PK\x03\x04"
+
+    async def test_download_invalid_format_returns_400(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(
+                return_value=self._mock_status("whatever")
+            )
+
+            resp = await client.get(
+                "/api/workflows/download?session_id=sess1&format=xlsx",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "Invalid format" in resp.json()["detail"]
+
 
 # ---------------------------------------------------------------------------
 # POST /api/workflows/steps/test

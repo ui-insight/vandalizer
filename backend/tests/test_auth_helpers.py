@@ -30,10 +30,38 @@ class TestSetTokensCookieSecurity:
         for header in self._get_cookie_headers(response):
             assert "httponly" in header.lower()
 
-    def test_secure_flag_in_production(self):
+    def test_secure_flag_in_https_production(self):
         settings = Settings(
             jwt_secret_key="real-secret",
             environment="production",
+            frontend_url="https://vandalizer.example.edu",
+        )
+        response = Response()
+        _set_tokens(response, _make_mock_user(), settings)
+
+        for header in self._get_cookie_headers(response):
+            assert "secure" in header.lower()
+
+    def test_no_secure_flag_in_http_production(self):
+        """Production served over plain HTTP (air-gapped box, no TLS): the
+        browser would drop Secure cookies entirely, so the flag must be off."""
+        settings = Settings(
+            jwt_secret_key="real-secret",
+            environment="production",
+            frontend_url="http://localhost",
+        )
+        response = Response()
+        _set_tokens(response, _make_mock_user(), settings)
+
+        for header in self._get_cookie_headers(response):
+            assert "secure" not in header.lower()
+
+    def test_cookie_secure_override_forces_flag_on(self):
+        settings = Settings(
+            jwt_secret_key="real-secret",
+            environment="production",
+            frontend_url="http://localhost",
+            cookie_secure=True,
         )
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)

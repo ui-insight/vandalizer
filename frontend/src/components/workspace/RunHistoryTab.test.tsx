@@ -86,6 +86,8 @@ describe('RunHistoryTab — workflow run output', () => {
       .toBe('/api/workflows/download?session_id=sess-abc&format=json')
     expect(screen.getByText('PDF')).toBeTruthy()
     expect(screen.getByText('Word (.docx)')).toBeTruthy()
+    expect(screen.getByText('Markdown').closest('a')?.getAttribute('href'))
+      .toBe('/api/workflows/download?session_id=sess-abc&format=markdown')
     expect(vi.mocked(downloadResults)).toHaveBeenCalledWith('sess-abc', 'json', { parseStructured: false })
   })
 

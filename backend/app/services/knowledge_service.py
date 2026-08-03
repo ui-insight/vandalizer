@@ -9,7 +9,9 @@ import re
 from typing import TYPE_CHECKING
 
 import httpx
+import pymongo
 from bs4 import BeautifulSoup
+from pymongo.errors import DuplicateKeyError, OperationFailure
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -230,6 +232,114 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
     return await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
     ).sort(-KnowledgeBaseSource.created_at).to_list()
+
+
+KB_SOURCE_URL_UNIQUE_INDEX = "kb_uuid_url_unique"
+
+
+async def ensure_source_url_unique_index() -> None:
+    """Create the unique (knowledge_base_uuid, url) index that backs URL dedup.
+
+    URL dedup in ``add_urls`` / ``_crawl_from_source`` is check-then-insert,
+    so two concurrent ingest runs for the same KB could both pass the check
+    and ingest the same page twice (support ticket: a crawled document showed
+    up as two identical 378-chunk sources). The unique index makes the insert
+    itself the arbiter; ``_insert_source_unless_duplicate`` turns the loser's
+    error into a skip.
+
+    The index is managed here rather than in the model's ``Settings.indexes``
+    because building it over data that already contains duplicates fails —
+    Beanie would then crash every process at init. Instead the web app calls
+    this at startup: on a duplicate-key build failure it deletes the newer
+    copy of each duplicate pair (chunks included) and retries once.
+    """
+    collection = KnowledgeBaseSource.get_motor_collection()
+    index = pymongo.IndexModel(
+        [("knowledge_base_uuid", pymongo.ASCENDING), ("url", pymongo.ASCENDING)],
+        name=KB_SOURCE_URL_UNIQUE_INDEX,
+        unique=True,
+        # Document-type sources carry url=None; only real URL strings must be
+        # unique within a KB.
+        partialFilterExpression={"url": {"$type": "string"}},
+    )
+    try:
+        await collection.create_indexes([index])
+        return
+    except OperationFailure as e:
+        if e.code != 11000 and "E11000" not in str(e):
+            raise
+    removed = await _remove_duplicate_url_sources()
+    logger.warning(
+        "Removed %d duplicate KB URL source(s) left behind by the pre-index "
+        "ingest race; retrying unique index build",
+        removed,
+    )
+    await collection.create_indexes([index])
+
+
+async def _remove_duplicate_url_sources() -> int:
+    """Delete all but the oldest source of each duplicated (KB, url) pair.
+
+    Chunks are removed from ChromaDB per deleted source, so retrieval stops
+    double-counting the page, and affected KB stats are recalculated.
+    Returns the number of source rows deleted.
+    """
+    collection = KnowledgeBaseSource.get_motor_collection()
+    pipeline = [
+        {"$match": {"url": {"$type": "string"}}},
+        {"$group": {
+            "_id": {"kb": "$knowledge_base_uuid", "url": "$url"},
+            "count": {"$sum": 1},
+        }},
+        {"$match": {"count": {"$gt": 1}}},
+    ]
+    # Materialize the groups up front: the per-source ChromaDB deletions below
+    # can be slow, and holding an aggregation cursor open across them risks a
+    # cursor timeout.
+    groups = await collection.aggregate(pipeline).to_list(length=None)
+    removed = 0
+    affected_kbs: set[str] = set()
+    for group in groups:
+        kb_uuid = group["_id"]["kb"]
+        dupes = await KnowledgeBaseSource.find(
+            KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
+            KnowledgeBaseSource.url == group["_id"]["url"],
+        ).sort(+KnowledgeBaseSource.created_at).to_list()
+        for extra in dupes[1:]:
+            try:
+                dm = _get_dm()
+                await asyncio.to_thread(dm.delete_kb_source, kb_uuid, extra.uuid)
+            except Exception as e:
+                logger.error(
+                    f"Error deleting chunks of duplicate KB source {extra.uuid}: {e}",
+                )
+            await extra.delete()
+            removed += 1
+        affected_kbs.add(kb_uuid)
+    for kb_uuid in affected_kbs:
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+        if kb:
+            await recalculate_stats(kb)
+    return removed
+
+
+async def _insert_source_unless_duplicate(source: KnowledgeBaseSource) -> bool:
+    """Insert a source row; False if another writer beat us to this URL.
+
+    The ``find_one`` pre-checks at the call sites cover the sequential case;
+    the unique index behind this covers the concurrent one (two ingest runs
+    racing through the same URL list).
+    """
+    try:
+        await source.insert()
+    except DuplicateKeyError:
+        logger.info(
+            "Skipping KB source %s for KB %s — inserted concurrently by "
+            "another ingest run",
+            source.url, source.knowledge_base_uuid,
+        )
+        return False
+    return True
 
 
 async def resolve_document_titles(sources) -> dict[str, str]:
@@ -592,7 +702,8 @@ async def add_urls(
             crawl_enabled=crawl_enabled,
             max_crawl_pages=max_crawl_pages,
         )
-        await source.insert()
+        if not await _insert_source_unless_duplicate(source):
+            continue
         added += 1
 
         # Ingest inline
@@ -604,8 +715,10 @@ async def add_urls(
             crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, fetched)
             added += crawled
 
-    if added:
-        await recalculate_stats(kb)
+    # Unconditional: the router set status="building" before dispatching this
+    # run, and a run that added nothing (every URL already present) must still
+    # restore the real status or the KB shows "building" forever.
+    await recalculate_stats(kb)
     return added
 
 
@@ -745,7 +858,10 @@ async def clone_knowledge_base(
             custom_name=src.custom_name,
             content=src.content,  # Copy cached content for URLs
         )
-        await new_src.insert()
+        # A source KB that still carries pre-index duplicate URLs must not
+        # abort the whole clone — copy each URL once.
+        if not await _insert_source_unless_duplicate(new_src):
+            continue
 
         if src.source_type == "document":
             await _ingest_document_source(new_src, clone)
@@ -1062,7 +1178,8 @@ async def _crawl_from_source(
             url=url[:2000],
             parent_source_uuid=parent.uuid,
         )
-        await child.insert()
+        if not await _insert_source_unless_duplicate(child):
+            continue
         fetches += 1
         # _ingest_url_source returns the fetch result on success
         child_fetched = await _ingest_url_source(
@@ -1206,7 +1323,9 @@ async def import_knowledge_base(
             parent_source_uuid=src.get("parent_source_uuid"),
             crawled_urls=src.get("crawled_urls"),
         )
-        await new_src.insert()
+        # Exports taken before the unique index may repeat a URL — import it once.
+        if not await _insert_source_unless_duplicate(new_src):
+            continue
         imported += 1
 
         if content and content.strip():

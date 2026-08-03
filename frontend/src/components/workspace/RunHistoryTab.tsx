@@ -89,6 +89,7 @@ const DOWNLOAD_FORMATS = [
   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
   { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
   { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
+  { fmt: 'markdown', label: 'Markdown', desc: 'Formatted text (.md)', parseStructured: false },
   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
 ] as const
 

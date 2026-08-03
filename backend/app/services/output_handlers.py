@@ -97,11 +97,15 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
         _save_workflow_as_markdown(file_path, output_data, workflow_name)
     elif format_type == "pdf":
         _save_workflow_as_pdf(file_path, output_data, workflow_name)
+    elif format_type == "docx":
+        _save_workflow_as_docx(file_path, output_data)
     elif format_type in ("text", "txt"):
         _save_workflow_as_text(file_path, output_data)
     else:
-        with open(file_path, "w") as f:
-            f.write(str(output_data))
+        raise ValueError(
+            f"Unsupported output format '{format_type}'. "
+            "Use one of: csv, docx, json, markdown, pdf, text"
+        )
 
     # Render markdown for raw_text regardless of file format. PDF/CSV/JSON files
     # aren't useful as text input to the next workflow; the markdown rendition is.
@@ -212,11 +216,13 @@ def _save_workflow_as_text(file_path: Path, data) -> None:
             f.write(str(data) if data else "")
 
 
-def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") -> None:
-    """Save workflow output as a Markdown table."""
+def render_workflow_markdown(data, title: str = "Results") -> str:
+    """Render workflow output as Markdown — shared by the download endpoint and
+    the save-to-folder .md writer so both surfaces produce identical files."""
     lines = [f"# {title.replace('_', ' ')}", ""]
     if isinstance(data, list) and data and isinstance(data[0], dict):
-        headers = list(data[0].keys())
+        # Collect keys from ALL rows so no columns are missing
+        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
         lines.append("| " + " | ".join(headers) + " |")
         lines.append("| " + " | ".join("---" for _ in headers) + " |")
         for row in data:
@@ -228,8 +234,20 @@ def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") ->
             lines.append(f"| {k} | {str(v).replace('|', chr(92) + '|')} |")
     else:
         lines.append(str(data) if data else "")
-    with open(file_path, "w") as f:
-        f.write("\n".join(lines) + "\n")
+    return "\n".join(lines) + "\n"
+
+
+def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") -> None:
+    """Save workflow output as a Markdown table."""
+    file_path.write_text(render_workflow_markdown(data, title))
+
+
+def _save_workflow_as_docx(file_path: Path, data) -> None:
+    """Save workflow output as a Word document (same rendering as the
+    docx download in the workflows router)."""
+    from app.services.docx_service import data_to_docx_bytes
+
+    file_path.write_bytes(data_to_docx_bytes(data))
 
 
 def _save_workflow_as_pdf(file_path: Path, data, title: str = "Results") -> None:

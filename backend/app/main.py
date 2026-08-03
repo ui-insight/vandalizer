@@ -59,6 +59,16 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
 
+    # Unique (kb, url) index for KB sources. Lives outside Beanie's index
+    # management because it self-heals: duplicates created by the old racy
+    # check-then-insert are deleted (chunks included) before the build is
+    # retried. Best-effort — never block startup on it.
+    try:
+        from app.services.knowledge_service import ensure_source_url_unique_index
+        await ensure_source_url_unique_index()
+    except Exception:
+        logger.warning("KB source unique-index ensure failed during startup", exc_info=True)
+
     # Seed default feedback prompts for trial check-ins
     if get_settings().enable_trial_system:
         from app.services.feedback_prompt_service import seed_default_prompts
@@ -180,6 +190,14 @@ app.add_middleware(CSRFMiddleware)
 # CORS
 # ---------------------------------------------------------------------------
 settings = get_settings()
+if settings.is_production and not settings.use_secure_cookies:
+    logger.warning(
+        "Production deployment served over plain HTTP (frontend_url=%s): "
+        "auth/CSRF cookies will NOT carry the Secure attribute. This is "
+        "expected for isolated/intranet installs; put the site behind HTTPS "
+        "for anything internet-facing.",
+        settings.frontend_url,
+    )
 _cors_origins = [settings.frontend_url]
 if not settings.is_production:
     _cors_origins.append("http://localhost:5173")

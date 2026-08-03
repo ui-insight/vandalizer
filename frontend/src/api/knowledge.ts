@@ -330,6 +330,8 @@ export type KBTestQuery = {
   expected_answer_contains: string | null
   expected_answer: string | null
   category: string | null
+  notes: string | null
+  external_id: string | null
   auto_generated: boolean
   source_chunk_ids: string[]
   last_judged_score: number | null
@@ -350,6 +352,8 @@ export function createKBTestQuery(uuid: string, data: {
   expected_answer_contains?: string
   expected_answer?: string
   category?: string
+  notes?: string
+  external_id?: string
 }) {
   return apiFetch<KBTestQuery>(`/api/knowledge/${uuid}/test-queries`, {
     method: 'POST',
@@ -363,6 +367,8 @@ export function updateKBTestQuery(uuid: string, queryUuid: string, data: {
   expected_answer_contains?: string | null
   expected_answer?: string | null
   category?: string | null
+  notes?: string | null
+  external_id?: string | null
 }) {
   return apiFetch<KBTestQuery>(`/api/knowledge/${uuid}/test-queries/${queryUuid}`, {
     method: 'PATCH',
@@ -374,6 +380,37 @@ export function deleteKBTestQuery(uuid: string, queryUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/test-queries/${queryUuid}`, {
     method: 'DELETE',
   })
+}
+
+export type KBTestQueryImportResult = {
+  created: number
+  updated: number
+  skipped: number
+  total_rows: number
+  errors: { row: number; error: string }[]
+}
+
+/**
+ * Bulk-import test queries from a CSV/XLSX file. Rows carrying a stable ID
+ * that matches an existing query's external_id update it in place; ID-less
+ * rows duplicating an existing question are skipped.
+ */
+export async function importKBTestQueries(uuid: string, file: File) {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  // btoa takes a binary string; build it in chunks to stay under the
+  // argument-count limit String.fromCharCode hits on large arrays.
+  let binary = ''
+  const CHUNK = 0x8000
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+  }
+  return apiFetch<KBTestQueryImportResult>(
+    `/api/knowledge/${uuid}/test-queries/import`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ filename: file.name, content_base64: btoa(binary) }),
+    },
+  )
 }
 
 export function generateKBTestQueries(

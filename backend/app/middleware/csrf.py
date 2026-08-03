@@ -56,8 +56,9 @@ CSRF_EXEMPT_PREFIXES = (
 # to be ``Secure``, ``Path=/``, and ``Domain``-less.  That guarantees only one
 # cookie of this name can live in the jar — immune to collisions from sibling
 # apps on a shared parent domain, prior deploys that set different attributes,
-# or proxies.  HTTP (development) cannot satisfy the prefix's ``Secure``
-# requirement, so we fall back to the legacy name there.
+# or proxies.  HTTP (development, or a production box served without TLS)
+# cannot satisfy the prefix's ``Secure`` requirement, so we fall back to the
+# legacy name there.
 MODERN_COOKIE_NAME = "__Host-csrf_token"
 LEGACY_COOKIE_NAME = "csrf_token"
 
@@ -91,7 +92,7 @@ class CSRFMiddleware:
         from app.dependencies import get_settings
 
         settings = get_settings()
-        primary_name = _primary_cookie_name(secure=settings.is_production)
+        primary_name = _primary_cookie_name(secure=settings.use_secure_cookies)
 
         method: str = scope["method"]
         path: str = scope["path"]
@@ -106,7 +107,10 @@ class CSRFMiddleware:
         # Path), the old SPA's regex picks the *first* value while SimpleCookie
         # picks the *last* — so we must enumerate every legacy value, not just
         # the deduped one, or the old-SPA header value won't be in the set.
-        csrf_modern = cookies.get(primary_name)
+        # The modern name is checked even when it isn't the primary (insecure
+        # mode): a jar can still hold a ``__Host-`` cookie from an earlier
+        # HTTPS visit to the same host, and the SPA prefers that one.
+        csrf_modern = cookies.get(MODERN_COOKIE_NAME)
         legacy_values = _all_cookie_values(cookie_header, LEGACY_COOKIE_NAME)
 
         is_safe = method in SAFE_METHODS
@@ -158,7 +162,7 @@ class CSRFMiddleware:
             return
 
         set_cookie_value = _build_csrf_cookie_header(
-            name=primary_name, secure=settings.is_production
+            name=primary_name, secure=settings.use_secure_cookies
         )
 
         async def send_with_cookie(message: Message) -> None:

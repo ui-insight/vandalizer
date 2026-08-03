@@ -2044,3 +2044,233 @@ class TestKnowledgeReingest:
             )
 
         assert resp.status_code == 403
+
+        assert resp.status_code == 403
+
+
+class TestTestQueryImport:
+    """Bulk CSV/XLSX import of validation test queries."""
+
+    @staticmethod
+    def _payload(csv_text, filename="set.csv"):
+        import base64
+
+        return {
+            "filename": filename,
+            "content_base64": base64.b64encode(csv_text.encode("utf-8")).decode(),
+        }
+
+    @staticmethod
+    def _existing_query(**overrides):
+        # Beanie Documents can't be constructed without an initialized
+        # collection, so stand-ins carry the exact attrs the endpoint touches
+        # (explicit values — a bare MagicMock's auto-attrs are truthy and
+        # would satisfy the external_id lookup by accident).
+        from types import SimpleNamespace
+
+        defaults = {
+            "knowledge_base_uuid": "kb-uuid-1",
+            "query": "Old question?",
+            "expected_answer": None,
+            "expected_answer_contains": None,
+            "expected_source_labels": [],
+            "category": None,
+            "notes": None,
+            "external_id": None,
+            "updated_at": None,
+            "user_id": "user1",
+        }
+        defaults.update(overrides)
+        q = SimpleNamespace(**defaults)
+        q.save = AsyncMock()
+        return q
+
+    @staticmethod
+    def _fake_query_cls(existing):
+        """Stand-in for the KBTestQuery class: find() returns ``existing``,
+        constructing an instance records it and gives it an AsyncMock insert."""
+        from types import SimpleNamespace
+
+        created = []
+
+        def construct(**kwargs):
+            inst = SimpleNamespace(uuid="new-uuid", **kwargs)
+            inst.insert = AsyncMock()
+            created.append(inst)
+            return inst
+
+        cls = MagicMock(side_effect=construct)
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=existing)
+        cls.find.return_value = find_result
+        return cls, created
+
+    @pytest.mark.asyncio
+    async def test_import_creates_updates_and_skips(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        # One row matched by stable ID (updated in place), one existing
+        # ID-less question repeated verbatim in the file (skipped).
+        existing_by_id = self._existing_query(external_id="EXIST-1")
+        existing_dup = self._existing_query(query="Duplicate question?")
+
+        csv_text = (
+            "Question,Expected Answer,Category,Source,Notes,ID\n"
+            "New question?,New answer,factual,Doc A,fresh,NEW-1\n"
+            "Updated question?,Better answer,summary,Doc B,,EXIST-1\n"
+            "Duplicate question?,,,,,\n"
+        )
+
+        fake_cls, created = self._fake_query_cls([existing_by_id, existing_dup])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload(csv_text),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 1
+        assert body["updated"] == 1
+        assert body["skipped"] == 1
+        assert body["total_rows"] == 3
+        assert body["errors"] == []
+        assert len(created) == 1
+        assert created[0].query == "New question?"
+        assert created[0].external_id == "NEW-1"
+        created[0].insert.assert_awaited_once()
+        existing_by_id.save.assert_awaited_once()
+        existing_dup.save.assert_not_awaited()
+        # The ID-matched row was rewritten from the spreadsheet.
+        assert existing_by_id.query == "Updated question?"
+        assert existing_by_id.expected_answer == "Better answer"
+        assert existing_by_id.category == "summary"
+        assert existing_by_id.expected_source_labels == ["Doc B"]
+        assert existing_by_id.updated_at is not None
+
+    @pytest.mark.asyncio
+    async def test_import_reports_row_errors_without_failing(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        csv_text = "Question,Answer\nQ1,A1\n,orphan answer\n"
+        fake_cls, created = self._fake_query_cls([])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload(csv_text),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 1
+        assert body["errors"] == [{"row": 3, "error": "Missing question"}]
+
+    @pytest.mark.asyncio
+    async def test_import_bad_file_type_is_400(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question\nQ1\n", filename="set.txt"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "Unsupported" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_import_invalid_base64_is_400(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json={"filename": "set.csv", "content_base64": "%%% not base64 %%%"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_import_view_only_user_gets_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        async def gated_lookup(uuid, u, manage=False, **kw):
+            return None if manage else kb
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(side_effect=gated_lookup)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question\nQ1\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+
+

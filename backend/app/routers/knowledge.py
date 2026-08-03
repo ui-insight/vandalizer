@@ -963,6 +963,8 @@ def _serialize_test_query(q) -> dict:
         "expected_answer_contains": q.expected_answer_contains,
         "expected_answer": q.expected_answer,
         "category": q.category,
+        "notes": getattr(q, "notes", None),
+        "external_id": getattr(q, "external_id", None),
         "auto_generated": q.auto_generated,
         "source_chunk_ids": q.source_chunk_ids,
         "last_judged_score": q.last_judged_score,
@@ -1003,10 +1005,119 @@ async def create_test_query(uuid: str, request: Request, user: User = Depends(ge
         expected_answer_contains=body.get("expected_answer_contains"),
         expected_answer=body.get("expected_answer"),
         category=body.get("category"),
+        notes=body.get("notes"),
+        external_id=body.get("external_id"),
         user_id=user.user_id,
     )
     await tq.insert()
     return _serialize_test_query(tq)
+
+
+# Uploads are sent base64-encoded in a JSON body (the codebase's file-upload
+# convention — see files.py). 5 MB of encoded spreadsheet is far beyond any
+# real 500-row test set, so treat larger payloads as a mistake.
+_TEST_QUERY_IMPORT_MAX_BYTES = 5 * 1024 * 1024
+
+
+@router.post("/{uuid}/test-queries/import")
+async def import_test_queries(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    """Bulk-import test queries from an uploaded CSV/XLSX file.
+
+    Body: ``{"filename": str, "content_base64": str}``.
+
+    Rows with an ID matching an existing query's ``external_id`` update that
+    query in place, so evaluators can re-import the same spreadsheet across KB
+    versions without duplicating the set. Rows without an ID that exactly match
+    an existing question are skipped for the same reason. Row-level problems
+    (e.g. a missing question) are reported per-row without failing the import;
+    file-level problems (wrong format, no question column) return 400.
+    """
+    import base64
+    import datetime as _datetime
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+
+    body = await request.json()
+    filename = (body.get("filename") or "").strip()
+    content_b64 = body.get("content_base64") or ""
+    if not filename or not content_b64:
+        raise HTTPException(status_code=400, detail="filename and content_base64 are required")
+    try:
+        data = base64.b64decode(content_b64, validate=True)
+    except Exception:
+        raise HTTPException(status_code=400, detail="content_base64 is not valid base64")
+    if len(data) > _TEST_QUERY_IMPORT_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="File is too large (5 MB limit)")
+
+    from app.services.kb_test_query_import import (
+        TestQueryImportError,
+        parse_test_query_import,
+    )
+    try:
+        rows, row_errors = parse_test_query_import(filename, data)
+    except TestQueryImportError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.models.kb_test_query import KBTestQuery
+    existing = await KBTestQuery.find(
+        KBTestQuery.knowledge_base_uuid == kb.uuid,
+    ).to_list()
+    by_external_id = {
+        q.external_id: q for q in existing if getattr(q, "external_id", None)
+    }
+    seen_questions = {q.query.strip().lower() for q in existing}
+
+    created = updated = skipped = 0
+    now = _datetime.datetime.now(tz=_datetime.timezone.utc)
+    for row in rows:
+        target = by_external_id.get(row["external_id"]) if row["external_id"] else None
+        if target is not None:
+            target.query = row["query"]
+            target.expected_answer = row["expected_answer"]
+            target.expected_answer_contains = row["expected_answer_contains"]
+            target.expected_source_labels = row["expected_source_labels"]
+            target.category = row["category"]
+            target.notes = row["notes"]
+            target.updated_at = now
+            await target.save()
+            seen_questions.add(row["query"].strip().lower())
+            updated += 1
+            continue
+        if not row["external_id"] and row["query"].strip().lower() in seen_questions:
+            skipped += 1
+            continue
+        tq = KBTestQuery(
+            knowledge_base_uuid=kb.uuid,
+            query=row["query"],
+            expected_answer=row["expected_answer"],
+            expected_answer_contains=row["expected_answer_contains"],
+            expected_source_labels=row["expected_source_labels"],
+            category=row["category"],
+            notes=row["notes"],
+            external_id=row["external_id"],
+            user_id=user.user_id,
+        )
+        await tq.insert()
+        seen_questions.add(row["query"].strip().lower())
+        if row["external_id"]:
+            # A later row repeating the same ID updates this record instead of
+            # inserting a duplicate.
+            by_external_id[row["external_id"]] = tq
+        created += 1
+
+    logger.info(
+        "Test-query import for KB %s by user %s: %d created, %d updated, "
+        "%d skipped, %d row errors (%s)",
+        kb.uuid, user.user_id, created, updated, skipped, len(row_errors), filename,
+    )
+    return {
+        "created": created,
+        "updated": updated,
+        "skipped": skipped,
+        "total_rows": len(rows) + len(row_errors),
+        "errors": row_errors,
+    }
 
 
 async def _require_manageable_kb(uuid: str, user: User, user_org_ancestry: list[str]):
@@ -1222,6 +1333,10 @@ async def update_test_query(
         tq.expected_source_labels = body.get("expected_source_labels") or []
     if "category" in body:
         tq.category = body.get("category") or None
+    if "notes" in body:
+        tq.notes = body.get("notes") or None
+    if "external_id" in body:
+        tq.external_id = body.get("external_id") or None
     tq.updated_at = _datetime.datetime.now(tz=_datetime.timezone.utc)
     await tq.save()
     return _serialize_test_query(tq)

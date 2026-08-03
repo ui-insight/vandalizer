@@ -136,11 +136,18 @@ async def get_or_create_verified_library() -> Library:
 
 
 async def ensure_collection(title: str, description: str, featured: bool = False) -> VerifiedCollection:
-    """Get or create a VerifiedCollection by title."""
+    """Get or create a VerifiedCollection by title, syncing description/featured from seeds."""
     existing = await VerifiedCollection.find_one(VerifiedCollection.title == title)
     if existing:
+        changed = False
+        if existing.description != description:
+            existing.description = description
+            changed = True
         if featured and not existing.featured:
             existing.featured = True
+            changed = True
+        if changed:
+            existing.updated_at = datetime.datetime.now(datetime.timezone.utc)
             await existing.save()
         return existing
     now = datetime.datetime.now(datetime.timezone.utc)

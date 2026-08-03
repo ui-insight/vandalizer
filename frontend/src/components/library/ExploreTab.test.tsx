@@ -4,9 +4,14 @@ import { ExploreTab } from './ExploreTab'
 import type { VerifiedCatalogItem } from '../../types/library'
 
 const navigateMock = vi.hoisted(() => vi.fn())
+const invalidateQueriesMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navigateMock,
+}))
+
+vi.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: invalidateQueriesMock }),
 }))
 
 vi.mock('focus-trap-react', () => ({
@@ -55,6 +60,7 @@ vi.mock('../../lib/shareLink', () => ({
 }))
 
 import { listVerifiedItems } from '../../api/library'
+import { adoptKnowledgeBase } from '../../api/knowledge'
 
 function makeItem(overrides: Partial<VerifiedCatalogItem> = {}): VerifiedCatalogItem {
   return {
@@ -157,5 +163,58 @@ describe('ExploreTab open navigation', () => {
         search: expect.objectContaining({ tab: 'library', extraction: 'ss-uuid-1' }),
       }),
     )
+  })
+})
+
+describe('ExploreTab KB adopt', () => {
+  beforeEach(() => {
+    invalidateQueriesMock.mockClear()
+    vi.mocked(adoptKnowledgeBase).mockClear()
+  })
+
+  it('invalidates the cached KB lists after adopting, so My KBs updates without a reload', async () => {
+    vi.mocked(adoptKnowledgeBase).mockResolvedValue({} as never)
+    vi.mocked(listVerifiedItems).mockResolvedValue({
+      items: [makeItem({
+        id: 'cat-kb-2',
+        item_id: 'kb-3',
+        kind: 'knowledge_base',
+        name: 'Uniform Guidance KB',
+        source_uuid: 'kb-uuid-3',
+        total_chunks: 50,
+      })],
+      total: 1,
+    })
+    render(<ExploreTab />)
+    fireEvent.click(await screen.findByText('Uniform Guidance KB'))
+    fireEvent.click(await screen.findByRole('button', { name: /Add to My Knowledge Bases/ }))
+
+    await vi.waitFor(() => {
+      expect(adoptKnowledgeBase).toHaveBeenCalledWith('kb-uuid-3', undefined, undefined)
+      expect(invalidateQueriesMock).toHaveBeenCalledWith({ queryKey: ['knowledgeBases'] })
+    })
+  })
+
+  it('does not invalidate the KB list caches when adopting fails', async () => {
+    vi.mocked(adoptKnowledgeBase).mockRejectedValue(new Error('nope'))
+    vi.mocked(listVerifiedItems).mockResolvedValue({
+      items: [makeItem({
+        id: 'cat-kb-3',
+        item_id: 'kb-4',
+        kind: 'knowledge_base',
+        name: 'Failing KB',
+        source_uuid: 'kb-uuid-4',
+        total_chunks: 50,
+      })],
+      total: 1,
+    })
+    render(<ExploreTab />)
+    fireEvent.click(await screen.findByText('Failing KB'))
+    fireEvent.click(await screen.findByRole('button', { name: /Add to My Knowledge Bases/ }))
+
+    await vi.waitFor(() => {
+      expect(adoptKnowledgeBase).toHaveBeenCalled()
+    })
+    expect(invalidateQueriesMock).not.toHaveBeenCalled()
   })
 })

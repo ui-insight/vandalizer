@@ -367,12 +367,14 @@ async def list_tickets(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[dict]:
+) -> tuple[list[dict], int]:
     """List tickets the given user_id owns *or* is tagged as a watcher on.
 
     Watched tickets are surfaced in the same list as owned ones so the
     requester sees a single unified queue — owner_tickets vs. tickets I
     follow are distinguished client-side via `user_id` vs. `watcher_ids`.
+
+    Returns the page of tickets plus the total match count for pagination.
     """
     eq: dict = {}
     or_clauses: list[dict] = []
@@ -394,14 +396,16 @@ async def list_tickets(
     if search_clause:
         or_clauses.append(search_clause)
 
+    query = _combine_query(eq, or_clauses)
+    total = await SupportTicket.find(query).count()
     tickets = (
-        await SupportTicket.find(_combine_query(eq, or_clauses))
+        await SupportTicket.find(query)
         .sort("-updated_at")
         .skip(offset)
         .limit(limit)
         .to_list()
     )
-    return [_ticket_summary(t) for t in tickets]
+    return [_ticket_summary(t) for t in tickets], total
 
 
 async def list_all_tickets(
@@ -413,9 +417,11 @@ async def list_all_tickets(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
-) -> list[dict]:
+) -> tuple[list[dict], int]:
     """List every ticket in the system. Defaults to regular tickets only —
     pass ``category="feedback_prompt"`` to fetch trial check-ins instead.
+
+    Returns the page of tickets plus the total match count for pagination.
     """
     eq: dict = {}
     or_clauses: list[dict] = []
@@ -435,14 +441,16 @@ async def list_all_tickets(
     if search_clause:
         or_clauses.append(search_clause)
 
+    query = _combine_query(eq, or_clauses)
+    total = await SupportTicket.find(query).count()
     tickets = (
-        await SupportTicket.find(_combine_query(eq, or_clauses))
+        await SupportTicket.find(query)
         .sort("-updated_at")
         .skip(offset)
         .limit(limit)
         .to_list()
     )
-    return [_ticket_summary(t) for t in tickets]
+    return [_ticket_summary(t) for t in tickets], total
 
 
 async def list_all_tags() -> list[str]:

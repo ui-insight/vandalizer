@@ -26,6 +26,11 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      # package-lock.json is generated with npm 11 (dev machines, dependabot);
+      # npm 10 (bundled with Node 22) rejects its optional-dep shape (@emnapi/*).
+      - name: Use npm 11 to match the lockfile
+        run: npm install -g npm@11
+
       - name: Install dependencies
         run: make backend-install frontend-install
 

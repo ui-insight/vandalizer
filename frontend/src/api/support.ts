@@ -47,7 +47,7 @@ export function listTickets(
   if (search) params.set('search', search)
   if (priority) params.set('priority', priority)
   if (classification) params.set('classification', classification)
-  return apiFetch<{ tickets: SupportTicketSummary[] }>(
+  return apiFetch<{ tickets: SupportTicketSummary[]; total: number; limit: number; offset: number }>(
     `/api/support/tickets?${params}`,
   )
 }

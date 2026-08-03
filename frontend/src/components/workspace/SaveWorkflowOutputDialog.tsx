@@ -15,6 +15,7 @@ interface Props {
 
 const FORMAT_OPTIONS: { value: SaveOutputFormat; label: string; ext: string }[] = [
   { value: 'pdf', label: 'PDF', ext: 'pdf' },
+  { value: 'docx', label: 'Word', ext: 'docx' },
   { value: 'markdown', label: 'Markdown', ext: 'md' },
   { value: 'text', label: 'Plain text', ext: 'txt' },
   { value: 'csv', label: 'CSV (tables)', ext: 'csv' },
