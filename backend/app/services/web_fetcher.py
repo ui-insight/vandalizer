@@ -301,7 +301,7 @@ async def fetch_url(
         follow_redirects=False,
         headers=_DEFAULT_HEADERS,
     ) as client:
-        resp = await safe_get(client, url)
+        resp = await safe_get(client, url, validate=validate_outbound_url)
         status_code = resp.status_code
         resp.raise_for_status()
 

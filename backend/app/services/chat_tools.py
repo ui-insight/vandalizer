@@ -879,7 +879,7 @@ async def fetch_url(
             follow_redirects=False,
             headers={"User-Agent": "Vandalizer-Chat/1.0 (+research-admin agent)"},
         ) as client:
-            resp = await safe_get(client, url)
+            resp = await safe_get(client, url, validate=validate_outbound_url)
             resp.raise_for_status()
     except ValueError as e:
         return {

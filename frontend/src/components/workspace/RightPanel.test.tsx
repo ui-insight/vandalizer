@@ -76,8 +76,10 @@ describe('RightPanel tab switching', () => {
     const assistant = screen.getByTestId('assistant-marker')
     expect(assistant).toBeInTheDocument()
     expect(assistant.closest('div.hidden')).not.toBeNull()
-    // Editors take over the whole panel — no tab bar alongside them.
-    expect(screen.queryByRole('button', { name: /assistant/i })).not.toBeInTheDocument()
+    // The tab view (bar + content) stays mounted underneath, hidden, so the
+    // Library's filters/search/scroll also survive editor open/close.
+    const assistantTabButton = screen.getByRole('button', { name: /assistant/i })
+    expect(assistantTabButton.closest('div.hidden')).not.toBeNull()
   })
 
   it('does not remount the Assistant across an editor open→close round trip', () => {

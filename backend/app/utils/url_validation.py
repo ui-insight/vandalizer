@@ -77,7 +77,7 @@ def validate_outbound_url(url: str) -> str:
     return url
 
 
-async def safe_get(client, url: str, *, max_redirects: int = 5):
+async def safe_get(client, url: str, *, max_redirects: int = 5, validate=None):
     """GET *url*, re-validating every redirect hop against the SSRF policy.
 
     ``httpx``'s built-in ``follow_redirects`` validates nothing, so a public
@@ -92,8 +92,13 @@ async def safe_get(client, url: str, *, max_redirects: int = 5):
     :func:`validate_outbound_url` raises) when a hop is blocked or the redirect
     chain is too long, so existing ``except ValueError`` handlers catch it.
     Returns the final non-redirect ``httpx.Response``.
+
+    ``validate`` lets callers pass their own module-level reference to
+    :func:`validate_outbound_url` so tests that patch it at the call site
+    also cover the per-hop checks here.
     """
-    current = validate_outbound_url(url)
+    validate = validate or validate_outbound_url
+    current = validate(url)
     for _ in range(max_redirects + 1):
         resp = await client.get(current)
         if resp.is_redirect:
@@ -102,7 +107,7 @@ async def safe_get(client, url: str, *, max_redirects: int = 5):
                 return resp
             # Resolve relative redirects against the URL we just requested,
             # then re-run the full SSRF policy on the absolute target.
-            current = validate_outbound_url(str(resp.url.join(location)))
+            current = validate(str(resp.url.join(location)))
             continue
         return resp
     raise ValueError("Too many redirects")
