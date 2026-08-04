@@ -41,6 +41,7 @@ dependencies = [
     "pymupdf>=1.27.2",
     "tiktoken>=0.9,<1",
     "langchain-text-splitters>=0.3,<2",
+    "pdf-inspector>=0.2,<0.3",
 ]
 
 [project.optional-dependencies]

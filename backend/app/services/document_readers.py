@@ -16,6 +16,11 @@ logger = logging.getLogger(__name__)
 MIN_PDF_TEXT_LENGTH = 100
 MAX_XLSX_COMMENT_LEN = 500
 
+# Below this classifier confidence we don't trust the local fast path and
+# fall through to the existing OCR-first flow — same "prefer accuracy over
+# speed when unsure" posture as the rest of this module.
+_PDF_INSPECTOR_MIN_CONFIDENCE = 0.8
+
 # A rendered grayscale pixel this bright or brighter counts as blank paper.
 # Real content — even faint anti-aliased text — pulls pixels well below this.
 _BLANK_PAGE_INK_THRESHOLD = 250
@@ -617,6 +622,71 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
     return False
 
 
+def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | None:
+    """Classify a PDF locally and, if it's confidently text-based with no
+    pages flagged for OCR, extract structured Markdown locally — skipping
+    the OCR round-trip entirely.
+
+    Most research-admin PDFs (proposals, budgets, reports) are digitally
+    native, not scanned, so this fast path is expected to fire for the
+    majority of uploads: sub-5ms classification, no network call, and
+    Markdown with real table/heading structure that flat OCR/PyMuPDF text
+    doesn't have.
+
+    Returns None — signalling "not a fit for the fast path" — for anything
+    scanned, image-based, mixed, low classifier confidence, or any error, so
+    the caller falls through to the existing OCR-first flow unchanged. This
+    function never raises.
+    """
+    try:
+        import pdf_inspector
+    except ImportError:
+        return None
+
+    try:
+        classification = pdf_inspector.classify_pdf(pdf_path)
+    except Exception as e:
+        logger.warning("pdf-inspector classification failed for %s: %s", pdf_path, e)
+        return None
+
+    if (
+        classification.pdf_type != "text_based"
+        or classification.confidence < _PDF_INSPECTOR_MIN_CONFIDENCE
+        or classification.pages_needing_ocr
+    ):
+        return None
+
+    try:
+        result = pdf_inspector.extract_pages_markdown(pdf_path)
+    except Exception as e:
+        logger.warning("pdf-inspector extraction failed for %s: %s", pdf_path, e)
+        return None
+
+    parts: list[str] = []
+    markers: list[dict] = []
+    cursor = 0
+    for page in result.pages:
+        page_text = page.markdown or ""
+        if not page_text:
+            continue
+        markers.append({"char_offset": cursor, "kind": "page", "value": page.page + 1})
+        if parts:
+            cursor += 1
+        parts.append(page_text)
+        cursor += len(page_text)
+
+    text = "\n".join(parts)
+    if len(text.strip()) < MIN_PDF_TEXT_LENGTH:
+        return None
+
+    logger.info(
+        "pdf-inspector fast path: extracted %d chars from %s locally, "
+        "skipping OCR (confidence=%.2f, tables_on_pages=%s)",
+        len(text), pdf_path, classification.confidence, result.pages_with_tables,
+    )
+    return text, markers
+
+
 def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
@@ -638,6 +708,11 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
                 file_path,
             )
             return "", []
+
+        fast_path = _local_markdown_extract_from_pdf(file_path)
+        if fast_path is not None:
+            return fast_path
+
         # Prefer OCR text for accuracy. When OCR is used we lose true page
         # boundaries, so fall back to interpolating against PyMuPDF's page
         # count — approximate, but enough for "around page N" citations.
@@ -692,6 +767,11 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
                     file_path,
                 )
                 return ""
+
+            fast_path = _local_markdown_extract_from_pdf(file_path)
+            if fast_path is not None:
+                return fast_path[0]
+
             # Prefer OCR when available — it handles scanned pages,
             # complex layouts, and image-heavy PDFs far better than PyPDF2.
             ocr_text = ocr_extract_text_from_pdf(file_path)
