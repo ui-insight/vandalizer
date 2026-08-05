@@ -627,6 +627,83 @@ class TestResumeWorkflowAfterApproval:
         assert db.approval_request.insert_one.call_args[0][0]["step_index"] == 3
 
     @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_runs_on_the_model_the_run_started_with(self, mock_build, mock_get_db):
+        """An LLM step after an approval gate must use the run's model. The
+        resume path used to read a `resource_config.model` key nothing writes,
+        so every resumed step silently fell back to a hardcoded model name that
+        is not configured — reaching the provider with no API key (401)."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        result_doc = _make_result_doc(result_id=result_id, workflow_id=wf_id)
+        result_doc["model"] = "azure-gpt-4.1"
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=result_doc,
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Resumed output", [])
+        mock_build.return_value = mock_engine
+
+        resume_workflow_after_approval("a1")
+
+        assert mock_build.call_args[1]["model"] == "azure-gpt-4.1"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_without_stamped_model_uses_configured_default(self, mock_build, mock_get_db):
+        """Runs created before the model was snapshotted must resolve the
+        configured default, never a hardcoded model name."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            sys_config={"available_models": [{"name": "azure-gpt-4.1"}]},
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Resumed output", [])
+        mock_build.return_value = mock_engine
+
+        resume_workflow_after_approval("a1")
+
+        assert mock_build.call_args[1]["model"] == "azure-gpt-4.1"
+
+    def test_default_model_resolution(self):
+        from app.tasks.workflow_tasks import _default_model_from_config
+
+        models = [{"name": "azure-gpt-4.1"}, {"name": "claude-sonnet-5"}]
+
+        # An explicit default wins.
+        assert _default_model_from_config(
+            {"available_models": models, "default_model": "claude-sonnet-5"}
+        ) == "claude-sonnet-5"
+        # A stale default that no longer matches a model falls back to the first.
+        assert _default_model_from_config(
+            {"available_models": models, "default_model": "removed-model"}
+        ) == "azure-gpt-4.1"
+        # No models configured at all resolves to empty, not a guessed name.
+        assert _default_model_from_config({}) == ""
+
+    @patch("app.tasks.workflow_tasks._get_db")
     def test_missing_approval_raises(self, mock_get_db):
         from app.tasks.workflow_tasks import resume_workflow_after_approval
 

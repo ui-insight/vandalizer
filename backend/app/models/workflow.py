@@ -109,6 +109,12 @@ class WorkflowResult(Document):
     #          "oversize_documents": [{"uuid": ..., "title": ..., "token_count": ...}]}
     error_payload: Optional[dict] = None
     session_id: str
+    # LLM model this run started on, snapshotted at dispatch. The model is
+    # resolved once per run (user config → system default) and passed to the
+    # execution task; a run that pauses at an approval gate loses that argument,
+    # so the resume task reads it back from here to keep steps after the gate on
+    # the same model. None for runs created before this field existed.
+    model: Optional[str] = None
     # Celery task id of the execution job, captured at enqueue time so a user
     # can cancel an in-flight run (revoke + terminate). None for runs created
     # before this field existed or for runs that never enqueued a task.
