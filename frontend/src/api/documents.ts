@@ -33,6 +33,7 @@ export interface SearchResult {
   task_status: string | null
   folder: string | null
   token_count: number
+  extraction_low_quality?: boolean
 }
 
 export function searchDocuments(query: string = '', limit: number = 20, folder?: string | null) {

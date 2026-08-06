@@ -20,6 +20,7 @@ class DocumentResponse(BaseModel):
     chromadb_ready: bool = False
     chunk_count: int = 0
     ingest_error: Optional[str] = None
+    extraction_low_quality: bool = False
 
 
 class FolderResponse(BaseModel):
@@ -46,6 +47,7 @@ class PollStatusResponse(BaseModel):
     validation_feedback: Optional[str] = None
     valid: bool = True
     path: Optional[str] = None
+    extraction_low_quality: bool = False
 
 
 class CreateFolderRequest(BaseModel):

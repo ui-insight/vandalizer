@@ -122,4 +122,22 @@ describe('FileRow', () => {
     renderFileRow({ doc: makeDoc({ valid: true }) })
     expect(screen.queryByTitle(/validation/i)).toBeNull()
   })
+
+  it('shows a low-quality extraction warning when flagged', () => {
+    renderFileRow({ doc: makeDoc({ extraction_low_quality: true }) })
+    expect(screen.getByTitle(/Text extracted poorly/)).toBeTruthy()
+  })
+
+  it('does not show the low-quality warning for clean documents', () => {
+    renderFileRow({ doc: makeDoc({ extraction_low_quality: false }) })
+    expect(screen.queryByTitle(/Text extracted poorly/)).toBeNull()
+  })
+
+  it('ingest_error outranks the low-quality warning (one icon slot)', () => {
+    renderFileRow({
+      doc: makeDoc({ ingest_error: 'chroma down', extraction_low_quality: true }),
+    })
+    expect(screen.getByTitle(/Could not index this document/)).toBeTruthy()
+    expect(screen.queryByTitle(/Text extracted poorly/)).toBeNull()
+  })
 })

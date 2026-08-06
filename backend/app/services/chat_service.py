@@ -23,6 +23,7 @@ from app.models.activity import ActivityEvent, ActivityStatus
 from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
+from app.services import document_service
 from app.services.config_service import get_llm_model_by_name, get_user_model_name
 from app.services.context_budget import (
     DocumentSegment,
@@ -320,12 +321,15 @@ async def chat_stream(
     doc_segments: list[DocumentSegment] = []
     skipped_no_text: list[str] = []
     errored_docs: list[str] = []
+    low_quality_docs: list[str] = []
     for doc in documents:
         if doc.raw_text:
             doc_segments.append(DocumentSegment(
                 label=f"doc:{doc.title or doc.uuid}",
                 text=f"\n\n## Document: {doc.title}\n{doc.raw_text}",
             ))
+            if document_service.is_extraction_low_quality(doc):
+                low_quality_docs.append(doc.title or doc.uuid)
         elif doc.task_status == "error":
             errored_docs.append(doc.title or doc.uuid)
         else:
@@ -357,6 +361,24 @@ async def chat_stream(
                 "Wait for processing to finish, then re-send."
             ),
             "action": "documents_not_ready",
+            "tokens_dropped": 0,
+        }) + "\n"
+    if low_quality_docs:
+        # A garbled text layer (broken font encoding) still yields plenty of
+        # "text", and models answer over it with fluent, confidently wrong
+        # summaries — the user gets no signal unless we give one.
+        joined = ", ".join(low_quality_docs[:5]) + ("…" if len(low_quality_docs) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"Text extracted poorly from {len(low_quality_docs)} selected "
+                f"document(s): {joined}. Most of the stored text is unreadable, "
+                "so answers about these documents are likely to be unreliable "
+                "or wrong. Try \"Retry extraction\" on the document, or "
+                "re-upload it (e.g. as a scanned/printed copy) so OCR can "
+                "produce clean text."
+            ),
+            "action": "documents_low_quality",
             "tokens_dropped": 0,
         }) + "\n"
 

@@ -161,6 +161,13 @@ class Settings(BaseSettings):
     # generously above httpx's 5s default.
     workflow_llm_timeout_seconds: int = 120
 
+    # A document whose extracted text has a non-letter ratio above this is
+    # treated as a garbled extraction (broken font encoding / CID-mangled text
+    # layer) and chat over it carries a low-quality warning. Clean extractions
+    # measure ≤0.01 and garbled ones ~0.5, so anywhere in between works; 0.25
+    # leaves wide margin on both sides and tolerates notation-heavy documents.
+    extraction_max_nonletter_ratio: float = 0.25
+
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
         # Resolve relative paths against the backend directory (parent of app/)

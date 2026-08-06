@@ -198,6 +198,7 @@ async def test_copy_project_contents_maps_subtree_and_enqueues_ingest():
         text_markers=[], extension="pdf", downloadpath="u1/OLD.pdf", path="u1/OLD.pdf",
         folder="cA", token_count=5, num_pages=2, classification=None,
         classification_confidence=None, classified_at=None, classified_by=None, valid=True,
+        extraction_nonletter_ratio=None,
     )
     Doc.find = _find_returning([src_doc])
 

@@ -353,6 +353,9 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         from app.services.context_budget import count_tokens
         token_count = count_tokens(raw_text) if raw_text else 0
 
+        from app.utils.extraction_quality import nonletter_ratio
+        extraction_ratio = nonletter_ratio(raw_text) if raw_text else None
+
         # An "extracted successfully but got zero text" outcome is almost always
         # a silent OCR/extraction failure (image-only PDF, OCR endpoint down,
         # encrypted file). Mark it as error so the UI can surface it and offer
@@ -370,6 +373,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         "processing": False,
                         "token_count": 0,
                         "text_markers": [],
+                        "extraction_nonletter_ratio": None,
                         "task_status": "error",
                         "error_message": (
                             "We couldn't extract any text from this document. "
@@ -391,6 +395,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "processing": False,
                     "token_count": token_count,
                     "text_markers": text_markers,
+                    "extraction_nonletter_ratio": extraction_ratio,
                     "error_message": None,
                 }
             },
@@ -417,6 +422,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 "$set": {
                     "raw_text": "",
                     "processing": False,
+                    "extraction_nonletter_ratio": None,
                     "task_status": "error",
                     "error_message": message,
                 }
@@ -434,6 +440,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 "$set": {
                     "raw_text": "",
                     "processing": False,
+                    "extraction_nonletter_ratio": None,
                     "task_status": "error",
                     "error_message": message,
                 }

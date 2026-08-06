@@ -111,6 +111,7 @@ async def search_documents(
             "task_status": doc.task_status,
             "folder": doc.folder,
             "token_count": doc.token_count,
+            "extraction_low_quality": document_service.is_extraction_low_quality(doc),
         })
 
     return {"items": items, "total": len(items)}
@@ -152,6 +153,7 @@ async def retry_extraction(
     doc.raw_text = ""
     doc.token_count = 0
     doc.text_markers = []
+    doc.extraction_nonletter_ratio = None
     await doc.save()
 
     task_id = dispatch_upload_tasks(

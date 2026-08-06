@@ -21,6 +21,7 @@ export interface Document {
   chromadb_ready?: boolean
   chunk_count?: number
   ingest_error?: string | null
+  extraction_low_quality?: boolean
 }
 
 export interface Folder {
@@ -48,4 +49,5 @@ export interface PollStatusResponse {
   error_message: string | null
   processing: boolean
   title: string
+  extraction_low_quality?: boolean
 }

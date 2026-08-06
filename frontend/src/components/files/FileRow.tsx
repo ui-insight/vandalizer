@@ -99,6 +99,15 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             >
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </span>
+          ) : doc.extraction_low_quality ? (
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label="Text extracted poorly from this document — most of its stored text is unreadable, so chat answers about it are likely to be unreliable. Try Retry extraction or re-upload it."
+              title="Text extracted poorly from this document — most of its stored text is unreadable, so chat answers about it are likely to be unreliable. Try Retry extraction or re-upload it."
+            >
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+            </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">

@@ -158,6 +158,55 @@ class TestPerformExtractionAndUpdate:
         assert update_set["processing"] is False
         assert update_set["task_status"] == "error"
         assert "extraction failed" in update_set["error_message"].lower()
+        # Any previously stored quality measurement no longer describes the
+        # (now empty) text.
+        assert update_set["extraction_nonletter_ratio"] is None
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("Clean extracted budget narrative text.", []),
+    )
+    def test_clean_extraction_stores_low_nonletter_ratio(self, mock_extract, MockSettings, mock_get_db):
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["extraction_nonletter_ratio"] < 0.05
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("⌘∂■ ♥♃Ω ⌘∂◊ " * 500, []),
+    )
+    def test_garbled_extraction_stores_high_nonletter_ratio(self, mock_extract, MockSettings, mock_get_db):
+        """A CID-mangled text layer must be measurable downstream — this ratio
+        is what gates the low-quality warning in document chat."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "garbled.pdf"}
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        # Ω in the sample is a genuine letter, so the ratio is 8/9, not 1.0 —
+        # the metric is unicode-aware by design.
+        assert update_set["extraction_nonletter_ratio"] > 0.8
 
     @patch("app.tasks.document_tasks.get_sync_db")
     @patch("app.config.Settings")
