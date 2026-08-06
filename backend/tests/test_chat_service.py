@@ -360,6 +360,15 @@ class TestChatSystemPromptSelection:
         from app.services.llm_service import DOCUMENT_CHAT_SYSTEM_PROMPT
         assert self._select(have_context=True) == DOCUMENT_CHAT_SYSTEM_PROMPT
 
+    def test_document_prompt_has_absence_guardrails(self):
+        # Grant budgets are dense with figures yet often lack the asked-for
+        # field; the model must not substitute a neighbouring value (#610).
+        from app.services.llm_service import DOCUMENT_CHAT_SYSTEM_PROMPT
+        assert "Check before answering" in DOCUMENT_CHAT_SYSTEM_PROMPT
+        assert "related-but-different value" in DOCUMENT_CHAT_SYSTEM_PROMPT
+        assert "blank form field is not zero" in DOCUMENT_CHAT_SYSTEM_PROMPT
+        assert 'states "None", report "None"' in DOCUMENT_CHAT_SYSTEM_PROMPT
+
     def test_requested_kb_with_no_retrieval_selects_the_empty_kb_prompt(self):
         from app.services.llm_service import build_project_kb_empty_prompt
         assert self._select(kb_uuid="kb-1") == build_project_kb_empty_prompt("")
