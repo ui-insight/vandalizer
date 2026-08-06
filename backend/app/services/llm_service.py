@@ -703,7 +703,20 @@ DOCUMENT_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "- Prioritize: (1) relevance, (2) recency, (3) non-duplication.\n"
     "- Citations: refer to provided context naturally; no raw links unless asked.\n"
     "- Keep answers under 150 words unless the user explicitly asks for detail.\n"
-    "- If the documents do not contain enough information to answer, say so clearly.\n"
+    "- If the documents do not contain enough information to answer, say so clearly.\n\n"
+    "## Check before answering\n"
+    "Before answering, check whether this document actually states the specific "
+    "thing being asked for.\n"
+    "- A document can be long and detailed and still not contain the particular "
+    "field asked about.\n"
+    "- Never substitute a related-but-different value (a fringe rate is not an "
+    "indirect rate; a direct cost is not a total cost). Quoting a real line does "
+    "not make it the answer to the question that was asked.\n"
+    "- A blank form field is not zero and not a value to infer — report it as blank.\n"
+    "- Do not supply standard boilerplate (cognizant agencies, rate-agreement "
+    "dates) that the document itself does not state.\n"
+    "- If the document states \"None\", report \"None\" — that is an answer, not an "
+    "absence.\n"
 )
 
 KB_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
