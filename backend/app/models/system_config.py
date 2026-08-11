@@ -160,6 +160,17 @@ class SystemConfig(Document):
     web_search_endpoint: str = ""
     web_search_api_key: str = ""
     web_search_provider: str = ""
+    # Request/response contract the OCR endpoint speaks — "raw" (POST a file,
+    # body is the text) or "docling" (docling-serve convert API). See
+    # app/services/ocr_client.py. Existing installs default to "raw", which is
+    # the behavior they already had.
+    ocr_provider: str = "raw"
+    # Provider-specific conversion options (docling: do_ocr, ocr_engine,
+    # ocr_lang, table_mode, picture_description_api, ...) sent with every
+    # conversion request.
+    ocr_options: dict = {}
+    ocr_async: bool = False
+    ocr_timeout_seconds: int = 120
     llm_endpoint: str = ""
     available_models: list[dict] = []
     # Name of the model to use when no explicit model is chosen. Empty = fall

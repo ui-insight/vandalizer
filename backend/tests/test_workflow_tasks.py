@@ -323,6 +323,50 @@ class TestExecuteWorkflowTask:
 
     @patch("app.tasks.workflow_tasks._get_db")
     @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_progress_writes_are_bson_safe(self, mock_build, mock_get_db):
+        """steps_output writes carry whole node outputs — whatever a node
+        emitted, bytes included. An unencodable write used to raise from inside
+        execute() and kill an otherwise healthy run mid-step."""
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+
+        def _execute(workflow_result_updater=None, **kwargs):
+            workflow_result_updater({
+                "steps_output.Export": {"output": b"\x89PNG", "meta": {1, 2}},
+                "current_step_name": "Export",
+            })
+            return ("done", [])
+
+        mock_engine.execute.side_effect = _execute
+        mock_build.return_value = mock_engine
+
+        with patch("app.tasks.quality_tasks.auto_validate_workflow"):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": []},
+                model="gpt-4o",
+            )
+
+        written = [c[0][1]["$set"] for c in db.workflow_result.update_one.call_args_list
+                   if "steps_output.Export" in c[0][1].get("$set", {})]
+        assert len(written) == 1
+        step_output = written[0]["steps_output.Export"]
+        assert isinstance(step_output["output"], str)
+        assert isinstance(step_output["meta"], list)
+        # Plain values pass through untouched.
+        assert written[0]["current_step_name"] == "Export"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
     def test_activity_tracking(self, mock_build, mock_get_db):
         from app.tasks.workflow_tasks import execute_workflow_task
 
@@ -351,7 +395,16 @@ class TestExecuteWorkflowTask:
         activity_completed = [c for c in db.activity_event.update_one.call_args_list
                              if c[0][1].get("$set", {}).get("status") == "completed"]
         assert len(activity_completed) >= 1
-        assert activity_completed[0][0][1]["$set"]["tokens_input"] == 200
+
+        # Tokens are accumulated ($inc), not overwritten: a run can span several
+        # execution passes (approval gates), each with its own engine, and the
+        # final pass must not erase what earlier passes banked.
+        token_incs = [c[0][1]["$inc"] for c in db.activity_event.update_one.call_args_list
+                      if "$inc" in c[0][1]]
+        assert len(token_incs) == 1
+        assert token_incs[0]["tokens_input"] == 200
+        assert token_incs[0]["tokens_output"] == 100
+        assert token_incs[0]["total_tokens"] == 300
 
     @patch("app.tasks.workflow_tasks._get_db")
     @patch("app.services.workflow_engine.build_workflow_engine")
@@ -627,6 +680,187 @@ class TestResumeWorkflowAfterApproval:
         assert db.approval_request.insert_one.call_args[0][0]["step_index"] == 3
 
     @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_keeps_steps_from_earlier_passes(self, mock_build, mock_get_db):
+        """execute() only reports the steps this pass ran. Without replaying the
+        pre-gate ones from steps_output, the saved run record showed a workflow
+        that began at the approval gate and everything before it vanished."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        result_doc = _make_result_doc(result_id=result_id, workflow_id=wf_id)
+        result_doc["steps_output"] = {
+            "Document": {"output": "doc text", "input": None},
+            "Extraction": {
+                "output": {"amount": "$5"},
+                "input": "doc text",
+                "retrieved_sources": [{"document_id": "d1", "page": 2}],
+                "warning": "low confidence",
+            },
+        }
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=result_doc,
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 2, "data_for_review": {"amount": "$5"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        def _node(name):
+            n = MagicMock()
+            n.name = name
+            return n
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = (
+            "Final", [{"name": "Formatter", "output": "Final", "input": "x"}],
+        )
+        mock_engine.get_topological_order.return_value = [
+            _node("Document"), _node("Extraction"), _node("Approval"),
+            _node("Formatter"),
+        ]
+        mock_engine.step_output_keys.return_value = [
+            "Document", "Extraction", "Approval", "Formatter",
+        ]
+        mock_build.return_value = mock_engine
+
+        assert resume_workflow_after_approval("a1")["status"] == "completed"
+
+        completed = [c for c in db.workflow_result.update_one.call_args_list
+                     if c[0][1].get("$set", {}).get("status") == "completed"]
+        saved = completed[0][0][1]["$set"]
+
+        names = [s["name"] for s in saved["final_output"]["data"]]
+        # Approval is absent by design: the engine returns on the pause sentinel
+        # before writing that step's output, so there is nothing to replay.
+        assert names == ["Document", "Extraction", "Formatter"]
+
+        replayed = saved["final_output"]["data"][1]
+        assert replayed["output"] == {"amount": "$5"}
+        assert replayed["input"] == "doc text"
+        assert replayed["warning"] == "low confidence"
+
+        # Citations from pre-gate steps survive into the run record too.
+        assert saved["retrieved_sources"] == [{"document_id": "d1", "page": 2}]
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_finalizes_activity(self, mock_build, mock_get_db):
+        """The resume path never touched the activity, so a run that passed
+        through a gate stayed "running" forever and reported no tokens."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id, activity_id = _fake_oid(), _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        db.activity_event.find_one.return_value = {"_id": activity_id}
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Resumed output", [])
+        mock_engine.get_topological_order.return_value = []
+        mock_engine.step_output_keys.return_value = []
+        mock_engine.usage = MagicMock(tokens_in=40, tokens_out=15)
+        mock_build.return_value = mock_engine
+
+        resume_workflow_after_approval("a1")
+
+        completed = [c for c in db.activity_event.update_one.call_args_list
+                     if c[0][1].get("$set", {}).get("status") == "completed"]
+        assert len(completed) == 1
+
+        incs = [c[0][1]["$inc"] for c in db.activity_event.update_one.call_args_list
+                if "$inc" in c[0][1]]
+        assert incs == [{"tokens_input": 40, "tokens_output": 15, "total_tokens": 55}]
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_runs_on_the_model_the_run_started_with(self, mock_build, mock_get_db):
+        """An LLM step after an approval gate must use the run's model. The
+        resume path used to read a `resource_config.model` key nothing writes,
+        so every resumed step silently fell back to a hardcoded model name that
+        is not configured — reaching the provider with no API key (401)."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        result_doc = _make_result_doc(result_id=result_id, workflow_id=wf_id)
+        result_doc["model"] = "azure-gpt-4.1"
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=result_doc,
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Resumed output", [])
+        mock_build.return_value = mock_engine
+
+        resume_workflow_after_approval("a1")
+
+        assert mock_build.call_args[1]["model"] == "azure-gpt-4.1"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_resume_without_stamped_model_uses_configured_default(self, mock_build, mock_get_db):
+        """Runs created before the model was snapshotted must resolve the
+        configured default, never a hardcoded model name."""
+        from app.tasks.workflow_tasks import resume_workflow_after_approval
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            sys_config={"available_models": [{"name": "azure-gpt-4.1"}]},
+            approval_doc={
+                "uuid": "a1", "status": "approved",
+                "workflow_result_id": result_id, "workflow_id": wf_id,
+                "step_index": 1, "data_for_review": {"extracted": "data"},
+            },
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Resumed output", [])
+        mock_build.return_value = mock_engine
+
+        resume_workflow_after_approval("a1")
+
+        assert mock_build.call_args[1]["model"] == "azure-gpt-4.1"
+
+    def test_default_model_resolution(self):
+        from app.tasks.workflow_tasks import _default_model_from_config
+
+        models = [{"name": "azure-gpt-4.1"}, {"name": "claude-sonnet-5"}]
+
+        # An explicit default wins.
+        assert _default_model_from_config(
+            {"available_models": models, "default_model": "claude-sonnet-5"}
+        ) == "claude-sonnet-5"
+        # A stale default that no longer matches a model falls back to the first.
+        assert _default_model_from_config(
+            {"available_models": models, "default_model": "removed-model"}
+        ) == "azure-gpt-4.1"
+        # No models configured at all resolves to empty, not a guessed name.
+        assert _default_model_from_config({}) == ""
+
+    @patch("app.tasks.workflow_tasks._get_db")
     def test_missing_approval_raises(self, mock_get_db):
         from app.tasks.workflow_tasks import resume_workflow_after_approval
 
@@ -673,6 +907,156 @@ class TestResumeWorkflowAfterApproval:
         error_calls = [c for c in db.workflow_result.update_one.call_args_list
                       if c[0][1].get("$set", {}).get("status") == "error"]
         assert len(error_calls) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Approval pause — activity bookkeeping
+# ---------------------------------------------------------------------------
+
+class TestPauseActivityBookkeeping:
+    def _run_to_pause(self, mock_build, mock_get_db, activity_id):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ({
+            "_approval_pause": True,
+            "_paused_step_index": 2,
+            "_assigned_to_user_ids": ["reviewer1"],
+            "_data_for_review": {"key": "value"},
+            "output": {"key": "value"},
+        }, [])
+        mock_engine.usage = MagicMock(tokens_in=120, tokens_out=60)
+        mock_build.return_value = mock_engine
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": []},
+            model="gpt-4o",
+            activity_id=str(activity_id),
+        )
+        assert result["status"] == "pending_approval"
+        return db, result_id
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_pause_links_activity_to_result(self, mock_build, mock_get_db):
+        """Only the completion block used to set ``workflow_result`` on the
+        activity, and a paused run never reaches it — so the resume pass, which
+        finds its activity by that field, came up empty and the run's activity
+        was orphaned mid-flight."""
+        activity_id = _fake_oid()
+        db, result_id = self._run_to_pause(mock_build, mock_get_db, activity_id)
+
+        linked = [c[0][1]["$set"] for c in db.activity_event.update_one.call_args_list
+                  if "workflow_result" in c[0][1].get("$set", {})]
+        assert len(linked) == 1
+        assert linked[0]["workflow_result"] == result_id
+        # ActivityStatus has no "paused" member; a gated run is still running.
+        assert "status" not in linked[0]
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_pause_banks_tokens_spent_before_the_gate(self, mock_build, mock_get_db):
+        """Pausing returned without recording usage, so every token spent on the
+        pre-gate steps was lost from the run's reported total."""
+        db, _ = self._run_to_pause(mock_build, mock_get_db, _fake_oid())
+
+        incs = [c[0][1]["$inc"] for c in db.activity_event.update_one.call_args_list
+                if "$inc" in c[0][1]]
+        assert incs == [{"tokens_input": 120, "tokens_output": 60, "total_tokens": 180}]
+
+
+# ---------------------------------------------------------------------------
+# _build_steps_data — one builder for the initial run and every resume pass
+# ---------------------------------------------------------------------------
+
+class TestBuildStepsData:
+    def _db_with_extraction_step(self):
+        step_id, task_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            step_docs=[{"_id": step_id, "name": "Extract", "tasks": [task_id]}],
+            task_docs=[{
+                "_id": task_id, "name": "Extraction",
+                "data": {"search_set_uuid": "ss1"},
+            }],
+            search_set_items=[
+                {"searchphrase": "amount", "is_optional": True, "enum_values": []},
+                {"searchphrase": "status", "is_optional": False,
+                 "enum_values": ["open", "closed"]},
+            ],
+        )
+        db.search_set.find_one.return_value = {"uuid": "ss1"}
+        return db, step_id
+
+    def test_extraction_field_metadata_is_resolved(self):
+        """The resume copy of this builder dropped field_metadata entirely, so
+        enum/optional constraints were silently lost after an approval gate."""
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db_with_extraction_step()
+        wf = _make_workflow_doc(step_ids=[step_id])
+
+        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+
+        task_data = steps_data[1]["tasks"][0]["data"]
+        assert task_data["keys"] == ["amount", "status"]
+        assert task_data["field_metadata"] == [
+            {"key": "amount", "is_optional": True, "enum_values": []},
+            {"key": "status", "is_optional": False, "enum_values": ["open", "closed"]},
+        ]
+
+    def test_fixed_documents_are_merged(self):
+        """Also missing from the resume copy: fixed inputs vanished on resume."""
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db_with_extraction_step()
+        db.smart_document.find_one.side_effect = lambda q, *a, **k: {
+            "uuid": q.get("uuid"), "raw_text": f"text-{q.get('uuid')}",
+        }
+        wf = _make_workflow_doc(step_ids=[step_id])
+        wf["input_config"] = {"fixed_documents": [{"uuid": "fixed1"}]}
+
+        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
+
+        assert steps_data[1]["tasks"][0]["data"]["doc_texts"] == ["text-u1", "text-fixed1"]
+
+    def test_no_input_mode_excludes_fixed_documents(self):
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db_with_extraction_step()
+        db.smart_document.find_one.side_effect = lambda q, *a, **k: {
+            "uuid": q.get("uuid"), "raw_text": "text",
+        }
+        wf = _make_workflow_doc(step_ids=[step_id])
+        wf["input_config"] = {
+            "trigger_type": "no_input", "fixed_documents": [{"uuid": "fixed1"}],
+        }
+
+        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+
+        assert "doc_texts" not in steps_data[1]["tasks"][0]["data"]
+
+    def test_output_step_names_are_collected(self):
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        step_a, step_b = _fake_oid(), _fake_oid()
+        db = _mock_db(step_docs=[
+            {"_id": step_a, "name": "First Step", "tasks": []},
+            {"_id": step_b, "name": "Final Step", "tasks": [], "is_output": True},
+        ])
+        wf = _make_workflow_doc(step_ids=[step_a, step_b])
+
+        _, output_step_names = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+
+        assert output_step_names == ["Final_Step"]
 
 
 # ---------------------------------------------------------------------------

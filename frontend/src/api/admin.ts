@@ -351,6 +351,11 @@ export interface CompliancePolicyConfig {
   chunk_overlap?: number
 }
 
+/** Request/response contract the configured OCR endpoint speaks.
+ *  `raw` — POST a file, the response body is the text.
+ *  `docling` — docling-serve's convert API (multipart `files` + options, JSON reply). */
+export type OcrProvider = 'raw' | 'docling'
+
 export interface SystemConfigData {
   extraction_config: Record<string, unknown>
   quality_config: Record<string, unknown>
@@ -363,6 +368,10 @@ export interface SystemConfigData {
   web_search_endpoint: string
   web_search_api_key: string
   web_search_provider: string
+  ocr_provider: OcrProvider
+  ocr_options: Record<string, unknown>
+  ocr_async: boolean
+  ocr_timeout_seconds: number
   llm_endpoint: string
   highlight_color: string
   ui_radius: string
@@ -375,7 +384,7 @@ export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; web_search_endpoint?: string; web_search_api_key?: string; web_search_provider?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; web_search_endpoint?: string; web_search_api_key?: string; web_search_provider?: string; ocr_provider?: OcrProvider; ocr_options?: Record<string, unknown>; ocr_async?: boolean; ocr_timeout_seconds?: number; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -514,7 +523,7 @@ export function setDefaultModel(name: string) {
 
 // Test connectivity
 
-export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string }) {
+export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string; ocr_provider?: OcrProvider }) {
   return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', {
     method: 'POST',
     body: JSON.stringify(data),

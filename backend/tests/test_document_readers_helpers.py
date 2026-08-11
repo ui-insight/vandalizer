@@ -323,6 +323,145 @@ class TestBlankPdfSkipsOcr:
         assert text == ocr_result
 
 
+class TestPdfInspectorFastPath:
+    """A confidently text-based PDF should be extracted locally via
+    pdf-inspector, skipping the OCR round-trip entirely. Anything scanned,
+    low-confidence, or erroring must fall through to the existing OCR flow
+    unchanged."""
+
+    def _text_pdf(self, tmp_path, name="text.pdf") -> str:
+        import pymupdf
+        doc = pymupdf.open()
+        page = doc.new_page()
+        # Multi-line, multi-paragraph text laid out like a real document —
+        # pdf-inspector's classifier is (correctly) less confident about a
+        # single unwrapped line of raw insert_text than about normal
+        # paragraph/line structure, so this needs real layout to clear the
+        # module's confidence threshold, same as genuine uploads do.
+        y = 72
+        for para in range(4):
+            page.insert_text((72, y), f"Paragraph {para + 1} heading", fontsize=13)
+            y += 20
+            for _ in range(3):
+                page.insert_text(
+                    (72, y),
+                    "This is a real, digitally-native research document body line.",
+                    fontsize=11,
+                )
+                y += 16
+            y += 10
+        return _save_pdf(doc, tmp_path, name)
+
+    def test_confident_text_pdf_skips_ocr_via_markers(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        with patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            text, markers = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_not_called()
+        assert "research document" in text
+        assert markers == [{"char_offset": 0, "kind": "page", "value": 1}]
+
+    def test_confident_text_pdf_skips_ocr_via_extract_text_from_file(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        with patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            result = dr.extract_text_from_file(path, "pdf")
+
+        mock_ocr.assert_not_called()
+        assert "research document" in result
+
+    def test_scanned_classification_falls_through_to_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path, "looks_scanned.pdf")
+        classification = type(
+            "C", (), {"pdf_type": "scanned", "confidence": 0.95, "pages_needing_ocr": [1]},
+        )()
+        ocr_result = "x" * 200
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_result) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
+
+    def test_low_confidence_falls_through_to_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.5, "pages_needing_ocr": []},
+        )()
+        ocr_result = "x" * 200
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_result) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
+
+    def test_pages_needing_ocr_falls_through(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.99, "pages_needing_ocr": [0]},
+        )()
+        ocr_result = "x" * 200
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_result) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
+
+    def test_extraction_error_falls_through_to_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.99, "pages_needing_ocr": []},
+        )()
+        ocr_result = "x" * 200
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch("pdf_inspector.extract_pages_markdown", side_effect=RuntimeError("boom")), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_result) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
+
+    def test_short_extracted_markdown_falls_through_to_ocr(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = self._text_pdf(tmp_path)
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.99, "pages_needing_ocr": []},
+        )()
+        page_result = type("Page", (), {"page": 0, "markdown": "too short"})()
+        extraction = type(
+            "E", (), {"pages": [page_result], "pages_with_tables": []},
+        )()
+        ocr_result = "x" * 200
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch("pdf_inspector.extract_pages_markdown", return_value=extraction), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_result) as mock_ocr:
+            text, _ = dr.extract_text_with_markers(path, "pdf")
+
+        mock_ocr.assert_called_once()
+        assert text == ocr_result
+
+
 class TestExtractWithMarkersOcrFallback:
     """When OCR returns short-but-valid text and the PyMuPDF page-boundary
     refinement fails (corrupt PDF, or the source file removed mid-processing),

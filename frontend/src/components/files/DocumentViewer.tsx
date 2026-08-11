@@ -308,6 +308,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     if (isPdf !== true) return
     let cancelled = false
 
+    // SECURITY: this viewer is deliberately built on the raw pdfjs API only.
+    // CVE-2026-16633 (GHSA-hq66-cqwq-w95j, pdfjs-dist >=5.6.83 <6.2.108) lets a
+    // malicious PDF run arbitrary JS in the hosting origin -- but only through
+    // embedded-script execution, which lives in the annotation layer and the
+    // bundled viewer, not here. `enableScripting` is not a getDocument option;
+    // it is an AnnotationLayer/PDFViewer option defaulting to false in the API
+    // (`params.enableScripting === true`) and true in the bundled viewer. We
+    // render canvas + text layer ourselves, so pdf.sandbox is never loaded and
+    // that path is unreachable.
+    //
+    // Before adding an annotation layer, switching to `pdfjs-dist/web/pdf_viewer`,
+    // or wiring PDFScriptingManager: upgrade pdfjs-dist to >=6.2.108 first, and
+    // pass enableScripting: false explicitly. Uploaded PDFs are untrusted and
+    // are rendered in other team members' browsers, and no CSP is set.
     const loadTask = pdfjsLib.getDocument({
       url: inlineUrl,
       withCredentials: true,

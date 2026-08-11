@@ -713,7 +713,10 @@ class TestOcrConnectivityTest:
     async def test_body_overrides_saved_endpoint_and_key(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        cfg = SimpleNamespace(
+            ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved",
+            ocr_provider="raw", ocr_async=False,
+        )
         ctx, http_client = self._httpx_client_mock()
 
         with (
@@ -740,7 +743,10 @@ class TestOcrConnectivityTest:
     async def test_masked_key_sentinel_uses_saved_key(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        cfg = SimpleNamespace(
+            ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved",
+            ocr_provider="raw", ocr_async=False,
+        )
         ctx, http_client = self._httpx_client_mock()
 
         with (
@@ -766,7 +772,10 @@ class TestOcrConnectivityTest:
     async def test_no_body_falls_back_to_saved_config(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="")
+        cfg = SimpleNamespace(
+            ocr_endpoint="https://saved.example/ocr", ocr_api_key="",
+            ocr_provider="raw", ocr_async=False,
+        )
         ctx, http_client = self._httpx_client_mock()
 
         with (
@@ -789,7 +798,7 @@ class TestOcrConnectivityTest:
     async def test_no_endpoint_anywhere_returns_400(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(ocr_endpoint="", ocr_api_key="")
+        cfg = SimpleNamespace(ocr_endpoint="", ocr_api_key="", ocr_provider="raw", ocr_async=False)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -803,6 +812,125 @@ class TestOcrConnectivityTest:
             )
 
         assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_docling_probes_health_not_the_convert_path(self, client):
+        # docling-serve's convert path only answers POSTs, so a GET against it
+        # reports 405 and tells the admin nothing about their config.
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            ocr_endpoint="", ocr_api_key="", ocr_provider="docling", ocr_async=False,
+        )
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://docling.example.edu", "ocr_provider": "docling"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert http_client.get.call_args[0][0] == "https://docling.example.edu/health"
+        # The message names the URL uploads will actually go to.
+        assert "https://docling.example.edu/v1/convert/file" in resp.json()["message"]
+
+    @pytest.mark.asyncio
+    async def test_docling_unhealthy_probe_reports_warning(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            ocr_endpoint="", ocr_api_key="", ocr_provider="docling", ocr_async=False,
+        )
+        ctx, _ = self._httpx_client_mock(status_code=404)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://not-docling.example", "ocr_provider": "docling"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "warning"
+
+
+class TestOcrProviderConfig:
+    """PUT /api/admin/config — OCR provider/options validation."""
+
+    def _config_stub(self):
+        return SimpleNamespace(
+            extraction_config={}, quality_config={}, compliance_config={},
+            retention_config={}, ocr_endpoint="", ocr_api_key="", ocr_provider="raw",
+            ocr_options={}, ocr_async=False, ocr_timeout_seconds=120,
+            llm_endpoint="", default_team_id=None, support_contacts=[],
+            updated_at=None, updated_by=None, save=AsyncMock(),
+        )
+
+    async def _put(self, client, body, cfg):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+            patch("app.routers.admin.clear_agent_caches"),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            return await client.put(
+                "/api/admin/config", json=body, cookies=cookies, headers=headers
+            )
+
+    @pytest.mark.asyncio
+    async def test_docling_provider_and_options_persist(self, client):
+        cfg = self._config_stub()
+        options = {"do_ocr": True, "ocr_engine": "easyocr", "ocr_lang": ["en", "fr"]}
+
+        resp = await self._put(client, {
+            "ocr_provider": "docling", "ocr_options": options,
+            "ocr_async": True, "ocr_timeout_seconds": 600,
+        }, cfg)
+
+        assert resp.status_code == 200
+        assert cfg.ocr_provider == "docling"
+        assert cfg.ocr_options == options
+        assert cfg.ocr_async is True
+        assert cfg.ocr_timeout_seconds == 600
+
+    @pytest.mark.asyncio
+    async def test_unknown_provider_is_rejected(self, client):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"ocr_provider": "tesseract"}, cfg)
+
+        assert resp.status_code == 400
+        assert cfg.ocr_provider == "raw"
+
+    @pytest.mark.asyncio
+    async def test_out_of_range_timeout_is_rejected(self, client):
+        cfg = self._config_stub()
+        resp = await self._put(client, {"ocr_timeout_seconds": 5}, cfg)
+
+        assert resp.status_code == 400
+        assert cfg.ocr_timeout_seconds == 120
 
 
 class TestUpdateAuthMethods:
@@ -941,6 +1069,10 @@ def _get_config_cfg(available_models: list[dict], oauth_providers: list[dict] | 
         web_search_endpoint="",
         web_search_api_key="",
         web_search_provider="",
+        ocr_provider="raw",
+        ocr_options={},
+        ocr_async=False,
+        ocr_timeout_seconds=120,
         llm_endpoint="",
         highlight_color="#eab308",
         ui_radius="12px",

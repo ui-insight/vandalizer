@@ -1492,11 +1492,22 @@ take_backup() {
     echo -e "  ${SYM_WARN}  Uploads backup skipped ${DIM}(container not reachable)${RESET}"
   fi
 
-  # ChromaDB
-  if $COMPOSE_CMD exec -T api sh -lc 'tar czf - -C /app/static/db .' > "$backup_dir/chroma.tgz" 2>/dev/null; then
-    local size
+  # ChromaDB. Chroma runs as its own service and persists to the chroma-data
+  # volume at /chroma/chroma in the `chromadb` container -- NOT to a path in
+  # `api`. Reading it from `api` produced an empty 110-byte tarball and still
+  # reported success, so every upgrade backup silently contained no vector
+  # data. That image sets its own entrypoint, so override it to get a shell.
+  if $COMPOSE_CMD exec -T chromadb sh -lc 'tar czf - -C /chroma/chroma .' > "$backup_dir/chroma.tgz" 2>/dev/null; then
+    local size entries
     size=$(ls -lh "$backup_dir/chroma.tgz" 2>/dev/null | awk '{print $5}')
-    echo -e "  ${SYM_CHECK}  ChromaDB archive ${DIM}(${size})${RESET}"
+    entries=$(tar tzf "$backup_dir/chroma.tgz" 2>/dev/null | wc -l | tr -d ' ')
+    # An archive that unpacks to nothing is a failed backup wearing a
+    # checkmark. Say so rather than let it pass as green.
+    if [ "${entries:-0}" -le 1 ]; then
+      echo -e "  ${SYM_WARN}  ChromaDB archive is EMPTY ${DIM}(${size}, ${entries} entries) — vector data was NOT backed up${RESET}"
+    else
+      echo -e "  ${SYM_CHECK}  ChromaDB archive ${DIM}(${size}, ${entries} entries)${RESET}"
+    fi
   else
     echo -e "  ${SYM_WARN}  ChromaDB backup skipped ${DIM}(container not reachable)${RESET}"
   fi

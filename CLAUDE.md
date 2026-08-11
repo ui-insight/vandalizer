@@ -64,7 +64,7 @@ make backend-test-integration-t3   # LLM integration (needs INTEGRATION_LLM=1)
 - **`app/dependencies.py`** — FastAPI dependency injection (current user, DB sessions)
 
 ### Routers (`backend/app/routers/`)
-`activity`, `admin`, `approvals`, `audit`, `auth`, `automations`, `browser_automation`, `certification`, `chat`, `config`, `demo`, `documents`, `extractions`, `feedback`, `feedback_prompt`, `files`, `folders`, `graph_webhooks`, `knowledge`, `library`, `notifications`, `office`, `organizations`, `spaces`, `support`, `teams`, `verification`, `workflows`
+`activity`, `admin`, `audit`, `auth`, `automations`, `browser_automation`, `certification`, `chat`, `config`, `credentials`, `demo`, `documents`, `extractions`, `feedback`, `feedback_admin`, `feedback_prompt`, `files`, `folders`, `graph_webhooks`, `knowledge`, `library`, `mgmt`, `notifications`, `office`, `optimizer_inbox`, `organizations`, `projects`, `reviews`, `spaces`, `support`, `teams`, `telemetry`, `verification`, `workflows`
 
 ### Data Models (`backend/app/models/`)
 Beanie `Document` classes: `User`, `Team`/`TeamMembership`, `SmartDocument`, `SmartFolder`, `Space`, `Workflow`/`WorkflowStep`/`WorkflowResult`, `ChatConversation`, `Library`/`LibraryItem`, `SystemConfig`, `SearchSet`, `Group`, `QualityAlert`, `ValidationRun`, and more.
@@ -76,10 +76,13 @@ Business logic layer. Key services:
 - **`chat_service.py`** — Streaming chat with RAG
 - **`workflow_engine.py`** — Workflow execution with dependency resolution
 - **`document_manager.py`** — Document processing pipeline, ChromaDB ingestion
-- **`document_readers.py`** — Multi-format text extraction (PDF, DOCX, XLSX, HTML)
+- **`document_readers.py`** — Multi-format text extraction (PDF, DOCX, XLSX, HTML); owns OCR config lookup, retries, and fallback to local PyMuPDF
+- **`ocr_client.py`** — OCR provider request/response handling (plain-text services and Docling-Serve)
+- **`extraction_sources.py`** — Resolves per-field supporting quotes to document pages for source tracking
+- **`failure_notifications.py`** — Coalesced failure notifications emitted from Celery failure paths
 
 ### Celery Tasks (`backend/app/tasks/`)
-Task modules: `activity_tasks`, `classification_tasks`, `demo_tasks`, `document_tasks`, `engagement_tasks`, `evaluation_tasks`, `extraction_tasks`, `knowledge_base_tasks`, `m365_tasks`, `passive_tasks`, `quality_tasks`, `retention_tasks`, `upload_tasks`, `upload_validation_tasks`, `workflow_tasks`
+Task modules: `activity_tasks`, `approval_tasks`, `catalog_tasks`, `classification_tasks`, `demo_tasks`, `document_tasks`, `engagement_tasks`, `extraction_tasks`, `kb_validation_tasks`, `knowledge_base_tasks`, `m365_tasks`, `passive_tasks`, `project_tasks`, `quality_tasks`, `retention_tasks`, `telemetry_tasks`, `upload_tasks`, `upload_validation_tasks`, `workflow_optimization_tasks`, `workflow_tasks`
 
 ### Frontend (`frontend/`)
 React 19, Vite, TypeScript, Tailwind CSS v4, TanStack Router. Source in `frontend/src/`.

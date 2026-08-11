@@ -63,10 +63,19 @@ const statCardStyle = (color: string): React.CSSProperties => ({
   border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
 })
 
+type SupportSearch = {
+  ticket?: string
+  status?: StatusFilter
+  priority?: PriorityFilter
+  classification?: ClassificationFilter
+  tag?: string
+  q?: string
+}
+
 export default function SupportCenter() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const urlSearch = useSearch({ from: '/support' }) as { ticket?: string }
+  const urlSearch = useSearch({ from: '/support' }) as SupportSearch
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -76,23 +85,72 @@ export default function SupportCenter() {
   const [totalMatching, setTotalMatching] = useState(0)
   const [loadingMore, setLoadingMore] = useState(false)
   const [stats, setStats] = useState<Stats | null>(null)
-  // Default to "open" — agents care about the active queue, not the archive.
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
-  const [classificationFilter, setClassificationFilter] = useState<ClassificationFilter>('all')
-  const [tagFilter, setTagFilter] = useState<string>('')
-  // `searchInput` is the live text in the box; `search` is the debounced value
-  // we actually query with, so typing doesn't fire a request on every keystroke.
-  const [searchInput, setSearchInput] = useState<string>('')
-  const [search, setSearch] = useState<string>('')
   const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTicketUuid, setActiveTicketUuid] = useState<string | null>(null)
 
+  // Filters are read from the URL rather than held in component state, so they
+  // survive a refresh, a trip into a ticket and back, and browser back/forward
+  // — and so an agent can share a filtered queue as a link. Defaults stay out
+  // of the URL: status defaults to "open" because agents care about the active
+  // queue, not the archive.
+  const statusFilter: StatusFilter = urlSearch.status ?? 'open'
+  const priorityFilter: PriorityFilter = urlSearch.priority ?? 'all'
+  const classificationFilter: ClassificationFilter = urlSearch.classification ?? 'all'
+  const tagFilter = urlSearch.tag ?? ''
+  const search = urlSearch.q ?? ''
+
+  // `replace` so filter fiddling doesn't bury the previous page in history.
+  const patchSearch = useCallback((patch: Partial<SupportSearch>) => {
+    navigate({
+      to: '/support',
+      search: (prev) => ({ ...(prev as SupportSearch), ...patch }),
+      replace: true,
+    })
+  }, [navigate])
+
+  const setStatusFilter = useCallback((s: StatusFilter) => {
+    patchSearch({ status: s === 'open' ? undefined : s })
+  }, [patchSearch])
+  const setPriorityFilter = useCallback((p: PriorityFilter) => {
+    patchSearch({ priority: p === 'all' ? undefined : p })
+  }, [patchSearch])
+  const setClassificationFilter = useCallback((c: ClassificationFilter) => {
+    patchSearch({ classification: c === 'all' ? undefined : c })
+  }, [patchSearch])
+  const setTagFilter = useCallback((t: string) => {
+    patchSearch({ tag: t || undefined })
+  }, [patchSearch])
+
+  // `searchInput` is the live text in the box; the debounced value is what
+  // lands in the URL and drives the query, so typing doesn't fire a request on
+  // every keystroke. `lastWrittenQ` distinguishes our own debounced write from
+  // an external one (back/forward, Clear filters) that should re-seed the box.
+  const [searchInput, setSearchInput] = useState<string>(urlSearch.q ?? '')
+  const lastWrittenQ = useRef<string | undefined>(urlSearch.q)
+
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput.trim()), 250)
+    if (urlSearch.q !== lastWrittenQ.current) {
+      lastWrittenQ.current = urlSearch.q
+      setSearchInput(urlSearch.q ?? '')
+    }
+  }, [urlSearch.q])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = searchInput.trim() || undefined
+      if (next === lastWrittenQ.current) return
+      lastWrittenQ.current = next
+      patchSearch({ q: next })
+    }, 250)
     return () => clearTimeout(t)
-  }, [searchInput])
+  }, [searchInput, patchSearch])
+
+  const clearFilters = useCallback(() => {
+    lastWrittenQ.current = undefined
+    setSearchInput('')
+    patchSearch({ status: undefined, priority: undefined, classification: undefined, tag: undefined, q: undefined })
+  }, [patchSearch])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -165,16 +223,18 @@ export default function SupportCenter() {
     return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />
   }
 
+  // Both keep the filter params intact — opening a ticket and coming back must
+  // land on the same filtered queue the agent left.
   const openTicket = (uuid: string) => {
     setActiveTicketUuid(uuid)
     setView('chat')
-    navigate({ to: '/support', search: { ticket: uuid } })
+    navigate({ to: '/support', search: (prev) => ({ ...(prev as SupportSearch), ticket: uuid }) })
   }
 
   const backToList = () => {
     setActiveTicketUuid(null)
     setView('list')
-    navigate({ to: '/support', search: { ticket: undefined } })
+    navigate({ to: '/support', search: (prev) => ({ ...(prev as SupportSearch), ticket: undefined }) })
     load()
   }
 
@@ -200,6 +260,7 @@ export default function SupportCenter() {
           searchInput={searchInput}
           onSearchInputChange={setSearchInput}
           activeSearch={search}
+          onClearFilters={clearFilters}
           currentUserId={user.user_id}
           onNew={() => setView('new')}
           onSelect={openTicket}
@@ -375,7 +436,7 @@ function ListView({
   priorityFilter, onPriorityFilterChange,
   classificationFilter, onClassificationFilterChange,
   tagFilter, onTagFilterChange, allTags,
-  searchInput, onSearchInputChange, activeSearch,
+  searchInput, onSearchInputChange, activeSearch, onClearFilters,
   currentUserId, onNew, onSelect, onWhatsWorking,
 }: {
   tickets: SupportTicketSummary[]
@@ -396,6 +457,7 @@ function ListView({
   searchInput: string
   onSearchInputChange: (s: string) => void
   activeSearch: string
+  onClearFilters: () => void
   currentUserId: string
   onNew: () => void
   onSelect: (uuid: string) => void
@@ -404,13 +466,9 @@ function ListView({
   const hasFilters =
     statusFilter !== 'open' || priorityFilter !== 'all' ||
     classificationFilter !== 'all' || tagFilter !== '' || activeSearch !== ''
-  const clearAll = () => {
-    onStatusFilterChange('open')
-    onPriorityFilterChange('all')
-    onClassificationFilterChange('all')
-    onTagFilterChange('')
-    onSearchInputChange('')
-  }
+  // One call, not five setters — the filters live in the URL now, and clearing
+  // them one at a time would fire five separate navigations.
+  const clearAll = onClearFilters
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>

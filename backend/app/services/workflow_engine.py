@@ -67,6 +67,32 @@ def sanitize_step_name(name: str) -> str:
     return name or "step"
 
 
+def build_step_output_keys(nodes) -> list[str]:
+    """Per-node ``steps_output`` keys, disambiguated for duplicate step names.
+
+    Keys are derived from the step name, so two steps sharing a name used to
+    map to the same key and silently overwrite each other — the run record kept
+    only the last one's output. Worse for resumption: a pass that restarts at a
+    step index has to look its predecessor's output up by key, and a collided
+    key hands it the wrong payload.
+
+    The first use of a name keeps the bare sanitized form (so existing run
+    records, the frontend's mirror of ``sanitize_step_name``, and
+    ``output_step_names`` all still resolve); later duplicates get a ``_2``,
+    ``_3``, ... suffix. Derived purely from the node order, which is fixed once
+    the engine is built, so every pass over the same workflow produces the same
+    keys.
+    """
+    keys: list[str] = []
+    used: dict[str, int] = {}
+    for node in nodes:
+        base = sanitize_step_name(node.name)
+        seen = used.get(base, 0) + 1
+        used[base] = seen
+        keys.append(base if seen == 1 else f"{base}_{seen}")
+    return keys
+
+
 def _extract_text_from_html(html: str) -> str:
     """Extract clean text from HTML using BeautifulSoup."""
     soup = BeautifulSoup(html, "html.parser")
@@ -1530,6 +1556,11 @@ class WorkflowEngine:
             self._topological_order = list(reversed(tuple(self.graph.static_order())))
         return self._topological_order
 
+    def step_output_keys(self) -> list[str]:
+        """``steps_output`` key for each node, positionally aligned with
+        :meth:`get_topological_order`. See :func:`build_step_output_keys`."""
+        return build_step_output_keys(self.get_topological_order())
+
     def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
                 should_cancel=None):
         """Execute workflow. Returns (final_output, step_data_list).
@@ -1545,6 +1576,7 @@ class WorkflowEngine:
         """
         data = []
         nodes = self.get_topological_order()
+        output_keys = self.step_output_keys()
 
         latest_output = initial_output
         for idx, node in enumerate(nodes):
@@ -1597,9 +1629,8 @@ class WorkflowEngine:
                 return latest_output, data
 
             if workflow_result_updater:
-                step_name = sanitize_step_name(node.name)
                 workflow_result_updater({
-                    f"steps_output.{step_name}": output,
+                    f"steps_output.{output_keys[idx]}": output,
                     "num_steps_completed": idx,
                 })
 

@@ -132,6 +132,10 @@ function makeConfig(overrides: Partial<SystemConfigData> = {}): SystemConfigData
     web_search_provider: '',
     web_search_endpoint: '',
     web_search_api_key: '',
+    ocr_provider: 'raw' as const,
+    ocr_options: {},
+    ocr_async: false,
+    ocr_timeout_seconds: 120,
     llm_endpoint: '',
     highlight_color: '#eab308',
     ui_radius: '12px',
@@ -213,6 +217,87 @@ describe('ConfigTab — panel inventory', () => {
     expect(modelsPanel().getByText('gpt-4o')).toBeInTheDocument()
     expect(modelsPanel().getByText('llama3.1')).toBeInTheDocument()
     expect(screen.getByText('Campus Azure')).toBeInTheDocument()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 1b. OCR provider selection (Docling-Serve support)
+// ---------------------------------------------------------------------------
+
+describe('ConfigTab — OCR provider', () => {
+  const selectProvider = (value: string) =>
+    fireEvent.change(screen.getByLabelText('OCR Service Type'), { target: { value } })
+
+  it('hides the Docling-only fields until Docling is selected', async () => {
+    await renderConfigTab()
+
+    expect(screen.queryByLabelText('Conversion Options (JSON)')).not.toBeInTheDocument()
+
+    selectProvider('docling')
+
+    expect(screen.getByLabelText('Conversion Options (JSON)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Request Timeout (seconds)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Use async conversion API')).toBeInTheDocument()
+  })
+
+  it('saves the provider, parsed options, async flag and timeout', async () => {
+    await renderConfigTab()
+
+    selectProvider('docling')
+    fireEvent.change(screen.getByLabelText('Conversion Options (JSON)'), {
+      target: { value: '{"ocr_engine": "easyocr", "ocr_lang": ["fr", "en"]}' },
+    })
+    fireEvent.change(screen.getByLabelText('Request Timeout (seconds)'), { target: { value: '600' } })
+    fireEvent.click(screen.getByLabelText('Use async conversion API'))
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
+    const payload = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.ocr_provider).toBe('docling')
+    expect(payload.ocr_options).toEqual({ ocr_engine: 'easyocr', ocr_lang: ['fr', 'en'] })
+    expect(payload.ocr_async).toBe(true)
+    expect(payload.ocr_timeout_seconds).toBe(600)
+  })
+
+  it('blocks the save on malformed options JSON instead of dropping them', async () => {
+    await renderConfigTab()
+
+    selectProvider('docling')
+    fireEvent.change(screen.getByLabelText('Conversion Options (JSON)'), {
+      target: { value: '{"do_ocr": tru' },
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+
+    await screen.findByRole('alert')
+    expect(mockUpdateSystemConfig).not.toHaveBeenCalled()
+  })
+
+  it('round-trips saved Docling options back into the form', async () => {
+    mockGetSystemConfig.mockResolvedValue(makeConfig({
+      ocr_provider: 'docling',
+      ocr_options: { do_ocr: true, table_mode: 'accurate' },
+      ocr_async: true,
+      ocr_timeout_seconds: 300,
+    }))
+    await renderConfigTab()
+
+    const options = screen.getByLabelText('Conversion Options (JSON)') as HTMLTextAreaElement
+    expect(JSON.parse(options.value)).toEqual({ do_ocr: true, table_mode: 'accurate' })
+    expect((screen.getByLabelText('Request Timeout (seconds)') as HTMLInputElement).value).toBe('300')
+    expect((screen.getByLabelText('Use async conversion API') as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('sends the provider with the connection test and surfaces a warning verdict', async () => {
+    mockTestOcr.mockResolvedValue({
+      status: 'warning', status_code: 404, message: 'Docling-Serve health check returned 404',
+    })
+    await renderConfigTab()
+
+    selectProvider('docling')
+    fireEvent.click(screen.getByRole('button', { name: /Test Connection/i }))
+
+    await screen.findByText(/Docling-Serve health check returned 404/)
+    expect(mockTestOcr.mock.calls[0][0]).toMatchObject({ ocr_provider: 'docling' })
   })
 })
 

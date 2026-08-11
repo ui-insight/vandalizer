@@ -1,7 +1,18 @@
+from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.services import access_control
+
+
+def is_extraction_low_quality(doc: SmartDocument) -> bool:
+    """True when the document's stored text is a garbled extraction (non-letter
+    ratio above the configured threshold). Documents never measured (legacy, or
+    text that bypassed extraction) are not flagged."""
+    ratio = doc.extraction_nonletter_ratio
+    if ratio is None:
+        return False
+    return ratio > Settings().extraction_max_nonletter_ratio
 
 
 async def list_contents(
@@ -106,6 +117,7 @@ async def list_contents(
                 "chromadb_ready": d.chromadb_ready,
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,
+                "extraction_low_quality": is_extraction_low_quality(d),
             }
             for d in documents
         ],
@@ -195,4 +207,5 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "error_message": doc.error_message,
         "processing": doc.processing,
         "title": doc.title,
+        "extraction_low_quality": is_extraction_low_quality(doc),
     }

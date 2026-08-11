@@ -673,14 +673,19 @@ export function WorkflowEditorPanel() {
               }}
             />
           ) : (
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}
-              onClick={() => { setTitleValue(workflow.name); setEditingTitle(true) }}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
                 {workflow.name}
               </span>
-              <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+              <button
+                type="button"
+                aria-label="Rename workflow"
+                title="Rename workflow"
+                onClick={() => { setTitleValue(workflow.name); setEditingTitle(true) }}
+                style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+              >
+                <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+              </button>
               {((workflow as Workflow & { verified?: boolean }).verified || !canManage) && (
                 <span
                   title={
@@ -688,7 +693,7 @@ export function WorkflowEditorPanel() {
                       ? 'Verified workflow: make a copy to edit'
                       : 'Shared with you: make a copy to edit'
                   }
-                  onClick={(e) => { e.stopPropagation(); void handleMakeCopy() }}
+                  onClick={() => { void handleMakeCopy() }}
                   style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
                 >
                   <ShieldCheck style={{ width: 14, height: 14, color: '#b45309' }} />
@@ -782,22 +787,27 @@ export function WorkflowEditorPanel() {
             }}
           />
         ) : workflow.description ? (
-          <div
-            onClick={() => { setDescValue(workflow.description ?? ''); setEditingDesc(true) }}
-            title="Click to edit description"
-            style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', fontSize: 13, color: '#5f6368', marginTop: 4 }}
-          >
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 13, color: '#5f6368', marginTop: 4 }}>
             <span>{workflow.description}</span>
-            <Pencil style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0, marginTop: 2 }} />
+            <button
+              type="button"
+              aria-label="Edit description"
+              title="Edit description"
+              onClick={() => { setDescValue(workflow.description ?? ''); setEditingDesc(true) }}
+              style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0, marginTop: 2 }}
+            >
+              <Pencil style={{ width: 12, height: 12, color: '#6b7280' }} />
+            </button>
           </div>
         ) : canManage ? (
-          <div
+          <button
+            type="button"
             onClick={() => { setDescValue(''); setEditingDesc(true) }}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#6b7280', marginTop: 4 }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#6b7280', marginTop: 4, background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' }}
           >
             <Pencil style={{ width: 12, height: 12 }} />
             <span>Add a description</span>
-          </div>
+          </button>
         ) : null}
       </div>
 
@@ -1877,12 +1887,19 @@ function EditStepOverlay({
               }}
             />
           ) : (
-            <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1 }}
-              onClick={canManage ? () => { setNameValue(step.name); setEditingName(true) } : undefined}
-            >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124' }}>{step.name}</span>
-              {canManage && <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />}
+              {canManage && (
+                <button
+                  type="button"
+                  aria-label="Rename step"
+                  title="Rename step"
+                  onClick={() => { setNameValue(step.name); setEditingName(true) }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+                >
+                  <Pencil style={{ width: 14, height: 14, color: '#6b7280' }} />
+                </button>
+              )}
             </div>
           )}
           <button type="button" aria-label="Close" onClick={onClose} style={{

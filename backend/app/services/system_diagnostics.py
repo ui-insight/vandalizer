@@ -277,7 +277,8 @@ def build_readiness(cfg: SystemConfig) -> dict[str, Any]:
         "title": "Enable OCR for scanned PDFs",
         "severity": "recommended",
         "status": ocr_status,
-        "summary": "OCR endpoint configured." if ocr_status == "configured"
+        "summary": f"OCR endpoint configured ({(cfg.ocr_provider or 'raw')} provider)."
+                   if ocr_status == "configured"
                    else "No OCR endpoint — scanned/image PDFs fall back to basic text extraction.",
         "unlocks": "High-quality text from scanned and image-only PDFs. Without it those documents extract poorly but still upload.",
         "action_label": "Configure OCR",

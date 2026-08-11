@@ -528,6 +528,7 @@ async def run_workflow(
         status="queued",
         num_steps_total=len(wf.steps),
         input_context={"doc_uuids": document_uuids},
+        model=model,
         celery_task_id=celery_task_id,
     )
     await result.insert()
@@ -720,6 +721,7 @@ async def run_workflow_batch(
             num_steps_total=len(wf.steps),
             batch_id=batch_id,
             document_title=doc_title,
+            model=model,
         )
         await result.insert()
 

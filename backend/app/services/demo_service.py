@@ -842,6 +842,10 @@ async def process_recapture_drips(settings: Settings | None = None) -> int:
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping recapture drips")
+        return 0
+
     now = datetime.datetime.now(datetime.timezone.utc)
     sent = 0
 
@@ -853,11 +857,18 @@ async def process_recapture_drips(settings: Settings | None = None) -> int:
     ).to_list()
 
     for app in apps:
-        # Skip if the user has already logged in
         if app.user_id:
             user = await User.find_one(User.user_id == app.user_id)
             if user and user.last_login_at:
                 # User logged in — stop the recapture sequence
+                app.recapture_next_at = None
+                await app.save()
+                continue
+            # Honor the same opt-out the other nudge campaigns respect. Opting
+            # out ends the sequence rather than deferring it, so the app stops
+            # coming back as due on every daily run.
+            prefs = (user.email_preferences or {}) if user else {}
+            if not prefs.get("nudges", True):
                 app.recapture_next_at = None
                 await app.save()
                 continue

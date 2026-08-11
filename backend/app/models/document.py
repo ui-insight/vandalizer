@@ -34,6 +34,13 @@ class SmartDocument(Document):
     chunk_count: int = 0
     ingest_error: Optional[str] = None
 
+    # Extraction quality — set by perform_extraction_and_update. Fraction of
+    # non-whitespace chars in raw_text that are neither alphanumeric nor common
+    # punctuation; a garbled (e.g. CID-mangled) text layer measures far above
+    # Settings.extraction_max_nonletter_ratio while clean extractions are ~0.
+    # None = not measured (legacy docs, or docs whose text bypassed extraction).
+    extraction_nonletter_ratio: Optional[float] = None
+
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for
     # formats with no location structure (docx, txt, html, code).

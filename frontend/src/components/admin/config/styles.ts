@@ -24,3 +24,7 @@ export const inputStyle: CSSProperties = {
 }
 
 export const checkStyle: CSSProperties = { marginRight: 8, accentColor: 'var(--highlight-color, #eab308)' }
+
+/** Helper text under a field. Matches the ad-hoc hint styling already used
+ *  throughout the config panels. */
+export const hintStyle: CSSProperties = { fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.6, maxWidth: 640 }

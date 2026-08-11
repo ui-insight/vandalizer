@@ -253,6 +253,7 @@ async def copy_project_contents(
             folder=id_map.get(doc.folder),
             token_count=doc.token_count,
             num_pages=doc.num_pages,
+            extraction_nonletter_ratio=doc.extraction_nonletter_ratio,
             classification=doc.classification,
             classification_confidence=doc.classification_confidence,
             classified_at=doc.classified_at,

@@ -8,12 +8,38 @@ failure. A sentry-sdk bump that re-enables them would silently reintroduce the
 flood, so pin the behavior here.
 """
 
+import pytest
 import sentry_sdk
 
 from app.config import Settings
 from app.observability import init_sentry
 
 _FAKE_DSN = "https://examplepublickey@o0.ingest.sentry.io/0"
+
+
+@pytest.fixture(autouse=True)
+def _sentry_offline_and_isolated(monkeypatch):
+    """Run the real ``sentry_sdk.init()`` — that is what is under test — but
+    never touch the network, and do not leave a live client installed once this
+    module is done.
+
+    ``init()`` installs a *process-global* client. Without the teardown below,
+    every later test in the session runs under a live client with a real
+    HttpTransport aimed at sentry.io and ``traces_sample_rate=1.0`` (the
+    non-production branch of ``app/observability.py``). See #615.
+
+    Autouse is scoped to this module on purpose: applying it suite-wide would
+    re-enter ``init()`` once per test across the whole run.
+    """
+    real_init = sentry_sdk.init
+
+    def offline_init(*args, **kwargs):
+        kwargs["transport"] = lambda envelope: None  # discard, never send
+        return real_init(*args, **kwargs)
+
+    monkeypatch.setattr(sentry_sdk, "init", offline_init)
+    yield
+    real_init(dsn="")  # uninstall the global client
 
 
 def _active_integrations() -> set[str]:

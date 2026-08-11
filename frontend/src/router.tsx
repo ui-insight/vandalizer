@@ -287,9 +287,20 @@ const verificationRoute = createRoute({
 const supportRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/support',
-  validateSearch: (search: Record<string, unknown>) => ({
-    ticket: (search.ticket as string) || undefined,
-  }),
+  // Queue filters live in the URL so they survive a refresh (and can be shared
+  // or bookmarked). Anything unrecognized falls back to the default.
+  validateSearch: (search: Record<string, unknown>) => {
+    const oneOf = <T extends string>(v: unknown, allowed: readonly T[]): T | undefined =>
+      typeof v === 'string' && (allowed as readonly string[]).includes(v) ? (v as T) : undefined
+    return {
+      ticket: (search.ticket as string) || undefined,
+      status: oneOf(search.status, ['all', 'open', 'in_progress', 'closed'] as const),
+      priority: oneOf(search.priority, ['all', 'low', 'normal', 'high'] as const),
+      classification: oneOf(search.classification, ['all', 'bug', 'enhancement', 'feature_request'] as const),
+      tag: (typeof search.tag === 'string' && search.tag) || undefined,
+      q: (typeof search.q === 'string' && search.q) || undefined,
+    }
+  },
   component: () => (
     <ProtectedRoute>
       <SupportCenter />

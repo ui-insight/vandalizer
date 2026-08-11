@@ -139,7 +139,7 @@ Vandalizer connects to local LLMs through its standard model configuration (Admi
 - [**vLLM**](https://docs.vllm.ai) — Higher throughput for concurrent users. Exposes an OpenAI-compatible API. Protocol: `openai` or `vllm`.
 - [**llama.cpp server**](https://github.com/ggerganov/llama.cpp) — Lightweight, runs on CPU or GPU. OpenAI-compatible API.
 
-For OCR, self-hosted options include [Marker](https://github.com/VikParuchuri/marker), [Surya](https://github.com/VikParuchuri/surya), or a Tesseract wrapper. These can run on the same GPU server or on a separate machine. See the [PDF Processing & OCR](#pdf-processing--ocr) section for configuration details.
+For OCR, self-hosted options include [Docling-Serve](https://github.com/docling-project/docling-serve) (supported natively — see below), [Marker](https://github.com/VikParuchuri/marker), [Surya](https://github.com/VikParuchuri/surya), or a Tesseract wrapper. These can run on the same GPU server or on a separate machine. See the [PDF Processing & OCR](#pdf-processing--ocr) section for configuration details.
 
 **Deployment topology:** The local LLM/OCR server does **not** need to be the same machine as Vandalizer. A common setup is two servers — one lightweight machine for Vandalizer (16 GB RAM, no GPU) and one GPU-equipped machine for inference — connected over the local network.
 
@@ -242,9 +242,34 @@ Models can be added, removed, or rotated at any time without restarting the appl
 
 Vandalizer extracts text from PDFs using one of two approaches, both configured in the admin UI:
 
-**OCR endpoint** — Navigate to **Admin → System Config → Endpoints** and set the **OCR Endpoint** URL. This should point to an HTTP service that accepts a multipart PDF file upload and returns extracted plain text. This is the recommended approach for scanned documents. Any service implementing this interface works — self-hosted Marker, Surya, a Tesseract wrapper, or a wrapper around a cloud OCR API (Azure Document Intelligence, AWS Textract, Google Document AI).
+**OCR endpoint** — Navigate to **Admin → System Config → Endpoints**, choose an **OCR Service Type**, and set the **OCR Endpoint** URL. Two service contracts are supported:
 
-Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyPDF2. This works for digitally-created PDFs but produces poor results on scanned documents.
+- **Plain text response** (default) — an HTTP service that accepts a multipart PDF upload on the field `file` and returns the extracted text as the response body. Any service implementing this interface works: self-hosted Marker, Surya, a Tesseract wrapper, or a wrapper around a cloud OCR API (Azure Document Intelligence, AWS Textract, Google Document AI).
+- **Docling-Serve** — [docling-serve](https://github.com/docling-project/docling-serve)'s conversion API, including the project's prebuilt container image. Point the endpoint at the service root (e.g. `https://docling.example.edu`) and Vandalizer posts to `/v1/convert/file`, reading the Markdown out of the JSON response. A full convert URL is also accepted if your deployment serves a different path (e.g. `/v1alpha/`).
+
+Docling-Serve deployments additionally get:
+
+- **Conversion Options (JSON)** — sent as form fields with every request, using Docling's own option names (`do_ocr`, `ocr_engine`, `ocr_lang`, `pdf_backend`, `table_mode`, `include_images`, `images_scale`, `do_picture_description`, `picture_description_api`, …). Leave it blank to use Docling's defaults; Vandalizer always requests Markdown output. Example:
+
+  ```json
+  {
+    "do_ocr": true,
+    "ocr_engine": "easyocr",
+    "ocr_lang": ["fr", "de", "es", "en"],
+    "pdf_backend": "dlparse_v4",
+    "table_mode": "accurate",
+    "include_images": true,
+    "images_scale": 2,
+    "do_picture_description": true,
+    "picture_description_api": "{\"url\": \"https://llm.example.edu/v1/chat/completions\", \"params\": {\"model\": \"gemma4-31B-it\"}, \"headers\": {\"Authorization\": \"Bearer <api key>\"}, \"prompt\": \"Describe the image provided with as much granularity as possible.\"}"
+  }
+  ```
+
+- **Request Timeout** and **Use async conversion API** — async submits the job to `/v1/convert/file/async` and polls for the result, which avoids timeouts on large scanned PDFs where OCR takes minutes.
+
+**Test Connection** probes the service (for Docling-Serve, its `/health` endpoint) and reports the exact convert URL uploads will use.
+
+Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyMuPDF. This works for digitally-created PDFs but produces poor results on scanned documents.
 
 **Multimodal LLM (alternative)** — For models that support vision (e.g., GPT-4o, Claude), Vandalizer can send PDF pages as images directly to the LLM instead of using OCR. Enable this under **Admin → System Config → Extraction** by toggling **Use Document Images (Multimodal)**. This works well for visually complex documents but uses more LLM tokens.
 
@@ -376,12 +401,17 @@ mongorestore --uri="$MONGO_HOST" --db=vandalizer --gzip "$BACKUP_DIR/$TIMESTAMP/
 
 ### ChromaDB
 
-Weekly rsync of the persistent directory:
+ChromaDB runs as its own service and persists to the `chroma-data` volume at
+`/chroma/chroma` inside the `chromadb` container. It is not readable from a
+path on the host or in the `api` container, so archive it from that container:
 
 ```bash
 #!/bin/bash
 # /etc/cron.weekly/vandalizer-chromadb-backup
-rsync -a --delete /app/static/db/ /backups/chromadb/
+cd /opt/vandalizer   # the directory holding compose.yaml
+docker compose exec -T chromadb \
+  sh -lc 'tar czf - -C /chroma/chroma .' \
+  > "/backups/chromadb/chroma-$(date +%F).tgz"
 ```
 
 ChromaDB can be rebuilt from source documents if the backup is lost, but this is time-consuming.

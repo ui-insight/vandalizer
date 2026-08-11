@@ -37,6 +37,7 @@ def _make_document(
     classified_at=None,
     classified_by=None,
     retention_hold=False,
+    extraction_nonletter_ratio=None,
 ):
     d = MagicMock()
     d.id = f"id-{uuid}"
@@ -58,6 +59,7 @@ def _make_document(
     d.classified_at = classified_at
     d.classified_by = classified_by
     d.retention_hold = retention_hold
+    d.extraction_nonletter_ratio = extraction_nonletter_ratio
     d.raw_text = "sample text"
     d.path = "/uploads/test.pdf"
     d.validation_feedback = None

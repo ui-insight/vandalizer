@@ -20,7 +20,7 @@ Back up all of these before upgrades:
 | --- | --- | --- |
 | MongoDB application data | `mongo-data` volume / `/data/db` in the `mongo` container | users, teams, workflows, audit data, document metadata |
 | Uploaded files | `uploads` volume / `/app/static/uploads` in the `api` and `celery` containers | source PDFs and generated files |
-| ChromaDB embeddings | `chroma-data` volume / `/app/static/db` in the `api` and `celery` containers | vector index for chat and retrieval |
+| ChromaDB embeddings | `chroma-data` volume / `/chroma/chroma` in the `chromadb` container | vector index for chat and retrieval |
 | Environment secrets | [`backend/.env`](backend/.env) | JWT secret, provider keys, auth configuration |
 
 Redis is not treated as durable state in this deployment. Losing Redis will drop in-flight queue state, but application data remains in MongoDB, uploaded files, and ChromaDB.
@@ -85,9 +85,13 @@ docker compose exec -T api \
 
 Back up the ChromaDB persistent directory:
 
+ChromaDB runs as its own service and persists to the `chroma-data` volume at
+`/chroma/chroma` inside the `chromadb` container — **not** to a path in `api`.
+Read it from that container:
+
 ```bash
-docker compose exec -T api \
-  sh -lc 'tar czf - -C /app/static/db .' \
+docker compose exec -T chromadb \
+  sh -lc 'tar czf - -C /chroma/chroma .' \
   > "$BACKUP_DIR/chroma.tgz"
 ```
 
@@ -138,9 +142,12 @@ cat "$BACKUP_DIR/uploads.tgz" | docker compose run --rm -T api \
 
 6. Restore ChromaDB data:
 
+Restore into the `chromadb` container's volume, not `api`. That image sets its
+own entrypoint, so override it to get a shell:
+
 ```bash
-cat "$BACKUP_DIR/chroma.tgz" | docker compose run --rm -T api \
-  sh -lc 'mkdir -p /app/static/db && rm -rf /app/static/db/* && tar xzf - -C /app/static/db'
+cat "$BACKUP_DIR/chroma.tgz" | docker compose run --rm -T --entrypoint sh chromadb \
+  -lc 'mkdir -p /chroma/chroma && rm -rf /chroma/chroma/* && tar xzf - -C /chroma/chroma'
 ```
 
 7. Start the full stack:

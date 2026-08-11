@@ -21,6 +21,7 @@ def _cfg(**overrides):
         default_model="",
         ocr_endpoint="",
         ocr_api_key="",
+        ocr_provider="raw",
         llm_endpoint="",
         auth_methods=[],
         oauth_providers=[],

@@ -5,7 +5,6 @@ All functions are synchronous — safe for Celery workers.
 """
 
 import logging
-import os
 import re
 from datetime import date, datetime, time
 
@@ -15,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 MIN_PDF_TEXT_LENGTH = 100
 MAX_XLSX_COMMENT_LEN = 500
+
+# Below this classifier confidence we don't trust the local fast path and
+# fall through to the existing OCR-first flow — same "prefer accuracy over
+# speed when unsure" posture as the rest of this module.
+_PDF_INSPECTOR_MIN_CONFIDENCE = 0.8
 
 # A rendered grayscale pixel this bright or brighter counts as blank paper.
 # Real content — even faint anti-aliased text — pulls pixels well below this.
@@ -99,18 +103,25 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
 
 
 def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
-    """Extract text from a PDF using the UIPDF OCR endpoint.
+    """Extract text from a PDF using the configured OCR endpoint.
 
-    Falls back gracefully if the OCR service is unavailable.
+    The request/response contract depends on the configured provider — see
+    ``app.services.ocr_client``. Falls back gracefully (returns "") if the OCR
+    service is unavailable or misconfigured; callers then use PyMuPDF.
     """
     # OCR endpoint is stored in the database via admin config (SystemConfig)
+    from app.services import ocr_client
     from app.tasks import get_sync_db
     from app.utils.encryption import decrypt_value
     db = get_sync_db()
-    cfg = db.system_config.find_one({})
-    ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
-    raw_api_key = (cfg or {}).get("ocr_api_key", "")
+    cfg = db.system_config.find_one({}) or {}
+    ocr_endpoint = cfg.get("ocr_endpoint", "")
+    raw_api_key = cfg.get("ocr_api_key", "")
     ocr_api_key = decrypt_value(raw_api_key)
+    provider = ocr_client.normalize_provider(cfg.get("ocr_provider"))
+    options = cfg.get("ocr_options") or {}
+    use_async = bool(cfg.get("ocr_async"))
+    timeout = float(cfg.get("ocr_timeout_seconds") or ocr_client.DEFAULT_OCR_TIMEOUT)
 
     if not ocr_endpoint:
         logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
@@ -126,8 +137,9 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
         return ""
 
     logger.info(
-        "Extracting text with OCR: endpoint=%s key_set=%s key_len=%d file=%s",
-        ocr_endpoint, bool(ocr_api_key), len(ocr_api_key), pdf_path,
+        "Extracting text with OCR: provider=%s endpoint=%s async=%s key_set=%s "
+        "key_len=%d file=%s",
+        provider, ocr_endpoint, use_async, bool(ocr_api_key), len(ocr_api_key), pdf_path,
     )
 
     headers = {}
@@ -139,19 +151,21 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     import httpx
     for attempt in range(retries):
         try:
-            with httpx.Client(timeout=120.0) as client:
-                with open(pdf_path, "rb") as f:
-                    resp = client.post(
-                        ocr_endpoint,
-                        headers=headers,
-                        files={"file": (os.path.basename(pdf_path), f, "application/pdf")},
-                    )
-                if resp.status_code == 200:
-                    return resp.text
-                logger.warning(
-                    "OCR attempt %d returned HTTP %d from %s — body: %s",
-                    attempt + 1, resp.status_code, ocr_endpoint, resp.text[:500],
+            with httpx.Client(timeout=timeout) as client:
+                return ocr_client.convert(
+                    client,
+                    pdf_path=pdf_path,
+                    endpoint=ocr_endpoint,
+                    headers=headers,
+                    provider=provider,
+                    options=options,
+                    use_async=use_async,
                 )
+        except ocr_client.OcrRequestError as e:
+            logger.warning(
+                "OCR attempt %d failed against %s: %s — body: %s",
+                attempt + 1, ocr_endpoint, e, e.body,
+            )
         except Exception as e:
             logger.warning("OCR attempt %d raised: %s", attempt + 1, e)
         if attempt < retries - 1:
@@ -617,6 +631,71 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
     return False
 
 
+def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | None:
+    """Classify a PDF locally and, if it's confidently text-based with no
+    pages flagged for OCR, extract structured Markdown locally — skipping
+    the OCR round-trip entirely.
+
+    Most research-admin PDFs (proposals, budgets, reports) are digitally
+    native, not scanned, so this fast path is expected to fire for the
+    majority of uploads: sub-5ms classification, no network call, and
+    Markdown with real table/heading structure that flat OCR/PyMuPDF text
+    doesn't have.
+
+    Returns None — signalling "not a fit for the fast path" — for anything
+    scanned, image-based, mixed, low classifier confidence, or any error, so
+    the caller falls through to the existing OCR-first flow unchanged. This
+    function never raises.
+    """
+    try:
+        import pdf_inspector
+    except ImportError:
+        return None
+
+    try:
+        classification = pdf_inspector.classify_pdf(pdf_path)
+    except Exception as e:
+        logger.warning("pdf-inspector classification failed for %s: %s", pdf_path, e)
+        return None
+
+    if (
+        classification.pdf_type != "text_based"
+        or classification.confidence < _PDF_INSPECTOR_MIN_CONFIDENCE
+        or classification.pages_needing_ocr
+    ):
+        return None
+
+    try:
+        result = pdf_inspector.extract_pages_markdown(pdf_path)
+    except Exception as e:
+        logger.warning("pdf-inspector extraction failed for %s: %s", pdf_path, e)
+        return None
+
+    parts: list[str] = []
+    markers: list[dict] = []
+    cursor = 0
+    for page in result.pages:
+        page_text = page.markdown or ""
+        if not page_text:
+            continue
+        markers.append({"char_offset": cursor, "kind": "page", "value": page.page + 1})
+        if parts:
+            cursor += 1
+        parts.append(page_text)
+        cursor += len(page_text)
+
+    text = "\n".join(parts)
+    if len(text.strip()) < MIN_PDF_TEXT_LENGTH:
+        return None
+
+    logger.info(
+        "pdf-inspector fast path: extracted %d chars from %s locally, "
+        "skipping OCR (confidence=%.2f, tables_on_pages=%s)",
+        len(text), pdf_path, classification.confidence, result.pages_with_tables,
+    )
+    return text, markers
+
+
 def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
@@ -638,6 +717,11 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
                 file_path,
             )
             return "", []
+
+        fast_path = _local_markdown_extract_from_pdf(file_path)
+        if fast_path is not None:
+            return fast_path
+
         # Prefer OCR text for accuracy. When OCR is used we lose true page
         # boundaries, so fall back to interpolating against PyMuPDF's page
         # count — approximate, but enough for "around page N" citations.
@@ -692,6 +776,11 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
                     file_path,
                 )
                 return ""
+
+            fast_path = _local_markdown_extract_from_pdf(file_path)
+            if fast_path is not None:
+                return fast_path[0]
+
             # Prefer OCR when available — it handles scanned pages,
             # complex layouts, and image-heavy PDFs far better than PyPDF2.
             ocr_text = ocr_extract_text_from_pdf(file_path)

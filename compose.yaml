@@ -122,6 +122,18 @@ services:
         soft: 65536
         hard: 65536
     entrypoint: ["sh", "run_celery.sh", "start"]
+    # The backend image's HEALTHCHECK probes the API's HTTP endpoint, but this
+    # container runs Celery workers and serves no HTTP — so without this
+    # override it reports "unhealthy" on every install from the first probe
+    # onward, and a genuinely dead worker is indistinguishable from a healthy
+    # one. Ping the workers over the broker instead: exits 0 when they answer,
+    # non-zero when they don't. start_period covers worker boot.
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.celery_app.celery inspect ping -t 10 > /dev/null 2>&1"]
+      interval: 30s
+      timeout: 15s
+      start_period: 90s
+      retries: 3
     restart: unless-stopped
     deploy:
       resources:

@@ -43,7 +43,24 @@ if ! git diff-index --quiet HEAD --; then
   echo "error: working tree has uncommitted changes" >&2
   exit 1
 fi
-git fetch origin main --tags --quiet
+if ! git fetch origin main --quiet; then
+  echo "error: could not fetch origin/main" >&2
+  exit 1
+fi
+# Fetch tags separately and report failures explicitly. A local tag that has
+# diverged from origin (e.g. a lightweight tag left over from an older cut)
+# makes this fail with "would clobber existing tag" — and under `set -e` that
+# would otherwise abort this script with no output at all, which reads as
+# "nothing happened" rather than "your tags are wrong".
+if ! fetch_err="$(git fetch origin --tags 2>&1)"; then
+  echo "error: could not fetch tags from origin:" >&2
+  echo "$fetch_err" >&2
+  echo "hint: a local tag has diverged from origin. Compare with" >&2
+  echo "        git ls-remote --tags origin" >&2
+  echo "        git rev-parse <tag>^{commit}" >&2
+  echo "      and repair with: git tag -d <tag> && git fetch origin tag <tag>" >&2
+  exit 1
+fi
 local_sha="$(git rev-parse HEAD)"
 remote_sha="$(git rev-parse origin/main)"
 if [[ "$local_sha" != "$remote_sha" ]]; then
@@ -53,6 +70,18 @@ fi
 
 # Latest release tag on the vX.Y[.Z] line (sorted by version, so v4.9.0 > v4.0).
 prev_tag="$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n1 || true)"
+
+# The next tag and the release-notes range are both derived from prev_tag, so a
+# local-only tag (a leftover experiment, or one never pushed) would silently
+# compute the wrong version and the wrong commit list. Require it on origin.
+if [[ -n "$prev_tag" ]] && ! git ls-remote --exit-code --tags origin "$prev_tag" >/dev/null 2>&1; then
+  echo "error: latest local tag ${prev_tag} does not exist on origin." >&2
+  echo "       Version and release notes are computed from it, so this would" >&2
+  echo "       produce the wrong tag and commit list." >&2
+  echo "hint:  delete the stray local tag (git tag -d ${prev_tag}) or push it." >&2
+  exit 1
+fi
+
 ver="${prev_tag#v}"
 IFS='.' read -r maj min pat <<< "$ver"
 maj="${maj:-0}"; min="${min:-0}"; pat="${pat:-0}"

@@ -356,6 +356,80 @@ class TestWorkflowEngineExecute:
 # Step failure semantics
 # ---------------------------------------------------------------------------
 
+class TestStepOutputKeys:
+    """steps_output keys must be unique per node. Two steps sharing a name used
+    to map to the same key: the second silently overwrote the first, and a
+    resumed pass looking its predecessor's output up by key got the wrong
+    payload."""
+
+    def test_unique_names_keep_bare_key(self):
+        """Backwards compatible: existing run records, the frontend's mirror of
+        sanitize_step_name, and output_step_names all resolve unchanged."""
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["uuid1"]})
+        add = AddDocumentNode({"doc_texts": ["text"]})
+        engine.add_node(doc)
+        engine.add_node(add)
+        engine.connect(doc, add)
+        assert engine.step_output_keys() == ["Document", "AddDocument"]
+
+    def test_duplicate_names_get_suffixed(self):
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["uuid1"]})
+        first = AddDocumentNode({"doc_texts": ["one"]})
+        second = AddDocumentNode({"doc_texts": ["two"]})
+        third = AddDocumentNode({"doc_texts": ["three"]})
+        for n in (doc, first, second, third):
+            engine.add_node(n)
+        engine.connect(doc, first)
+        engine.connect(first, second)
+        engine.connect(second, third)
+
+        assert engine.step_output_keys() == [
+            "Document", "AddDocument", "AddDocument_2", "AddDocument_3",
+        ]
+
+    def test_duplicate_steps_persist_separate_outputs(self):
+        """The second same-named step no longer clobbers the first."""
+        engine = WorkflowEngine()
+        doc = DocumentNode({"doc_uuids": ["uuid1"]})
+        first = AddDocumentNode({"doc_texts": ["one"]})
+        second = AddDocumentNode({"doc_texts": ["two"]})
+        for n in (doc, first, second):
+            engine.add_node(n)
+        engine.connect(doc, first)
+        engine.connect(first, second)
+
+        stored = {}
+
+        def updater(updates):
+            for k, v in updates.items():
+                if k.startswith("steps_output."):
+                    stored[k.split(".", 1)[1]] = v
+
+        engine.execute(workflow_result_updater=updater)
+
+        assert stored["AddDocument"]["output"] == "one"
+        assert stored["AddDocument_2"]["output"] == "two"
+
+    def test_keys_are_stable_across_passes(self):
+        """A resumed pass rebuilds the engine from the same steps_data, so it
+        must derive identical keys — otherwise resume reads its predecessor's
+        output from a key nothing ever wrote."""
+        def _build():
+            engine = WorkflowEngine()
+            doc = DocumentNode({"doc_uuids": ["uuid1"]})
+            a = AddDocumentNode({"doc_texts": ["one"]})
+            b = AddDocumentNode({"doc_texts": ["two"]})
+            for n in (doc, a, b):
+                engine.add_node(n)
+            engine.connect(doc, a)
+            engine.connect(a, b)
+            return engine
+
+        assert _build().step_output_keys() == _build().step_output_keys()
+
+
 class TestWorkflowStepFailure:
     def _engine_with_failing_middle_step(self):
         """Document -> failing step -> AddDocument (must never run)."""

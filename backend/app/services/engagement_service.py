@@ -49,10 +49,28 @@ NUDGE_COOLDOWN_DAYS = 30  # don't nudge the same person more than once a month
 _DRIP_SCHEDULE_DAYS = [0, 3, 7, 14]
 
 
+def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
+    """Treat a datetime read back from MongoDB as UTC-aware.
+
+    Why: Motor isn't configured tz_aware, so BSON Dates come back naive even
+    though they were stored as UTC. Comparing one to an aware datetime.now()
+    raises TypeError.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
 async def process_onboarding_drips(settings: Settings | None = None) -> int:
     """Send due onboarding drip emails. Returns count sent."""
     if settings is None:
         settings = Settings()
+
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping onboarding drips")
+        return 0
 
     now = datetime.datetime.now(datetime.timezone.utc)
     sent = 0
@@ -123,6 +141,10 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping inactivity nudges")
+        return 0
+
     now = datetime.datetime.now(datetime.timezone.utc)
     threshold = now - datetime.timedelta(days=INACTIVITY_THRESHOLD_DAYS)
     sent = 0
@@ -142,15 +164,20 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
         if not prefs.get("nudges", True):
             continue
         # Cooldown check
-        if user.last_nudge_sent_at and user.last_nudge_sent_at > nudge_cutoff:
+        last_nudge = _as_aware_utc(user.last_nudge_sent_at)
+        if last_nudge and last_nudge > nudge_cutoff:
+            continue
+
+        last_login = _as_aware_utc(user.last_login_at)
+        if last_login is None:
             continue
 
         # Find new verified items since their last login
-        new_items = await _get_new_catalog_items_since(user.last_login_at)
+        new_items = await _get_new_catalog_items_since(last_login)
         if not new_items:
             continue  # nothing new — don't send an empty nudge
 
-        days_inactive = (now - user.last_login_at).days
+        days_inactive = (now - last_login).days
 
         subject, html = inactivity_nudge_email(
             name=user.name or user.user_id,

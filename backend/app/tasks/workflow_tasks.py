@@ -125,8 +125,245 @@ def _bson_safe(value):
     return str(value)
 
 
+def _default_model_from_config(sys_config: dict) -> str:
+    """Resolve the configured default model from a raw SystemConfig dict.
+
+    The sync mirror of :func:`app.services.config_service.get_default_model_name`
+    for Celery tasks, which hold the config as a pymongo document rather than a
+    Beanie model. Returns "" when no model is configured at all.
+    """
+    models = [m for m in (sys_config.get("available_models") or []) if isinstance(m, dict)]
+
+    configured_default = (sys_config.get("default_model") or "").strip()
+    if configured_default and any(m.get("name") == configured_default for m in models):
+        return configured_default
+
+    for m in models:
+        if m.get("name"):
+            return m["name"]
+    return ""
+
+
+def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
+    """Materialize a workflow's steps into engine-ready ``steps_data``.
+
+    Returns ``(steps_data, output_step_names)``.
+
+    Shared by the initial run and every resume pass. These used to be two
+    hand-maintained copies and had already drifted apart: the resume copy
+    dropped extraction ``field_metadata`` (so enum/optional constraints were
+    silently lost after an approval) and the ``input_config`` fixed-documents
+    merge (so fixed inputs vanished on resume). A resumed run must execute the
+    same configuration the first pass did, so there is one builder.
+    """
+    from app.services.workflow_engine import sanitize_step_name
+
+    steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
+
+    # Track which steps the user designated as deliverables.
+    output_step_names: list[str] = []
+
+    for step_id in workflow_doc.get("steps", []):
+        step_doc = db.workflow_step.find_one({"_id": step_id})
+        if not step_doc:
+            continue
+
+        if step_doc.get("is_output"):
+            output_step_names.append(sanitize_step_name(step_doc.get("name", "")))
+
+        tasks = []
+        for task_id in step_doc.get("tasks", []):
+            task_doc = db.workflow_step_task.find_one({"_id": task_id})
+            if not task_doc:
+                continue
+
+            # Resolve extraction keys from search set
+            task_data = dict(task_doc.get("data", {}))
+            if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
+                ss = db.search_set.find_one({"uuid": task_data["search_set_uuid"]})
+                if ss:
+                    items = list(db.search_set_item.find({
+                        "searchset": task_data["search_set_uuid"],
+                        "searchtype": "extraction",
+                    }))
+                    task_data["keys"] = [item["searchphrase"] for item in items]
+                    # Preserve per-field validation (enum_values) and optional
+                    # designations (is_optional) so workflow extraction honors the
+                    # same constraints as a standalone run. Without this, the saved
+                    # set's optional/enum metadata is silently dropped at execution.
+                    task_data["field_metadata"] = [
+                        {
+                            "key": item["searchphrase"],
+                            "is_optional": item.get("is_optional", False),
+                            "enum_values": item.get("enum_values", []),
+                        }
+                        for item in items
+                    ]
+                    # UI is mutually exclusive between saved-set and manual fields,
+                    # but older workflows may have both persisted. Drop stale manual
+                    # fields so the saved set is unambiguously the source of truth.
+                    task_data.pop("extractions", None)
+
+            # Resolve a linked saved Prompt/Formatter into its inline body.
+            _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)
+
+            # Pre-load doc texts for extraction and prompt nodes
+            doc_uuids = list(trigger_step_data.get("doc_uuids", []))
+
+            # Merge fixed documents from workflow input_config — except in
+            # "no input" mode, where the workflow runs with no documents at
+            # all (leftover fixed docs from a prior mode must not leak in).
+            input_cfg = workflow_doc.get("input_config") or {}
+            if input_cfg.get("trigger_type") != "no_input":
+                fixed_doc_config = input_cfg.get("fixed_documents", [])
+                for fd in fixed_doc_config:
+                    fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+                    if fd_uuid and fd_uuid not in doc_uuids:
+                        doc_uuids.append(fd_uuid)
+
+            if doc_uuids:
+                doc_texts = []
+                for uuid in doc_uuids:
+                    doc = db.smart_document.find_one({"uuid": uuid})
+                    if doc and doc.get("origin_workflow_id") == workflow_id:
+                        logger.info(
+                            "Skipping own-origin document %s to prevent workflow self-loop",
+                            uuid,
+                        )
+                        continue
+                    if doc and doc.get("raw_text"):
+                        doc_texts.append(doc["raw_text"])
+                    else:
+                        logger.warning(
+                            "Document %s has no raw_text — it may still be processing or text extraction failed",
+                            uuid,
+                        )
+                if not doc_texts:
+                    logger.error(
+                        "None of the %d input documents have raw_text available — workflow will produce no output",
+                        len(doc_uuids),
+                    )
+                task_data["doc_texts"] = doc_texts
+
+            # Pre-load specific document text when select_document is selected
+            if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
+                sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+                if sel_doc and sel_doc.get("raw_text"):
+                    task_data["selected_doc_text"] = sel_doc["raw_text"]
+
+            tasks.append({"name": task_doc.get("name", ""), "data": task_data})
+
+        steps_data.append({
+            "name": step_doc.get("name", ""),
+            "data": step_doc.get("data", {}),
+            "tasks": tasks,
+        })
+
+    return steps_data, output_step_names
+
+
+def _replay_step_entries(engine, steps_output: dict, upto_index: int) -> list[dict]:
+    """Rebuild the engine's per-step ``data`` entries for earlier passes.
+
+    ``engine.execute()`` returns only the steps *it* ran, so a resumed pass
+    returns a ``data`` list covering the tail of the workflow. Persisting that
+    as-is truncated the run record: everything before the approval gate
+    disappeared from the saved output. Steps completed in earlier passes are
+    still in ``steps_output``, so replay them into the same entry shape and
+    prepend.
+
+    Steps with no persisted output are skipped — notably the Approval node
+    itself, whose output is never written (the engine returns on the pause
+    sentinel before the progress update).
+    """
+    entries: list[dict] = []
+    nodes = engine.get_topological_order()
+    keys = engine.step_output_keys()
+
+    for idx, node in enumerate(nodes):
+        if idx >= upto_index:
+            break
+        output = steps_output.get(keys[idx])
+        if not isinstance(output, dict):
+            continue
+        entry = {
+            "name": node.name,
+            "output": output.get("output"),
+            "input": output.get("input"),
+        }
+        sources = output.get("retrieved_sources")
+        if isinstance(sources, list) and sources:
+            entry["retrieved_sources"] = sources
+        warning = output.get("warning")
+        if isinstance(warning, str) and warning:
+            entry["warning"] = warning
+        entries.append(entry)
+
+    return entries
+
+
+def _accumulate_activity_usage(db, workflow_result_id, engine, activity_id=None) -> None:
+    """Fold one execution pass's token usage into the run's ActivityEvent.
+
+    Each pass builds its own engine with its own ``UsageAccumulator``, so usage
+    has to accumulate rather than overwrite. It previously did neither on the
+    two paths that matter: a run that paused at an approval gate returned
+    without recording anything (losing every token spent before the gate), and
+    the resume task never touched the activity at all.
+
+    Best-effort — token bookkeeping must never fail a run that has otherwise
+    succeeded.
+    """
+    from bson import ObjectId
+
+    try:
+        if activity_id:
+            query = {"_id": ObjectId(activity_id)}
+        else:
+            act = db.activity_event.find_one(
+                {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1},
+            )
+            if not act:
+                return
+            query = {"_id": act["_id"]}
+
+        tokens_in = engine.usage.tokens_in
+        tokens_out = engine.usage.tokens_out
+        db.activity_event.update_one(query, {"$inc": {
+            "tokens_input": tokens_in,
+            "tokens_output": tokens_out,
+            "total_tokens": tokens_in + tokens_out,
+        }})
+    except Exception as e:
+        logger.warning(
+            "Could not record token usage for workflow result %s: %s",
+            workflow_result_id, e,
+        )
+
+
+def _make_progress_updater(db, workflow_result_id):
+    """Build the engine's ``workflow_result_updater`` callback.
+
+    Values pass through :func:`_bson_safe`: the biggest writes here are whole
+    step outputs, which are whatever a node emitted and can contain bytes or
+    other shapes pymongo refuses. An unencodable write used to raise from
+    inside ``execute()`` and kill an otherwise healthy run mid-way.
+    """
+    from bson import ObjectId
+
+    def update_progress(updates: dict):
+        set_ops = {k: _bson_safe(v) for k, v in updates.items()}
+        if set_ops:
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": set_ops},
+            )
+
+    return update_progress
+
+
 def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id,
-                        search_from=0):
+                        search_from=0, activity_id=None):
     """Persist the approval request and flip the run to ``pending_approval``.
 
     Extracted from :func:`execute_workflow_task` so the whole sequence runs
@@ -137,6 +374,11 @@ def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_i
         search_from: Index the current execution pass started at. Used only as
             the floor for the legacy name-scan fallback; the engine normally
             stamps the exact paused index on the sentinel.
+        activity_id: ActivityEvent for this run, when the caller knows it. The
+            pause links the activity to the WorkflowResult and banks the pass's
+            token usage — neither of which used to happen, so a paused run left
+            an activity that no later pass could find and whose pre-gate tokens
+            were never counted.
     """
     import uuid as uuid_mod
     from datetime import datetime, timedelta, timezone
@@ -223,6 +465,25 @@ def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_i
             "current_step_detail": "Waiting for human review",
         }},
     )
+
+    # Link the activity to the run *now*, not at completion. The completion
+    # block is the only other place that sets ``workflow_result``, and a paused
+    # run never reaches it — so the resume pass's lookup by workflow_result
+    # found nothing and the run's activity was orphaned mid-flight.
+    #
+    # The status stays "running": a run waiting on a gate has not reached a
+    # terminal state, and ActivityStatus has no "paused" member to widen to
+    # without touching every consumer of the activity rail.
+    if activity_id:
+        try:
+            db.activity_event.update_one(
+                {"_id": ObjectId(activity_id)},
+                {"$set": {"workflow_result": ObjectId(workflow_result_id)}},
+            )
+        except Exception as e:
+            logger.warning("Could not link activity %s to paused run: %s", activity_id, e)
+
+    _accumulate_activity_usage(db, workflow_result_id, engine, activity_id)
 
     review_instructions = final_output.get("_review_instructions", "")
     _notify_approval_reviewers_sync(
@@ -379,7 +640,6 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         WorkflowCancelled,
         WorkflowStepError,
         build_workflow_engine,
-        sanitize_step_name,
     )
 
     db = _get_db()
@@ -453,104 +713,9 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             return
 
     # Build steps data from workflow steps
-    steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
-
-    # Track which steps the user designated as deliverables.
-    output_step_names: list[str] = []
-
-    for step_id in workflow_doc.get("steps", []):
-        step_doc = db.workflow_step.find_one({"_id": step_id})
-        if not step_doc:
-            continue
-
-        if step_doc.get("is_output"):
-            output_step_names.append(sanitize_step_name(step_doc.get("name", "")))
-
-        tasks = []
-        for task_id in step_doc.get("tasks", []):
-            task_doc = db.workflow_step_task.find_one({"_id": task_id})
-            if task_doc:
-                # Resolve extraction keys from search set
-                task_data = dict(task_doc.get("data", {}))
-                if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
-                    ss = db.search_set.find_one({"uuid": task_data["search_set_uuid"]})
-                    if ss:
-                        items = list(db.search_set_item.find({
-                            "searchset": task_data["search_set_uuid"],
-                            "searchtype": "extraction",
-                        }))
-                        task_data["keys"] = [item["searchphrase"] for item in items]
-                        # Preserve per-field validation (enum_values) and optional
-                        # designations (is_optional) so workflow extraction honors the
-                        # same constraints as a standalone run. Without this, the saved
-                        # set's optional/enum metadata is silently dropped at execution.
-                        task_data["field_metadata"] = [
-                            {
-                                "key": item["searchphrase"],
-                                "is_optional": item.get("is_optional", False),
-                                "enum_values": item.get("enum_values", []),
-                            }
-                            for item in items
-                        ]
-                        # UI is mutually exclusive between saved-set and manual fields,
-                        # but older workflows may have both persisted. Drop stale manual
-                        # fields so the saved set is unambiguously the source of truth.
-                        task_data.pop("extractions", None)
-
-                # Resolve a linked saved Prompt/Formatter into its inline body.
-                _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)
-
-                # Pre-load doc texts for extraction and prompt nodes
-                doc_uuids = list(trigger_step_data.get("doc_uuids", []))
-
-                # Merge fixed documents from workflow input_config — except in
-                # "no input" mode, where the workflow runs with no documents at
-                # all (leftover fixed docs from a prior mode must not leak in).
-                input_cfg = workflow_doc.get("input_config") or {}
-                if input_cfg.get("trigger_type") != "no_input":
-                    fixed_doc_config = input_cfg.get("fixed_documents", [])
-                    for fd in fixed_doc_config:
-                        fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
-                        if fd_uuid and fd_uuid not in doc_uuids:
-                            doc_uuids.append(fd_uuid)
-
-                if doc_uuids:
-                    doc_texts = []
-                    for uuid in doc_uuids:
-                        doc = db.smart_document.find_one({"uuid": uuid})
-                        if doc and doc.get("origin_workflow_id") == workflow_id:
-                            logger.info(
-                                "Skipping own-origin document %s to prevent workflow self-loop",
-                                uuid,
-                            )
-                            continue
-                        if doc and doc.get("raw_text"):
-                            doc_texts.append(doc["raw_text"])
-                        else:
-                            logger.warning(
-                                "Document %s has no raw_text — it may still be processing or text extraction failed",
-                                uuid,
-                            )
-                    if not doc_texts:
-                        logger.error(
-                            "None of the %d input documents have raw_text available — workflow will produce no output",
-                            len(doc_uuids),
-                        )
-                    task_data["doc_texts"] = doc_texts
-
-                # Pre-load specific document text when select_document is selected
-                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
-                    sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
-                    if sel_doc and sel_doc.get("raw_text"):
-                        task_data["selected_doc_text"] = sel_doc["raw_text"]
-
-                tasks.append({"name": task_doc.get("name", ""), "data": task_data})
-
-        steps_data.append({
-            "name": step_doc.get("name", ""),
-            "data": step_doc.get("data", {}),
-            "tasks": tasks,
-        })
+    steps_data, output_step_names = _build_steps_data(
+        db, workflow_doc, workflow_id, trigger_step_data,
+    )
 
     user_id = workflow_doc.get("user_id")
 
@@ -571,15 +736,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     )
 
     # Progress updater using pymongo
-    def update_progress(updates: dict):
-        set_ops = {}
-        for k, v in updates.items():
-            set_ops[k] = v
-        if set_ops:
-            db.workflow_result.update_one(
-                {"_id": ObjectId(workflow_result_id)},
-                {"$set": set_ops},
-            )
+    update_progress = _make_progress_updater(db, workflow_result_id)
 
     engine = build_workflow_engine(
         steps_data=steps_data,
@@ -742,6 +899,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         try:
             return _pause_for_approval(
                 db, final_output, engine, workflow_id, workflow_result_id,
+                activity_id=activity_id,
             )
         except Exception as e:
             logger.exception(
@@ -810,9 +968,6 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "finished_at": datetime.now(timezone.utc),
                 "last_updated_at": datetime.now(timezone.utc),
                 "workflow_result": ObjectId(workflow_result_id),
-                "tokens_input": engine.usage.tokens_in,
-                "tokens_output": engine.usage.tokens_out,
-                "total_tokens": engine.usage.tokens_in + engine.usage.tokens_out,
                 "steps_completed": (wr_doc or {}).get("num_steps_completed", 0),
                 "steps_total": (wr_doc or {}).get("num_steps_total", 0),
             }
@@ -820,6 +975,10 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 {"_id": ObjectId(activity_id)},
                 {"$set": usage_update},
             )
+            # Tokens accumulate ($inc) rather than overwrite — this run may be
+            # the tail of a multi-pass execution and must not erase the tokens
+            # earlier passes banked.
+            _accumulate_activity_usage(db, workflow_result_id, engine, activity_id)
             # Chat-workflow milestone: increment only for chat-dispatched runs
             # that actually completed (not dispatches that later failed).
             activity_doc = db.activity_event.find_one(
@@ -1009,63 +1168,10 @@ def resume_workflow_after_approval(self, approval_uuid):
 
     sys_config = db.system_config.find_one() or {}
 
-    # Rebuild steps_data (same as execute_workflow_task)
+    # Rebuild steps_data through the same builder the initial run uses, so the
+    # resumed pass executes the identical configuration.
     trigger_data = result_doc.get("input_context", {}) or {}
-    doc_uuids = trigger_data.get("doc_uuids", [])
-    steps_data = [{"name": "Document", "data": trigger_data, "tasks": []}]
-
-    for step_oid in workflow_doc.get("steps", []):
-        step_doc = db.workflow_step.find_one({"_id": step_oid})
-        if not step_doc:
-            continue
-        tasks = []
-        for task_oid in step_doc.get("tasks", []):
-            task_doc = db.workflow_step_task.find_one({"_id": task_oid})
-            if task_doc:
-                task_data = dict(task_doc.get("data", {}))
-                if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
-                    ss = db.search_set.find_one({"uuid": task_data["search_set_uuid"]})
-                    if ss:
-                        items = list(db.search_set_item.find({
-                            "searchset": task_data["search_set_uuid"],
-                            "searchtype": "extraction",
-                        }))
-                        task_data["keys"] = [item["searchphrase"] for item in items]
-                        task_data.pop("extractions", None)
-                _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)
-                if doc_uuids:
-                    doc_texts = []
-                    for uuid in doc_uuids:
-                        doc = db.smart_document.find_one({"uuid": uuid})
-                        if doc and doc.get("origin_workflow_id") == workflow_id:
-                            logger.info(
-                                "Skipping own-origin document %s to prevent workflow self-loop",
-                                uuid,
-                            )
-                            continue
-                        if doc and doc.get("raw_text"):
-                            doc_texts.append(doc["raw_text"])
-                        else:
-                            logger.warning(
-                                "Document %s has no raw_text — it may still be processing or text extraction failed",
-                                uuid,
-                            )
-                    if not doc_texts:
-                        logger.error(
-                            "None of the %d input documents have raw_text available — workflow will produce no output",
-                            len(doc_uuids),
-                        )
-                    task_data["doc_texts"] = doc_texts
-                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
-                    sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
-                    if sel_doc and sel_doc.get("raw_text"):
-                        task_data["selected_doc_text"] = sel_doc["raw_text"]
-                tasks.append({"name": task_doc.get("name", ""), "data": task_data})
-        steps_data.append({
-            "name": step_doc.get("name", ""),
-            "data": step_doc.get("data", {}),
-            "tasks": tasks,
-        })
+    steps_data, _ = _build_steps_data(db, workflow_doc, workflow_id, trigger_data)
 
     user_id = workflow_doc.get("user_id")
 
@@ -1085,22 +1191,22 @@ def resume_workflow_after_approval(self, approval_uuid):
         {"$set": {"status": "running", "current_step_detail": "Resuming after approval"}},
     )
 
-    def update_progress(updates: dict):
-        set_ops = {}
-        for k, v in updates.items():
-            set_ops[k] = v
-        if set_ops:
-            db.workflow_result.update_one(
-                {"_id": ObjectId(workflow_result_id)},
-                {"$set": set_ops},
-            )
+    update_progress = _make_progress_updater(db, workflow_result_id)
+
+    # Steps after an approval gate must run on the model the run started with.
+    # That model is snapshotted on the result at dispatch; runs that predate the
+    # field fall back to the configured default rather than to a hardcoded model
+    # name, which is never a configured model and so reaches the provider with
+    # no API key.
+    model = result_doc.get("model") or _default_model_from_config(sys_config)
 
     engine = build_workflow_engine(
         steps_data=steps_data,
-        model=workflow_doc.get("resource_config", {}).get("model", "gpt-4o-mini"),
+        model=model,
         user_id=user_id,
         system_config_doc=sys_config,
         allow_code_execution=is_admin,
+        config_override=workflow_doc.get("config_override"),
     )
 
     # Resolved before the try so the failure handler below can always reach it.
@@ -1121,6 +1227,13 @@ def resume_workflow_after_approval(self, approval_uuid):
                 start_index=step_index + 1,
                 initial_output=initial_output,
             )
+        # execute() reports only the steps this pass ran. Prepend the ones
+        # earlier passes completed, replayed from the persisted steps_output,
+        # or the saved run record would show a workflow that began at the
+        # approval gate and everything before it would vanish from the output.
+        data = _replay_step_entries(
+            engine, result_doc.get("steps_output") or {}, step_index + 1,
+        ) + (data or [])
     except WorkflowStepError as e:
         # Deterministic step failure — mark the run failed, don't retry.
         logger.warning("Workflow %s failed after resume: %s", workflow_id, e)
@@ -1150,6 +1263,7 @@ def resume_workflow_after_approval(self, approval_uuid):
             return _pause_for_approval(
                 db, final_output, engine, workflow_id, workflow_result_id,
                 search_from=step_index + 1,
+                activity_id=str(_act["_id"]) if _act else None,
             )
         except Exception as e:
             logger.exception(
@@ -1162,17 +1276,55 @@ def resume_workflow_after_approval(self, approval_uuid):
             )
             raise
 
+    # Citations are aggregated over the whole run, not just this pass — `data`
+    # now spans every step, including the pre-gate ones replayed above.
+    retrieved_sources: list[dict] = []
+    for step in data or []:
+        sources = step.get("retrieved_sources") if isinstance(step, dict) else None
+        if isinstance(sources, list):
+            retrieved_sources.extend(sources)
+
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},
         {"$set": {
             "status": "completed",
             "final_output": {"output": final_output, "data": data},
+            "retrieved_sources": retrieved_sources,
         }},
     )
 
     db.workflow.update_one(
         {"_id": ObjectId(workflow_id)},
         {"$inc": {"num_executions": 1}},
+    )
+
+    # Finalize the activity. The resume path used to skip this entirely, so a
+    # run that passed through an approval gate left its activity stuck at
+    # "running" forever and never reported the tokens it spent.
+    if _act:
+        try:
+            from datetime import datetime, timezone
+
+            wr_doc = db.workflow_result.find_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"num_steps_completed": 1, "num_steps_total": 1},
+            )
+            db.activity_event.update_one(
+                {"_id": _act["_id"]},
+                {"$set": {
+                    "status": "completed",
+                    "finished_at": datetime.now(timezone.utc),
+                    "last_updated_at": datetime.now(timezone.utc),
+                    "steps_completed": (wr_doc or {}).get("num_steps_completed", 0),
+                    "steps_total": (wr_doc or {}).get("num_steps_total", 0),
+                }},
+            )
+        except Exception as e:
+            logger.warning(
+                "Could not finalize activity for resumed workflow %s: %s", workflow_id, e,
+            )
+    _accumulate_activity_usage(
+        db, workflow_result_id, engine, str(_act["_id"]) if _act else None,
     )
 
     return {

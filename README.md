@@ -15,7 +15,7 @@ The project was developed at the University of Idaho under the NSF GRANTED progr
 
 ## Features
 
-- **Structured Extraction** - Pull dates, budgets, requirements, and more from PDFs into clean structured data
+- **Structured Extraction** - Pull dates, budgets, requirements, and more from PDFs into clean structured data, with per-field source tracking: click any extracted value to jump to the passage and page it came from, or see an explicit "no source found" when it can't be traced
 - **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution
 - **RAG Chat** - Ask questions against your document collection with citation-backed answers
 - **Projects** - Gather the files, knowledge base, pinned tools, and chat for one grant or effort in a single scoped workspace, sharable to a team or via invite link
@@ -198,7 +198,11 @@ Vandalizer offers two approaches for extracting text from PDF documents. Both ar
 
 ### Option 1: OCR endpoint (recommended for scanned documents)
 
-Navigate to **Admin → System Config → Endpoints** and set the **OCR Endpoint** URL. This should point to an HTTP service that accepts a multipart PDF file upload and returns extracted plain text. Any service that implements this interface will work — common choices include:
+Navigate to **Admin → System Config → Endpoints**, pick an **OCR Service Type**, and set the **OCR Endpoint** URL.
+
+**Docling-Serve** — point the endpoint at a [docling-serve](https://github.com/docling-project/docling-serve) deployment (the service root is enough) and set its conversion options — `do_ocr`, `ocr_engine`, `ocr_lang`, `table_mode`, `picture_description_api`, and the rest — as JSON in the same panel.
+
+**Plain text response** — any HTTP service that accepts a multipart PDF upload on the field `file` and returns the extracted text as the response body. Common choices include:
 
 - A self-hosted [Marker](https://github.com/VikParuchuri/marker) instance
 - A self-hosted [Surya](https://github.com/VikParuchuri/surya) instance
@@ -235,6 +239,8 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 ## Documentation
 
 - [External API Reference](docs/api.md)
+- [Management API Reference](docs/mgmt-api.md)
+- [Anonymous Telemetry](docs/telemetry.md)
 - [Authorization Matrix](AUTHORIZATION_MATRIX.md)
 - [Deployment Guide](DEPLOY.md)
 - [Operations Guide](OPERATIONS.md)

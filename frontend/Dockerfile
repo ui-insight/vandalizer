@@ -1,5 +1,8 @@
 # Stage 1: Build the React app
-FROM node:22-alpine AS builder
+# Node 24 bundles npm 11, which is required to read this package-lock.json
+# (see the note above `npm ci` below). Build-stage only — the runtime image
+# is nginx, so this does not affect what is served.
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -30,7 +33,11 @@ ENV VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
 COPY package.json package-lock.json ./
 # package-lock.json is generated with npm 11 (dev machines, dependabot);
 # npm 10 (bundled with Node 22) rejects its optional-dep shape (@emnapi/*).
-RUN npm install -g npm@11 && npm ci
+# Do NOT reintroduce `npm install -g npm@11` here: on the alpine image npm
+# cannot overwrite itself in place, and it leaves the global install broken
+# ("Cannot find module 'promise-retry'"), failing this build. Getting npm 11
+# from the base image is the reliable way to pin it.
+RUN npm ci
 
 COPY . .
 RUN npm run build

@@ -16,7 +16,7 @@ from app.dependencies import get_current_user, get_settings
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig, ensure_stable_ids
-from app.services import audit_service
+from app.services import audit_service, ocr_client
 from app.services.llm_service import clear_agent_caches, get_agent_model
 from app.services.name_conflicts import (
     DuplicateNameError,
@@ -278,6 +278,10 @@ class ConfigUpdateRequest(BaseModel):
     web_search_endpoint: Optional[str] = None
     web_search_api_key: Optional[str] = None
     web_search_provider: Optional[str] = None
+    ocr_provider: Optional[str] = None
+    ocr_options: Optional[dict] = None
+    ocr_async: Optional[bool] = None
+    ocr_timeout_seconds: Optional[int] = None
     llm_endpoint: Optional[str] = None
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
@@ -1474,6 +1478,10 @@ async def get_config(
         "web_search_endpoint": cfg.web_search_endpoint,
         "web_search_api_key": "***" if decrypt_value(cfg.web_search_api_key) else "",
         "web_search_provider": cfg.web_search_provider,
+        "ocr_provider": cfg.ocr_provider or "raw",
+        "ocr_options": cfg.ocr_options or {},
+        "ocr_async": bool(cfg.ocr_async),
+        "ocr_timeout_seconds": cfg.ocr_timeout_seconds or 120,
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
@@ -1515,6 +1523,30 @@ async def update_config(
         cfg.web_search_api_key = encrypt_value(body.web_search_api_key)
     if body.web_search_provider is not None:
         cfg.web_search_provider = body.web_search_provider
+    if body.ocr_provider is not None:
+        if body.ocr_provider not in ocr_client.OCR_PROVIDERS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown OCR provider '{body.ocr_provider}'. "
+                       f"Supported: {', '.join(ocr_client.OCR_PROVIDERS)}",
+            )
+        cfg.ocr_provider = body.ocr_provider
+    if body.ocr_options is not None:
+        # Reject unencodable options here rather than letting them surface as a
+        # 422 on every upload, hours after the config change that caused them.
+        try:
+            cfg.ocr_options = ocr_client.validate_docling_options(body.ocr_options)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    if body.ocr_async is not None:
+        cfg.ocr_async = body.ocr_async
+    if body.ocr_timeout_seconds is not None:
+        if not 10 <= body.ocr_timeout_seconds <= 3600:
+            raise HTTPException(
+                status_code=400,
+                detail="OCR timeout must be between 10 and 3600 seconds",
+            )
+        cfg.ocr_timeout_seconds = body.ocr_timeout_seconds
     if body.llm_endpoint is not None:
         cfg.llm_endpoint = body.llm_endpoint
     if body.default_team_id is not None:
@@ -2662,6 +2694,7 @@ async def classification_dashboard(user: User = Depends(get_current_user)):
 class TestOcrRequest(BaseModel):
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
+    ocr_provider: Optional[str] = None
 
 
 @router.post("/config/test-ocr")
@@ -2671,6 +2704,12 @@ async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(g
     Accepts the admin form's current values so unsaved edits can be tested;
     an ``"***"`` api key means "use the saved key", the same sentinel the
     config update path uses. Omitted fields fall back to the saved config.
+
+    The probe is provider-aware: docling-serve's convert path only answers
+    POSTs, so a GET against it reports 405 and tells an admin nothing. For that
+    provider we probe the service's ``/health`` endpoint instead, and report
+    the convert URL the extraction path will actually use — the field most
+    often misconfigured.
     """
     await _require_superadmin(user)
 
@@ -2678,6 +2717,9 @@ async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(g
     endpoint = body.ocr_endpoint if body and body.ocr_endpoint is not None else cfg.ocr_endpoint
     if not endpoint:
         raise HTTPException(status_code=400, detail="OCR endpoint not configured")
+
+    provider_raw = body.ocr_provider if body and body.ocr_provider is not None else cfg.ocr_provider
+    provider = ocr_client.normalize_provider(provider_raw)
 
     import httpx
 
@@ -2690,9 +2732,32 @@ async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(g
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
+    probe_url = (
+        ocr_client.docling_health_url(endpoint) if provider == "docling" else endpoint
+    )
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(endpoint, headers=headers)
+            resp = await client.get(probe_url, headers=headers)
+            if provider == "docling":
+                convert_url = ocr_client.normalize_endpoint(
+                    endpoint, provider, use_async=bool(cfg.ocr_async)
+                )
+                healthy = resp.status_code == 200
+                message = (
+                    f"Docling-Serve health check returned {resp.status_code}"
+                    f" — documents will be converted via POST {convert_url}"
+                )
+                if not healthy:
+                    message += (
+                        f" (probed {probe_url}; a non-200 here usually means the URL "
+                        "is not a docling-serve root)"
+                    )
+                return {
+                    "status": "ok" if healthy else "warning",
+                    "status_code": resp.status_code,
+                    "message": message,
+                }
             return {
                 "status": "ok",
                 "status_code": resp.status_code,

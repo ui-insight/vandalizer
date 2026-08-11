@@ -12,13 +12,27 @@ import {
 } from '../../api/admin'
 import type { TestPromptResult, ReadinessReport, ReadinessItem } from '../../api/admin'
 import type {
-  SystemConfigData,
+  SystemConfigData, OcrProvider,
 } from '../../api/admin'
 import { AuthPanel } from './config/AuthPanel'
 import { ModelEditor } from './config/ModelEditor'
 import type { ModelEditorHandle } from './config/ModelEditor'
 import { ThemePanel } from './config/ThemePanel'
-import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputStyle, checkStyle } from './config/styles'
+import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputStyle, checkStyle, hintStyle } from './config/styles'
+
+// Starting point for the Docling-Serve options blob — the options sites most
+// often need to set (OCR engine, languages, table fidelity, image handling)
+// rather than an exhaustive list. Offered via "Insert example options" so an
+// admin edits real JSON instead of authoring it from the docs.
+const DOCLING_OPTIONS_PLACEHOLDER = `{
+  "do_ocr": true,
+  "ocr_engine": "easyocr",
+  "ocr_lang": ["en"],
+  "pdf_backend": "dlparse_v4",
+  "table_mode": "accurate",
+  "include_images": true,
+  "images_scale": 2
+}`
 
 // ──────────────────────────────────────────
 // Setup readiness checklist
@@ -141,6 +155,14 @@ export function ConfigTab() {
   const [ocrApiKeyDirty, setOcrApiKeyDirty] = useState(false)
   const [ocrTesting, setOcrTesting] = useState(false)
   const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [ocrProvider, setOcrProvider] = useState<OcrProvider>('raw')
+  // Held as text, not a parsed object, so a half-typed edit isn't destroyed on
+  // every keystroke. Parsed on save; a parse error blocks the save with a
+  // message rather than silently sending {}.
+  const [ocrOptionsText, setOcrOptionsText] = useState('')
+  const [ocrOptionsError, setOcrOptionsError] = useState<string | null>(null)
+  const [ocrAsync, setOcrAsync] = useState(false)
+  const [ocrTimeout, setOcrTimeout] = useState(120)
 
   // Web Search — powers the agentic chat web_search tool
   const [webSearchProvider, setWebSearchProvider] = useState('')
@@ -228,6 +250,15 @@ export function ConfigTab() {
       setWebSearchEndpoint(c.web_search_endpoint || '')
       setWebSearchApiKey(c.web_search_api_key || '')
       setWebSearchApiKeyDirty(false)
+      setOcrProvider(c.ocr_provider === 'docling' ? 'docling' : 'raw')
+      setOcrOptionsText(
+        c.ocr_options && Object.keys(c.ocr_options).length
+          ? JSON.stringify(c.ocr_options, null, 2)
+          : ''
+      )
+      setOcrOptionsError(null)
+      setOcrAsync(!!c.ocr_async)
+      setOcrTimeout(c.ocr_timeout_seconds || 120)
       // auth_methods is seeded into AuthPanel from `cfg` on mount; a reload
       // unmounts and remounts that subtree, which re-seeds it.
       setSupportContacts((c as unknown as Record<string, unknown>).support_contacts as typeof supportContacts || [])
@@ -288,6 +319,24 @@ export function ConfigTab() {
   }, [loadConfig])
 
   const handleSaveConfig = async () => {
+    // Parse before touching the saving state so a malformed options blob fails
+    // loudly at the field rather than being silently dropped from the payload.
+    let parsedOcrOptions: Record<string, unknown> = {}
+    if (ocrOptionsText.trim()) {
+      try {
+        const parsed = JSON.parse(ocrOptionsText)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('OCR options must be a JSON object')
+        }
+        parsedOcrOptions = parsed as Record<string, unknown>
+      } catch (e) {
+        const message = e instanceof Error ? e.message : 'Invalid JSON'
+        setOcrOptionsError(message)
+        setError(`OCR options: ${message}`)
+        return
+      }
+    }
+    setOcrOptionsError(null)
     setSaving(true)
     setSaved(false)
     setError(null)
@@ -318,6 +367,10 @@ export function ConfigTab() {
           },
         },
         ocr_endpoint: ocrEndpoint,
+        ocr_provider: ocrProvider,
+        ocr_options: parsedOcrOptions,
+        ocr_async: ocrAsync,
+        ocr_timeout_seconds: ocrTimeout,
         // Only send the key when the user actually touched the field. An
         // untouched field after a successful load holds the "***" sentinel,
         // which the backend already treats as "keep the stored key" — so
@@ -343,8 +396,8 @@ export function ConfigTab() {
     try {
       // Send the form's current values so unsaved edits are what gets tested;
       // an untouched key field holds the "***" sentinel, meaning the saved key.
-      const res = await testOcr({ ocr_endpoint: ocrEndpoint, ocr_api_key: ocrApiKey })
-      setOcrTestResult({ ok: true, message: res.message })
+      const res = await testOcr({ ocr_endpoint: ocrEndpoint, ocr_api_key: ocrApiKey, ocr_provider: ocrProvider })
+      setOcrTestResult({ ok: res.status !== 'warning', message: res.message })
     } catch (e) {
       setOcrTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
     } finally {
@@ -634,12 +687,93 @@ ${playgroundResult.request.user_prompt}`}
         </div>
         <div style={sectionBodyStyle}>
           <div>
+            <label style={labelStyle} htmlFor="ocr-provider">OCR Service Type</label>
+            <select
+              id="ocr-provider" value={ocrProvider}
+              onChange={e => setOcrProvider(e.target.value as OcrProvider)}
+              style={{ ...inputStyle, maxWidth: 500 }}
+            >
+              <option value="raw">Plain text response (Marker, Surya, Tesseract wrapper, custom)</option>
+              <option value="docling">Docling-Serve</option>
+            </select>
+            <div style={hintStyle}>
+              {ocrProvider === 'docling'
+                ? 'Uploads to Docling-Serve’s /v1/convert/file API and reads the Markdown from the JSON response. Paste either the service root or a full convert URL below.'
+                : 'Posts the PDF as multipart field "file" and treats the whole response body as the extracted text.'}
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR Endpoint</label>
             <input
               type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
-              placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
+              placeholder={ocrProvider === 'docling' ? 'https://docling.example.edu' : 'https://...'}
+              style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
+          {ocrProvider === 'docling' && (
+            <>
+              <div style={{ marginTop: 12 }}>
+                <label style={labelStyle} htmlFor="ocr-options">Conversion Options (JSON)</label>
+                <textarea
+                  id="ocr-options" rows={10} spellCheck={false}
+                  value={ocrOptionsText}
+                  onChange={e => { setOcrOptionsText(e.target.value); setOcrOptionsError(null) }}
+                  placeholder={DOCLING_OPTIONS_PLACEHOLDER}
+                  style={{
+                    ...inputStyle, maxWidth: 640, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    fontSize: 12, lineHeight: 1.5,
+                    borderColor: ocrOptionsError ? '#dc2626' : undefined,
+                  }}
+                />
+                <div style={hintStyle}>
+                  Sent as form fields with every conversion request — the same option names
+                  Docling-Serve accepts (<code>do_ocr</code>, <code>ocr_engine</code>,{' '}
+                  <code>ocr_lang</code>, <code>pdf_backend</code>, <code>table_mode</code>,{' '}
+                  <code>do_picture_description</code>, <code>picture_description_api</code>, …).
+                  Leave blank to use Docling&rsquo;s own defaults. Vandalizer always requests
+                  Markdown output.
+                </div>
+                {ocrOptionsError && (
+                  <div role="alert" style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>
+                    {ocrOptionsError}
+                  </div>
+                )}
+                {!ocrOptionsText.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => setOcrOptionsText(DOCLING_OPTIONS_PLACEHOLDER)}
+                    style={{
+                      marginTop: 6, padding: '4px 10px', fontSize: 12, fontWeight: 500,
+                      borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+                      background: '#fff', color: '#374151', cursor: 'pointer',
+                    }}
+                  >
+                    Insert example options
+                  </button>
+                )}
+              </div>
+              <div style={{ marginTop: 12, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
+                <div>
+                  <label style={labelStyle} htmlFor="ocr-timeout">Request Timeout (seconds)</label>
+                  <input
+                    id="ocr-timeout" type="number" min={10} max={3600}
+                    value={ocrTimeout}
+                    onChange={e => setOcrTimeout(parseInt(e.target.value) || 120)}
+                    style={{ ...inputStyle, maxWidth: 160 }}
+                  />
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', alignSelf: 'flex-end', paddingBottom: 8 }}>
+                  <input type="checkbox" checked={ocrAsync} onChange={e => setOcrAsync(e.target.checked)} />
+                  Use async conversion API
+                </label>
+              </div>
+              <div style={hintStyle}>
+                Async submits the job and polls for the result, which avoids timeouts on
+                large scanned PDFs where OCR takes minutes. Requires Docling-Serve&rsquo;s
+                async endpoints to be enabled.
+              </div>
+            </>
+          )}
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR API Key (optional)</label>
             <input
