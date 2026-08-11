@@ -4,12 +4,16 @@
 
 **Vandal Workflow Architect** — abbreviated as **VWA**. "Architect" signals mastery over design, not just usage, and pairs with the University of Idaho Vandals identity. The certificate itself: **Vandal Workflow Architect Certification**.
 
+> **Note:** this document is the original program design. The curriculum and philosophy below still hold, but the delivery mechanism changed in v5.0 — certification now runs primarily **inside the agentic chat**. The "Interface Presentation" and "Training Format" sections have been updated to match what shipped; the module content that follows is unchanged.
+
 ## Interface Presentation
 
-The certification should be accessible from two places:
+The certification is accessible from two places, sharing **one progress store** (`certification_service`) so work done in either counts in both:
 
-1. **User profile dropdown** — a menu item like "Workflow Certification" with a progress indicator (e.g., "3/8 modules complete")
-2. **Workflows page** — a subtle banner or card at the top for uncertified users: *"Become a Vandal Workflow Architect — learn to build production-grade extraction workflows."* Dismissible, but returns as a small badge-link in the sidebar.
+1. **Agentic chat (primary)** — the user asks to *"start the certification course"* and the whole program runs in the conversation. Seven chat tools cover progress, module exercises, lesson delivery, lab provisioning, grading, completion, and reflective self-assessments.
+2. **Certification panel** — a floating panel reachable from the top nav, with a progress indicator (e.g., "3/11 modules complete"). Live cert writes from chat refresh the panel and its rail badge.
+
+The chat home surfaces a CTA directly: *"Start the certification course"* for new users, *"Continue certification (n/11)"* for returning ones.
 
 Once earned, the certification shows as a badge on the user's avatar/profile visible to team members, and optionally in the workflow editor header ("Designed by [Name], VWA").
 
@@ -17,12 +21,15 @@ Once earned, the certification shows as a badge on the user's avatar/profile vis
 
 Interactive, guided walkthroughs inside the actual product — not videos, not a separate LMS. Each module follows this pattern:
 
-1. **Brief concept explanation** (2-3 paragraphs, inline)
-2. **Guided task** — the user builds something real in a sandbox space pre-loaded with sample documents
-3. **Knowledge check** — a short quiz or "fix this broken workflow" challenge
-4. **Completion unlock** — the next module becomes available
+1. **Lessons, taught one at a time** — the agent delivers each lesson as a card, frames it rather than reciting it, and asks any knowledge-check question before moving on
+2. **Lab provisioning** — `provision_certification_lab` uploads the module's practice PDFs into a **Certification Lab** folder in the user's own workspace (reused on repeat calls, so it's safe to re-run). A split view puts the file browser beside the chat. Reflective modules have no documents
+3. **Guided task** — the user builds something real. The agent can do the doable parts *with* them, and it still counts, because grading runs against real workspace artifacts
+4. **Grading** — `check_certification_module` runs the module's **deterministic validator** over what actually exists (templates, workflows, runs, test cases) and returns each check pass/fail. The model narrates; it never grades. `complete_certification_module` re-runs the validator before awarding XP
+5. **Completion unlock** — the next module becomes available
 
-Estimated time: ~3-4 hours total across all modules. Users can stop and resume anytime. Progress persists.
+Three reflective modules (`ai_literacy`, `process_mapping`, `workflow_design`) are completed by answering reflection questions in the user's own words rather than by building artifacts. The agent is forbidden from inventing or padding those answers.
+
+Estimated time: ~3-4 hours total across all modules. Users can stop and resume anytime. Progress persists, and the conversation survives editor round trips mid-module.
 
 ## Training Modules
 

@@ -6,6 +6,111 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [5.0.0] — Fully Agentic (unreleased, pending merge of `major/agentic-chat`)
+
+The biggest change since launch: chat now drives the entire platform. Documents, knowledge bases, extractions, workflows, projects, automations, and the certification program are all reachable through one conversation — with quality scores, source citations, and confirmation flows built in.
+
+The dedicated editors are unchanged and remain the precision surface. Chat is a second way into the same machinery, not a replacement for it.
+
+### Added — the agent
+
+- **Agentic chat agent** (`create_agentic_chat_agent` in `llm_service.py`) — activates automatically whenever a request has both a user and a team context; falls back to plain chat otherwise.
+- **49 pydantic-ai tools** registered via the `TOOLS` registry in `chat_tools.py`. See [`docs/AGENTIC_CHAT_TOOLS_REFERENCE.md`](docs/AGENTIC_CHAT_TOOLS_REFERENCE.md) for the full catalog; by area:
+  - **Discovery** (10): `search_documents`, `list_documents`, `list_folders`, `search_knowledge_base`, `list_knowledge_bases`, `list_extraction_sets`, `list_workflows`, `get_quality_info`, `search_library`, `get_app_help`
+  - **Web** (2): `fetch_url`, `web_search`
+  - **Reading & extraction** (4): `get_document_text`, `analyze_documents`, `run_extraction`, `check_compliance`
+  - **Knowledge-base writes** (3): `create_knowledge_base`, `add_documents_to_kb`, `add_url_to_kb`
+  - **Workflow orchestration** (4): `run_workflow`, `get_workflow_status`, `approve_workflow_step`, `reject_workflow_step`
+  - **Validation & guided verification** (4): `list_test_cases`, `propose_test_case`, `run_validation`, `create_extraction_from_document`
+  - **Autovalidate** (5): `list_optimization_recommendations`, `get_optimization_run`, `start_optimization`, `apply_optimization`, `regenerate_validation_plan`
+  - **Output** (1): `save_to_folder`
+  - **Projects** (6): `create_project`, `list_project_documents`, `run_pin_on_project`, `pin_to_project`, `unpin_from_project`, `set_project_status`
+  - **Authoring** (2): `create_workflow`, `create_automation`
+  - **Certification** (7): `get_certification_progress`, `get_certification_module`, `get_certification_lesson`, `provision_certification_lab`, `check_certification_module`, `complete_certification_module`, `submit_certification_assessment`
+  - **Plan tracking** (1): `update_plan`
+- **Confirmation gate on all 19 state-changing tools** — each takes `confirmed: bool = False`, returns a preview with `needs_confirmation: true` on the first call, and executes only after the user approves. Write operations emit `AdminAuditLog` events. `approve_workflow_step` / `reject_workflow_step` additionally require reviewer or workflow-manager role.
+- **Quality-signal sidecar** — tools returning validation metadata surface it via `deps.quality_annotations`, stripped from the payload before the model sees it, so the agent cannot inflate its own score. The frontend renders `QualityBadge` with tier, accuracy, consistency, test-case count, and active alerts.
+- **Streaming tool-call UX** — `tool_call` / `tool_result` events drive live spinners and result summaries, with rich content blocks for extraction tables (CSV/TSV export), KB passage lists with clickable sources, workflow step trackers, guided-verification launchers, and certification cards.
+
+### Added — chat as a building surface
+
+- **`create_workflow`** — describe a multi-step process in plain language and get a real, runnable workflow. Created unverified, with the agent instructed to point users at the visual editor and validation before relying on it. Supports text-input and no-input workflows alongside document-driven ones.
+- **`create_automation`** — folder-watch and schedule triggers from chat. Created **disabled** so nothing fires unreviewed.
+- **Projects** — `create_project` and five project tools. Files added to a project are auto-indexed into its implicit knowledge base, so project-wide chat needs no separate KB. The agent recommends a project over a bare KB whenever the user describes an ongoing effort ("chat across all my files").
+- **`save_to_folder`** — chat output becomes a real `SmartDocument`: browsable, downloadable, and once indexed, searchable and usable as workflow/extraction input.
+- **`check_compliance`** — evaluates an extraction set's cross-field rules (sum checks, required-when, date ordering, ranges, cross-references) and reports each pass/fail with a plain-language reason.
+- **`web_search` + `fetch_url`** — configurable web search (serper/tavily/brave via System Config) and single-page URL reading, with prompt ordering that puts the user's own documents and knowledge bases first. Web search fails closed when no provider is configured.
+- **`get_app_help`** — a curated topic catalog (`help_content.py`) the agent uses to explain the product on demand, including the "why not just ChatGPT" case. Bodies respect white-label branding.
+
+### Added — certification in chat
+
+- The Vandal Workflow Architect program runs as a first-class chat experience sharing one progress store with the floating panel (both call `certification_service`), so work done in either counts in both.
+- Grading stays in the deterministic validators; the model only narrates. `check_certification_module` is read-only and never completes a module.
+- `provision_certification_lab` uploads a module's practice PDFs into a "Certification Lab" folder, reusing already-uploaded documents so repeat calls are safe.
+- Split view (`chatSplitOpen`) shows the file browser beside chat, and the Assistant stays mounted while workflow/extraction/automation editors are open so a conversation survives editor round trips mid-module.
+
+### Added — reliability and context management
+
+- **Prompt-cache-aware assembly** — stable prefixes so providers that support prompt caching bill repeated context at a discount.
+- **Usage-anchored context estimation** with a threshold meter, replacing token guesswork with reported usage.
+- **Replay-time micro-compaction** — old results from re-runnable read-only tools (`COMPACTABLE_TOOLS`) are cleared from replayed history as a conversation nears its budget. Gated write tools are excluded by design: their previews must replay verbatim for the confirm handshake.
+- **Auto-compaction with a verbatim tail**, behind a circuit breaker.
+- **Fail-closed parallel tool execution** — only tools in `PARALLEL_SAFE_TOOLS` run concurrently; every gated write serializes, so two mutations never race and `pending_confirmations` is never written twice at once.
+- **`analyze_documents` subagent fan-out** — analyzes 3+ documents in parallel read-only sub-analyses, returning only per-document digests so full text never floods the main context.
+- **`update_plan` + pinned progress checklist** — live task list for multi-step work, with exactly one task in progress at a time.
+- **Mid-run message queue** — type while the agent works; messages queue and are picked up in order.
+- **Transient retries, tool-error hints, and resumable limits** so a single failed tool call doesn't sink a turn.
+- **Behavioral prompt transplants and routing examples** to make tool selection more predictable.
+
+### Added — onboarding and launch funnel
+
+- **Rebuilt chat home** — state-aware first-session, returning, and power-user variants; `ColdStartHero`, rotating capability pills gated on real workspace state (`useOnboarding`), and a `FirstRunTour`.
+- **Landing page** reframed around agentic chat and quality signals, with a certification callout and a demo-request form (`POST /api/demo/request-contact`).
+- **v5.0 launch email funnel** — one-time announcement blast (`POST /api/admin/announcements/v5-launch`), a 5-step agentic-chat tutorial drip (Celery beat, daily 10:15), a power-user upsell at 30 chat-dispatched workflows (daily 10:45), and a certification-completion celebration email. All idempotent per user.
+- **Role segmentation** — `role_segment` captured at registration and on the demo form, powering cohort-specific drip copy.
+
+### Changed
+
+- Chat activation logic: plain chat is now the fallback; the agentic agent is the default whenever a team context is available.
+- Certification curriculum rewritten for v5 — Module 1 reframed around validated agentic chat; Foundations, Extraction, Multi-Step, Advanced Nodes, Output Delivery, Validation & QA, Batch, and Governance exercises now drive from chat prompts. Cert validators accept both the classical Workflow path and the chat-driven SearchSet / `SEARCH_SET_RUN` activity path.
+- `get_quality_info` now reports the latest autovalidate run (flagging pending recommendations with score deltas) and, for workflows, whether the validation plan has drifted from the definition.
+- Agentic system prompt carries v4.5's KB grounding rules (inline `[Source: …]` citations, `_Beyond the retrieved sources:_` marking, honest no-answer admissions) scoped to KB tool results, plus an honesty rule for `tied_with_baseline` optimizer outcomes.
+- Chat surfaces honor white-label branding — system prompts, scripted-demo copy, and `get_app_help` bodies swap in the configured org name.
+- `email_preferences` gains an `announcements` key (opted in by default); inactivity-nudge copy now speaks to chat usage.
+- Chat-dispatched workflow runs create tagged `ActivityEvent` records so the power-user milestone counts only completed runs.
+
+### Fixed
+
+- Assistant no longer claims a write tool ran when it only previewed, and duplicate write-tool confirmation prompts are collapsed.
+- Assistant can no longer fake clear/detach of attachments — it gets an authoritative attachment list; attachments clear on new chat and carry forward correctly when a document is opened.
+- Conversations survive switching to Library and back, and survive editor round trips.
+- Dropped-document readiness is polled authoritatively; the agent holds instead of hallucinating when attached documents aren't readable yet.
+- Improvised action buttons work instead of dead-ending; chat-built workflows register in the personal library; workflow output renders as markdown.
+- Auto-scroll no longer fires on incoming messages; the thinking shimmer is clipped to its text.
+- First-session prompt no longer deflects explicit web lookups, and concrete build requests from first-session users are fulfilled.
+- Web search keys tolerate pasted whitespace and error clearly when undecryptable.
+- Raw `ACTION` markup no longer leaks into certification lesson text.
+- Branding identity holds on white-label deployments; raw-error voice breaks removed.
+
+### Configuration
+
+- New System Config fields: `web_search_provider`, `web_search_endpoint`, `web_search_api_key` (**Admin → System Config → Endpoints**).
+- New env var: `demo_request_to_email` (falls back to `resend_from_email` / `smtp_from_email`).
+- New Celery beat schedules: `engagement-agentic-chat-drip` (daily 10:15), `engagement-powerup-milestones` (daily 10:45).
+
+### Upgrade notes
+
+- **Database:** existing users receive new optional fields (`v5_announcement_sent_at`, `agentic_drip_step`, `agentic_drip_next_at`, `first_chat_workflow_at`, `chat_workflow_count`, `powerup_milestone_sent_at`, `certification_complete_sent_at`, `role_segment`). No migration required — Beanie treats absent keys as defaults.
+- **Chat model:** validate your configured chat model against real multi-step prompts before rollout. Tool selection and the confirm-gate protocol demand stronger instruction-following than v4 summarization did.
+- **Team context:** users without team membership silently get non-agentic chat. Set `DEFAULT_TEAM_NAME` at bootstrap, or verify membership before rollout.
+- **Rollout order:** deploy code → dry-run the announcement blast to verify eligible count → run the drip backfill so existing users are enrolled → send the announcement in batches until `sent == 0`.
+- **Rollback:** safe to revert. New `User` fields are additive and sends are idempotently tracked per user, so revert-then-reapply won't double-send.
+
+### Documentation
+
+- New: [`docs/AGENTIC_CHAT_USER_GUIDE.md`](docs/AGENTIC_CHAT_USER_GUIDE.md), [`docs/AGENTIC_CHAT_TOOLS_REFERENCE.md`](docs/AGENTIC_CHAT_TOOLS_REFERENCE.md), [`docs/QUALITY_SIGNALS_EXPLAINED.md`](docs/QUALITY_SIGNALS_EXPLAINED.md).
+- README gains an agentic-chat section and web-search configuration; DEPLOY.md gains an Agentic Chat section covering model choice, token cost, team-context requirement, and web-access egress posture; OPERATIONS.md gains an agentic chat smoke test.
+
 ## [v4.10.0] - 2026-08-10
 
 ### Added
@@ -127,38 +232,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **`KBSourceResponse` was missing `source_reference`**, breaking the production build (`tsc -b`) at `KBSourceInspectorModal`.
 - **`QualityBadge` violated rules-of-hooks** (early return before hooks) — surfaced as eslint errors once the badge gained conditional content.
 - Branded deployments no longer flash the default Vandalizer theme (colors, logo, icon, favicon, title) for ~1s on load before the custom branding appears. The last-known theme is cached in `localStorage` and applied synchronously — by an inline bootstrap script in `index.html` before the bundle loads, and by the `BrandingProvider` initial state before the first React paint — then reconciled against `GET /api/config/theme` on mount. First-ever visit (empty cache) is unchanged.
-
-## [5.0.0] — Fully Agentic
-
-The biggest change since launch: chat now drives the entire platform. Documents, knowledge bases, extractions, and workflows are all reachable through one conversation — with quality scores, source citations, and confirmation flows built in.
-
-### Added — Agentic chat
-- **Agentic chat agent** (`create_agentic_chat_agent` in `llm_service.py`) — activates automatically whenever a request has a user and team context; falls back to plain chat otherwise
-- **19 pydantic-ai tools** registered on the agentic agent across 5 categories:
-  - **Read-only discovery** (8): `search_documents`, `list_documents`, `search_knowledge_base`, `list_knowledge_bases`, `list_extraction_sets`, `list_workflows`, `get_quality_info`, `search_library`
-  - **Extraction** (2): `get_document_text`, `run_extraction`
-  - **Knowledge-base writes** (3): `create_knowledge_base`, `add_documents_to_kb`, `add_url_to_kb` — all gated by 2-step confirmation
-  - **Workflow orchestration** (2): `run_workflow` (async Celery dispatch), `get_workflow_status` (live polling)
-  - **Validation & guided verification** (4): `list_test_cases`, `propose_test_case`, `run_validation`, `create_extraction_from_document`
-- **Quality-signal sidecar** — tools that return validation metadata surface it via `deps.quality_annotations` (never polluting the LLM context); frontend renders `QualityBadge` with tier, accuracy, consistency, test-case count, and active alerts
-- **Streaming tool-call UX** — `chat_service.py` emits `tool_call` and `tool_result` events; `ToolStatusLine` renders live spinners and result summaries; rich content blocks for extraction tables, KB passages, workflow output, and guided-verification launchers
-- **Confirmation flow for writes** — KB creation, URL ingestion, extraction-set creation, workflow dispatch, and validation runs all preview first, then execute only after user confirmation
-- **Landing page rewrite** — hero, feature sections, and demo flow reframed around agentic chat and quality signals; added certification callout
-- **Demo-request form** — new landing-page form posting to `POST /api/demo/request-contact` with confirmation and admin-notification emails
-- **v5.0 launch email funnel**:
-  - One-time launch announcement email, triggerable by admins via `POST /api/admin/announcements/v5-launch`
-  - 5-step agentic-chat tutorial drip (Celery beat: daily 10:15am)
-  - Certification-complete celebration email (fires once per user when all 11 modules are done)
-  - Idempotent send tracking via `v5_announcement_sent_at`, `agentic_drip_step`, `certification_complete_sent_at` on `User`
-- **Chat milestone tracking** — `first_chat_workflow_at`, `chat_workflow_count`, `powerup_milestone_sent_at` on `User`, recorded when `run_workflow` succeeds
-- **Role segmentation** — `role_segment` field on `User` for future cohort-targeted drips
-- **Certification curriculum updated for v5** — Module 1 ("AI Literacy") reframed to position agentic chat as the professional answer rather than a problem; Foundations, Extraction, Multi-Step, Advanced Nodes, Output Delivery, Validation & QA, Batch, and Governance exercises rewritten to drive from chat prompts
-- **Docs**: `AGENTIC_CHAT_PLAN.md` (implementation plan, all phases shipped); user and quality-signal guides in `docs/`
-
-### Changed — v5.0
-- Chat activation logic: plain chat is now a fallback; agentic agent is the default when a team context is available
-- `email_preferences` gains an `announcements` key (defaults to opted-in)
-- Inactivity-nudge copy updated to speak to chat usage instead of "extractions and knowledge bases ready to use"
 
 ## [v4.8.0] - 2026-07-01
 

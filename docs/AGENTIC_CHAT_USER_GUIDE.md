@@ -10,23 +10,25 @@ This guide walks through everything the chat can do for you. If you've used Chat
 
 Vandalizer's agentic chat is built on the same conversational interface you already know, with three things generic AI chat can't give you:
 
-1. **Validated answers.** Every extraction and workflow the chat runs comes with a quality score, accuracy %, and the number of test cases behind it.
+1. **Validated answers.** Every extraction and workflow the chat runs comes with a quality score, accuracy %, and the number of test cases behind it. The agent can't see that number, so it can't talk it up — the badge comes straight from your stored validation runs.
 2. **Cited sources.** Knowledge-base answers show the exact passages used. Click any passage to jump to the source document.
-3. **Confirmation on writes.** Creating knowledge bases, running workflows, or promoting results into validated templates always previews first, then waits for your approval.
+3. **Confirmation on writes.** Creating knowledge bases, running workflows, building automations, or promoting results into validated templates always previews first, then waits for your approval.
 
 You can still ask the chat free-form questions. The difference shows up when the answer matters.
+
+**You never have to use chat.** Every editor — workflows, extractions, knowledge bases, automations — is still there and still the precision surface. Chat is a faster way in, not a replacement.
 
 ---
 
 ## What you can ask the chat to do
 
-The chat has 19 tools at its disposal. You don't need to know the tool names — describing what you want is enough.
+The chat has 49 tools at its disposal. You don't need to know the tool names — describing what you want is enough.
 
 ### Finding things
 
 | Ask… | The agent will… |
 |---|---|
-| *"What documents do I have about NSF proposals?"* | Search your workspace by keyword, folder, or extension |
+| *"What documents do I have about NSF proposals?"* | Search your workspace by title, or by content when a title search comes up empty |
 | *"Show me the files in the Grants folder."* | List folders and documents |
 | *"What knowledge bases are available to my team?"* | Return your accessible KBs with chunk counts and verification status |
 | *"What extraction templates exist for NIH proposals?"* | List extraction sets with field counts, domains, and quality tiers |
@@ -37,23 +39,54 @@ The chat has 19 tools at its disposal. You don't need to know the tool names —
 | Ask… | The agent will… |
 |---|---|
 | *"Summarize the NIH R01 proposal on my desk."* | Fetch the document text and summarize |
+| *"Compare these 8 proposals on budget and scope."* | Analyze them in parallel and return a digest per document, without flooding the conversation with full text |
 | *"What does our OSP handbook say about subaward budgets?"* | Query the relevant knowledge base and return cited passages |
 | *"Find the deadline in the RFP."* | Search the document and extract the answer |
+
+### Looking things up on the web
+
+| Ask… | The agent will… |
+|---|---|
+| *"What's the current NIH salary cap?"* | Check your own documents first, then search the web if the answer isn't there — citing the source URL |
+| *"Read this page: https://…"* | Fetch the page and answer questions about it |
+| *"Add that page to my Funding KB."* | Chunk and index it so you can query it later with citations |
+
+Your institution's own policy always outranks a search result — the agent is instructed to check your material first. If web search isn't available, your administrator hasn't configured a provider yet.
 
 ### Extracting structured data
 
 | Ask… | The agent will… |
 |---|---|
-| *"Extract PI name, budget, and deadline from this proposal."* | Run the right extraction template (or propose a new one) and return a table |
-| *"Propose an extraction set for NIH R01 proposals."* | Analyze sample documents and suggest fields (creation requires your confirmation) |
+| *"Extract PI name, budget, and deadline from this proposal."* | Run the right extraction template and return a table with CSV/TSV export |
+| *"Build an extraction template from this RFP."* | Read the document, propose fields, and create the template on your confirm |
 | *"Run the NIH Compliance extraction on these 5 proposals."* | Execute extraction across a batch, returning a combined table with quality sidebar |
+| *"Does this proposal follow our budget rules?"* | Run the template's cross-field rules and report each pass/fail with a reason |
 
-### Running workflows
+Cross-field rules are *evaluated* from chat but *authored* in the extraction editor's Cross-field Rules section.
+
+### Running and building workflows
 
 | Ask… | The agent will… |
 |---|---|
 | *"Run the NIH compliance check on this proposal."* | Dispatch the verified workflow, stream step-by-step progress, and show output |
-| *"What's the status of the workflow I just ran?"* | Poll and return current step, completion %, any approval gates, or final output |
+| *"What's the status of the workflow I just ran?"* | Poll and return current step, completion %, approval gates, or final output |
+| *"Approve the review step."* | Resume a paused workflow — if you're an assigned reviewer or workflow manager |
+| *"Build a workflow that extracts the budget, checks it against policy, then drafts a summary."* | Lay out the steps, preview them, and create a real workflow on your confirm |
+| *"Run that on every file added to my Intake folder."* | Create an automation (disabled, so nothing fires before you review it) |
+
+A workflow built in chat starts **unverified**. It's ready to run, but fine-tune it in the visual editor and validate it before relying on it for real decisions.
+
+### Working in projects
+
+| Ask… | The agent will… |
+|---|---|
+| *"Start a project for the Smith R01."* | Create a goal-scoped workspace — folder, knowledge base, pinned tools, and chat in one place |
+| *"What's in this project?"* | List the project's documents |
+| *"Run the intake workflow on everything in this project."* | Resolve the file set itself and run the pinned capability across all of it |
+| *"Pin the compliance extraction to this project."* | Add a quick-access reference (nothing is moved or copied) |
+| *"Mark this project submitted."* | Move it through its lifecycle: draft → active → submitted → awarded → closeout → archived |
+
+Because every file added to a project is auto-indexed, project-wide chat works immediately — **there's no knowledge base to build or maintain.**
 
 ### Building knowledge bases
 
@@ -63,13 +96,34 @@ The chat has 19 tools at its disposal. You don't need to know the tool names —
 | *"Add these 10 handbook PDFs to the OSP KB."* | Chunk and index the documents into ChromaDB (confirmation required) |
 | *"Ingest the NIH grants.gov page into the Funding KB."* | Fetch and index a URL (with optional crawl) |
 
+If you'll be feeding documents in over time rather than indexing a fixed corpus, the agent will suggest a **project** instead.
+
 ### Building trust in your templates
 
 | Ask… | The agent will… |
 |---|---|
 | *"List the test cases for my NSF extractor."* | Return the ground-truth set |
 | *"Propose a test case from this proposal."* | Run extraction once and open the guided verification modal so you can confirm each value before saving |
-| *"Validate the NSF extractor."* | Run extraction repeatedly against test cases, compute unified accuracy/consistency score, update the quality tier |
+| *"Validate the NSF extractor."* | Run extraction repeatedly against test cases, compute unified accuracy/consistency, update the quality tier |
+| *"Can this template be more accurate?"* | Run autovalidate — sweeping candidate configs and reporting the winner |
+| *"Any optimization suggestions?"* | List pending recommendations across your KBs, templates, and workflows |
+
+Autovalidate **never changes anything until you apply it**, it tells you honestly when a candidate merely ties the baseline, and every apply is snapshotted so it can be reverted.
+
+### Keeping the output
+
+| Ask… | The agent will… |
+|---|---|
+| *"Save that summary to my Grants folder."* | Write it as a real document — browsable, downloadable, and reusable as workflow input |
+
+### Learning the platform
+
+| Ask… | The agent will… |
+|---|---|
+| *"What is a knowledge base?"* / *"Why not just use ChatGPT?"* | Explain the product itself |
+| *"Start the certification course."* | Run the Vandal Workflow Architect program right in chat — teaching lessons, setting up practice documents, and grading against your real workspace |
+
+Certification progress is shared with the Certification panel in the top nav, so work done in either place counts in both.
 
 ---
 
@@ -79,10 +133,14 @@ Every tool call the agent makes is shown in real time:
 
 - **Spinner + tool label** while the tool runs ("Searching documents for 'budget'", "Running extraction on 5 files"…).
 - **Result summary** when it completes ("Found 12 matches", "Extracted 20 fields · 94% accuracy").
-- **Rich content block** below the summary when appropriate — an extraction table with CSV/TSV export, a KB passage list with clickable sources, a workflow step tracker, or a verification launcher.
+- **Rich content block** below the summary when appropriate — an extraction table with CSV/TSV export, a KB passage list with clickable sources, a workflow step tracker, a verification launcher, or a certification card.
 - **Quality badge** inline when the result comes from a validated template.
 
-If a tool will write (create a KB, run a workflow, build a test case), the agent previews what it's about to do and **waits for you to confirm** before executing.
+For work that takes several steps, the agent keeps a **live checklist pinned above the conversation** so you can see what's done and what's left.
+
+You can **keep typing while the agent works.** Your messages queue and get picked up in order — no need to wait for a long extraction to finish before adding a follow-up.
+
+If a tool will write (create a KB, run a workflow, build an automation, save a document), the agent previews what it's about to do and **waits for you to confirm** before executing.
 
 ---
 
@@ -107,7 +165,7 @@ Hover the badge to see accuracy, consistency, test-case count, last validation d
 Describe the tool outcome, not the tool name. *"Run my NIH compliance workflow"* works better than *"invoke run_workflow."*
 
 **"The agent asked me to confirm, but I don't see a confirm button."**
-Some writes require two steps: a preview response followed by the agent running again with `confirmed=true`. If you see a preview, just reply *"go ahead"* or *"confirm."*
+Some writes require two steps: a preview response followed by the agent running again once approved. If you see a preview, just reply *"go ahead"* or *"confirm."*
 
 **"The chat fell back to generic mode."**
 The agentic agent only activates when you're logged in and have a team context. If you're in a demo without a team, or an admin without team membership, you'll see plain chat. Switch to a team to get tool access back.
@@ -115,10 +173,19 @@ The agentic agent only activates when you're logged in and have a team context. 
 **"I don't see a quality badge."**
 Not every extraction template has validation runs yet. Ask the agent to *"propose a test case from this document"* to start building ground truth, then *"run validation"* to generate the first score.
 
+**"It says web search isn't available."**
+Your administrator hasn't configured a search provider. Reading a URL you paste in directly works either way.
+
+**"It couldn't read a link I sent."**
+Login-gated pages (SharePoint, Google Docs, Confluence) return a login screen rather than content, and PDFs and other downloads aren't fetched. Upload those through the Files tab instead so they get OCR'd and indexed.
+
+**"A long conversation seems to have forgotten earlier details."**
+Very long conversations get compacted to stay within the model's context. Recent turns are kept verbatim; older read-only results may be dropped and re-fetched on demand. If something important scrolled far back, restate it or save it to a document.
+
 ---
 
 ## Next steps
 
-- Open the **Certification panel** (top nav) — Module 1 walks through the agentic chat in about 10 minutes.
+- Ask the chat to *"start the certification course"* — Module 1 takes about 10 minutes and tours the agentic chat.
 - Read [QUALITY_SIGNALS_EXPLAINED.md](./QUALITY_SIGNALS_EXPLAINED.md) for the full trust-signal explainer.
-- Dev/admin teams: see [AGENTIC_CHAT_TOOLS_REFERENCE.md](./AGENTIC_CHAT_TOOLS_REFERENCE.md) for the tool catalog and auth rules.
+- Dev/admin teams: see [AGENTIC_CHAT_TOOLS_REFERENCE.md](./AGENTIC_CHAT_TOOLS_REFERENCE.md) for the tool catalog and auth rules, and [DEPLOY.md](../DEPLOY.md#agentic-chat) for configuration.

@@ -1,6 +1,12 @@
 # Agentic Chat Implementation Plan
 
-## Status: ALL PHASES COMPLETE
+> **Historical document.** This is the original April 2026 plan for Phases 1–4. It is kept for the architectural rationale in the sections below, which still holds. It is **not** a current description of the tool surface — the agent has since grown well past the 15 tools this plan scoped.
+>
+> **For what actually shipped, see [`docs/AGENTIC_CHAT_TOOLS_REFERENCE.md`](docs/AGENTIC_CHAT_TOOLS_REFERENCE.md)**, generated against the `TOOLS` registry in `backend/app/services/chat_tools.py`, which is the source of truth.
+
+## Status
+
+**Phases 1–4 (this plan): COMPLETE.**
 
 - **Phase 1** (Read-only tools): DONE — 8 tools
 - **Phase 2** (Extraction tools): DONE — 2 tools
@@ -9,7 +15,19 @@
 - **Frontend**: DONE — ToolCallDisplay, QualityBadge, extended useChat + ChatMessage + ChatPanel
 - **Tests**: DONE — 17 unit tests passing, 31 existing chat tests passing, TypeScript clean
 
-**Total: 15 tools registered, full end-to-end streaming pipeline, quality sidecar pattern**
+**Shipped after this plan was written** (tracked in `CHANGELOG.md` under `[5.0.0]`, not planned here):
+
+- Phase 5 — Validation & guided verification (4 tools)
+- Phase 6 — Autovalidate / optimizer (5 tools)
+- Phase 7 — Output artifacts: `save_to_folder`
+- Phase 8 — Projects (6 tools)
+- Phase 9 — Automations: `create_automation`
+- Phase 10 — Workflow authoring: `create_workflow`
+- Phase 11 — Certification program in chat (7 tools)
+- Plus `list_folders`, `get_app_help`, `fetch_url`, `web_search`, `analyze_documents`, `check_compliance`, `approve_workflow_step`, `reject_workflow_step`, and `update_plan`
+- A separate 10-phase reliability uplift: prompt-cache-aware assembly, usage-anchored context estimation, replay-time micro-compaction, auto-compaction with verbatim tail + circuit breaker, transient retries, behavioral prompt transplants, fail-closed parallel tool execution, the pinned plan checklist, subagent fan-out, and the mid-run message queue
+
+**Current total: 49 tools**, of which 19 are confirm-gated writes.
 
 ---
 

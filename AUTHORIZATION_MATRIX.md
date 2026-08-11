@@ -20,6 +20,19 @@ As of `2026-03-20`, this matrix has been systematically audited across all 28 ro
 - Organization-scoped visibility:
   - when a resource declares `organization_ids`, non-owners must belong to one of those orgs to view or manage it
 
+## Agentic Chat Tools
+
+As of v5.0 the chat agent can invoke 49 tools (`backend/app/services/chat_tools.py`). The agent is **not a new principal** in this model — it is a caller-shaped wrapper over existing services.
+
+- **No ambient privilege.** Every tool executes as the calling user, against that user's team scope, using the same `access_control.py` helpers as the routers. The agent cannot reach any resource the user could not reach through the UI.
+- **Activation requires a team context.** The agentic agent is only constructed when a request carries both a user and a team. Without one, chat falls back to plain non-agentic mode with no tool access.
+- **Writes are confirm-gated.** The 19 state-changing tools take `confirmed: bool = False`; the first call returns a preview and performs no write. This is a user-consent gate layered *on top of* authorization, not a substitute for it — every gated tool still performs its own permission check before writing.
+- **Write tools serialize.** Only tools listed in `PARALLEL_SAFE_TOOLS` (read-only, re-runnable) may execute concurrently. Gated writes are registered sequential so two mutations, or a mutation and a read of its target, never race.
+- **Elevated actions keep their role checks.** `approve_workflow_step` / `reject_workflow_step` require assigned-reviewer or workflow-manager role, exactly as the corresponding routes do. Approval authority is not delegable to the agent — it can only relay a decision the user makes.
+- **Writes are audited.** Tool-driven writes emit `AdminAuditLog` entries with the acting user, operation, and target IDs, on the same path as route-driven writes.
+
+When adding a tool, derive its permission check from the shared helpers rather than re-implementing one, and add it to `PARALLEL_SAFE_TOOLS` / `COMPACTABLE_TOOLS` only if it is genuinely read-only and safely re-runnable. Both sets are fail-closed by default.
+
 ## Team Scope Normalization
 
 The codebase currently has mixed team identifier formats:

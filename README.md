@@ -13,14 +13,28 @@ These offices typically review hundreds of documents per cycle to extract deadli
 
 The project was developed at the University of Idaho under the NSF GRANTED program (Award [#2427549](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2427549)) and is designed to be adopted by other institutions. It is fully self-hosted, runs on commodity infrastructure, and supports any OpenAI-compatible LLM provider including local models via Ollama.
 
+## Agentic chat
+
+As of v5.0, chat drives the platform. A pydantic-ai agent with **49 tools** can search documents, query knowledge bases, run and author extractions and workflows, set up automations, manage projects, and run validation — from plain-English prompts. The dedicated editors are all still there; chat is a second way into the same machinery, not a replacement for it.
+
+Three properties separate it from generic AI chat:
+
+- **Validated answers.** Results carry a quality score, accuracy, consistency, and the number of test cases behind them. The score is computed from stored `ValidationRun` records and stripped from the payload before the model sees it, so the agent cannot inflate its own grade.
+- **Cited sources.** Knowledge-base answers show the passages they used, with click-through to the source document and page.
+- **Confirmation on writes.** All 19 state-changing tools preview first and execute only after the user approves. Every tool call runs as the calling user, against that user's team scope — the agent holds no privileges of its own.
+
+See the [Agentic Chat User Guide](docs/AGENTIC_CHAT_USER_GUIDE.md) to get started, or the [Tools Reference](docs/AGENTIC_CHAT_TOOLS_REFERENCE.md) for the full catalog.
+
 ## Features
 
+- **Agentic Chat** - Drive the whole platform by conversation: find and read documents, build and run extractions and workflows, manage projects, and validate results, with quality badges and cited sources inline
 - **Structured Extraction** - Pull dates, budgets, requirements, and more from PDFs into clean structured data, with per-field source tracking: click any extracted value to jump to the passage and page it came from, or see an explicit "no source found" when it can't be traced
-- **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution
+- **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution, built in the visual editor or described in chat
 - **RAG Chat** - Ask questions against your document collection with citation-backed answers
-- **Projects** - Gather the files, knowledge base, pinned tools, and chat for one grant or effort in a single scoped workspace, sharable to a team or via invite link
+- **Projects** - Gather the files, knowledge base, pinned tools, and chat for one grant or effort in a single scoped workspace, sharable to a team or via invite link. Files added to a project are auto-indexed, so project-wide chat works with no knowledge base to build
 - **Validate & Improve** - Score and automatically tune your extractions, workflows, and knowledge bases against a test set, with certified results
 - **Automations** - Run a workflow on every new upload, on a schedule, via API, or from Microsoft 365 intake
+- **Certification** - A built-in Vandal Workflow Architect program (11 modules) that teaches the platform in chat and grades progress against your real workspace artifacts
 - **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
 - **Custom Branding** - White-label the deployment with your institution's name, logo, icon, brand color, and branded email — set in the admin UI, applied at runtime with no redeploy
 - **Self-Hosted** - Run on your own infrastructure with full control over your data. A single server with 16 GB of RAM is sufficient; see the [Deployment Guide](DEPLOY.md) for details on local LLM/OCR hosting options for fully air-gapped installations.
@@ -192,6 +206,20 @@ Navigate to **Admin → System Config → Models** to add LLM providers. Each mo
 
 Vandalizer works with any provider that exposes an OpenAI-compatible API — including OpenAI, Azure OpenAI, Anthropic (Claude), OpenRouter, Google Gemini (via its OpenAI-compatibility endpoint), Ollama (local models), and vLLM. It does **not** integrate with Microsoft 365 Copilot, which is an end-user product rather than a developer API. See the [provider compatibility table in `DEPLOY.md`](DEPLOY.md#provider-compatibility) for endpoint URLs and per-provider notes.
 
+## Web Search (optional)
+
+The agentic chat can search the public web when an answer isn't in the user's own documents. This is **off until an administrator configures a provider** — with none set, the tool reports that web search is unavailable rather than failing the request.
+
+Navigate to **Admin → System Config → Endpoints** and set:
+
+| Field | Description |
+|-------|-------------|
+| **Web Search Provider** | `serper`, `tavily`, or `brave` — selects the response shape to parse |
+| **Web Search Endpoint** | The provider's search API URL |
+| **Web Search API Key** | Provider API key (stored encrypted, same Fernet key as LLM credentials) |
+
+Reading a URL a user pastes into chat (`fetch_url`) needs no provider and works whenever the backend has outbound network access. Both tools make **server-side** outbound requests; see [Agentic chat web access](DEPLOY.md#agentic-chat-web-access) for the egress and air-gap considerations.
+
 ## PDF Processing & OCR
 
 Vandalizer offers two approaches for extracting text from PDF documents. Both are configured in the admin UI — no environment variables or restarts required.
@@ -238,6 +266,9 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 
 ## Documentation
 
+- [Agentic Chat User Guide](docs/AGENTIC_CHAT_USER_GUIDE.md) — what the chat can do, for end users
+- [Agentic Chat Tools Reference](docs/AGENTIC_CHAT_TOOLS_REFERENCE.md) — all 49 tools, parameters, and authorization rules
+- [Quality Signals Explained](docs/QUALITY_SIGNALS_EXPLAINED.md) — how scores, tiers, and badges are computed
 - [External API Reference](docs/api.md)
 - [Management API Reference](docs/mgmt-api.md)
 - [Anonymous Telemetry](docs/telemetry.md)

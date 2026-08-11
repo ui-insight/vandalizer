@@ -273,6 +273,43 @@ Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyM
 
 **Multimodal LLM (alternative)** — For models that support vision (e.g., GPT-4o, Claude), Vandalizer can send PDF pages as images directly to the LLM instead of using OCR. Enable this under **Admin → System Config → Extraction** by toggling **Use Document Images (Multimodal)**. This works well for visually complex documents but uses more LLM tokens.
 
+### Agentic Chat
+
+As of v5.0 the chat is an agent with 49 tools that can read documents, run extractions and workflows, and perform gated writes. Three operational consequences are worth planning for.
+
+**Model choice matters more than it used to.** The agent selects tools, chains multi-step work, and follows a confirm-gate protocol — all of which need solid instruction-following and tool-calling. A model that produced acceptable summaries in v4 may pick wrong tools or skip confirmations in v5. Configure the chat model under **Admin → System Config → Models** and validate it against real multi-step prompts before rolling out. Small local models are viable for summarization but should be tested specifically for tool-calling reliability.
+
+**Per-conversation token cost is higher.** Tool schemas ride along in every request, and tool results accumulate in history. The chat mitigates this automatically: prompt assembly is cache-aware (so providers that support prompt caching bill repeated prefixes at a discount), old read-only tool results are micro-compacted out of replayed history as a conversation nears its budget, and a full auto-compaction pass with a verbatim tail runs behind a circuit breaker. Budget for higher per-conversation usage than v4 regardless, especially on providers without prompt caching.
+
+**Agentic mode needs a team context.** The agent activates only when a request has both a user and a team. Users with no team membership — including admins who never joined one — silently get plain non-agentic chat with no tool access. If users report "the chat can't do anything," check team membership first. Setting `DEFAULT_TEAM_NAME` at bootstrap avoids this for new registrations.
+
+#### Agentic chat web access
+
+Two tools make **server-side outbound HTTP requests on user instruction**. Both are worth an explicit decision before deployment.
+
+| Tool | What it does | Requires |
+|---|---|---|
+| `fetch_url` | Fetches one public page the user pasted and extracts readable text | Outbound network access only |
+| `web_search` | Searches the public web and returns ranked results | A configured provider (below) |
+
+Configure web search under **Admin → System Config → Endpoints**:
+
+| Field | Description |
+|-------|-------------|
+| **Web Search Provider** | `serper`, `tavily`, or `brave` — selects the response shape to parse |
+| **Web Search Endpoint** | The provider's search API URL |
+| **Web Search API Key** | Provider API key, encrypted at rest with `CONFIG_ENCRYPTION_KEY` |
+
+With no provider configured, `web_search` reports itself unavailable and the agent falls back to the user's own documents. It fails closed — there is no default provider and no implicit egress.
+
+Operational notes:
+
+- **Air-gapped installs.** Leave web search unconfigured. To also disable `fetch_url`, block outbound HTTP egress from the API and Celery containers at the network layer; there is no separate application toggle for it.
+- **Egress posture.** `fetch_url` retrieves a URL supplied through chat, so the backend can be pointed at hosts a user names. If the API container sits on a network with reachable internal services, restrict its egress (allowlist, or route through a forward proxy) rather than relying on the application layer.
+- **Limits.** `fetch_url` enforces a 20-second timeout, a 2 MB response cap, and truncates to roughly 25k characters before the text reaches the model.
+- **What it can't reach.** Login-gated pages (SharePoint, Google Docs, Confluence) return login HTML rather than content, and non-HTML downloads are refused — users are directed to upload those through Files or M365 intake instead.
+- **Prompt ordering.** The agent is instructed to search the user's own documents and knowledge bases before the web, so institutional policy outranks search results by default.
+
 ### TLS / HTTPS
 
 In production, place a reverse proxy in front of the application to terminate TLS. Nginx, Caddy, and Traefik all work well. The example below uses nginx:

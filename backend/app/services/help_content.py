@@ -38,12 +38,15 @@ HELP_TOPICS: list[dict] = [
             "answer the chat returns can carry a quality score, accuracy %, "
             "and the number of test cases behind it — so you know how much to "
             "trust it before you act on it.\n\n"
-            "**You can:**\n"
+            "**Chat drives all of it.** You can do these by talking, or in the "
+            "dedicated editors — whichever suits the task:\n"
             "- Upload documents and chat with them, grounded in their content\n"
             "- Run extraction templates that pull structured data from PDFs/DOCX/etc.\n"
-            "- Chain steps into multi-step workflows (extract → summarize → compare → merge)\n"
+            "- Build and run multi-step workflows (extract → summarize → compare → merge)\n"
             "- Build knowledge bases over policy docs and ask questions with cited sources\n"
-            "- Trigger automations on folder watches, M365, or API calls\n"
+            "- Group a grant's files, tools, and chat into a project with its "
+            "own auto-indexed knowledge base\n"
+            "- Trigger automations on folder watches, schedules, M365, or API calls\n"
             "- Validate templates against test cases to grow accuracy over time"
         ),
     },
@@ -80,19 +83,33 @@ HELP_TOPICS: list[dict] = [
             "what can the assistant do",
         ],
         "body": (
-            "The chat has 19 tools at its disposal — you don't need to know "
-            "the names. Describe what you want and the agent picks the right "
-            "tool.\n\n"
-            "**Common asks:**\n"
+            "The chat can drive essentially the whole platform — you don't "
+            "need to know any tool names. Describe what you want and the agent "
+            "picks the right tool.\n\n"
+            "**Find and read:**\n"
             '- *"What documents do I have about NSF proposals?"* → searches your workspace\n'
             '- *"Summarize the R01 on my desk."* → fetches and summarizes\n'
+            '- *"Compare these 8 proposals on budget and scope."* → analyzes them in parallel\n'
+            '- *"What\'s the current NIH salary cap?"* → searches the web when the answer isn\'t in your files\n\n'
+            "**Extract and check:**\n"
             '- *"Extract PI name, budget, and deadline from this proposal."* → runs the right template\n'
-            '- *"Run the NIH compliance check on these 5 proposals."* → dispatches a workflow\n'
-            '- *"Create a knowledge base called OSP Policy."* → previews, then creates on your confirm\n'
-            '- *"Validate the NSF extractor."* → runs validation across test cases\n\n'
+            '- *"Build an extraction template from this RFP."* → proposes fields, creates on your confirm\n'
+            '- *"Does this proposal follow our budget rules?"* → runs cross-field compliance checks\n\n'
+            "**Build and run:**\n"
+            '- *"Build a workflow that extracts the budget then checks it against policy."* → authors a real multi-step workflow\n'
+            '- *"Run the NIH compliance check on these 5 proposals."* → dispatches a workflow and streams progress\n'
+            '- *"Run that workflow on every file added to this folder."* → creates an automation\n'
+            '- *"Start a project for the Smith R01."* → creates a project with its own auto-indexed knowledge base\n\n'
+            "**Improve and keep:**\n"
+            '- *"Validate the NSF extractor."* → runs validation across test cases\n'
+            '- *"Can this template be more accurate?"* → runs autovalidate and reports the winner\n'
+            '- *"Save that summary to my Grants folder."* → writes a real document you can reuse\n'
+            '- *"Start the certification course."* → teaches the program right here in chat\n\n'
             "Every tool call shows a spinner with a label, then a result "
             "summary. Quality badges appear inline when the result comes from "
-            "a validated template."
+            "a validated template. For multi-step work the agent keeps a live "
+            "checklist pinned above the conversation, and you can keep typing "
+            "while it works — your messages queue and are picked up in order."
         ),
     },
     {
@@ -351,11 +368,20 @@ HELP_TOPICS: list[dict] = [
             "certification — 11 modules, ~1,600 XP — that walks through the "
             "full agentic stack: AI literacy, validated extraction, multi-step "
             "workflows, trust signals, and governance.\n\n"
-            "**To start:** click **Certification** in the top nav. Module 1 "
-            "is about 10 minutes and gives the full tour of the agentic chat.\n\n"
-            "Modules are chat-driven — you complete real work (build a "
-            "template, run a validation, ship a workflow) and the system "
-            "validates your progress against your actual data, not multiple-choice."
+            "**To start:** just ask — *\"start the certification course\"* — and "
+            "the whole program runs right here in chat. The agent teaches each "
+            "lesson, sets up practice documents in a **Certification Lab** "
+            "folder, walks you through the challenge, and grades it. You can "
+            "also open the **Certification** panel from the top nav; both share "
+            "one progress store, so work done in chat counts there and vice versa.\n\n"
+            "Modules are hands-on — you complete real work (build a template, "
+            "run a validation, ship a workflow) and the system validates your "
+            "progress against your actual data, not multiple-choice. The agent "
+            "can do the doable parts with you, and it still counts, because "
+            "grading runs against what actually exists in your workspace.\n\n"
+            "Three reflective modules (AI literacy, process mapping, workflow "
+            "design) are completed by answering reflection questions in your "
+            "own words instead of building artifacts."
         ),
     },
     {
@@ -419,7 +445,10 @@ HELP_TOPICS: list[dict] = [
             "previews first and waits for your approval. That covers:\n\n"
             "- Creating knowledge bases\n"
             "- Adding documents or URLs to a KB\n"
-            "- Running workflows\n"
+            "- Running workflows, and approving or rejecting a paused step\n"
+            "- Building new workflows, extraction templates, and automations\n"
+            "- Creating projects, pinning tools to them, and changing their status\n"
+            "- Saving chat output as a document in your folders\n"
             "- Saving test cases (guided verification)\n"
             "- Starting or applying autovalidate optimization runs\n"
             "- Regenerating a workflow's validation plan\n\n"
@@ -460,6 +489,121 @@ HELP_TOPICS: list[dict] = [
             "Autovalidate panel in each editor, or review system-suggested "
             "candidates in **Library → Quality Inbox** (quality monitoring "
             "auto-tunes items in shadow mode when it detects drift)."
+        ),
+    },
+    {
+        "id": "projects",
+        "title": "Projects — a workspace per grant or effort",
+        "aliases": [
+            "project", "projects", "what is a project", "create a project",
+            "grant workspace", "chat across all my files",
+            "chat with all my documents", "drop files in",
+            "project status", "pin to project", "scoped workspace",
+        ],
+        "body": (
+            "A **project** is a goal-scoped workspace for one unit of work — a "
+            "grant, a submission, an audit. It bundles a folder, a knowledge "
+            "base, pinned tools, and its own chat in one place.\n\n"
+            "**Why it beats a plain folder:** every file you add to a project "
+            "is automatically indexed into the project's knowledge base. So "
+            "project-wide chat — *\"what do all these documents say about "
+            "cost share?\"* — works immediately, with **no separate knowledge "
+            "base to build or maintain**. Drop files in as they arrive and the "
+            "answers stay current.\n\n"
+            "**You can:**\n"
+            "- Ask the chat to *\"start a project for the Smith R01\"*\n"
+            "- Pin the workflows and extraction templates you use on it, then "
+            "*\"run the intake workflow on everything in this project\"* — the "
+            "agent resolves the file set itself\n"
+            "- Move it through its lifecycle: draft → active → submitted → "
+            "awarded → closeout → archived\n"
+            "- Share it with your team or hand out an invite link\n\n"
+            "**Rule of thumb:** if you'll feed documents in over time, use a "
+            "project. If you have one fixed reference corpus (a policy manual), "
+            "a plain knowledge base is enough."
+        ),
+    },
+    {
+        "id": "web-search",
+        "title": "Searching the web from chat",
+        "aliases": [
+            "web search", "search the web", "search the internet", "google",
+            "look it up online", "current information", "latest guidance",
+            "can you search online", "internet access", "up to date",
+        ],
+        "body": (
+            "The chat can search the public web when the answer isn't in your "
+            "own documents — current sponsor guidance, agency policy pages, "
+            "salary caps, deadlines, version numbers.\n\n"
+            "**The order matters.** The agent checks *your* material first — "
+            "your documents and knowledge bases — and only reaches for the web "
+            "when the question needs external or current information. Your "
+            "institution's own policy always beats a search result, so answers "
+            "grounded in your files stay grounded.\n\n"
+            "When it does use the web, it cites the source URL. Ask it to "
+            "*\"read that page\"* on any result and it will fetch the full "
+            "text; ask it to *\"add that to a knowledge base\"* and the page "
+            "gets chunked and indexed for repeat queries with citations.\n\n"
+            "**If web search isn't available**, your administrator hasn't "
+            "configured a search provider yet — it's set under **Admin → "
+            "System Config → Endpoints**. Reading a URL you paste in directly "
+            "works either way."
+        ),
+    },
+    {
+        "id": "build-from-chat",
+        "title": "Building workflows and automations by talking",
+        "aliases": [
+            "build a workflow", "create a workflow from chat",
+            "make a workflow", "author a workflow", "build an automation",
+            "set up an automation", "automate this", "can you build",
+            "turn this into a workflow", "repeatable",
+        ],
+        "body": (
+            "You don't have to open the visual editor to build things. Describe "
+            "the process and the chat will build it.\n\n"
+            "**Workflows** — *\"build me a workflow that extracts the budget, "
+            "checks it against policy, then drafts a summary.\"* The agent lays "
+            "out the steps, shows you a preview, and creates the workflow on "
+            "your confirm. Steps run in order and each step's output feeds the "
+            "next.\n\n"
+            "**Automations** — *\"run that workflow on every file added to my "
+            "Intake folder\"* or *\"run it every Monday at 9am.\"* Folder "
+            "watches and schedules can both be set up from chat. New "
+            "automations are created **disabled** so nothing fires before "
+            "you've looked at it — enable it in the Automations tab.\n\n"
+            "**Extraction templates** — *\"build an extraction template from "
+            "this RFP\"* reads the document and proposes the fields worth "
+            "pulling.\n\n"
+            "**A workflow built in chat starts unverified.** That's on purpose: "
+            "it's ready to run, but you should fine-tune it in the visual "
+            "editor and validate it against test cases before you rely on it "
+            "for real decisions. Ask the chat to *\"validate it\"* when you're "
+            "ready."
+        ),
+    },
+    {
+        "id": "saving-chat-output",
+        "title": "Saving chat output as a document",
+        "aliases": [
+            "save this", "save to folder", "export", "keep this",
+            "save the summary", "write this up", "save output",
+            "export results", "download the answer", "make a document",
+        ],
+        "body": (
+            "Ask the chat to *\"save this to my Grants folder\"* and the output "
+            "becomes a real document in your file tree — not just text in a "
+            "transcript you'll lose.\n\n"
+            "A saved file behaves like anything else you upload: it shows up in "
+            "the **Files** tab, downloads, and once indexing finishes it's "
+            "searchable in chat, addable to a knowledge base, and usable as "
+            "input to extractions and workflows. So a synthesis you generate "
+            "today can be the source material for a workflow next week.\n\n"
+            "Saves as Markdown by default (`.md`), or plain text if you ask. "
+            "Like every other write, it previews first and waits for your "
+            "confirm.\n\n"
+            "Extraction results have their own path — the results table has "
+            "CSV/TSV export built in."
         ),
     },
 ]
