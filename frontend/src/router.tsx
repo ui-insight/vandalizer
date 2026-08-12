@@ -77,7 +77,7 @@ const ROUTE_TITLES: Array<[string, string]> = [
   ['/support', 'Support'],
   ['/automation', 'Automations'],
   ['/docs', 'Docs'],
-  ['/landing', 'Sign in'],
+  ['/landing', 'Vandalizer 5.0'],
   ['/login', 'Sign in'],
   ['/register', 'Create account'],
   ['/reset-password', 'Reset password'],
