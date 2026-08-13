@@ -1,0 +1,9 @@
+Proposal review isn’t just about finding an answer once. It’s about making sure the next reviewer can find the same answer, from the same source, without starting over.
+
+Here, the research administrator asks Vandalizer for the proposal facts that drive review: the project title, funding request, project period, and equipment budget.
+
+Vandalizer prepares a reusable extraction, grounded in the proposal, and pauses for approval before it creates anything.
+
+Once approved, the facts are structured, source-linked, and ready to check, share, and use again on the next proposal.
+
+That means the next proposal starts with a stronger process, not another blank page.

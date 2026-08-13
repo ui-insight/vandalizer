@@ -48,6 +48,14 @@ backend/data/chromadb/
 frontend/.vite/
 node_modules/
 
+# Demo renders are reproducible from the checked-in recipes. Keep the source
+# assets and recipes under version control, but never commit rendered media or
+# run-specific timelines.
+frontend/public/videos/generated/
+frontend/public/videos/live-product-demo*.mp4
+frontend/public/videos/live-product-demo*.mp3
+frontend/public/videos/live-product-demo*-poster.jpg
+
 # Internal planning docs (not for public release)
 deploy_roadmap.md
 risk-plan.md

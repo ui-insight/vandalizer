@@ -12,6 +12,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "test:e2e": "playwright test",
+    "demo:check": "node scripts/render-demo.mjs --check",
+    "demo:render": "node scripts/render-demo.mjs",
     "ci": "npm run typecheck && npm run lint && npm run test:coverage && npm run build"
   },
   "dependencies": {
