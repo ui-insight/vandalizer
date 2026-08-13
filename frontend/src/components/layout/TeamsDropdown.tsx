@@ -222,7 +222,7 @@ export function TeamsDropdown() {
               <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
               <Link
                 to="/support"
-                search={{ ticket: undefined }}
+                search={{ ticket: undefined, status: undefined, priority: undefined, classification: undefined, tag: undefined, q: undefined }}
                 role="menuitem"
                 tabIndex={-1}
                 onClick={() => closeMenu()}

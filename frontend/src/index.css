@@ -31,6 +31,12 @@ html {
   font-family: "Public Sans Variable", "Public Sans", Arial, sans-serif;
 }
 
+@media (max-width: 767px) {
+  .project-context-bar {
+    margin-right: 0 !important;
+  }
+}
+
 /* Global keyboard focus indicator */
 @layer base {
   :focus-visible {
@@ -614,7 +620,10 @@ html {
 }
 
 .launch-eyebrow-dark {
-  color: var(--highlight-on-light, #806600);
+  /* This sits on #f5f5f7, which is just dark enough that the runtime brand
+     variant can miss normal-text contrast by a fraction. Keep the eyebrow
+     on the proven accessible brand shade. */
+  color: #806600;
 }
 
 .launch-display,
@@ -748,8 +757,7 @@ html {
 .launch-capability-section,
 .launch-project-section,
 .launch-control-section,
-.launch-demo-section,
-.launch-video-section {
+.launch-demo-section {
   padding: clamp(96px, 12vw, 168px) 0;
 }
 
@@ -783,7 +791,7 @@ html {
   position: absolute;
   top: 23px;
   right: 22px;
-  color: #52525b;
+  color: #a1a1aa;
   font-family: "SF Mono", ui-monospace, monospace;
   font-size: 11px;
 }
@@ -970,21 +978,6 @@ html {
 }
 
 .launch-control-point svg { color: var(--highlight-color, #eab308); }
-
-.launch-video-section {
-  background: #f5f5f7;
-  padding: clamp(96px, 12vw, 150px) 0;
-}
-
-.launch-video-frame {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border: 1px solid #d4d4d8;
-  border-radius: 23px;
-  background: #080808;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.16);
-}
 
 .launch-demo-section {
   position: relative;

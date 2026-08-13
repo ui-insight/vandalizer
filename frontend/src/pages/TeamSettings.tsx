@@ -71,14 +71,20 @@ export function TeamSettings() {
 
   const refreshData = useCallback(async () => {
     if (!currentTeam) return
-    const [m, i, l] = await Promise.all([
-      getTeamMembers(currentTeam.uuid),
-      getTeamInvites(currentTeam.uuid),
-      canEdit ? getJoinLinks(currentTeam.uuid) : Promise.resolve([]),
-    ])
-    setMembers(m)
-    setInvites(i)
-    setJoinLinks(l)
+    try {
+      const [m, i, l] = await Promise.all([
+        getTeamMembers(currentTeam.uuid),
+        // Members can see their team roster, but pending invitations and join
+        // links are admin controls. Don't generate an avoidable 403 for them.
+        canEdit ? getTeamInvites(currentTeam.uuid) : Promise.resolve([]),
+        canEdit ? getJoinLinks(currentTeam.uuid) : Promise.resolve([]),
+      ])
+      setMembers(m)
+      setInvites(i)
+      setJoinLinks(l)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load team details')
+    }
   }, [currentTeam, canEdit])
 
   useEffect(() => {

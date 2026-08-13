@@ -72,8 +72,12 @@ export function LoginForm() {
         </Link>
       </p>
       <p className="text-center text-sm text-gray-400">
-        Don&apos;t have an account?{' '}
-        <Link to="/register" className="font-bold text-white hover:text-[#f1b300]">
+        Need an account?{' '}
+        <Link
+          to="/landing"
+          search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }}
+          className="font-bold text-white hover:text-[#f1b300]"
+        >
           Create one
         </Link>
       </p>

@@ -2371,6 +2371,12 @@ _INVENTORY_TTL = 60.0  # seconds
 
 def _relative_time(dt: datetime.datetime) -> str:
     """Format a datetime as a human-friendly relative string."""
+    # MongoDB/BSON returns UTC datetimes without tzinfo. Normalize here because
+    # this formatter is called by workspace onboarding and activity surfaces.
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    else:
+        dt = dt.astimezone(datetime.timezone.utc)
     now = datetime.datetime.now(datetime.timezone.utc)
     delta = now - dt
     seconds = delta.total_seconds()

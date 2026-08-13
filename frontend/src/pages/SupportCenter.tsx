@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   ArrowLeft, Check, MessageSquare, Send, Plus, Paperclip, Pencil, X, Loader2, Link2, Tag,
   Eye, UserPlus, Search, Flag, Lock, Layers, Heart, Sparkles, Trash2,
@@ -72,11 +72,24 @@ type SupportSearch = {
   q?: string
 }
 
+function mergeSupportSearch(current: SupportSearch, patch: Partial<SupportSearch>) {
+  const next = { ...current, ...patch }
+  return {
+    ticket: next.ticket,
+    status: next.status,
+    priority: next.priority,
+    classification: next.classification,
+    tag: next.tag,
+    q: next.q,
+  }
+}
+
 export default function SupportCenter() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const urlSearch = useSearch({ from: '/support' }) as SupportSearch
   const { toast } = useToast()
+  const isSupportAgent = !!user?.is_support_agent
 
   const [view, setView] = useState<View>('list')
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
@@ -104,7 +117,7 @@ export default function SupportCenter() {
   const patchSearch = useCallback((patch: Partial<SupportSearch>) => {
     navigate({
       to: '/support',
-      search: (prev) => ({ ...(prev as SupportSearch), ...patch }),
+      search: (prev) => mergeSupportSearch(prev as SupportSearch, patch),
       replace: true,
     })
   }, [navigate])
@@ -153,6 +166,10 @@ export default function SupportCenter() {
   }, [patchSearch])
 
   const load = useCallback(async () => {
+    if (!isSupportAgent) {
+      setLoading(false)
+      return
+    }
     setLoading(true)
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
@@ -177,7 +194,7 @@ export default function SupportCenter() {
     } finally {
       setLoading(false)
     }
-  }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
+  }, [isSupportAgent, toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
 
   const loadMore = useCallback(async () => {
     setLoadingMore(true)
@@ -219,8 +236,23 @@ export default function SupportCenter() {
     }
   }, [urlSearch.ticket, activeTicketUuid, view])
 
-  if (!user?.is_support_agent) {
-    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />
+  if (!isSupportAgent) {
+    return (
+      <PageLayout>
+        <main className="mx-auto flex min-h-[55vh] max-w-xl flex-col items-center justify-center px-6 text-center">
+          <span className="mb-4 inline-flex rounded-full bg-amber-50 p-3 text-amber-700"><Lock className="h-6 w-6" /></span>
+          <h1 className="text-2xl font-bold text-gray-900">Support Center is for support staff</h1>
+          <p className="mt-3 text-sm leading-6 text-gray-600">Your account does not have access to the internal ticket queue. Use the workspace support button to contact the team.</p>
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined } })}
+            className="mt-6 rounded-md bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:brightness-90"
+          >
+            Back to workspace
+          </button>
+        </main>
+      </PageLayout>
+    )
   }
 
   // Both keep the filter params intact — opening a ticket and coming back must
@@ -228,13 +260,13 @@ export default function SupportCenter() {
   const openTicket = (uuid: string) => {
     setActiveTicketUuid(uuid)
     setView('chat')
-    navigate({ to: '/support', search: (prev) => ({ ...(prev as SupportSearch), ticket: uuid }) })
+    navigate({ to: '/support', search: (prev) => mergeSupportSearch(prev as SupportSearch, { ticket: uuid }) })
   }
 
   const backToList = () => {
     setActiveTicketUuid(null)
     setView('list')
-    navigate({ to: '/support', search: (prev) => ({ ...(prev as SupportSearch), ticket: undefined }) })
+    navigate({ to: '/support', search: (prev) => mergeSupportSearch(prev as SupportSearch, { ticket: undefined }) })
     load()
   }
 

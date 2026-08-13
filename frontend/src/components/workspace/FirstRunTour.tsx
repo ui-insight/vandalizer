@@ -80,7 +80,7 @@ export function FirstRunTour() {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#171717] shadow-2xl">
+      <div role="dialog" aria-modal="true" aria-labelledby="first-run-tour-title" className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#171717] shadow-2xl">
         <button
           type="button"
           onClick={dismiss}
@@ -102,7 +102,7 @@ export function FirstRunTour() {
               <Icon className="w-6 h-6" />
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-bold text-white mb-2">{s.title}</h2>
+              <h2 id="first-run-tour-title" className="text-lg font-bold text-white mb-2">{s.title}</h2>
               <p className="text-sm text-gray-400 leading-relaxed">{s.body}</p>
             </div>
           </div>
@@ -122,7 +122,7 @@ export function FirstRunTour() {
             <button
               type="button"
               onClick={dismiss}
-              className="text-sm text-gray-500 hover:text-gray-300 transition-colors"
+              className="text-sm text-gray-300 hover:text-white transition-colors"
             >
               Skip tour
             </button>

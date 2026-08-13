@@ -26,6 +26,8 @@ interface Props {
   focusSignal?: number
 }
 
+const MIN_COMPOSER_TEXT_HEIGHT = 24
+
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled,
   isStreaming, onStop,
@@ -51,7 +53,10 @@ export function ChatInput({
     const ta = textareaRef.current
     if (!ta) return
     ta.style.height = 'auto'
-    ta.style.height = `${ta.scrollHeight}px`
+    // A zero scrollHeight can occur briefly while the workspace is laying out
+    // (and in a few browser/zoom combinations). Never let that collapse the
+    // empty composer and hide its placeholder.
+    ta.style.height = `${Math.max(ta.scrollHeight, MIN_COMPOSER_TEXT_HEIGHT)}px`
   }, [message])
 
   // Pull focus into the composer when the workspace requests it. Guard on the
@@ -170,8 +175,9 @@ export function ChatInput({
             }
             aria-label="Message input"
             rows={1}
-            className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"
-            style={{ fontSize: 16, maxHeight: '25vh' }}
+            wrap="soft"
+            className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none"
+            style={{ fontSize: 16, lineHeight: 1.5, minHeight: `${MIN_COMPOSER_TEXT_HEIGHT}px`, maxHeight: '25vh' }}
             disabled={disabled}
           />
         </div>

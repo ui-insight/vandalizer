@@ -340,6 +340,7 @@ def _generate_since_last_visit(
     active_alerts: list,
 ) -> str | None:
     """Summarize what happened since the user was last here."""
+    last_login_at = _as_aware_utc(last_login_at)
     if not last_login_at:
         return None
 
@@ -352,7 +353,7 @@ def _generate_since_last_visit(
     completed_since = 0
     failed_since = 0
     for ev in recent_activity:
-        ev_time = getattr(ev, "last_updated_at", None)
+        ev_time = _as_aware_utc(getattr(ev, "last_updated_at", None))
         if ev_time and ev_time > last_login_at:
             status = getattr(ev, "status", "")
             if status == "completed":
@@ -362,7 +363,7 @@ def _generate_since_last_visit(
 
     new_alerts = sum(
         1 for a in active_alerts
-        if getattr(a, "created_at", None) and a.created_at > last_login_at
+        if (created_at := _as_aware_utc(getattr(a, "created_at", None))) and created_at > last_login_at
     )
 
     parts: list[str] = []

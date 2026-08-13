@@ -302,51 +302,6 @@ function AccessDialog({ config, orgName, onClose }: { config: AuthConfig | null;
   )
 }
 
-// ---------------------------------------------------------------------------
-// Optional video and demo form
-// ---------------------------------------------------------------------------
-
-function DemoVideo() {
-  const url = (import.meta.env.VITE_DEMO_VIDEO_URL as string | undefined)?.trim()
-
-  const isIframeEmbed =
-    /youtube\.com\/embed\//.test(url) ||
-    /player\.vimeo\.com\/video\//.test(url) ||
-    /loom\.com\/embed\//.test(url)
-
-  return (
-    <section className="launch-video-section" aria-labelledby="walkthrough-heading">
-      <div className="launch-content-wide">
-        <div className="mx-auto mb-10 max-w-2xl text-center">
-          <p className="launch-eyebrow launch-eyebrow-dark"><PlayCircle className="h-4 w-4" /> Watch it work</p>
-          <h2 id="walkthrough-heading" className="launch-heading-dark mt-5 text-4xl sm:text-5xl">One request. The whole system responds.</h2>
-        </div>
-        <div className="launch-video-frame">
-          {isIframeEmbed ? (
-            <iframe
-              src={url}
-              title="Vandalizer 5.0 walkthrough"
-              className="absolute inset-0 h-full w-full"
-              frameBorder={0}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          ) : (
-            <video
-              src={url}
-              poster="/videos/vandalizer-5-walkthrough-poster.jpg"
-              controls
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-          )}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function DemoRequestForm() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -718,8 +673,6 @@ export default function Landing() {
             </div>
           </div>
         </section>
-
-        <DemoVideo />
 
         <section id="demo" className="launch-demo-section" aria-labelledby="demo-heading">
           <div className="launch-content-wide grid items-start gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-24">

@@ -10,6 +10,7 @@ import SupportCenter from './SupportCenter'
 const mockUseSearch = vi.fn()
 const mockNavigate = vi.fn()
 const mockListTickets = vi.fn()
+const mockUseAuth = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   Navigate: () => null,
@@ -37,7 +38,7 @@ vi.mock('../api/support', () => ({
 }))
 
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ user: { user_id: 'u1', is_support_agent: true } }),
+  useAuth: () => mockUseAuth(),
 }))
 vi.mock('../contexts/ToastContext', () => ({ useToast: () => ({ toast: vi.fn() }) }))
 vi.mock('../components/shared/useConfirm', () => ({ useConfirm: () => vi.fn() }))
@@ -55,12 +56,23 @@ beforeEach(() => {
   mockListTickets.mockResolvedValue({ tickets: [], total: 0, limit: 50, offset: 0 })
   mockUseSearch.mockReset()
   mockUseSearch.mockReturnValue({})
+  mockUseAuth.mockReset()
+  mockUseAuth.mockReturnValue({ user: { user_id: 'u1', is_support_agent: true } })
 })
 
 // listTickets(status, limit, offset, scope, tag, category, search, priority, classification)
 const lastCall = () => mockListTickets.mock.calls[mockListTickets.mock.calls.length - 1]
 
 describe('SupportCenter filter persistence', () => {
+  it('shows a clear access state without loading staff-only data for non-support users', () => {
+    mockUseAuth.mockReturnValue({ user: { user_id: 'member-1', is_support_agent: false } })
+
+    render(<SupportCenter />)
+
+    expect(screen.getByRole('heading', { name: 'Support Center is for support staff' })).toBeInTheDocument()
+    expect(mockListTickets).not.toHaveBeenCalled()
+  })
+
   it('seeds the query from the URL, so filters survive a refresh', async () => {
     mockUseSearch.mockReturnValue({
       status: 'closed',

@@ -183,6 +183,7 @@ export function LibraryTab() {
       folder: selectedFolder,
     },
   )
+  const hasActiveFilters = Boolean(search || viewFilter !== 'all' || kindFilter !== 'all')
 
   // The tab stays mounted (hidden) while a workflow/extraction/automation
   // editor is open in the right panel, so filters and search survive the
@@ -598,7 +599,7 @@ export function LibraryTab() {
 
   if (libLoading) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ fontSize: 13, color: '#888' }}>
+      <div className="flex items-center justify-center h-full" style={{ fontSize: 13, color: '#666' }}>
         Loading...
       </div>
     )
@@ -606,7 +607,7 @@ export function LibraryTab() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 13, color: '#888' }}>
+      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 13, color: '#666' }}>
         <p>{error}</p>
         <button
           onClick={refresh}
@@ -829,7 +830,7 @@ export function LibraryTab() {
                     style={{
                       fontSize: 11,
                       fontWeight: 500,
-                      color: active ? 'var(--library-highlight-ink)' : '#888',
+                      color: active ? 'var(--library-highlight-ink)' : '#666',
                       opacity: active ? 0.85 : 1,
                     }}
                   >
@@ -841,6 +842,7 @@ export function LibraryTab() {
           </div>
           <div style={{ flexShrink: 0, display: 'flex', justifyContent: 'flex-end', minWidth: 150 }}>
             <select
+              aria-label="Sort library items"
               value={sortOption}
               onChange={(e) => setSortOption(e.target.value as SortOption)}
               style={{
@@ -901,7 +903,7 @@ export function LibraryTab() {
               fontSize: 10,
               fontWeight: 700,
               textTransform: 'uppercase',
-              color: '#888',
+              color: '#666',
               letterSpacing: '0.5px',
             }}
           >
@@ -959,7 +961,7 @@ export function LibraryTab() {
                   justifyContent: 'space-between',
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
                   Folders
                 </span>
                 <button
@@ -1128,7 +1130,7 @@ export function LibraryTab() {
                             border: 'none',
                             padding: '2px 3px',
                             cursor: 'pointer',
-                            color: '#888',
+                            color: '#666',
                             display: 'flex',
                             alignItems: 'center',
                             borderRadius: 4,
@@ -1278,13 +1280,13 @@ export function LibraryTab() {
                   border: 'none',
                   padding: 4,
                   cursor: 'pointer',
-                  color: '#888',
+                  color: '#666',
                   display: 'flex',
                   alignItems: 'center',
                   borderRadius: 4,
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = '#333' }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#666' }}
               >
                 <X style={{ width: 16, height: 16 }} />
               </button>
@@ -1313,9 +1315,39 @@ export function LibraryTab() {
           {/* Items list */}
           <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
             {itemsLoading ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading...</div>
+              <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 13 }}>Loading...</div>
             ) : sorted.length === 0 ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>No items found.</div>
+              <div style={{ maxWidth: 360, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }}>
+                <h2 style={{ margin: 0, color: '#303030', fontSize: 16, fontWeight: 700 }}>
+                  {hasActiveFilters ? 'No items match these filters' : 'Your library is ready for its first tool'}
+                </h2>
+                <p style={{ margin: '10px 0 18px', color: '#5f6368', fontSize: 13, lineHeight: 1.55 }}>
+                  {hasActiveFilters
+                    ? 'Try clearing a filter or searching with a different term.'
+                    : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work.'}
+                </p>
+                {hasActiveFilters ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('')
+                      setViewFilter('all')
+                      setKindFilter('all')
+                    }}
+                    style={{ border: '1px solid #dadce0', borderRadius: 8, padding: '8px 12px', background: '#fff', color: '#303030', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Clear filters
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openCreateModal('workflow')}
+                    style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--library-highlight-ink, #1f1b00)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    Create a workflow
+                  </button>
+                )}
+              </div>
             ) : (
               sorted.map((item) => (
                 <LibraryItemRow

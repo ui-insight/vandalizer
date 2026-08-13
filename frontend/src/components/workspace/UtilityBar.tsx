@@ -17,7 +17,8 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
   const modes = activeProjectRole === 'viewer' ? MODES.filter(m => m.mode === 'chat') : MODES
 
   return (
-    <div
+    <nav
+      aria-label="Workspace navigation"
       style={{
         width: 48,
         background: '#191919',
@@ -150,6 +151,6 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           50% { opacity: 0.4; transform: scale(0.7); }
         }
       `}</style>
-    </div>
+    </nav>
   )
 }

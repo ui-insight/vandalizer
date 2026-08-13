@@ -17,6 +17,7 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
 
   return (
     <div
+      className="project-context-bar"
       style={{
         display: 'flex',
         alignItems: 'center',

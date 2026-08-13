@@ -70,6 +70,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
   return (
     <nav
       aria-label="Folder navigation"
+      tabIndex={0}
       className="overflow-x-auto whitespace-nowrap flex items-center gap-2"
       style={{ padding: '20px 30px 0px 0px' }}
     >

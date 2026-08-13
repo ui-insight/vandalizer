@@ -80,7 +80,7 @@ function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail() {
+export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolean }) {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { counts: tuningCounts, actionable: tuningActionable } = useOptimizerInboxCount()
@@ -88,7 +88,9 @@ export function ActivityRail() {
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
   const confirm = useConfirm()
-  const visualDocked = railDocked
+  // The mobile drawer always needs its labels; a collapsed rail inside a
+  // full-width drawer would waste space and make the activity list opaque.
+  const visualDocked = forceExpanded ? false : railDocked
 
   const certLevel = progress?.level || 'novice'
   const certConfig = LEVEL_CONFIG[certLevel] || LEVEL_CONFIG.novice
@@ -166,6 +168,7 @@ export function ActivityRail() {
 
   return (
     <aside
+      aria-label="Activity"
       className="flex h-full flex-col border-l border-[#d8d8d8] bg-panel-bg"
     >
       {/* Header */}
@@ -179,10 +182,13 @@ export function ActivityRail() {
           )}
           <button
             onClick={toggleRailDocked}
-            className="flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto"
-            title={railDocked ? 'Expand' : 'Collapse'}
+            className={cn(
+              'flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto',
+              forceExpanded && 'hidden',
+            )}
+            title={visualDocked ? 'Expand' : 'Collapse'}
           >
-            {railDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+            {visualDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
         </div>
       </div>
@@ -221,19 +227,19 @@ export function ActivityRail() {
                 'flex items-center gap-2 rounded-lg cursor-pointer p-2',
                 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
                 'transition-[background-color,box-shadow] duration-200',
-                railDocked ? 'justify-center' : '',
+                visualDocked ? 'justify-center' : '',
               )}
             >
               <div className="relative shrink-0 w-4 text-center text-[#806600]">
                 <Sparkles className="h-4 w-4" />
-                {railDocked && (
+                {visualDocked && (
                   <span
                     className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
                     style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
                   />
                 )}
               </div>
-              {!railDocked && (
+              {!visualDocked && (
                 <>
                   <div className="min-w-0 flex-1 text-[11px] leading-[1.4] text-[#111]">
                     Tuning suggestions

@@ -250,7 +250,7 @@ export function LeftPanel() {
   }
 
   return (
-    <div className="h-full overflow-hidden bg-panel-bg relative">
+    <aside aria-label="Documents" className="h-full overflow-hidden bg-panel-bg relative">
       {/* Black header bar - matches Flask .main-panel .header */}
       <div
         className="relative z-[300] flex items-center"
@@ -453,6 +453,6 @@ export function LeftPanel() {
           onClose={() => setKbPickerFolder(null)}
         />
       )}
-    </div>
+    </aside>
   )
 }

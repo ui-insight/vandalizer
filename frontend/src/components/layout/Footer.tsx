@@ -15,7 +15,7 @@ export function Footer() {
               AI-powered document intelligence for research administration.
             </p>
             {branding.isCustomized ? (
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-400">
                 Powered by{' '}
                 <a
                   href="https://github.com/ui-insight/vandalizer"
@@ -28,7 +28,7 @@ export function Footer() {
                 {' '}&middot; &copy; 2024&ndash;2026 Vandalizer Contributors
               </p>
             ) : (
-              <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 Vandalizer Contributors</p>
+              <p className="text-sm text-gray-400">&copy; 2024&ndash;2026 Vandalizer Contributors</p>
             )}
           </div>
 
@@ -90,7 +90,7 @@ export function Footer() {
       {/* NSF Disclaimer */}
       <div className="border-t border-white/5 py-6">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <p className="text-xs text-gray-500 leading-relaxed">
+          <p className="text-xs text-gray-400 leading-relaxed">
             This material is based upon work supported by the National Science Foundation under
             Award No. 2427549. Any opinions, findings, and conclusions or recommendations expressed
             in this material are those of the author(s) and do not necessarily reflect the views of
