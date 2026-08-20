@@ -47,6 +47,9 @@ def _mock_db(
     db.workflow_step.find_one.side_effect = lambda q, *a, **k: _steps.get(q.get("_id"))
     db.workflow_step_task.find_one.side_effect = lambda q, *a, **k: _tasks.get(q.get("_id"))
     db.smart_document.find_one.side_effect = lambda q, *a, **k: _docs.get(q.get("uuid"))
+    db.smart_document.find.side_effect = lambda q, *a, **k: [
+        _docs[u] for u in ((q.get("uuid") or {}).get("$in") or []) if u in _docs
+    ]
     db.search_set_item.find.return_value = search_set_items or []
     db.search_set.find_one.return_value = None
 
@@ -120,6 +123,58 @@ class TestExecuteWorkflowTask:
         assert first_update[0][1]["$set"]["status"] == "running"
         # Verify num_executions incremented
         db.workflow.update_one.assert_called_once()
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_completion_does_not_overwrite_a_cancelled_run(
+        self, mock_build, mock_get_db,
+    ):
+        """Cancellation flips the row out-of-band and revokes the worker, but a
+        step already in flight can finish before the revoke lands. Writing
+        "completed" unconditionally undid the user's stop, so a batch they
+        halted reported success — and on a batch that was the *only* thing
+        stopping it, since batch runs carried no task id to revoke.
+        """
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "test"}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Final output", [{"name": "Doc", "output": ["uuid1"]}])
+        mock_engine.usage = MagicMock(tokens_in=100, tokens_out=50)
+        mock_build.return_value = mock_engine
+
+        with patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+            )
+
+        completed = [
+            c for c in db.workflow_result.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("status") == "completed"
+        ]
+        assert completed, "no completion write was issued at all"
+        for call in completed:
+            assert call[0][0].get("status") == {"$ne": "canceled"}, (
+                "the completion write was not guarded, so it would resurrect a "
+                "run the user stopped"
+            )
 
     @patch("app.tasks.workflow_tasks._get_db")
     def test_missing_workflow_raises(self, mock_get_db):
@@ -1257,3 +1312,150 @@ class TestInputReadinessGate:
         # One ready document is enough — the gate must not block the run.
         assert result["status"] == "completed"
         mock_build.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight context grouping
+# ---------------------------------------------------------------------------
+
+def test_context_groups_bundle_the_document_trigger_package():
+    from app.tasks.workflow_tasks import _document_context_groups
+
+    steps = [
+        {"name": "Document", "data": {"doc_uuids": ["a", "b", "c", "d"]}},
+        {"name": "Assess", "tasks": [{"name": "Prompt", "data": {}}]},
+    ]
+    assert _document_context_groups(steps) == [{"a", "b", "c", "d"}]
+
+
+def test_context_groups_do_not_sum_docs_from_unrelated_steps():
+    from app.tasks.workflow_tasks import _document_context_groups
+
+    # Step One reads doc a, Step Two reads doc b. They never share a prompt, so
+    # they must be scored separately — summing them would refuse a valid run.
+    steps = [
+        {"name": "One", "tasks": [{"name": "Prompt", "data": {"selected_document_uuid": "a"}}]},
+        {"name": "Two", "tasks": [{"name": "Prompt", "data": {"selected_document_uuid": "b"}}]},
+    ]
+    assert _document_context_groups(steps) == [{"a"}, {"b"}]
+
+
+def test_context_groups_add_trigger_docs_to_each_step():
+    from app.tasks.workflow_tasks import _document_context_groups
+
+    # The trigger package flows into every step, so a step's own attachment is
+    # read alongside it.
+    steps = [
+        {"name": "Document", "data": {"doc_uuids": ["trigger"]}},
+        {"name": "One", "tasks": [{"name": "Prompt", "data": {"selected_document_uuid": "a"}}]},
+    ]
+    assert _document_context_groups(steps) == [{"trigger"}, {"trigger", "a"}]
+
+
+def test_context_groups_empty_when_nothing_attached():
+    from app.tasks.workflow_tasks import _document_context_groups
+
+    assert _document_context_groups([{"name": "One", "tasks": []}]) == []
+
+
+def test_document_token_counts_maps_by_uuid():
+    from app.tasks.workflow_tasks import _document_token_counts
+
+    db = MagicMock()
+    db.smart_document.find.return_value = [
+        {"uuid": "a", "title": "A.pdf", "token_count": 12_000},
+        {"uuid": "b", "token_count": None},  # missing title/count
+    ]
+    counts = _document_token_counts(db, {"a", "b"})
+    assert counts["a"] == {"uuid": "a", "title": "A.pdf", "token_count": 12_000}
+    assert counts["b"] == {"uuid": "b", "title": "b", "token_count": 0}
+
+
+def test_document_token_counts_skips_query_when_empty():
+    from app.tasks.workflow_tasks import _document_token_counts
+
+    db = MagicMock()
+    assert _document_token_counts(db, set()) == {}
+    db.smart_document.find.assert_not_called()
+
+
+class TestPreflightContextOverflow:
+    """A package that only overflows once concatenated is refused before the run."""
+
+    def _nasa_db(self, wf_id, result_id, step_id, task_id):
+        return _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            # Margin pinned to 1.0 so this fixture measures the pre-flight
+            # wiring rather than the stored-count divergence allowance, which
+            # is covered directly in test_context_budget.py.
+            sys_config={"available_models": [
+                {"name": "qwen3", "context_window": 65_536, "token_safety_margin": 1.0},
+            ]},
+            step_docs=[{"_id": step_id, "name": "Assess", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "assess"}}],
+            smart_docs=[
+                {"uuid": "a", "title": "ECIPES.pdf", "token_count": 12_000, "raw_text": "x"},
+                {"uuid": "b", "title": "Overview.pdf", "token_count": 15_000, "raw_text": "x"},
+                {"uuid": "c", "title": "Solicitation.pdf", "token_count": 25_000, "raw_text": "x"},
+                {"uuid": "d", "title": "ProposersGuide.pdf", "token_count": 40_119, "raw_text": "x"},
+            ],
+        )
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_combined_overflow_fails_before_the_engine_runs(self, mock_build, mock_get_db):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id, step_id, task_id = (_fake_oid() for _ in range(4))
+        db = self._nasa_db(wf_id, result_id, step_id, task_id)
+        mock_get_db.return_value = db
+        mock_engine = MagicMock()
+        mock_build.return_value = mock_engine
+
+        execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": ["a", "b", "c", "d"]},
+            model="qwen3",
+        )
+
+        mock_engine.execute.assert_not_called()
+        payload = next(
+            c[0][1]["$set"]["error_payload"]
+            for c in db.workflow_result.update_one.call_args_list
+            if "error_payload" in (c[0][1].get("$set") or {})
+        )
+        assert payload["overflow_kind"] == "combined"
+        assert payload["total_tokens"] == 92_119
+        assert payload["suggested_action"] == "convert_to_kb"
+        assert {d["uuid"] for d in payload["oversize_documents"]} == {"a", "b", "c", "d"}
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_same_package_runs_on_a_wider_model(self, mock_build, mock_get_db):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id, step_id, task_id = (_fake_oid() for _ in range(4))
+        db = self._nasa_db(wf_id, result_id, step_id, task_id)
+        db.system_config.find_one.return_value = {
+            "available_models": [{"name": "qwen3", "context_window": 262_144}],
+        }
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Report", [{"name": "Assess", "output": "Report"}])
+        mock_engine.usage = MagicMock(tokens_in=90_000, tokens_out=5_000)
+        mock_build.return_value = mock_engine
+
+        with patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            result = execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["a", "b", "c", "d"]},
+                model="qwen3",
+            )
+
+        assert result["status"] == "completed"
+        mock_engine.execute.assert_called_once()

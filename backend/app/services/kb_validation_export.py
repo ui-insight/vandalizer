@@ -3,10 +3,14 @@
 A persisted ``ValidationRun`` for a knowledge base keeps the full per-query
 judge output in ``result_snapshot.retrieval_precision.details`` — question,
 actual answer, judge score/verdict/reasoning, retrieved sources, baseline and
-lift. The snapshot does *not* keep the expected answer (the judge reads it
-from the live ``KBTestQuery`` at run time), so the builder re-joins the
-current test queries by uuid (falling back to the query text) to fill it in;
-a since-deleted query simply exports with a blank expected answer.
+lift. It also records each question's expected answer and external id, so an
+export is reproducible from the run alone: pruning the live test set no longer
+blanks those columns on a run that already scored them.
+
+Runs recorded before that was persisted fall back to re-joining the current
+test queries by uuid (then by query text), which is why the re-join is still
+here — for those, a since-deleted query still exports with a blank expected
+answer.
 
 The build step is pure (no I/O) so it's unit-testable, matching the
 extraction-results export in ``routers/extractions.py``.
@@ -88,11 +92,16 @@ def build_kb_validation_results_export(
         baseline = det.get("baseline_judge") or {}
         rows.append({
             "query_uuid": quuid or (getattr(tq, "uuid", "") if tq else ""),
-            "external_id": (getattr(tq, "external_id", None) if tq else None) or "",
+            # Prefer what the run recorded. The live re-join is a fallback for
+            # runs from before these were persisted — and it is exactly what
+            # went blank when a test query was later deleted.
+            "external_id": det.get("external_id")
+                or (getattr(tq, "external_id", None) if tq else None) or "",
             "question": det.get("query") or "",
             "category": det.get("category")
                 or (getattr(tq, "category", None) if tq else None) or "",
-            "expected_answer": (getattr(tq, "expected_answer", None) if tq else None) or "",
+            "expected_answer": det.get("expected_answer")
+                or (getattr(tq, "expected_answer", None) if tq else None) or "",
             "expected_sources": det.get("expected_sources")
                 or (list(getattr(tq, "expected_source_labels", []) or []) if tq else []),
             "retrieved_sources": det.get("retrieved_sources") or [],

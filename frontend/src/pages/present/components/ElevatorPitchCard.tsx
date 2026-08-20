@@ -67,12 +67,18 @@ function CopyablePitch({
           )}
         </button>
       </div>
-      <p className="text-gray-200 leading-relaxed">{text}</p>
+      <div className="space-y-3">
+        {text.split(/\n{2,}/).map((para, i) => (
+          <p key={i} className="text-gray-200 leading-relaxed">
+            {para}
+          </p>
+        ))}
+      </div>
     </div>
   )
 }
 
-/** Two copy-ready elevator pitches: a spoken (~30s) and a written paragraph. */
+/** Two copy-ready elevator pitches: a spoken (~30s) and a written one for email. */
 export function ElevatorPitchCard({ pitch, highlight }: ElevatorPitchCardProps) {
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -86,7 +92,7 @@ export function ElevatorPitchCard({ pitch, highlight }: ElevatorPitchCardProps) 
       <CopyablePitch
         icon={Mail}
         kind="Written"
-        caption="one paragraph, for email"
+        caption="for email"
         text={pitch.written}
         highlighted={highlight === 'written'}
       />

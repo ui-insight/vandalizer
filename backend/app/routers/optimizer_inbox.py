@@ -114,9 +114,10 @@ class _AccessCache:
         if not item_id:
             return None
         try:
+            access = await self.team_access()
+
             if surface == "kb":
                 ancestry = await self.org_ancestry()
-                access = await self.team_access()
                 doc = await access_control.get_authorized_knowledge_base(
                     item_id, self.user, manage=True,
                     user_org_ancestry=ancestry, team_access=access,
@@ -126,10 +127,7 @@ class _AccessCache:
                 doc = await access_control.get_authorized_knowledge_base(
                     item_id, self.user, user_org_ancestry=ancestry, team_access=access,
                 )
-                return (doc, False) if doc is not None else None
-
-            if surface == "workflow":
-                access = await self.team_access()
+            elif surface == "workflow":
                 doc = await access_control.get_authorized_workflow(
                     item_id, self.user, manage=True, team_access=access,
                 )
@@ -138,15 +136,17 @@ class _AccessCache:
                 doc = await access_control.get_authorized_workflow(
                     item_id, self.user, team_access=access,
                 )
-                return (doc, False) if doc is not None else None
+            else:
+                doc = await access_control.get_authorized_search_set(
+                    item_id, self.user, manage=True,
+                )
+                if doc is not None:
+                    return (doc, True)
+                doc = await access_control.get_authorized_search_set(item_id, self.user)
 
-            doc = await access_control.get_authorized_search_set(
-                item_id, self.user, manage=True,
-            )
-            if doc is not None:
-                return (doc, True)
-            doc = await access_control.get_authorized_search_set(item_id, self.user)
-            return (doc, False) if doc is not None else None
+            if doc is None or not _is_own_or_team_item(surface, doc, self.user, access):
+                return None
+            return (doc, False)
         except Exception:
             # A malformed id (e.g. a non-ObjectId workflow_id from an old run)
             # must not take down the whole inbox — just hide that row.
@@ -154,6 +154,32 @@ class _AccessCache:
                 "Inbox access resolution failed for %s/%s", surface, item_id, exc_info=True,
             )
             return None
+
+
+def _is_own_or_team_item(
+    surface: SurfaceKind, doc: Any, user: User, team_access: Any,
+) -> bool:
+    """Is this item the caller's own, or their team's?
+
+    View access in this app is deliberately wider than ownership: a verified
+    catalog KB, a global search set, a workflow published to the catalog
+    library and an examiner's open review window all grant *view* to users far
+    outside the item's team. That is right for reading a shared definition and
+    wrong for a triage inbox — it put every catalog item's tuning runs, scores
+    and failure detail in front of every authenticated user, none of whom could
+    act on any of it (see ``can_manage`` below). So a row the caller cannot
+    manage is kept only when the item is theirs or their team's.
+
+    Manage rights are checked before this and stand on their own — an examiner
+    curating a verified KB genuinely can act on it, so those rows stay.
+    """
+    owner = getattr(doc, "user_id", None)
+    if owner is not None and owner == user.user_id:
+        return True
+    # Team sharing on a KB is opt-in; membership alone doesn't grant view.
+    if surface == "kb" and not getattr(doc, "shared_with_team", False):
+        return False
+    return access_control.can_view_team(getattr(doc, "team_id", None), team_access)
 
 
 def _item_name(surface: SurfaceKind, doc: Any) -> str:
@@ -386,11 +412,13 @@ async def list_optimizer_inbox(
     ),
     user: User = Depends(get_current_user),
 ) -> dict:
-    """Tuning suggestions and tuning failures for items the caller can see.
+    """Tuning suggestions and tuning failures for the caller's own items.
 
-    Every row is access-filtered against the parent KB / search set / workflow,
-    so this endpoint leaks nothing the caller couldn't already open, and rows
-    carry ``can_manage`` so the UI only offers Apply where it would succeed.
+    Every row is access-filtered against the parent KB / search set / workflow:
+    the caller must be able to manage it, or own it / share a team with it.
+    Catalog-wide *view* grants (verified KBs, global search sets, published
+    workflows) deliberately do not qualify — see ``_is_own_or_team_item``.
+    Rows carry ``can_manage`` so the UI only offers Apply where it would work.
     """
     items = await _collect(user, days=days, include_dismissed=include_dismissed)
     return {

@@ -2,6 +2,7 @@
 
 import datetime
 import secrets
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -642,6 +643,7 @@ class TestKnowledgeCRUD:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[src])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
             MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
             MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
@@ -695,6 +697,7 @@ class TestKnowledgeCRUD:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
             MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
             MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
@@ -914,11 +917,12 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge._dispatch_kb_ingest") as mock_dispatch,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
-            mock_svc.add_documents = AsyncMock(return_value=2)
+            mock_svc.register_documents = AsyncMock(return_value=["src-1", "src-2"])
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/add_documents",
@@ -929,6 +933,10 @@ class TestKnowledgeDocSources:
 
         assert resp.status_code == 200
         assert resp.json()["added"] == 2
+        # Embedding must not run inline — it is queued per source so the request
+        # returns immediately and the UI can poll per-source status.
+        mock_svc.add_documents.assert_not_called()
+        mock_dispatch.assert_called_once_with(["src-1", "src-2"])
 
     @pytest.mark.asyncio
     async def test_add_documents_empty_list_rejected(self, client):
@@ -1232,6 +1240,7 @@ class TestKnowledgeDocSources:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[src])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
 
             resp = await client.get(
                 "/api/knowledge/kb-uuid-1/status",
@@ -2132,6 +2141,8 @@ class TestTestQueryImport:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/test-queries/import",
@@ -2179,6 +2190,8 @@ class TestTestQueryImport:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/test-queries/import",
@@ -2207,6 +2220,8 @@ class TestTestQueryImport:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/test-queries/import",
@@ -2233,6 +2248,8 @@ class TestTestQueryImport:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/test-queries/import",
@@ -2265,6 +2282,309 @@ class TestTestQueryImport:
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/test-queries/import",
                 json=self._payload("Question\nQ1\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+
+
+    @pytest.mark.asyncio
+    async def test_document_backed_sources_are_matched_by_their_title(self, client):
+        """Resolving a name as ``custom_name or url_title or url`` leaves a
+        document-backed source with an empty name — those two fields are only
+        set for URL sources — so it was dropped and every correct label in a
+        document KB was reported as matching nothing, inviting the user to
+        clear labels that were right. Ingestion writes the document's *title*,
+        and that title is what the validation run scores against.
+        """
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        fake_cls, _created = self._fake_query_cls([])
+
+        from types import SimpleNamespace
+        doc_source = SimpleNamespace(
+            custom_name=None,
+            source_type="document",
+            document_uuid="doc-1",
+            url_title=None,
+            url=None,
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[doc_source])
+            mock_svc.resolve_document_titles = AsyncMock(
+                return_value={"doc-1": "NSF PAPPG 24-1.pdf"},
+            )
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question,Source\nQ1,NSF PAPPG 24-1.pdf\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["unmatched_source_labels"] == [], (
+            "a label naming an uploaded document by its title was reported as "
+            "matching no source"
+        )
+
+    @pytest.mark.asyncio
+    async def test_import_warns_on_source_labels_matching_no_source(self, client):
+        """A label that matches no source scores 0 retrieval precision forever.
+
+        This is how the 2 CFR 200 set silently lost its precision metric: an
+        imported taxonomy ("Subpart E-i — Cost Principles | §§200.400-200.419")
+        named nothing in the KB, so every question carrying it was scored as a
+        retrieval miss no matter how good the retrieval was.
+        """
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        csv_text = (
+            "Question,Source\n"
+            "Q1,Subpart E-i — Cost Principles | §§200.400-200.419\n"
+            "Q2,Subpart E-i — Cost Principles | §§200.400-200.419\n"
+            "Q3,Subpart E—Cost Principles\n"
+        )
+        fake_cls, _created = self._fake_query_cls([])
+
+        from types import SimpleNamespace
+        real_source = SimpleNamespace(
+            custom_name=None,
+            source_type="url",
+            document_uuid=None,
+            url_title="Subpart E—Cost Principles",
+            url="https://example.gov/subpart-e",
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[real_source])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload(csv_text),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["created"] == 3          # every row still imports
+        unmatched = body["unmatched_source_labels"]
+        assert len(unmatched) == 1
+        assert unmatched[0]["label"] == "Subpart E-i — Cost Principles | §§200.400-200.419"
+        assert unmatched[0]["questions"] == 2  # the label that does match is not reported
+
+    @pytest.mark.asyncio
+    async def test_import_succeeds_when_label_check_fails(self, client):
+        """The questions are already written when the check runs, so a failure
+        there must not report the import as failed."""
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        fake_cls, _created = self._fake_query_cls([])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(side_effect=RuntimeError("mongo down"))
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question,Source\nQ1,Doc A\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["created"] == 1
+        assert resp.json()["unmatched_source_labels"] == []
+
+
+class TestTestQueryBulkDelete:
+    """POST /{uuid}/test-queries/bulk-delete — prune a large test set."""
+
+    @staticmethod
+    def _recording_find(deleted_count=0):
+        """Stand-in for KBTestQuery.find that records the Mongo filter it was
+        handed and reports ``deleted_count`` from .delete()."""
+        calls = []
+
+        def fake_find(*args, **kwargs):
+            calls.append(args[0] if args else kwargs)
+            result = MagicMock()
+            result.delete = AsyncMock(return_value=SimpleNamespace(deleted_count=deleted_count))
+            return result
+
+        return fake_find, calls
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_scopes_to_kb_and_dedupes(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        fake_find, calls = self._recording_find(deleted_count=2)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery.find", side_effect=fake_find),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/bulk-delete",
+                json={"query_uuids": ["q-1", "q-2", "q-1", "", 7]},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"deleted": 2}
+        # Blanks and non-strings dropped, duplicates collapsed, KB scope applied.
+        assert calls == [{"knowledge_base_uuid": "kb-uuid-1", "uuid": {"$in": ["q-1", "q-2"]}}]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("body", [None, "not json", "[]", '"x"'])
+    async def test_bulk_delete_malformed_body_is_a_client_error(self, client, body):
+        """A body that is empty, not JSON, or JSON that is not an object used
+        to raise inside the handler and surface as a 500 — reading it with
+        ``request.json()`` throws, and ``.get`` throws again on a JSON array.
+        """
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/bulk-delete",
+                content=body,
+                headers={**headers, "Content-Type": "application/json"},
+                cookies=cookies,
+            )
+
+        assert resp.status_code < 500, (
+            f"malformed body {body!r} produced {resp.status_code}"
+        )
+        assert resp.status_code in (400, 422)
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_rejects_empty_selection(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/bulk-delete",
+                json={"query_uuids": []},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_caps_batch_size(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/bulk-delete",
+                json={"query_uuids": [f"q-{i}" for i in range(2001)]},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "2000" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_bulk_delete_view_only_user_gets_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        async def gated_lookup(uuid, u, manage=False, **kw):
+            return None if manage else kb
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(side_effect=gated_lookup)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/bulk-delete",
+                json={"query_uuids": ["q-1"]},
                 cookies=cookies,
                 headers=headers,
             )

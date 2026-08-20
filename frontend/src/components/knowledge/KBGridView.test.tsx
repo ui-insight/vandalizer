@@ -91,4 +91,23 @@ describe('KBGridView clone action', () => {
 
     expect(screen.queryByText('Clone')).not.toBeInTheDocument()
   })
+
+  // Support ticket: cloning a KB with no sources produced a second empty KB.
+  it('disables Clone on a KB with no sources, and says why', () => {
+    kbs.current = [makeKB({
+      status: 'empty',
+      total_sources: 0,
+      sources_ready: 0,
+      total_chunks: 0,
+    })]
+    const onClone = vi.fn()
+    render(<KBGridView {...baseProps} onClone={onClone} />)
+
+    const button = screen.getByText('Clone').closest('button')
+    expect(button).toBeDisabled()
+    expect(button).toHaveAttribute('title', 'This knowledge base has no sources to copy yet')
+
+    fireEvent.click(screen.getByText('Clone'))
+    expect(onClone).not.toHaveBeenCalled()
+  })
 })

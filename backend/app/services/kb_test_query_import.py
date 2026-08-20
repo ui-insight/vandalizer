@@ -43,6 +43,94 @@ class TestQueryImportError(ValueError):
     """File-level problem the user can act on (bad format, missing columns)."""
 
 
+
+# Straight and curly pairs — spreadsheets autocorrect the former into the latter.
+_QUOTE_PAIRS = {'"': '"', "\u201c": "\u201d", "\u201d": "\u201d"}
+
+
+def _unwrap_quoted_cell(raw: str) -> tuple[str, bool]:
+    """Strip one matched pair of quotes wrapping the *whole* cell.
+
+    Returns ``(text, was_quoted)``. Only whole-cell quoting is honoured, and
+    only where the quotes actually reach us: ``csv.reader`` consumes CSV
+    quoting long before this module sees the value, so for CSV this is a no-op
+    and the semicolon rule below is the real escape hatch. In XLSX a typed
+    quote character does survive, and there it means what the author intended.
+    """
+    text = raw.strip()
+    if len(text) >= 2 and text[0] in _QUOTE_PAIRS and text[-1] == _QUOTE_PAIRS[text[0]]:
+        return text[1:-1].strip(), True
+    return text, False
+
+
+def _names_one_known_source(text: str, known_source_names) -> bool:
+    """True when the cell, taken whole, names a single source in the KB.
+
+    Same substring rule the validation run scores with, so a cell this keeps
+    intact is one that run can actually credit.
+    """
+    if not known_source_names:
+        return False
+    needle = text.lower()
+    return any(needle in name.lower() for name in known_source_names if name)
+
+
+def _split_source_labels(raw: str, known_source_names=()) -> list[str]:
+    """Split a source-label cell into individual labels.
+
+    Commas are the obvious separator, but real source names contain them —
+    "Subpart D-iii — Monitoring, Reporting, Remedies & Closeout" is one
+    source, not three. Splitting it blindly invents labels that match no
+    source in the KB, and every invented label also inflates the denominator
+    of the retrieval-precision score, so the KB gets marked down for a
+    spreadsheet formatting artifact rather than a retrieval failure.
+
+    Three things stop that, in order:
+
+      * A cell quoted as a whole is one label — but see ``_unwrap_quoted_cell``:
+        for CSV the quotes are gone before we run, so this only helps XLSX.
+      * Semicolons, when the cell contains any, are the *only* separator,
+        leaving commas inside each label intact. This is the escape hatch that
+        works in every format, and the one the template and help text teach.
+      * Failing both, a cell that already names a source in this KB is kept
+        whole. This is what rescues the case the other two were meant to cover
+        for authors who wrote a plain comma-bearing source name and never read
+        the instructions — which is how the 2 CFR 200 set came to be split.
+
+    A cell matching none of the three still splits on commas, so every file
+    that imported correctly before still does.
+    """
+    if not raw or not raw.strip():
+        return []
+
+    text, was_quoted = _unwrap_quoted_cell(raw)
+    if not text:
+        return []
+    if was_quoted:
+        return [text]
+    if ";" in text:
+        return _unwrap_parts(text.split(";"))
+    if _names_one_known_source(text, known_source_names):
+        return [text]
+    return _unwrap_parts(text.split(","))
+
+
+def _unwrap_parts(parts) -> list[str]:
+    """Trim each split part and drop quotes wrapping one whole part.
+
+    ``"Monitoring, Reporting"; Subpart E`` is the semicolon form written by an
+    author who also quoted for good measure; the quotes are redundant there but
+    must not end up inside the label, where they would stop it matching the
+    source name.
+    """
+    out = []
+    for part in parts:
+        text, _ = _unwrap_quoted_cell(part)
+        if text:
+            out.append(text)
+    return out
+
+
 def _normalize_header(value: str) -> str:
     return " ".join(value.replace("_", " ").strip().lower().split())
 
@@ -91,7 +179,9 @@ def _raw_rows_from_xlsx(data: bytes) -> list[list[str]]:
         wb.close()
 
 
-def parse_test_query_import(filename: str, data: bytes) -> tuple[list[dict], list[dict]]:
+def parse_test_query_import(
+    filename: str, data: bytes, known_source_names=(),
+) -> tuple[list[dict], list[dict]]:
     """Parse an uploaded CSV/XLSX into (rows, row_errors).
 
     Each row dict carries the ``KBTestQuery`` user fields: ``query``,
@@ -161,11 +251,9 @@ def parse_test_query_import(filename: str, data: bytes) -> tuple[list[dict], lis
         if not values["query"]:
             errors.append({"row": sheet_row, "error": "Missing question"})
             continue
-        labels = [
-            s.strip()
-            for s in values["expected_source_labels"].replace(";", ",").split(",")
-            if s.strip()
-        ]
+        labels = _split_source_labels(
+            values["expected_source_labels"], known_source_names,
+        )
         rows.append({
             "row": sheet_row,
             "query": values["query"],

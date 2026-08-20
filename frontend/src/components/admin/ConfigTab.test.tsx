@@ -214,8 +214,8 @@ describe('ConfigTab — panel inventory', () => {
   it('renders each configured model and OAuth provider', async () => {
     await renderConfigTab()
 
-    expect(modelsPanel().getByText('gpt-4o')).toBeInTheDocument()
-    expect(modelsPanel().getByText('llama3.1')).toBeInTheDocument()
+    expect(modelsPanel().getByText('gpt-4o', { selector: 'span' })).toBeInTheDocument()
+    expect(modelsPanel().getByText('llama3.1', { selector: 'span' })).toBeInTheDocument()
     expect(screen.getByText('Campus Azure')).toBeInTheDocument()
   })
 })
@@ -413,7 +413,7 @@ describe('ConfigTab — models addressed by id (plan 011)', () => {
     await waitFor(() => expect(mockDeleteModel).toHaveBeenCalledWith('model-beta'))
     expect(mockDeleteModel).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(modelsPanel().queryByText('llama3.1')).not.toBeInTheDocument())
-    expect(modelsPanel().getByText('gpt-4o')).toBeInTheDocument()
+    expect(modelsPanel().getByText('gpt-4o', { selector: 'span' })).toBeInTheDocument()
   })
 
   it('tests the clicked model by its id', async () => {

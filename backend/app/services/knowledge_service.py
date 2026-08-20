@@ -34,6 +34,11 @@ from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
 
 logger = logging.getLogger(__name__)
 
+# Document task_status values that mean extraction is still running, so a KB
+# source waiting on that document's text should park as "pending" rather than
+# error. Mirrors the stage list in tasks.document_tasks.
+IN_FLIGHT_TASK_STATUSES = ("layout", "extracting", "ocr", "security", "readying")
+
 
 def _get_dm():
     return get_document_manager()
@@ -229,6 +234,27 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
     ).sort(-KnowledgeBaseSource.created_at).to_list()
 
 
+async def kb_has_sources(kb: KnowledgeBase) -> bool:
+    """True when the KB has at least one source row.
+
+    Counted rather than read off ``kb.total_sources``, a denormalized field
+    that only ``recalculate_stats`` refreshes — a guard that lets an empty KB
+    through because its counter is stale is no guard at all.
+    """
+    return await KnowledgeBaseSource.find(
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    ).count() > 0
+
+
+async def require_kb_sources(kb: KnowledgeBase, action: str) -> None:
+    """Raise ValueError unless the KB has a source. ``action`` reads as a verb
+    phrase in the message: "before exporting it"."""
+    if not await kb_has_sources(kb):
+        raise ValueError(
+            f"This knowledge base has no sources yet — add at least one source before {action} it.",
+        )
+
+
 KB_SOURCE_URL_UNIQUE_INDEX = "kb_uuid_url_unique"
 
 
@@ -356,6 +382,63 @@ async def resolve_document_titles(sources) -> dict[str, str]:
     return {d.uuid: d.title for d in docs if d.title}
 
 
+async def resolve_openable_documents(
+    source_uuids: list[str], user_id: str | None = None
+) -> dict[str, str]:
+    """Map KB source uuid -> SmartDocument uuid for sources a user can open.
+
+    Only document-backed sources whose SmartDocument still exists (and isn't
+    soft-deleted) are returned, so callers can offer an "open the document"
+    affordance without ever pointing at a document that 404s. URL sources and
+    orphaned rows are simply absent from the mapping.
+
+    ``user_id`` is the person who will click the affordance, and it matters:
+    membership is checked when a document is *added* to a KB, against the
+    adder. A KB shared with a team (or a verified one) can therefore hold
+    sources pointing at another member's personal-space documents, which
+    ``can_view_document`` denies to everyone but their owner. Offering "open"
+    on one of those yields a 404 from the download endpoint — a dead button,
+    since the reader can already see the chunk preview either way. Documents
+    the caller cannot view are dropped here so the affordance is never shown.
+
+    Omitting ``user_id`` skips the check and is only correct where no reader is
+    in scope.
+
+    Like title resolution, this is a display nicety — a lookup failure must
+    never break the caller.
+    """
+    ids = [u for u in dict.fromkeys(source_uuids) if u]
+    if not ids:
+        return {}
+    try:
+        sources = await KnowledgeBaseSource.find({"uuid": {"$in": ids}}).to_list()
+        by_doc: dict[str, list[str]] = {}
+        for s in sources:
+            if s.source_type == "document" and s.document_uuid:
+                by_doc.setdefault(s.document_uuid, []).append(s.uuid)
+        if not by_doc:
+            return {}
+        docs = await SmartDocument.find(
+            {"uuid": {"$in": list(by_doc)}, "soft_deleted": {"$ne": True}}
+        ).to_list()
+        if user_id:
+            user = await User.find_one(User.user_id == user_id)
+            if user is None:
+                return {}
+            team_access = await access_control.get_team_access_context(user)
+            docs = [
+                d for d in docs
+                if access_control.can_view_document(d, user, team_access)
+            ]
+    except Exception:
+        return {}
+    return {
+        source_uuid: d.uuid
+        for d in docs
+        for source_uuid in by_doc.get(d.uuid, [])
+    }
+
+
 async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
     """Compact listing of a KB's sources for chat prompt injection and
     named-document retrieval targeting.
@@ -419,8 +502,10 @@ async def update_knowledge_base(
         kb.description = description[:5000] or None
     if shared_with_team is not None:
         kb.shared_with_team = shared_with_team
-    if organization_ids is not None:
+    org_scope_changed = False
+    if organization_ids is not None and organization_ids != list(kb.organization_ids or []):
         kb.organization_ids = organization_ids
+        org_scope_changed = True
     tags_changed = False
     if tags is not None:
         normalized = _normalize_tags(tags)
@@ -435,6 +520,9 @@ async def update_knowledge_base(
     if tags_changed and kb.verified:
         from app.services.verification_service import sync_verified_kb_tags
         await sync_verified_kb_tags(kb)
+    if org_scope_changed and kb.verified:
+        from app.services.verification_service import sync_verified_kb_org_scope
+        await sync_verified_kb_org_scope(kb)
 
     return kb
 
@@ -660,6 +748,52 @@ async def add_documents(
     return added
 
 
+async def register_documents(
+    kb: KnowledgeBase,
+    document_uuids: list[str],
+    user: User,
+) -> list[str]:
+    """Attach SmartDocuments to a KB as "pending" sources without ingesting them.
+
+    Chunking and embedding a large document runs for minutes, so the add-document
+    endpoints register sources here and hand the embed to a worker (see
+    ``tasks.documents.kb_ingest_document``). The sources land in the KB
+    immediately, which is what lets the UI show per-source progress instead of
+    blocking on the request. Returns the new source uuids in dispatch order;
+    duplicates are skipped, so an empty list means everything was already there.
+    """
+    team_access = await access_control.get_team_access_context(user)
+    source_uuids: list[str] = []
+    for doc_uuid in document_uuids:
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
+        if not doc:
+            raise ValueError(f"Document not found: {doc_uuid}")
+        existing = await KnowledgeBaseSource.find_one(
+            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+            KnowledgeBaseSource.document_uuid == doc_uuid,
+        )
+        if existing:
+            continue
+
+        source = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type="document",
+            document_uuid=doc.uuid,
+        )
+        await source.insert()
+        source_uuids.append(source.uuid)
+
+    # Recalculate either way: it flips the KB to "building" while the new
+    # sources are pending, and corrects a stale status when all were duplicates.
+    await recalculate_stats(kb)
+    return source_uuids
+
+
 def _normalize_url(url: str) -> str:
     """Ensure URL has a protocol prefix."""
     url = url.strip()
@@ -819,6 +953,8 @@ async def clone_knowledge_base(
     The clone is NOT verified - the user can extend and re-verify.
     The caller is responsible for passing an already-authorized source KB.
     """
+    await require_kb_sources(source_kb, "cloning")
+
     team_id = str(user.current_team) if user.current_team else None
 
     if new_title:
@@ -1231,6 +1367,8 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
     text) so the importer can reconstruct + re-embed without re-fetching. Does
     NOT include ChromaDB vectors — embeddings are regenerated on import.
     """
+    await require_kb_sources(kb, "exporting")
+
     sources = await get_kb_sources(kb.uuid)
     exported_sources: list[dict] = []
     for s in sources:
@@ -1381,9 +1519,7 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
             # extraction-completion hook in update_document_fields re-ingest it
             # once raw_text exists. Only error when extraction has actually
             # finished (or failed) with no usable text.
-            in_flight = bool(doc.processing) or doc.task_status in (
-                "extracting", "readying", "layout",
-            )
+            in_flight = bool(doc.processing) or doc.task_status in IN_FLIGHT_TASK_STATUSES
             if in_flight and doc.task_status != "error":
                 source.status = "pending"
                 source.error_message = None
@@ -1426,7 +1562,10 @@ async def _ingest_url_source(
     await source.save()
     try:
         from app.services.web_fetcher import fetch_url
-        from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.bot_challenge import (
+            looks_like_bot_challenge,
+            looks_like_boilerplate_only,
+        )
         from app.utils.fetch_errors import describe_empty_fetch
 
         result = await fetch_url(source.url)
@@ -1443,6 +1582,15 @@ async def _ingest_url_source(
             # page. Embedding it would poison retrieval with junk text.
             source.status = "error"
             source.error_message = "Blocked by the site's bot protection (verification page returned instead of content)"
+            await source.save()
+            return None
+
+        if looks_like_boilerplate_only(raw_text):
+            # A JavaScript-rendered page answered with HTTP 200 but only site
+            # chrome (.gov banner, nav, session dialog). Embedding it teaches
+            # the KB padlock trivia instead of the document.
+            source.status = "error"
+            source.error_message = "Page returned only site navigation/boilerplate — content is JavaScript-rendered and did not load"
             await source.save()
             return None
 

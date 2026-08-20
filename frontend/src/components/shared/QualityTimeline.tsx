@@ -56,13 +56,17 @@ interface Props {
    *  that exports the run's per-query results. Optimizer-apply rows carry no
    *  per-query results, so they never show the menu. */
   onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
+  /** Why this item can't be validated yet (e.g. a KB with no sources). When
+   *  set and there is no history, the empty state states that plainly rather
+   *  than pitching a Validate & improve run the item can't do. */
+  blockedReason?: string | null
 }
 
 export type QualityRunExportFormat = 'csv' | 'xlsx' | 'json'
 
 export function QualityTimeline({
   fetchHistory, itemKindLabel, itemKindPluralLabel, onSwitchToAutovalidate, sampleNoun = 'items',
-  refreshKey, polling = false, onExportRun,
+  refreshKey, polling = false, onExportRun, blockedReason,
 }: Props) {
   const [items, setItems] = useState<QualityHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -98,6 +102,17 @@ export function QualityTimeline({
         }}>
           Loading quality history…
         </span>
+      </div>
+    )
+  }
+
+  if (items.length === 0 && blockedReason) {
+    // Nothing to show and nothing the user could run from here: state the
+    // absence, in the register of the "No prior optimization runs" note, and
+    // leave the pitch to the Validate tab.
+    return (
+      <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#888', padding: '12px 8px', lineHeight: 1.6 }}>
+        No validation runs yet for this {itemKindLabel}. {blockedReason}
       </div>
     )
   }

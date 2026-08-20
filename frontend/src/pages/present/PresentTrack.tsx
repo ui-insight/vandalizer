@@ -31,7 +31,9 @@ export function PresentTrack({ track, onPresent, onPrint, pitchHighlight }: Pres
           </div>
         </div>
 
-        <ul className="grid gap-2 sm:grid-cols-2 mt-6">
+        <p className="mt-5 text-gray-400 max-w-3xl leading-relaxed">{track.overview}</p>
+
+        <ul className="grid gap-2 sm:grid-cols-2 mt-5">
           {track.valueProps.map((vp) => (
             <li key={vp} className="flex items-start gap-2 text-gray-300">
               <span className="text-[#f1b300] mt-1 leading-none">&#x2022;</span>

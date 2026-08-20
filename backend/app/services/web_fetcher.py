@@ -293,6 +293,8 @@ async def fetch_url(
     raw_html: Optional[str] = None
     status_code: Optional[int] = None
     used_browser = False
+    # Set when the static fetch was refused but a browser attempt is still owed.
+    blocked_error: Optional[httpx.HTTPStatusError] = None
 
     # follow_redirects=False + safe_get re-validates every redirect hop so a
     # public URL cannot bounce us to an internal/metadata address (SSRF).
@@ -303,7 +305,16 @@ async def fetch_url(
     ) as client:
         resp = await safe_get(client, url, validate=validate_outbound_url)
         status_code = resp.status_code
-        resp.raise_for_status()
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            # Some sites answer httpx with a bot-block but render normally in a
+            # real browser. Raising here short-circuited the browser fallback
+            # below, so those sites could never be reached by any path. Defer
+            # the raise until the browser has had its turn (see #566).
+            if not allow_browser:
+                raise
+            blocked_error = e
 
         # PDF links (common for KB URL sources — agency forms, terms documents)
         # must be parsed as PDFs, not decoded as HTML. trafilatura/BeautifulSoup
@@ -313,7 +324,7 @@ async def fetch_url(
         # with an HTML bot-challenge page and a 200 — only take the PDF path
         # when the body actually is a PDF, so challenge pages fall through to
         # HTML extraction where bot-challenge detection can name the failure.
-        if _looks_like_pdf(url, resp.headers.get("content-type", "")) and b"%PDF" in resp.content[:1024]:
+        if blocked_error is None and _looks_like_pdf(url, resp.headers.get("content-type", "")) and b"%PDF" in resp.content[:1024]:
             pdf_text, pdf_title, pdf_links = _extract_pdf_response(resp.content, url)
             pdf_text, pdf_truncated = _cap(pdf_text, settings.web_fetcher_max_chars)
             return WebFetchResult(
@@ -333,12 +344,30 @@ async def fetch_url(
         # before trafilatura ever parses them. web_fetcher_max_html_chars is
         # sized so real documents never hit it; if they somehow do, the flag
         # propagates so the source is not marked cleanly ready.
-        raw_html, html_truncated = _cap(resp.text, settings.web_fetcher_max_html_chars)
+        raw_html, html_truncated = _cap(
+            "" if blocked_error is not None else resp.text,
+            settings.web_fetcher_max_html_chars,
+        )
+
+    if blocked_error is not None:
+        # The static fetch was refused. A real browser engine sometimes gets
+        # through where httpx doesn't; if it doesn't, surface the original
+        # status error rather than an empty page.
+        logger.info(
+            "Static fetch refused for %s (%s); trying browser fallback",
+            url, blocked_error.response.status_code,
+        )
+        rendered = await _render_with_browser(url, settings.web_fetcher_timeout_seconds)
+        rendered_text = _extract_main_text(rendered) if rendered else ""
+        if len(rendered_text) < settings.web_fetcher_min_chars:
+            raise blocked_error
+        raw_html, html_truncated = _cap(rendered, settings.web_fetcher_max_html_chars)
+        used_browser = True
 
     text = _extract_main_text(raw_html)
     title = _extract_title(raw_html, url)
 
-    if allow_browser and len(text) < settings.web_fetcher_min_chars:
+    if allow_browser and not used_browser and len(text) < settings.web_fetcher_min_chars:
         logger.info(
             "Static fetch yielded %d chars for %s; trying browser fallback",
             len(text), url,

@@ -59,10 +59,91 @@ _ASYNC_MAX_POLL_SECONDS = 900.0
 class OcrRequestError(RuntimeError):
     """A single OCR attempt failed. Retryable — the caller decides."""
 
-    def __init__(self, message: str, status_code: int | None = None, body: str = ""):
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        body: str = "",
+        retry_after: float | None = None,
+    ):
         super().__init__(message)
         self.status_code = status_code
         self.body = body
+        # Seconds the service asked us to wait, parsed from a Retry-After
+        # header. Only 429 and 503 normally carry one.
+        self.retry_after = retry_after
+
+
+class OcrUnavailableError(ConnectionError):
+    """OCR could not be reached, and waiting is the right response.
+
+    Subclasses ``ConnectionError`` deliberately: the Celery tasks already
+    declare ``autoretry_for=TRANSIENT_EXCEPTIONS``, which includes it, so an
+    OCR outage engages the retry machinery that was previously bypassed —
+    ``OcrRequestError`` subclasses ``RuntimeError`` and was never caught.
+
+    Raised only after the in-process attempts are exhausted *and* the failure
+    looks transient. A permanent failure (see ``PERMANENT_STATUS_CODES``) still
+    degrades to PyMuPDF rather than retrying for tens of minutes.
+    """
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+# Statuses where retrying cannot help: the request itself is wrong, the file is
+# rejected, or we aren't authorized. Retrying these would burn the whole task
+# backoff budget per document against a misconfigured endpoint.
+PERMANENT_STATUS_CODES = frozenset({400, 401, 403, 413, 415, 422})
+
+
+# Reading the *input* file failed. The OCR service was never the problem, and
+# no amount of waiting brings a deleted upload back — a document removed
+# mid-processing (retention sweeps, E2E teardown) lands here.
+_LOCAL_INPUT_ERRORS = (
+    FileNotFoundError,
+    PermissionError,
+    IsADirectoryError,
+    NotADirectoryError,
+)
+
+
+def is_retryable(exc: Exception) -> bool:
+    """Whether another attempt at this OCR failure could plausibly succeed.
+
+    A non-HTTP failure carries no ``status_code`` (a malformed response body, a
+    poll timeout, a transport error). Those are treated as retryable: the
+    common cause is a service that is up but unhealthy, and the cost of being
+    wrong is a delayed document rather than a silently degraded one.
+
+    Note ``ConnectionError`` and friends stay retryable even though they are
+    ``OSError`` subclasses — a refused connection to the OCR host is precisely
+    the outage this exists for. Only the local-input failures above are
+    permanent.
+    """
+    if isinstance(exc, _LOCAL_INPUT_ERRORS):
+        return False
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        return True
+    return status not in PERMANENT_STATUS_CODES
+
+
+def parse_retry_after(value: str | None) -> float | None:
+    """Seconds from a Retry-After header, or None if absent/unparseable.
+
+    Only the delta-seconds form is honored. The HTTP-date form is legal but
+    rare from OCR services, and mis-parsing a date into a huge sleep is worse
+    than ignoring it.
+    """
+    if not value:
+        return None
+    try:
+        seconds = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    return seconds if seconds >= 0 else None
 
 
 def normalize_provider(provider: str | None) -> str:
@@ -245,6 +326,7 @@ def _await_docling_task(
                 f"Docling status poll returned HTTP {resp.status_code}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
+                retry_after=parse_retry_after(resp.headers.get("Retry-After")),
             )
         status = str((resp.json() or {}).get("task_status") or "").lower()
         if status == "success":
@@ -264,6 +346,7 @@ def _await_docling_task(
             f"Docling result fetch returned HTTP {result.status_code}",
             status_code=result.status_code,
             body=result.text[:500],
+            retry_after=parse_retry_after(result.headers.get("Retry-After")),
         )
     return parse_docling_response(result.json())
 
@@ -294,6 +377,7 @@ def convert(
                 f"OCR endpoint returned HTTP {resp.status_code}",
                 status_code=resp.status_code,
                 body=resp.text[:500],
+                retry_after=parse_retry_after(resp.headers.get("Retry-After")),
             )
         return resp.text
 
@@ -312,6 +396,7 @@ def convert(
             f"Docling endpoint returned HTTP {resp.status_code}{hint}",
             status_code=resp.status_code,
             body=detail,
+            retry_after=parse_retry_after(resp.headers.get("Retry-After")),
         )
 
     payload = resp.json()

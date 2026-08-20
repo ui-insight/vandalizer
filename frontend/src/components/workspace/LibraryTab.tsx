@@ -1599,12 +1599,12 @@ export function LibraryTab() {
               >
                 Close
               </button>
-              {(createModalType === 'workflow' || createModalType === 'extraction') && (
+              {createModalType && (
                 <>
                   <button
                     onClick={() => uploadInputRef.current?.click()}
                     disabled={creating || uploading}
-                    title={`Upload a ${createModalType === 'workflow' ? 'workflow' : 'extraction'} JSON definition`}
+                    title={`Upload a ${createModalType} JSON definition`}
                     style={{
                       marginLeft: 'auto',
                       display: 'inline-flex',

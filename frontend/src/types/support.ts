@@ -88,3 +88,23 @@ export interface SupportContact {
   email: string
   name: string
 }
+
+// ---- Support Center queue filters ----
+// The /support URL contract, defined once here because both sides need it:
+// router.tsx validates incoming params against it, SupportCenter reads and
+// patches them. When these lived in SupportCenter the two shapes drifted and
+// broke the build, so keep this the single source of truth.
+export type SupportStatusFilter = 'all' | 'open' | 'in_progress' | 'closed'
+export type SupportPriorityFilter = 'all' | 'low' | 'normal' | 'high'
+export type SupportClassificationFilter = 'all' | 'bug' | 'enhancement' | 'feature_request'
+
+// Every key is optional: defaults are normalized out of the URL, and callers
+// patch one filter at a time rather than rebuilding the whole search object.
+export type SupportSearch = {
+  ticket?: string
+  status?: SupportStatusFilter
+  priority?: SupportPriorityFilter
+  classification?: SupportClassificationFilter
+  tag?: string
+  q?: string
+}

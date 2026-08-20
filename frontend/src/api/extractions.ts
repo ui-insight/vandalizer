@@ -98,6 +98,8 @@ export function suggestFields(documentUuids: string[], model?: string) {
 export interface ExtractionFieldSource {
   quote: string | null
   page: number | null
+  /** Page was interpolated from OCR text, not measured. See #603. */
+  page_approximate?: boolean
   document_uuid: string | null
   document_title: string | null
   verified: boolean

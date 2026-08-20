@@ -176,6 +176,12 @@ class SystemConfig(Document):
     # Name of the model to use when no explicit model is chosen. Empty = fall
     # back to the first entry in available_models.
     default_model: str = ""
+    # Nominated fallback for requests that don't fit the chosen model's context
+    # window. Empty disables routing entirely. Deliberately an explicit choice
+    # rather than "whichever window is biggest": routing is the one place the
+    # product picks a model for the user, and an unattended pick could send a
+    # confidential document to an external provider. See services/model_routing.
+    long_document_model: str = ""
 
     # Legacy fields kept for backwards compatibility
     extraction_model: str = ""

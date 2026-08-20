@@ -6,6 +6,8 @@ import { marked } from 'marked'
 import { getReview, approveReview, rejectReview } from '../api/reviews'
 import type { ReviewDetail, ArtifactKind } from '../api/reviews'
 import { relativeTime } from '../utils/time'
+import { PageLayout } from '../components/layout/PageLayout'
+import { useMyReviewCount } from '../hooks/useMyReviewCount'
 
 function unwrapArtifact(value: ReviewDetail['data_for_review']): unknown {
   if (value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1) {
@@ -196,6 +198,7 @@ function DocumentRenderArtifact({ data }: { data: unknown }) {
 export default function ReviewDetailPage() {
   const params = useParams({ strict: false }) as { uuid: string }
   const navigate = useNavigate()
+  const { refresh: refreshReviewCount } = useMyReviewCount()
   const [review, setReview] = useState<ReviewDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -274,6 +277,9 @@ export default function ReviewDetailPage() {
     setSubmitError(null)
     try {
       await approveReview(review.uuid, { comments, edited_artifact: edited.value })
+      // Re-poll now rather than waiting out the badge's 30s tick — a reviewer
+      // who just cleared their last approval should not still see a "1".
+      void refreshReviewCount()
       navigate({ to: '/reviews' as never })
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to approve')
@@ -287,6 +293,7 @@ export default function ReviewDetailPage() {
     setSubmitError(null)
     try {
       await rejectReview(review.uuid, comments)
+      void refreshReviewCount()
       navigate({ to: '/reviews' as never })
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Failed to reject')
@@ -294,8 +301,14 @@ export default function ReviewDetailPage() {
     }
   }
 
-  if (loading) return <div style={{ padding: 24, fontSize: 13, color: '#6b7280' }}>Loading...</div>
-  if (error) return <div style={{ padding: 24, fontSize: 13, color: '#dc2626' }}>{error}</div>
+  // Wrapped too: a review that 404s (wrong link, already deleted) otherwise
+  // dropped the user on a bare error string with no way back into the app.
+  if (loading) {
+    return <PageLayout><div role="status" aria-live="polite" style={{ fontSize: 13, color: '#6b7280' }}>Loading...</div></PageLayout>
+  }
+  if (error) {
+    return <PageLayout><div role="status" aria-live="polite" style={{ fontSize: 13, color: '#dc2626' }}>{error}</div></PageLayout>
+  }
   if (!review) return null
 
   const inner = unwrapArtifact(review.data_for_review)
@@ -328,161 +341,160 @@ export default function ReviewDetailPage() {
   const isMultiRowTable = review.artifact_kind === 'extraction_table' && Array.isArray(inner)
 
   return (
-    <>
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
-    <main id="main-content" style={{ maxWidth: 920, margin: '0 auto', padding: '24px 24px 80px' }}>
-      <Link
-        to="/reviews"
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', textDecoration: 'none', marginBottom: 16 }}
-      >
-        <ArrowLeft style={{ width: 14, height: 14 }} />
-        Back to reviews
-      </Link>
+    <PageLayout>
+      <div style={{ maxWidth: 920, margin: '0 auto', paddingBottom: 80 }}>
+        <Link
+          to="/reviews"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', textDecoration: 'none', marginBottom: 16 }}
+        >
+          <ArrowLeft style={{ width: 14, height: 14 }} />
+          Back to reviews
+        </Link>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 12 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
-          {review.workflow_name || 'Workflow'}
-        </h1>
-        <span style={{
-          padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-          backgroundColor: review.status === 'pending' ? '#fef3c7'
-            : review.status === 'approved' ? '#dcfce7'
-            : review.status === 'rejected' ? '#fee2e2' : '#e5e7eb',
-          color: review.status === 'pending' ? '#92400e'
-            : review.status === 'approved' ? '#166534'
-            : review.status === 'rejected' ? '#991b1b' : '#374151',
-        }}>
-          {review.status}
-        </span>
-      </div>
-
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 24 }}>
-        Step "{review.step_name}"
-        {review.requester ? ` · launched by ${review.requester.name || review.requester.user_id}` : ''}
-        {review.created_at ? ` · ${relativeTime(review.created_at)}` : ''}
-        {review.expires_at ? ` · due ${new Date(review.expires_at).toLocaleString()}` : ''}
-      </div>
-
-      {review.review_instructions && (
-        <div style={{
-          marginBottom: 20, padding: '12px 14px', borderRadius: 8,
-          backgroundColor: '#fefce8', border: '1px solid #fde68a', color: '#713f12', fontSize: 13,
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>Review instructions</div>
-          {review.review_instructions}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8, gap: 12 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#111827', margin: 0 }}>
+            {review.workflow_name || 'Workflow'}
+          </h1>
+          <span style={{
+            padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+            backgroundColor: review.status === 'pending' ? '#fef3c7'
+              : review.status === 'approved' ? '#dcfce7'
+              : review.status === 'rejected' ? '#fee2e2' : '#e5e7eb',
+            color: review.status === 'pending' ? '#92400e'
+              : review.status === 'approved' ? '#166534'
+              : review.status === 'rejected' ? '#991b1b' : '#374151',
+          }}>
+            {review.status}
+          </span>
         </div>
-      )}
 
-      {review.source_docs.length > 0 && (
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 24 }}>
+          Step "{review.step_name}"
+          {review.requester ? ` · launched by ${review.requester.name || review.requester.user_id}` : ''}
+          {review.created_at ? ` · ${relativeTime(review.created_at)}` : ''}
+          {review.expires_at ? ` · due ${new Date(review.expires_at).toLocaleString()}` : ''}
+        </div>
+
+        {review.review_instructions && (
+          <div style={{
+            marginBottom: 20, padding: '12px 14px', borderRadius: 8,
+            backgroundColor: '#fefce8', border: '1px solid #fde68a', color: '#713f12', fontSize: 13,
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Review instructions</div>
+            {review.review_instructions}
+          </div>
+        )}
+
+        {review.source_docs.length > 0 && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>Source documents</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {review.source_docs.map(d => (
+                <span key={d.uuid} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '3px 10px', borderRadius: 6, fontSize: 12,
+                  backgroundColor: '#f3f4f6', color: '#374151',
+                }}>
+                  <FileText style={{ width: 12, height: 12 }} />
+                  {d.title}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6 }}>Source documents</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {review.source_docs.map(d => (
-              <span key={d.uuid} style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '3px 10px', borderRadius: 6, fontSize: 12,
-                backgroundColor: '#f3f4f6', color: '#374151',
-              }}>
-                <FileText style={{ width: 12, height: 12 }} />
-                {d.title}
-              </span>
-            ))}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+              Output to review
+            </div>
+            {editable && !isMultiRowTable && (
+              editing ? (
+                <button
+                  onClick={() => { setEditing(false); setSubmitError(null) }}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <RotateCcw style={{ width: 12, height: 12 }} />
+                  Discard edits
+                </button>
+              ) : (
+                <button
+                  onClick={() => setEditing(true)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  <Pencil style={{ width: 12, height: 12 }} />
+                  Edit before approving
+                </button>
+              )
+            )}
           </div>
+          {renderArtifact()}
         </div>
-      )}
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-            Output to review
+        {isPending && (
+          <>
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                Comments (optional)
+              </label>
+              <textarea
+                value={comments}
+                onChange={e => setComments(e.target.value)}
+                rows={3}
+                placeholder="Notes for the workflow owner..."
+                style={{
+                  width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                  border: '1px solid #d1d5db', borderRadius: 6, resize: 'vertical', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+
+            {submitError && (
+              <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{submitError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={handleApprove}
+                disabled={submitting}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 18px', fontSize: 13, fontWeight: 600,
+                  backgroundColor: submitting ? '#86efac' : '#16a34a', color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: submitting ? 'default' : 'pointer',
+                }}
+              >
+                <CheckCircle style={{ width: 14, height: 14 }} />
+                {editing ? 'Approve with edits' : 'Approve'}
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={submitting}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 18px', fontSize: 13, fontWeight: 600,
+                  backgroundColor: '#fff', color: '#dc2626',
+                  border: '1px solid #fca5a5', borderRadius: 6, cursor: submitting ? 'default' : 'pointer',
+                }}
+              >
+                <XCircle style={{ width: 14, height: 14 }} />
+                Reject
+              </button>
+            </div>
+          </>
+        )}
+
+        {!isPending && (
+          <div style={{ padding: 14, borderRadius: 8, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', fontSize: 13, color: '#374151' }}>
+            {review.status === 'approved' ? 'Approved' : review.status === 'rejected' ? 'Rejected' : `Status: ${review.status}`}
+            {review.reviewer_user_id ? ` by ${review.reviewer_user_id}` : ''}
+            {review.decision_at ? ` · ${new Date(review.decision_at).toLocaleString()}` : ''}
+            {review.reviewer_comments && (
+              <div style={{ marginTop: 6, color: '#4b5563' }}>"{review.reviewer_comments}"</div>
+            )}
           </div>
-          {editable && !isMultiRowTable && (
-            editing ? (
-              <button
-                onClick={() => { setEditing(false); setSubmitError(null) }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <RotateCcw style={{ width: 12, height: 12 }} />
-                Discard edits
-              </button>
-            ) : (
-              <button
-                onClick={() => setEditing(true)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#0ea5e9', background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                <Pencil style={{ width: 12, height: 12 }} />
-                Edit before approving
-              </button>
-            )
-          )}
-        </div>
-        {renderArtifact()}
+        )}
       </div>
-
-      {isPending && (
-        <>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-              Comments (optional)
-            </label>
-            <textarea
-              value={comments}
-              onChange={e => setComments(e.target.value)}
-              rows={3}
-              placeholder="Notes for the workflow owner..."
-              style={{
-                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, resize: 'vertical', boxSizing: 'border-box',
-              }}
-            />
-          </div>
-
-          {submitError && (
-            <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 12 }}>{submitError}</div>
-          )}
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={handleApprove}
-              disabled={submitting}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 18px', fontSize: 13, fontWeight: 600,
-                backgroundColor: submitting ? '#86efac' : '#16a34a', color: '#fff',
-                border: 'none', borderRadius: 6, cursor: submitting ? 'default' : 'pointer',
-              }}
-            >
-              <CheckCircle style={{ width: 14, height: 14 }} />
-              {editing ? 'Approve with edits' : 'Approve'}
-            </button>
-            <button
-              onClick={handleReject}
-              disabled={submitting}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 18px', fontSize: 13, fontWeight: 600,
-                backgroundColor: '#fff', color: '#dc2626',
-                border: '1px solid #fca5a5', borderRadius: 6, cursor: submitting ? 'default' : 'pointer',
-              }}
-            >
-              <XCircle style={{ width: 14, height: 14 }} />
-              Reject
-            </button>
-          </div>
-        </>
-      )}
-
-      {!isPending && (
-        <div style={{ padding: 14, borderRadius: 8, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', fontSize: 13, color: '#374151' }}>
-          {review.status === 'approved' ? 'Approved' : review.status === 'rejected' ? 'Rejected' : `Status: ${review.status}`}
-          {review.reviewer_user_id ? ` by ${review.reviewer_user_id}` : ''}
-          {review.decision_at ? ` · ${new Date(review.decision_at).toLocaleString()}` : ''}
-          {review.reviewer_comments && (
-            <div style={{ marginTop: 6, color: '#4b5563' }}>"{review.reviewer_comments}"</div>
-          )}
-        </div>
-      )}
-    </main>
-    </>
+    </PageLayout>
   )
 }

@@ -5,6 +5,7 @@ Uses mocked Beanie models and Celery to avoid DB/broker dependencies.
 """
 
 import datetime
+import re
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
@@ -97,9 +98,10 @@ def _make_result(session_id="abc123", status="completed", final_output=None, wor
 # ---------------------------------------------------------------------------
 
 class TestCreateWorkflow:
+    @patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock)
     @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
     @patch("app.services.workflow_service.Workflow")
-    async def test_creates_workflow(self, mock_wf_cls, mock_ensure):
+    async def test_creates_workflow(self, mock_wf_cls, mock_ensure, mock_bookmark):
         from app.services.workflow_service import create_workflow
 
         mock_wf = MagicMock()
@@ -114,6 +116,142 @@ class TestCreateWorkflow:
         )
         assert result is mock_wf
         mock_wf.insert.assert_awaited_once()
+
+    @patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock)
+    @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.Workflow")
+    async def test_a_new_workflow_is_bookmarked_so_it_is_visible(
+        self, mock_wf_cls, mock_ensure, mock_bookmark,
+    ):
+        """Workflows are listed *only* through library bookmarks, so one created
+        without a bookmark renders in no listing, no picker and no search while
+        still holding its name against name_conflicts — invisible, undeletable,
+        and its name unusable.
+
+        This path was the last one leaving the bookmark to a second request from
+        the client: LibraryTab makes it only when a personal library happens to
+        be loaded, and useWorkflows.create never made it at all.
+        """
+        from app.models.library import LibraryItemKind
+        from app.services.workflow_service import create_workflow
+
+        mock_wf = MagicMock()
+        mock_wf.insert = AsyncMock()
+        mock_wf_cls.return_value = mock_wf
+
+        await create_workflow(name="My Workflow", user_id="user1")
+
+        mock_bookmark.assert_awaited_once()
+        args = mock_bookmark.await_args.args
+        assert args[0] is mock_wf.id
+        assert args[1] == LibraryItemKind.WORKFLOW
+        assert args[2] == "user1"
+
+
+class TestDuplicateWorkflowBookmarks:
+    async def test_copy_gets_a_library_bookmark(self):
+        # "Make a copy" in the editor never added the bookmark itself, so every
+        # copy it produced was invisible in the library while still holding its
+        # name against name_conflicts. Bookmarking belongs on this side.
+        from app.models.library import LibraryItemKind
+
+        original = _make_workflow(name="Budget Analyzer")
+        new_wf = _make_workflow(name="Budget Analyzer (Copy)")
+        ensure = AsyncMock()
+
+        with (
+            patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock, return_value=original),
+            patch("app.services.workflow_service.get_workflow", new_callable=AsyncMock, return_value={"name": "Budget Analyzer", "steps": [], "description": None}),
+            patch("app.services.workflow_service.Workflow") as mock_wf_cls,
+            patch("app.services.name_conflicts.next_available_name", new_callable=AsyncMock, return_value="Budget Analyzer (Copy)"),
+            patch("app.services.library_service.ensure_bookmark", ensure),
+        ):
+            mock_wf_cls.return_value = new_wf
+            mock_wf_cls.get = AsyncMock(return_value=original)
+
+            from app.services.workflow_service import duplicate_workflow
+
+            await duplicate_workflow(
+                str(original.id), MagicMock(), user_id="user1", team_id=None,
+            )
+
+        ensure.assert_awaited_once()
+        args = ensure.await_args[0]
+        assert args[0] == new_wf.id
+        assert args[1] == LibraryItemKind.WORKFLOW
+        assert args[2] == "user1"
+
+
+class TestListWorkflows:
+    def _user(self, user_id="user1", team=None):
+        user = MagicMock()
+        user.user_id = user_id
+        user.current_team = team
+        return user
+
+    @patch("app.services.workflow_service.Workflow")
+    async def test_returns_newest_first(self, mock_wf_cls):
+        # Unsorted, Mongo hands back insertion order, so a capped page showed
+        # the oldest workflows and hid everything created since.
+        from app.services.workflow_service import list_workflows
+
+        chain = MagicMock()
+        mock_wf_cls.find.return_value = chain
+        chain.sort.return_value = chain
+        chain.skip.return_value = chain
+        chain.limit.return_value = chain
+        chain.to_list = AsyncMock(return_value=[])
+
+        await list_workflows(self._user(), skip=20, limit=10)
+
+        chain.sort.assert_called_once_with("-created_at", "-_id")
+        chain.skip.assert_called_once_with(20)
+        chain.limit.assert_called_once_with(10)
+
+    @patch("app.services.workflow_service.Workflow")
+    async def test_search_is_escaped_before_it_becomes_a_regex(self, mock_wf_cls):
+        # The filter is interpolated into a $regex; an unescaped "C++ (v2)"
+        # is invalid regex syntax and errors the whole listing.
+        from app.services.workflow_service import list_workflows
+
+        chain = MagicMock()
+        mock_wf_cls.find.return_value = chain
+        chain.sort.return_value = chain
+        chain.skip.return_value = chain
+        chain.limit.return_value = chain
+        chain.to_list = AsyncMock(return_value=[])
+
+        await list_workflows(self._user(), search="C++ (v2)")
+
+        query = mock_wf_cls.find.call_args[0][0]
+        assert query["name"]["$regex"] == re.escape("C++ (v2)")
+
+    @patch("app.services.workflow_service.Workflow")
+    async def test_count_matches_the_same_filter_the_page_uses(self, mock_wf_cls):
+        from app.services.workflow_service import count_workflows, list_workflows
+
+        chain = MagicMock()
+        mock_wf_cls.find.return_value = chain
+        chain.sort.return_value = chain
+        chain.skip.return_value = chain
+        chain.limit.return_value = chain
+        chain.to_list = AsyncMock(return_value=[])
+        chain.count = AsyncMock(return_value=412)
+
+        user = self._user()
+        await list_workflows(user, search="budget")
+        list_query = mock_wf_cls.find.call_args[0][0]
+
+        total = await count_workflows(user, search="budget")
+        count_query = mock_wf_cls.find.call_args[0][0]
+
+        assert total == 412
+        assert list_query == count_query
+
+    async def test_team_scope_without_a_team_counts_zero(self):
+        from app.services.workflow_service import count_workflows
+
+        assert await count_workflows(self._user(team=None), scope="team") == 0
 
 
 class TestGetWorkflowStatus:
@@ -219,6 +357,82 @@ class TestGetBatchStatus:
 
         result = await get_batch_status("batch3")
         assert result["status"] == "failed"
+
+    @patch("app.services.workflow_service.Workflow")
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_canceled_batch(self, mock_wr_cls, mock_wf_cls):
+        # A stopped batch: one run finished before the stop landed, the other was
+        # canceled. Overall status must be terminal ("canceled") so the poller
+        # stops — not "running", which would spin forever.
+        from app.services.workflow_service import get_batch_status
+
+        wf_id = _fake_oid()
+        results = [
+            _make_result("s1", "completed", workflow_id=wf_id),
+            _make_result("s2", "canceled", workflow_id=wf_id),
+        ]
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=results)
+        mock_wr_cls.find.return_value = mock_find
+
+        result = await get_batch_status("batch4")
+        assert result["status"] == "canceled"
+
+
+# ---------------------------------------------------------------------------
+# Batch cancellation
+# ---------------------------------------------------------------------------
+
+class TestCancelBatch:
+    @patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._cancel_result", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_cancels_only_unfinished_runs(self, mock_wr_cls, mock_cancel, mock_auth):
+        from app.services.workflow_service import cancel_batch
+
+        wf_id = _fake_oid()
+        running = _make_result("s1", "running", workflow_id=wf_id)
+        queued = _make_result("s2", "queued", workflow_id=wf_id)
+        done = _make_result("s3", "completed", workflow_id=wf_id)
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=[running, queued, done])
+        mock_wr_cls.find.return_value = mock_find
+        mock_auth.return_value = _make_workflow()
+
+        result = await cancel_batch("batch1", user=MagicMock())
+
+        assert result == {"batch_id": "batch1", "status": "canceled", "canceled": 2}
+        # The already-completed run is left untouched.
+        assert mock_cancel.await_count == 2
+        canceled_sessions = {c.args[0].session_id for c in mock_cancel.await_args_list}
+        assert canceled_sessions == {"s1", "s2"}
+
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_unknown_batch_returns_none(self, mock_wr_cls):
+        from app.services.workflow_service import cancel_batch
+
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=[])
+        mock_wr_cls.find.return_value = mock_find
+
+        result = await cancel_batch("nope", user=MagicMock())
+        assert result is None
+
+    @patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._cancel_result", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_unauthorized_returns_none(self, mock_wr_cls, mock_cancel, mock_auth):
+        from app.services.workflow_service import cancel_batch
+
+        results = [_make_result("s1", "running", workflow_id=_fake_oid())]
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=results)
+        mock_wr_cls.find.return_value = mock_find
+        mock_auth.return_value = None  # user not authorized for the workflow
+
+        result = await cancel_batch("batch1", user=MagicMock())
+        assert result is None
+        mock_cancel.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
@@ -644,16 +858,33 @@ class TestBuildResult:
 # run_workflow
 # ---------------------------------------------------------------------------
 
+def _stub_steps(mock_step_cls, names):
+    """Resolve the workflow's step ids to real-looking steps.
+
+    Runs are refused for a workflow with nothing to do, so the run path now
+    reads the step docs to tell a real step from the empty "Document" trigger.
+    """
+    docs = []
+    for step_name in names:
+        step = MagicMock()
+        step.name = step_name  # `name` is reserved in the MagicMock ctor
+        step.tasks = ["task-id"]
+        docs.append(step)
+    mock_step_cls.find.return_value.to_list = AsyncMock(return_value=docs)
+
+
 class TestRunWorkflow:
     @patch("app.services.workflow_service.celery_app")
     @patch("app.services.workflow_service.WorkflowResult")
     @patch("app.services.workflow_service.get_user_model_name", new_callable=AsyncMock, return_value="gpt-4o")
     @patch("app.services.workflow_service.Workflow")
-    async def test_run_workflow_creates_result_and_sends_task(self, mock_wf_cls, mock_model, mock_wr_cls, mock_celery):
+    @patch("app.services.workflow_service.WorkflowStep")
+    async def test_run_workflow_creates_result_and_sends_task(self, mock_step_cls, mock_wf_cls, mock_model, mock_wr_cls, mock_celery):
         from app.services.workflow_service import run_workflow
 
         wf = _make_workflow(steps=[_fake_oid(), _fake_oid()])
         mock_wf_cls.get = AsyncMock(return_value=wf)
+        _stub_steps(mock_step_cls, ["Extract", "Summarize"])
 
         mock_result = MagicMock()
         mock_result.id = _fake_oid()
@@ -691,11 +922,13 @@ class TestRunWorkflowBatch:
     @patch("app.services.workflow_service.WorkflowResult")
     @patch("app.services.workflow_service.get_user_model_name", new_callable=AsyncMock, return_value="gpt-4o")
     @patch("app.services.workflow_service.Workflow")
-    async def test_batch_creates_one_result_per_doc(self, mock_wf_cls, mock_model, mock_wr_cls, mock_celery):
+    @patch("app.services.workflow_service.WorkflowStep")
+    async def test_batch_creates_one_result_per_doc(self, mock_step_cls, mock_wf_cls, mock_model, mock_wr_cls, mock_celery):
         from app.services.workflow_service import run_workflow_batch
 
         wf = _make_workflow(steps=[_fake_oid()])
         mock_wf_cls.get = AsyncMock(return_value=wf)
+        _stub_steps(mock_step_cls, ["Summarize"])
 
         mock_result = MagicMock()
         mock_result.id = _fake_oid()
@@ -1049,3 +1282,208 @@ class TestFormatValidationReport:
         assert _slugify_filename("Award Compliance & Financial!") == "award-compliance-financial"
         assert _slugify_filename("") == "workflow"
         assert _slugify_filename("   ") == "workflow"
+
+
+# ---------------------------------------------------------------------------
+# Stopping a batch must actually stop it
+# ---------------------------------------------------------------------------
+
+class TestBatchStopIsReal:
+    """The STOP button's whole job is to halt spend already under way."""
+
+    @patch("app.services.workflow_service.celery_app")
+    @patch("app.services.workflow_service.SmartDocument")
+    @patch("app.services.workflow_service.get_user_model_name", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.workflow_has_executable_steps",
+           new_callable=AsyncMock)
+    @patch("app.services.workflow_service.WorkflowResult")
+    @patch("app.services.workflow_service.Workflow")
+    async def test_batch_runs_carry_a_revocable_task_id(
+        self, mock_wf_cls, mock_wr_cls, mock_steps, mock_model, mock_doc, mock_celery,
+    ):
+        """Without a persisted celery_task_id there is nothing to revoke, and
+        revocation is the only thing that interrupts a step already in flight —
+        the engine's cooperative check only runs *between* steps, so a one-step
+        batch run past that point would finish its LLM call regardless of STOP.
+        """
+        from app.services.workflow_service import run_workflow_batch
+
+        wf = _make_workflow()
+        mock_wf_cls.get = AsyncMock(return_value=wf)
+        mock_steps.return_value = True
+        mock_model.return_value = "test-model"
+        mock_doc.find_one = AsyncMock(return_value=None)
+
+        created = []
+
+        def capture(**kwargs):
+            row = MagicMock(**kwargs)
+            row.id = _fake_oid()
+            row.insert = AsyncMock()
+            created.append(kwargs)
+            return row
+
+        mock_wr_cls.side_effect = capture
+
+        await run_workflow_batch(str(_fake_oid()), ["doc-a", "doc-b"], user_id="u1")
+
+        assert len(created) == 2
+        for kwargs in created:
+            assert kwargs.get("celery_task_id"), (
+                "batch run persisted no task id, so _cancel_result has nothing "
+                "to revoke"
+            )
+
+        # ...and the id it stored is the id the task actually runs under.
+        sent = [c.kwargs for c in mock_celery.send_task.call_args_list]
+        assert len(sent) == 2
+        stored = [k["celery_task_id"] for k in created]
+        assert [s["task_id"] for s in sent] == stored
+
+    @patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._expire_approvals_for", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._cancel_result", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_a_run_waiting_on_approval_is_cancelled_and_its_review_closed(
+        self, mock_wr_cls, mock_cancel, mock_expire, mock_auth,
+    ):
+        """pending_approval is not terminal, so the run is canceled — but its
+        ApprovalRequest stayed pending in the reviewer's inbox, and approving it
+        restarted a run the user had explicitly stopped.
+        """
+        from app.services.workflow_service import cancel_batch
+
+        wf_id = _fake_oid()
+        waiting = _make_result("s1", "pending_approval", workflow_id=wf_id)
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=[waiting])
+        mock_wr_cls.find.return_value = mock_find
+        mock_auth.return_value = _make_workflow()
+
+        result = await cancel_batch("batch1", user=MagicMock())
+
+        assert result["canceled"] == 1
+        mock_expire.assert_awaited_once()
+        assert list(mock_expire.await_args.args[0]) == [waiting.id]
+
+    @patch("app.services.workflow_service.get_authorized_workflow", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._expire_approvals_for", new_callable=AsyncMock)
+    @patch("app.services.workflow_service._cancel_result", new_callable=AsyncMock)
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_nothing_to_cancel_closes_no_reviews(
+        self, mock_wr_cls, mock_cancel, mock_expire, mock_auth,
+    ):
+        from app.services.workflow_service import cancel_batch
+
+        wf_id = _fake_oid()
+        done = _make_result("s1", "completed", workflow_id=wf_id)
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=[done])
+        mock_wr_cls.find.return_value = mock_find
+        mock_auth.return_value = _make_workflow()
+
+        result = await cancel_batch("batch1", user=MagicMock())
+
+        assert result["canceled"] == 0
+        assert list(mock_expire.await_args.args[0]) == []
+
+
+class TestCancelIsAtomic:
+    @patch("app.services.workflow_service.celery_app")
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_a_run_that_finished_mid_loop_is_left_alone(
+        self, mock_wr_cls, mock_celery,
+    ):
+        """cancel_batch loops serially with a DB write, a Celery call and an
+        activity write per run, so the snapshot it holds goes stale. Beanie's
+        save() would $set every field of that stale copy back — discarding a
+        final_output the user already paid for, and resetting
+        approval_request_id so the ApprovalRequest is orphaned.
+        """
+        from app.services.workflow_service import _cancel_result
+
+        result = _make_result("s1", "running")
+        result.celery_task_id = "task-1"
+        coll = MagicMock()
+        # The guarded update matches nothing: the run reached a terminal state
+        # between the read and the write.
+        coll.update_one = AsyncMock(return_value=MagicMock(matched_count=0))
+        mock_wr_cls.get_motor_collection.return_value = coll
+
+        await _cancel_result(result)
+
+        # Nothing overwritten, and no revoke aimed at a task that already ended.
+        assert result.status == "running"
+        mock_celery.control.revoke.assert_not_called()
+        query = coll.update_one.await_args.args[0]
+        assert query["status"]["$nin"], "the update was not guarded on status"
+
+
+class TestCancelClearsTheReviewMarker:
+    @patch("app.services.workflow_service.celery_app")
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_cancelling_drops_the_pending_review_marker(
+        self, mock_wr_cls, mock_celery,
+    ):
+        """meta_summary.pending_review_uuid exempts a row from the stale reaper
+        and drives every "awaiting approval" affordance. Cancelling rewrites the
+        activity without touching meta_summary, so the marker outlived the run:
+        the row stayed reaper-exempt for good and kept offering a review for a
+        run that had stopped.
+        """
+        from app.models.activity import ActivityStatus
+        from app.services import workflow_service
+
+        result = _make_result("s1", "running")
+        result.celery_task_id = None
+        coll = MagicMock()
+        coll.update_one = AsyncMock(return_value=MagicMock(matched_count=1))
+        mock_wr_cls.get_motor_collection.return_value = coll
+
+        act = MagicMock()
+        act.is_running = True
+        act.meta_summary = {"pending_review_uuid": "rev-1", "kept": "yes"}
+        act.save = AsyncMock()
+
+        with patch("app.models.activity.ActivityEvent") as MockAct:
+            MockAct.find_one = AsyncMock(return_value=act)
+            await workflow_service._cancel_result(result)
+
+        assert act.status == ActivityStatus.CANCELED.value
+        assert "pending_review_uuid" not in act.meta_summary, (
+            "the marker survived cancellation, so the row stays reaper-exempt "
+            "and keeps offering a review"
+        )
+        # Only the marker is dropped; the rest of meta_summary is untouched.
+        assert act.meta_summary["kept"] == "yes"
+        act.save.assert_awaited_once()
+
+
+class TestBatchStatusReportsCancelled:
+    @patch("app.services.workflow_service.WorkflowResult")
+    async def test_the_stopped_count_is_returned(self, mock_wr_cls):
+        """The count was computed to decide the overall status and then dropped,
+        so the card could say "3 of 20 completed" with no way to tell which of
+        the other 17 had actually run before the stop and which never started.
+        """
+        from app.services.workflow_service import get_batch_status
+
+        results = [
+            _make_result("s1", "completed"),
+            _make_result("s2", "canceled"),
+            _make_result("s3", "canceled"),
+            _make_result("s4", "queued"),
+        ]
+        mock_find = MagicMock()
+        mock_find.to_list = AsyncMock(return_value=results)
+        mock_wr_cls.find.return_value = mock_find
+
+        status = await get_batch_status("b1")
+
+        assert status["canceled"] == 2
+        assert status["completed"] == 1
+        assert status["total"] == 4
+        # Per-item status was always carried; it is what the row renders from.
+        assert [i["status"] for i in status["items"]] == [
+            "completed", "canceled", "canceled", "queued",
+        ]

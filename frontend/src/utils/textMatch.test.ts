@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeWithMap } from './textMatch'
+import { citationAnchor, normalizeWithMap } from './textMatch'
 
 describe('normalizeWithMap', () => {
   it('lowercases and collapses whitespace, mapping back to source offsets', () => {
@@ -41,5 +41,52 @@ describe('normalizeWithMap', () => {
     expect(at).toBeGreaterThan(-1)
     // Projected start lands on the real "the terms" in the original string
     expect(pdfText.slice(doc.map[at], doc.map[at] + 9)).toBe('the terms')
+  })
+})
+
+describe('citationAnchor', () => {
+  it('keeps a short preview whole, including its last word', () => {
+    // The server cuts content_preview at 240 chars, so anything this short is
+    // a complete chunk and its final word is not a fragment. Trimming it would
+    // cost precision on the anchors least able to spare it.
+    const preview = 'The recipient shall retain records for three years'
+    expect(citationAnchor(preview)).toBe(preview)
+  })
+
+  it('keeps a short preview that ends on punctuation intact', () => {
+    const preview = 'Records are retained for three years.'
+    expect(citationAnchor(preview)).toBe(preview)
+  })
+
+  it('drops the partial word a genuinely truncated preview ends on', () => {
+    // A real server-side cut lands at 240 chars, past the cap, so the anchor
+    // comes from the >120 branch and ends on a whole word.
+    const preview = 'The recipient shall retain records for three years '.repeat(5).slice(0, 240)
+    const anchor = citationAnchor(preview)
+    expect(anchor.length).toBeLessThanOrEqual(120)
+    expect(anchor.endsWith('yea')).toBe(false)
+    expect(preview.startsWith(anchor)).toBe(true)
+  })
+
+  it('caps a long preview at a word boundary', () => {
+    const preview = 'alpha '.repeat(60)
+    const anchor = citationAnchor(preview)
+    expect(anchor.length).toBeLessThanOrEqual(120)
+    expect(anchor.endsWith('alpha')).toBe(true)
+    expect(preview.trim().startsWith(anchor)).toBe(true)
+  })
+
+  it('collapses whitespace so the needle matches reflowed document text', () => {
+    expect(citationAnchor('  two   lines\nof text.  ')).toBe('two lines of text.')
+  })
+
+  it('returns nothing usable for an empty or missing preview', () => {
+    expect(citationAnchor('   ')).toBe('')
+    expect(citationAnchor(undefined)).toBe('')
+  })
+
+  it('keeps an unbroken run rather than emptying the anchor', () => {
+    const url = 'https://example.gov/' + 'a'.repeat(200)
+    expect(citationAnchor(url)).toBe(url.slice(0, 120))
   })
 })

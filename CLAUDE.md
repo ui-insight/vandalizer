@@ -44,7 +44,11 @@ make backend-static    # Ruff lint + Bandit security scan
 make backend-backlog   # Mypy typecheck + pip-audit (non-blocking)
 make frontend-ci       # Typecheck, lint, audit, Vitest (coverage gate over whole src/ tree, currently ~6% lines — see frontend/vitest.config.ts), build
 make ci                # backend-ci + frontend-ci
-make release-check     # ci + backend-static + Docker builds
+make release-check     # ci + backend-static + security-gate + Docker builds
+
+# Vulnerability scanning (Trivy — brew install trivy)
+make security          # Full report: both lockfiles, runtime base images, secrets, Dockerfile config
+make security-gate     # Release gate: fails on a fixable CRITICAL or a leaked secret
 
 # Integration test tiers (run individually)
 make backend-test-integration-t1   # Engine tests (no external deps)

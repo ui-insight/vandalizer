@@ -17,6 +17,7 @@ const mockDeleteModel = vi.fn()
 const mockSetDefaultModel = vi.fn()
 const mockTestModel = vi.fn()
 const mockProbeModel = vi.fn()
+const mockSetLongDocumentModel = vi.fn()
 
 vi.mock('../../../api/admin', () => ({
   addModel: (...a: unknown[]) => mockAddModel(...a),
@@ -25,6 +26,7 @@ vi.mock('../../../api/admin', () => ({
   setDefaultModel: (...a: unknown[]) => mockSetDefaultModel(...a),
   testModel: (...a: unknown[]) => mockTestModel(...a),
   probeModel: (...a: unknown[]) => mockProbeModel(...a),
+  setLongDocumentModel: (...a: unknown[]) => mockSetLongDocumentModel(...a),
 }))
 
 const mockConfirm = vi.fn()
@@ -47,12 +49,13 @@ const onConfigPatch = vi.fn()
 const onReadinessChange = vi.fn()
 const onError = vi.fn()
 
-function renderPanel(models: ModelList = MODELS, ref?: React.Ref<ModelEditorHandle>) {
+function renderPanel(models: ModelList = MODELS, ref?: React.Ref<ModelEditorHandle>, longDocumentModel = '') {
   return render(
     <ModelEditor
       ref={ref}
       models={models}
       defaultModel="gpt-4o"
+      longDocumentModel={longDocumentModel}
       onConfigPatch={onConfigPatch}
       onReadinessChange={onReadinessChange}
       error={null}
@@ -68,6 +71,7 @@ beforeEach(() => {
   mockSetDefaultModel.mockReset().mockResolvedValue({ status: 'ok', default_model: '' })
   mockTestModel.mockReset().mockResolvedValue({ ok: true, checks: [], summary: 'Connected' })
   mockProbeModel.mockReset()
+  mockSetLongDocumentModel.mockReset().mockResolvedValue({ status: 'ok', long_document_model: '' })
   mockConfirm.mockReset().mockResolvedValue(true)
   onConfigPatch.mockReset()
   onReadinessChange.mockReset()
@@ -78,8 +82,10 @@ describe('ModelEditor — list', () => {
   it('renders each model with its tag and marks the default', () => {
     renderPanel()
 
-    expect(screen.getByText('gpt-4o')).toBeInTheDocument()
-    expect(screen.getByText('llama3.1')).toBeInTheDocument()
+    // Scoped to the list's own name spans: model names also appear as <option>
+    // values in the long-document-model picker below the list.
+    expect(screen.getByText('gpt-4o', { selector: 'span' })).toBeInTheDocument()
+    expect(screen.getByText('llama3.1', { selector: 'span' })).toBeInTheDocument()
     expect(screen.getByText('Default')).toBeInTheDocument()
     expect(screen.getByTitle('Remove as default')).toBeInTheDocument()
   })
@@ -232,6 +238,86 @@ describe('ModelEditor — edit survives a concurrent delete (wrong-record race)'
 
     await waitFor(() => expect(onError).toHaveBeenCalledWith('Could not find the model to update — refresh and try again.'))
     expect(mockUpdateModel).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('ModelEditor — long-document model', () => {
+  // A grant proposal arrives as one file. When it doesn't fit the chosen
+  // model, the planner trims the middle and the answer comes from part of the
+  // document. Nominating a bigger model is how an admin prevents that — but it
+  // has to be an explicit choice, so there is a control for it.
+
+  it('nominates a model to use when a document does not fit', async () => {
+    renderPanel()
+    fireEvent.change(screen.getByLabelText(/Long-document model/i), {
+      target: { value: 'llama3.1' },
+    })
+    await waitFor(() => expect(mockSetLongDocumentModel).toHaveBeenCalledWith('llama3.1'))
+  })
+
+  it('can be cleared, which turns routing off', async () => {
+    renderPanel(MODELS, undefined, 'llama3.1')
+    fireEvent.change(screen.getByLabelText(/Long-document model/i), { target: { value: '' } })
+    await waitFor(() => expect(mockSetLongDocumentModel).toHaveBeenCalledWith(''))
+  })
+
+  it('offers every configured model as a choice', () => {
+    renderPanel()
+    const select = screen.getByLabelText(/Long-document model/i) as HTMLSelectElement
+    const values = Array.from(select.options).map(o => o.value)
+    expect(values).toContain('gpt-4o')
+    expect(values).toContain('llama3.1')
+  })
+})
+
+describe('ModelEditor — sampling temperature', () => {
+  // Temperature is the one sampling control the product never sent, so the
+  // same question on the same document could return a different answer.
+  // Nothing here is useful unless the value actually reaches the save call.
+
+  it('sends the temperature an admin typed', async () => {
+    mockUpdateModel.mockResolvedValue({ status: 'ok', models: MODELS })
+
+    renderPanel()
+    fireEvent.click(screen.getAllByTitle('Edit model')[1])
+    fireEvent.change(screen.getByLabelText(/Temperature/i), { target: { value: '0.2' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
+
+    await waitFor(() => expect(mockUpdateModel).toHaveBeenCalledTimes(1))
+    expect(mockUpdateModel.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ temperature: 0.2 }),
+    )
+  })
+
+  it('sends 0 rather than dropping it as empty', async () => {
+    // 0 is the deterministic setting — the entire reason for the field. A
+    // `value || undefined` guard would silently discard it.
+    mockUpdateModel.mockResolvedValue({ status: 'ok', models: MODELS })
+
+    renderPanel()
+    fireEvent.click(screen.getAllByTitle('Edit model')[1])
+    fireEvent.change(screen.getByLabelText(/Temperature/i), { target: { value: '0' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
+
+    await waitFor(() => expect(mockUpdateModel).toHaveBeenCalledTimes(1))
+    expect(mockUpdateModel.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ temperature: 0 }),
+    )
+  })
+
+  it('sends null when the field is left blank, so the provider default applies', async () => {
+    mockUpdateModel.mockResolvedValue({ status: 'ok', models: MODELS })
+
+    renderPanel()
+    fireEvent.click(screen.getAllByTitle('Edit model')[1])
+    fireEvent.change(screen.getByLabelText(/Temperature/i), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save & test connection' }))
+
+    await waitFor(() => expect(mockUpdateModel).toHaveBeenCalledTimes(1))
+    expect(mockUpdateModel.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ temperature: null }),
+    )
   })
 })
 

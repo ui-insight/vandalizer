@@ -12,6 +12,7 @@ interface Props {
 const TEMPLATE_CSV = [
   'Question,Expected Answer,Category,Source or Section,Notes,ID',
   '"What is the indirect cost rate for on-campus research?","52% of modified total direct costs",factual,"Rate Agreement FY26","Verify against the current rate agreement",RATE-001',
+  '"Who approves a subaward budget revision?","The Federal awarding agency, per 2 CFR 200.308",factual,"Subpart D-ii — Procurement; Subpart E — Cost Principles","Two sources in one cell: separate them with a semicolon",SUB-002',
 ].join('\n')
 
 function downloadTemplate() {
@@ -96,6 +97,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           Expected Answer, Category, Source or Section, Notes, and ID columns are
           optional. Rows whose ID matches a previously imported question update it
           instead of creating a duplicate — re-import the same sheet as your KB evolves.
+          To list several sources in one cell, separate them with{' '}
+          <strong>semicolons</strong>. A cell with no semicolon is split on commas, so a
+          source name that itself contains one is best written with the semicolon form —
+          in a CSV, quoting the cell does not protect it, because the quotes are consumed
+          when the file is parsed.
         </div>
 
         <button
@@ -178,6 +184,25 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
                     <li key={e.row}>Row {e.row}: {e.error}</li>
                   ))}
                   {result.errors.length > 8 && <li>…and {result.errors.length - 8} more</li>}
+                </ul>
+              </div>
+            )}
+            {(result.unmatched_source_labels?.length ?? 0) > 0 && (
+              <div style={{ marginTop: 6, color: '#fbbf24' }}>
+                {result.unmatched_source_labels!.length} source label
+                {result.unmatched_source_labels!.length === 1 ? '' : 's'} match no source in
+                this knowledge base. Questions using them always score 0 retrieval
+                precision, which pulls the run score down for a naming mismatch rather
+                than a retrieval problem — rename them to match a source, or clear them:
+                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                  {result.unmatched_source_labels!.slice(0, 8).map(u => (
+                    <li key={u.label}>
+                      "{u.label}" — {u.questions} question{u.questions === 1 ? '' : 's'}
+                    </li>
+                  ))}
+                  {result.unmatched_source_labels!.length > 8 && (
+                    <li>…and {result.unmatched_source_labels!.length - 8} more</li>
+                  )}
                 </ul>
               </div>
             )}

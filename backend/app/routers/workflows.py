@@ -7,10 +7,12 @@ import io
 import json
 import logging
 import re
+import tempfile
 import zipfile
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -35,6 +37,7 @@ from app.schemas.workflows import (
     ValidateWorkflowResponse,
     ValidationInputsResponse,
     ValidationPlanResponse,
+    WorkflowPageResponse,
     WorkflowResponse,
     WorkflowStatusResponse,
 )
@@ -177,7 +180,7 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
     )
 
 
-@router.get("", response_model=list[WorkflowResponse])
+@router.get("", response_model=WorkflowPageResponse)
 async def list_workflows(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
@@ -185,21 +188,33 @@ async def list_workflows(
     search: str | None = Query(default=None),
     user: User = Depends(get_current_user),
 ):
+    """One page of the caller's visible workflows, newest first.
+
+    ``search`` filters server-side across the whole result set, not just the
+    current page — filtering a capped page client-side made every workflow
+    past the cap unfindable.
+    """
     workflows = await svc.list_workflows(user=user, skip=skip, limit=limit, scope=scope, search=search)
+    total = await svc.count_workflows(user=user, scope=scope, search=search)
     author_map = await resolve_authors(
         (wf.created_by_user_id or wf.user_id) for wf in workflows
     )
     # One team-access lookup powers can_manage for every workflow in the page.
     team_access = await access_control.get_team_access_context(user)
-    return [
-        WorkflowResponse(
-            id=str(wf.id), name=wf.name, description=wf.description,
-            user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
-            can_manage=access_control.can_manage_workflow(wf, user, team_access),
-            created_by=author_map.get(wf.created_by_user_id or wf.user_id),
-        )
-        for wf in workflows
-    ]
+    return WorkflowPageResponse(
+        items=[
+            WorkflowResponse(
+                id=str(wf.id), name=wf.name, description=wf.description,
+                user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
+                can_manage=access_control.can_manage_workflow(wf, user, team_access),
+                created_by=author_map.get(wf.created_by_user_id or wf.user_id),
+            )
+            for wf in workflows
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.get("/status", response_model=WorkflowStatusResponse)
@@ -306,48 +321,87 @@ def _zip_member_for_step(step_name: str, value):
     return f"{safe_name}.txt", str(value).encode()
 
 
-@router.get("/download")
-async def download_results(
-    session_id: str,
-    format: str = "json",
-    parse_structured: bool = False,
-    user: User = Depends(get_current_user),
-):
-    """Download workflow results in specified format.
+def _safe_zip_member(name: str) -> str:
+    """Reduce a caller-supplied filename to a single safe archive member name.
 
-    If the workflow has multiple steps marked as deliverables (is_output), the
-    response is a ZIP bundle containing one file per marked step. With 0 or 1
-    marked steps the single-output formatting paths below apply.
+    ``filename`` on a DataExport/DocumentRenderer/PackageBuilder step is free
+    text from the workflow's own configuration and reaches us unsanitised, so a
+    step named ``../../evil`` would be written into the ZIP verbatim. Archive
+    tools that do not normalise member paths then extract it outside the target
+    directory. Keep the last path component only, and refuse the traversal
+    spellings outright.
     """
-    if format not in VALID_EXPORT_FORMATS:
-        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(VALID_EXPORT_FORMATS)}")
+    cleaned = name.replace("\\", "/").split("/")[-1].strip()
+    cleaned = "".join(c if c.isalnum() or c in " _-." else "_" for c in cleaned)
+    cleaned = cleaned.lstrip(".") or "output"
+    return cleaned
 
-    status = await svc.get_workflow_status(session_id, user=user)
-    if not status:
-        raise HTTPException(status_code=404, detail="Workflow result not found")
 
-    # Build a base filename unique per session. Browsers cap auto-suffixing of
-    # duplicate downloads at ~5; past that, the same Content-Disposition name
-    # causes older files to be overwritten. Embedding the session id in the
-    # name guarantees uniqueness across manual runs.
+def _unique_member(member: str, seen: dict[str, int]) -> str:
+    """A member name not yet used in this archive.
+
+    The counter has to record the *resolved* name, not just the original:
+    otherwise ``report.pdf`` colliding once yields ``report_1.pdf``, and a later
+    run legitimately named ``report_1.pdf`` is not in ``seen`` and is written
+    under the same name — zipfile emits a duplicate-name warning and one entry
+    silently wins on extraction.
+    """
+    if member not in seen:
+        seen[member] = 0
+        return member
+    stem, _, m_ext = member.rpartition(".")
+    while True:
+        seen[member] += 1
+        n = seen[member]
+        candidate = f"{stem}_{n}.{m_ext}" if m_ext else f"{member}_{n}"
+        if candidate not in seen:
+            seen[candidate] = 0
+            return candidate
+
+
+# Past this the request is refused with a clear message rather than quietly
+# spending minutes and gigabytes. Nothing caps batch size — a folder can expand
+# one arbitrarily — so an unbounded bundle is a worker-wide stall, not a slow
+# response.
+MAX_BATCH_DOWNLOAD_RUNS = 250
+
+# Below this the archive stays in memory; above it, it spills to a temp file.
+_ZIP_SPOOL_BYTES = 32 * 1024 * 1024
+
+
+def _session_base_filename(status: dict, session_id: str) -> str:
+    """Build a filesystem-safe base name (no extension) unique per session.
+
+    Browsers cap auto-suffixing of duplicate downloads at ~5; past that, the same
+    Content-Disposition name causes older files to be overwritten. Embedding the
+    session id guarantees uniqueness across manual runs.
+    """
     workflow_name = status.get("workflow_name")
     document_title = status.get("document_title")
-    name_parts: list[str] = []
-    if workflow_name:
-        name_parts.append(workflow_name)
-    else:
-        name_parts.append("results")
+    name_parts: list[str] = [workflow_name or "results"]
     if document_title:
         doc_stem = document_title.rsplit(".", 1)[0] if "." in document_title else document_title
         name_parts.append(doc_stem)
     name_parts.append(session_id[:8])
     raw_base = "-".join(name_parts)
-    base_filename = "".join(c if c.isalnum() or c in " _-." else "_" for c in raw_base).strip() or f"results-{session_id[:8]}"
+    return "".join(c if c.isalnum() or c in " _-." else "_" for c in raw_base).strip() or f"results-{session_id[:8]}"
 
+
+def _render_workflow_output(status: dict, format: str, parse_structured: bool) -> tuple[bytes, str, str, str | None]:
+    """Render a workflow result to bytes for download.
+
+    Returns ``(content, media_type, ext, explicit_filename)``. When
+    ``explicit_filename`` is set (a file-producing step already named its own
+    file), the caller should use it verbatim; otherwise it should name the file
+    ``<base>.<ext>``. Shared by the single-session download endpoint and the
+    batch bundle so both format outputs identically.
+    """
+    workflow_name = status.get("workflow_name")
     final_output = status.get("final_output", {})
     steps_output = status.get("steps_output", {}) or {}
     output_step_names = [n for n in (status.get("output_step_names") or []) if n in steps_output]
 
+    # Multiple deliverable steps → bundle one file per step into a ZIP.
     if len(output_step_names) >= 2:
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
@@ -363,28 +417,21 @@ async def download_results(
                 else:
                     seen[filename] = 0
                 zf.writestr(filename, payload)
-        zip_buf.seek(0)
-        return StreamingResponse(
-            zip_buf,
-            media_type="application/zip",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.zip"'},
-        )
+        return zip_buf.getvalue(), "application/zip", "zip", None
 
     if len(output_step_names) == 1:
         output_data = _step_output_value(steps_output.get(output_step_names[0]))
     else:
         output_data = final_output.get("output", "") if isinstance(final_output, dict) else final_output
 
-    # Check for file_download type (e.g., from DataExport or DocumentRenderer)
+    # A step already produced a file (e.g. DataExport or DocumentRenderer) — hand
+    # its bytes back untouched under its own filename, ignoring the requested format.
     if isinstance(output_data, dict) and output_data.get("type") == "file_download":
         file_bytes = base64.b64decode(output_data["data_b64"])
         media_type_map = {"pdf": "application/pdf", "csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "json": "application/json", "zip": "application/zip"}
-        media_type = media_type_map.get(output_data.get("file_type", ""), "application/octet-stream")
-        return StreamingResponse(
-            io.BytesIO(file_bytes),
-            media_type=media_type,
-            headers={"Content-Disposition": f'attachment; filename="{output_data.get("filename", "output")}"'},
-        )
+        file_type = output_data.get("file_type", "")
+        media_type = media_type_map.get(file_type, "application/octet-stream")
+        return file_bytes, media_type, file_type or "bin", output_data.get("filename", "output")
 
     if format == "csv":
         buf = io.StringIO()
@@ -421,11 +468,7 @@ async def download_results(
             for line in text.split("\n"):
                 if line.strip():
                     writer.writerow([line])
-        return StreamingResponse(
-            io.BytesIO(buf.getvalue().encode()),
-            media_type="text/csv",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.csv"'},
-        )
+        return buf.getvalue().encode(), "text/csv", "csv", None
 
     if format == "text":
         if isinstance(output_data, str):
@@ -439,46 +482,136 @@ async def download_results(
             text = "\n".join(str(item) for item in output_data)
         else:
             text = str(output_data)
-        return StreamingResponse(
-            io.BytesIO(text.encode()),
-            media_type="text/plain",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.txt"'},
-        )
+        return text.encode(), "text/plain", "txt", None
 
     if format == "markdown":
         from app.services.output_handlers import render_workflow_markdown
 
         md_text = render_workflow_markdown(output_data, title=workflow_name or "Workflow Results")
-        return StreamingResponse(
-            io.BytesIO(md_text.encode()),
-            media_type="text/markdown",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.md"'},
-        )
+        return md_text.encode(), "text/markdown", "md", None
 
     if format == "pdf":
         from app.services.pdf_service import render_workflow_pdf
 
         pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
-        return StreamingResponse(
-            io.BytesIO(pdf_bytes),
-            media_type="application/pdf",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.pdf"'},
-        )
+        return pdf_bytes, "application/pdf", "pdf", None
 
     if format == "docx":
         docx_bytes = data_to_docx_bytes(output_data)
-        return StreamingResponse(
-            io.BytesIO(docx_bytes),
-            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": f'attachment; filename="{base_filename}.docx"'},
+        return (
+            docx_bytes,
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "docx",
+            None,
         )
 
     # Default: JSON
     json_bytes = json.dumps(output_data, indent=2, default=str).encode()
+    return json_bytes, "application/json", "json", None
+
+
+@router.get("/download")
+async def download_results(
+    session_id: str,
+    format: str = "json",
+    parse_structured: bool = False,
+    user: User = Depends(get_current_user),
+):
+    """Download workflow results in specified format.
+
+    If the workflow has multiple steps marked as deliverables (is_output), the
+    response is a ZIP bundle containing one file per marked step. With 0 or 1
+    marked steps the single-output formatting paths apply.
+    """
+    if format not in VALID_EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(VALID_EXPORT_FORMATS)}")
+
+    status = await svc.get_workflow_status(session_id, user=user)
+    if not status:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    base_filename = _session_base_filename(status, session_id)
+    content, media_type, ext, explicit_name = _render_workflow_output(status, format, parse_structured)
+    filename = explicit_name or f"{base_filename}.{ext}"
     return StreamingResponse(
-        io.BytesIO(json_bytes),
-        media_type="application/json",
-        headers={"Content-Disposition": f'attachment; filename="{base_filename}.json"'},
+        io.BytesIO(content),
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/batch-download")
+async def download_batch_results(
+    batch_id: str,
+    format: str = "json",
+    parse_structured: bool = False,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    """Bundle every completed run in a batch into a single ZIP.
+
+    One member per completed run, each formatted like the single-session
+    download. Not-yet-finished and failed runs are skipped. 404 if the batch is
+    unknown/unauthorized; 409 if it has no completed runs to bundle.
+    """
+    if format not in VALID_EXPORT_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(VALID_EXPORT_FORMATS)}")
+
+    # One pair of queries for the whole batch. get_workflow_status costs a
+    # find_one plus a Workflow.get *per run*, so a 300-document batch was ~600
+    # sequential round trips inside one request.
+    completed = await svc.get_batch_completed_outputs(
+        batch_id, user=user, share_token=share_token,
+    )
+    if completed is None:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    if not completed:
+        raise HTTPException(status_code=409, detail="No completed runs to download yet")
+    if len(completed) > MAX_BATCH_DOWNLOAD_RUNS:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"This batch has {len(completed)} completed runs; "
+                f"downloads are limited to {MAX_BATCH_DOWNLOAD_RUNS} at a time."
+            ),
+        )
+
+    def _build_zip():
+        """Render and compress every run.
+
+        Off the event loop: rendering to pdf/docx is CPU-bound, and doing it
+        inline stalled every other request the worker was serving for the
+        duration. Spooled so a large bundle spills to disk instead of being held
+        in memory in full.
+        """
+        buf = tempfile.SpooledTemporaryFile(max_size=_ZIP_SPOOL_BYTES)
+        seen: dict[str, int] = {}
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for status in completed:
+                sid = status["session_id"]
+                content, _media_type, ext, explicit_name = _render_workflow_output(
+                    status, format, parse_structured,
+                )
+                base = _session_base_filename(status, sid)
+                if explicit_name:
+                    # A step-supplied filename is static config, identical for
+                    # every run in the batch, so on its own it says nothing about
+                    # which document produced it. Prefix the per-run base so the
+                    # bundle stays readable.
+                    member = f"{base}-{_safe_zip_member(explicit_name)}"
+                else:
+                    member = f"{base}.{ext}"
+                zf.writestr(_unique_member(member, seen), content)
+        buf.seek(0)
+        return buf
+
+    zip_buf = await run_in_threadpool(_build_zip)
+
+    zip_name = "".join(c if c.isalnum() or c in " _-." else "_" for c in f"batch-{batch_id}").strip()
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{zip_name}.zip"'},
     )
 
 
@@ -549,6 +682,11 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    if not await svc.workflow_has_executable_steps(wf):
+        raise HTTPException(
+            status_code=400,
+            detail="This workflow has no steps yet — add at least one step before exporting it.",
+        )
 
     from app.services import export_import_service as eis
 
@@ -867,6 +1005,13 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     wf = await get_authorized_workflow(workflow_id, user, share_token=req.share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    # Checked here rather than only in the service so a blocked click doesn't
+    # leave a failed activity behind in History for every attempt.
+    if not await svc.workflow_has_executable_steps(wf):
+        raise HTTPException(
+            status_code=400,
+            detail="This workflow has no steps yet — add at least one step before running it.",
+        )
     document_uuids = await _authorize_documents(req.document_uuids, user)
     if req.folder_uuids:
         from app.services import folder_service
@@ -933,6 +1078,19 @@ async def cancel_workflow_run(
     return result
 
 
+@router.post("/batches/{batch_id}/cancel")
+async def cancel_batch_run(
+    batch_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    """Stop every in-flight run in a batch (per-document runs)."""
+    result = await svc.cancel_batch(batch_id, user, share_token=share_token)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return result
+
+
 @router.post("/steps/test")
 @limiter.limit("20/minute")
 async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
@@ -992,6 +1150,10 @@ async def get_workflow_history(
                 "steps_total": ev.steps_total,
                 "session_id": ev.workflow_session_id,
                 "result_snapshot": ev.result_snapshot or {},
+                # Set while the run is parked on an approval gate. Lets the
+                # history row say "awaiting approval" and link to the review
+                # instead of showing a run that has been "running" for days.
+                "pending_review_uuid": (ev.meta_summary or {}).get("pending_review_uuid"),
             }
             for ev in events
         ],

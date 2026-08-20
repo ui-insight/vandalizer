@@ -292,3 +292,82 @@ class TestDocumentRendererNode:
         result = node.process({"output": {"k": "v"}})
         decoded = base64.b64decode(result["output"]["data_b64"]).decode()
         assert json.loads(decoded) == {"k": "v"}
+
+
+class TestKnowledgeBaseQueryNodeApproximatePages:
+    """A KB Query node in ``answer`` mode writes prose that flows into
+    downstream steps and exports, where the ``page_approximate`` flag on
+    ``sources`` does not reach. If the model restates an estimated page as
+    exact, that is the last word anyone sees.
+    """
+
+    def _run_answer_mode(self, monkeypatch, *, approximate: bool):
+        from unittest.mock import MagicMock
+
+        from app.services import workflow_engine as we
+
+        captured = {}
+
+        def fake_llm_chat_model(*, prompt, data, **kwargs):
+            captured["prompt"] = prompt
+            captured["data"] = data
+            return "answer text"
+
+        chunk = {
+            "content": "Indirect costs are capped at 58% MTDC.",
+            "metadata": {
+                "source_name": "PAPPG.pdf",
+                "source_id": "src-1",
+                "page": 234,
+                "page_approximate": approximate,
+            },
+            "chunk_id": "c1",
+            "score": 0.1,
+            "similarity": 0.9,
+        }
+
+        dm = MagicMock()
+        dm.query_kb.return_value = [chunk]
+        # The node imports DocumentManager inside the function, so it has to be
+        # patched where it is defined rather than on workflow_engine.
+        from app.services import document_manager as dm_mod
+        monkeypatch.setattr(dm_mod, "DocumentManager", lambda *a, **k: dm)
+        monkeypatch.setattr(we, "llm_chat_model", fake_llm_chat_model)
+
+        node = we.KnowledgeBaseQueryNode({
+            "kb_uuid": "kb-1", "query": "indirect rate?", "mode": "answer",
+        })
+        result = node.process({"output": None})
+        return captured, result
+
+    def test_the_tilde_is_explained_when_a_page_is_estimated(self, monkeypatch):
+        captured, result = self._run_answer_mode(monkeypatch, approximate=True)
+
+        assert "p. ~234" in captured["data"], (
+            "the passage label lost its hedge before reaching the model"
+        )
+        assert "estimate" in captured["prompt"], (
+            "the model was shown a tilde with nothing explaining it, and the "
+            "instruction's own example is an un-hedged page"
+        )
+        assert "explicitly" in captured["prompt"], (
+            "restating an approximate page as exact was not ruled out by name"
+        )
+        assert result["retrieved_sources"][0]["page_approximate"] is True
+
+    def test_no_estimated_page_means_no_rule_about_them(self, monkeypatch):
+        captured, _ = self._run_answer_mode(monkeypatch, approximate=False)
+
+        assert "p. 234" in captured["data"]
+        assert "p. ~234" not in captured["data"]
+        assert "estimate" not in captured["prompt"]
+
+    def test_the_citation_example_does_not_teach_dropping_the_tilde(self):
+        """The instruction shows `[PAPPG.pdf · p. 234]` as the citation shape.
+        A model normalising to that example is how a hedged label silently
+        becomes an exact one, so the instruction must say to copy the locator
+        rather than to match the example's form.
+        """
+        from app.services.workflow_engine import KB_ANSWER_INSTRUCTION
+
+        assert "copying the locator exactly as shown" in KB_ANSWER_INSTRUCTION

@@ -1086,3 +1086,55 @@ def test_knowledge_base_supports_rag_config_override_field():
     assert d2["rag_config_override"] is None
     assert d2["rag_config_override_set_at"] is None
     assert d2["rag_config_override_run_uuid"] is None
+
+
+@pytest.mark.asyncio
+async def test_every_detail_row_records_what_it_scored_against():
+    """A run's rows must be readable after the live test set changes.
+
+    The export re-joins the current test queries to recover each question's
+    expected answer and external id, so pruning the set blanked those columns
+    on runs that had already scored them — the score survived, the thing it was
+    measured against did not. Recording them on the row makes an export
+    reproducible from the run alone.
+
+    Every branch matters, not just the happy one: a query that errored or
+    returned nothing is still a row in the export.
+    """
+    fake_dm = MagicMock()
+
+    def _make(uuid, answer, ext):
+        tq = _make_test_query(query=f"q for {uuid}", expected_source_labels=["Handbook"])
+        tq.uuid = uuid
+        tq.expected_answer = answer
+        tq.external_id = ext
+        tq.category = "factual"
+        return tq
+
+    ok = _make("tq-ok", "Expected A", "EXT-A")
+    empty = _make("tq-empty", "Expected B", "EXT-B")
+    boom = _make("tq-boom", "Expected C", "EXT-C")
+
+    def query_kb(_kb, query, _k):
+        if query.endswith("tq-boom"):
+            raise RuntimeError("retrieval blew up")
+        if query.endswith("tq-empty"):
+            return []
+        return [{"content": "text", "metadata": {"source_name": "Handbook 2025"}}]
+
+    fake_dm.query_kb = MagicMock(side_effect=query_kb)
+
+    with patch.object(kb_validation_service, "_get_dm", return_value=fake_dm):
+        result = await kb_validation_service.check_retrieval_precision(
+            "kb-1", [ok, empty, boom],
+        )
+
+    by_uuid = {d["query_uuid"]: d for d in result["details"]}
+    assert set(by_uuid) == {"tq-ok", "tq-empty", "tq-boom"}
+    for uuid, answer, ext in (
+        ("tq-ok", "Expected A", "EXT-A"),
+        ("tq-empty", "Expected B", "EXT-B"),
+        ("tq-boom", "Expected C", "EXT-C"),
+    ):
+        assert by_uuid[uuid]["expected_answer"] == answer, f"{uuid} lost its expected answer"
+        assert by_uuid[uuid]["external_id"] == ext, f"{uuid} lost its external id"

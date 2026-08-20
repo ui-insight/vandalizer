@@ -196,9 +196,18 @@ export function KnowledgePanel() {
     setValidationCollapsed(false)
   }, [selectedKB?.uuid])
 
-  // Poll status when building
+  // Sources still being chunked and embedded by a worker. Tracked separately
+  // from kb.status because a KB can report "ready" from an earlier build while
+  // newly added sources are still pending.
+  const inFlightSources = (selectedKB?.sources ?? []).filter(
+    s => s.status === 'pending' || s.status === 'processing'
+  )
+  const inFlightCount = inFlightSources.length
+
+  // Poll while the KB is building or any source is still indexing
   useEffect(() => {
-    if (!selectedKB || selectedKB.status !== 'building') return
+    if (!selectedKB) return
+    if (selectedKB.status !== 'building' && inFlightCount === 0) return
     const interval = setInterval(async () => {
       try {
         const detail = await api.getKnowledgeBase(selectedKB.uuid)
@@ -209,7 +218,7 @@ export function KnowledgePanel() {
       } catch { /* ignore */ }
     }, 3000)
     return () => clearInterval(interval)
-  }, [selectedKB?.uuid, selectedKB?.status, refresh])
+  }, [selectedKB?.uuid, selectedKB?.status, inFlightCount, refresh])
 
   const handleDelete = async (uuid: string) => {
     const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.uuid === uuid)
@@ -280,10 +289,17 @@ export function KnowledgePanel() {
     if (!selectedKB || docUuids.length === 0) return
     setAddingDocs(true)
     setShowDocPicker(false)
+    // Optimistically set status to building so the poller starts — indexing runs
+    // on a worker, so this call returns before any source is ready.
+    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     try {
       const result = await api.addDocumentsToKB(selectedKB.uuid, docUuids)
       const n = result?.added ?? docUuids.length
-      toast(`Added ${n} document${n === 1 ? '' : 's'}`, 'success')
+      if (n === 0) {
+        toast('Those documents are already in this knowledge base', 'info')
+      } else {
+        toast(`Added ${n} document${n === 1 ? '' : 's'} — indexing in background`, 'success')
+      }
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
@@ -298,13 +314,14 @@ export function KnowledgePanel() {
     if (!selectedKB) return
     setAddingDocs(true)
     setShowDocPicker(false)
+    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     try {
       const result = await api.addFolderToKB(selectedKB.uuid, folderUuid, includeSubfolders)
       const n = result?.added ?? 0
       if (n === 0) {
         toast('No new documents found in that folder', 'info')
       } else {
-        toast(`Added ${n} document${n === 1 ? '' : 's'} from folder`, 'success')
+        toast(`Added ${n} document${n === 1 ? '' : 's'} from folder — indexing in background`, 'success')
       }
       loadDetail(selectedKB.uuid)
       refresh()
@@ -656,6 +673,9 @@ export function KnowledgePanel() {
     // A ready KB with zero indexed chunks has nothing to retrieve — chatting
     // with it only produces a misleading "still indexing" reply.
     const canChatKB = selectedKB.status === 'ready' && selectedKB.total_chunks > 0
+    // Export serializes the KB's sources. With none it downloads a file nobody
+    // can use — the backend refuses it now, so say why before the click.
+    const hasSources = selectedKB.total_sources > 0
     return (
       <>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
@@ -944,6 +964,30 @@ export function KnowledgePanel() {
               </div>
             )}
 
+            {/* Indexing progress banner — covers the wait right after adding and
+                the case where the user navigates back while work is still queued. */}
+            {(addingDocs || inFlightCount > 0) && (
+              <div role="status" aria-live="polite" style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                padding: '10px 14px', marginBottom: 16, borderRadius: 8,
+                backgroundColor: 'rgba(217, 119, 6, 0.1)',
+                border: '1px solid rgba(217, 119, 6, 0.25)',
+              }}>
+                <Loader2 size={16} aria-hidden="true" style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
+                    {inFlightCount > 0
+                      ? `Indexing ${inFlightCount} source${inFlightCount === 1 ? '' : 's'}...`
+                      : 'Adding documents...'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                    Large documents can take a few minutes. Sources turn green below as they
+                    finish — you can leave this page and come back.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               <button
@@ -1044,15 +1088,17 @@ export function KnowledgePanel() {
               </button>
               <button
                 onClick={handleExport}
-                disabled={exporting}
-                title="Download this knowledge base as a JSON file"
+                disabled={exporting || !hasSources}
+                title={hasSources
+                  ? 'Download this knowledge base as a JSON file'
+                  : 'Add at least one source to this knowledge base first'}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   color: '#e5e5e5', backgroundColor: '#2a2a2a',
                   border: '1px solid #3a3a3a', borderRadius: 6,
-                  cursor: exporting ? 'default' : 'pointer',
-                  opacity: exporting ? 0.5 : 1,
+                  cursor: exporting || !hasSources ? 'default' : 'pointer',
+                  opacity: exporting || !hasSources ? 0.5 : 1,
                 }}
               >
                 {exporting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
@@ -1301,6 +1347,13 @@ export function KnowledgePanel() {
                         {!isRenaming && source.status === 'ready' && (
                           <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{source.chunk_count} chunks</div>
                         )}
+                        {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
+                          <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                            {source.status === 'processing'
+                              ? 'Indexing… large documents can take a few minutes'
+                              : 'Waiting for document text to finish extracting…'}
+                          </div>
+                        )}
                         {!isRenaming && isTruncated && (
                           <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
                             Page too long — text was cut off; later sections aren’t in this source.
@@ -1377,6 +1430,7 @@ export function KnowledgePanel() {
               kbUuid={selectedKB.uuid}
               kbReady={selectedKB.status === 'ready'}
               canManage={canManageKB}
+              kbHasSources={hasSources}
               onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
               collapsed={validationCollapsed}
               onToggleCollapsed={() => setValidationCollapsed(c => !c)}

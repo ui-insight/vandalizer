@@ -38,10 +38,13 @@ class ShareError(Exception):
     actionable HTTP responses instead of a single conflated 404.
     """
 
-    def __init__(self, code: str, status: int):
+    def __init__(self, code: str, status: int, message: str | None = None):
         self.code = code
         self.status = status
-        super().__init__(code)
+        # Set when the underlying failure already carries a user-facing reason
+        # worth showing verbatim, instead of a canned per-code message.
+        self.message = message
+        super().__init__(message or code)
 
 
 class CloneSourceMissingError(Exception):
@@ -280,6 +283,18 @@ async def add_item(
     else:
         return None
 
+    # Creation paths now bookmark server-side via ensure_bookmark, so a client
+    # that still adds the bookmark itself would otherwise produce two rows for
+    # the same object in one library — two identical, separately-deletable
+    # entries in the listing. Return the existing bookmark instead.
+    existing = await LibraryItem.find_one({
+        "_id": {"$in": lib.items},
+        "item_id": PydanticObjectId(item_id),
+        "kind": LibraryItemKind(kind).value,
+    })
+    if existing:
+        return await _attach_author(await _dereference_item(existing))
+
     now = datetime.datetime.now(datetime.timezone.utc)
     li = LibraryItem(
         item_id=PydanticObjectId(item_id),
@@ -299,6 +314,60 @@ async def add_item(
     await lib.save()
 
     return await _attach_author(await _dereference_item(li))
+
+
+async def has_bookmark(item_id: PydanticObjectId, kind: LibraryItemKind) -> bool:
+    """True when some library still lists a bookmark pointing at this object.
+
+    A ``LibraryItem`` row that no ``Library.items`` array references is a
+    leftover, not a bookmark: it renders in no listing, so it does not keep the
+    object reachable. Checking membership rather than mere row existence is
+    what makes :func:`ensure_bookmark` and the orphan cleanup agree on which
+    objects are stranded.
+    """
+    rows = await LibraryItem.find(
+        LibraryItem.item_id == item_id, LibraryItem.kind == kind
+    ).to_list()
+    if not rows:
+        return False
+    return await Library.find_one({"items": {"$in": [r.id for r in rows]}}) is not None
+
+
+async def ensure_bookmark(
+    item_id: PydanticObjectId,
+    kind: LibraryItemKind,
+    owner_user_id: str,
+    *,
+    verified: bool = False,
+) -> LibraryItem | None:
+    """Guarantee a newly created workflow / extraction is reachable somewhere.
+
+    These objects are only ever listed through library bookmarks, so one
+    created without a bookmark is invisible in every UI surface while still
+    holding its name against :mod:`app.services.name_conflicts` — the user
+    cannot see it, cannot delete it, and cannot reuse the name. Creation paths
+    that used to leave the bookmark to a follow-up call from the client
+    (duplicate, import, catalog import) call this instead, so a dropped or
+    failed second request can no longer strand the object.
+
+    Idempotent: returns ``None`` when the object is already bookmarked.
+    """
+    if await has_bookmark(item_id, kind):
+        return None
+    lib = await get_or_create_personal_library(owner_user_id)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    li = LibraryItem(
+        item_id=item_id,
+        kind=kind,
+        added_by_user_id=owner_user_id,
+        verified=verified,
+        created_at=now,
+    )
+    await li.insert()
+    lib.items.append(li.id)
+    lib.updated_at = now
+    await lib.save()
+    return li
 
 
 async def remove_item(
@@ -595,6 +664,13 @@ async def share_to_team(
     except CloneSourceMissingError as exc:
         logger.warning("Share-to-team source missing for item %s: %s", item.id, exc)
         raise ShareError("original_missing", 404)
+    except ValueError as exc:
+        # The clone refused for a reason the user can act on — e.g. a knowledge
+        # base with no sources. Its own message is more useful than the generic
+        # clone_failed text, and this is a 400, not the 500 the catch-all below
+        # would produce.
+        logger.info("Share-to-team refused for item %s: %s", item.id, exc)
+        raise ShareError("source_not_shareable", 400, str(exc))
     except Exception:
         logger.exception(
             "Unexpected error cloning library item %s (kind=%s) for team %s",

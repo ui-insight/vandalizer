@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { cancelWorkflow, getBatchStatus, getWorkflowStatus, runWorkflow } from '../api/workflows'
+import { cancelBatch, cancelWorkflow, getBatchStatus, getWorkflowStatus, runWorkflow } from '../api/workflows'
 import type { BatchStatus } from '../api/workflows'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { WorkflowStatus } from '../types/workflow'
@@ -44,7 +44,7 @@ export function useWorkflowRunner() {
     try {
       const s = await getBatchStatus(bid, shareToken)
       setBatchStatus(s)
-      if (s.status === 'completed' || s.status === 'failed') {
+      if (s.status === 'completed' || s.status === 'failed' || s.status === 'canceled') {
         setRunning(false)
         stopPolling()
       }
@@ -86,21 +86,25 @@ export function useWorkflowRunner() {
     }
   }, [poll, pollBatch, bumpActivitySignal, shareToken])
 
-  // Stop an in-flight single run. Batch runs are not cancellable yet, so this
-  // no-ops when only a batch is active. After the request returns, poll once so
-  // the UI flips to "canceled" immediately rather than waiting for the next tick.
+  // Stop an in-flight run — a batch (every per-document run) or a single run.
+  // After the request returns, poll once so the UI flips to its terminal state
+  // immediately rather than waiting for the next tick.
   const stop = useCallback(async () => {
-    if (!sessionId || batchId) return
     setCancelling(true)
     try {
-      await cancelWorkflow(sessionId, shareToken)
-      await poll(sessionId)
+      if (batchId) {
+        await cancelBatch(batchId, shareToken)
+        await pollBatch(batchId)
+      } else if (sessionId) {
+        await cancelWorkflow(sessionId, shareToken)
+        await poll(sessionId)
+      }
     } catch {
       // Leave the run as-is on failure; the poller keeps the UI honest.
     } finally {
       setCancelling(false)
     }
-  }, [sessionId, batchId, poll, shareToken])
+  }, [sessionId, batchId, poll, pollBatch, shareToken])
 
   const loadSession = useCallback(async (sid: string) => {
     stopPolling()

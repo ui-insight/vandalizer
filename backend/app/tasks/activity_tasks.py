@@ -309,6 +309,12 @@ def reap_stale_running_task(self) -> None:
     time limits that killed a task before its exception handler could update the
     activity record. Without this, the activity rail spins forever and the user
     has to delete the item manually.
+
+    Runs parked on a human approval gate are exempt: they carry
+    ``meta_summary.pending_review_uuid`` and stop reporting progress by design,
+    so reaping on elapsed time marked every review left overnight as a timeout.
+    The approval paths (resume, reject, expire) clear the marker, which puts the
+    row back under this sweep.
     """
     db = _get_db()
     threshold_minutes = _resolve_stale_threshold_minutes(db)
@@ -321,6 +327,8 @@ def reap_stale_running_task(self) -> None:
         {
             "status": {"$in": ["running", "queued"]},
             "last_updated_at": {"$lt": cutoff},
+            # Matches rows where the field is null *or* absent.
+            "meta_summary.pending_review_uuid": None,
         },
         {
             "$set": {
@@ -335,8 +343,43 @@ def reap_stale_running_task(self) -> None:
         },
     )
 
-    if result.modified_count:
+    # A row parked on a review is exempt from the sweep above, but only while
+    # that review is actually pending. approve_review returns as soon as the
+    # resume task is dispatched, and the marker is cleared deep inside that
+    # task — after guards that raise on "Approval not found", "is not approved"
+    # and "Workflow or result not found". If the workflows worker is down when
+    # the message is sent, the message is lost, or any guard trips, the marker
+    # stays and the row sits at "running" forever: precisely the condition this
+    # reaper exists to catch, made unreachable by its own exemption.
+    pending_uuids = [
+        a["uuid"]
+        for a in db.approval_request.find({"status": "pending"}, {"uuid": 1})
+        if a.get("uuid")
+    ]
+    orphaned = db.activity_event.update_many(
+        {
+            "status": {"$in": ["running", "queued"]},
+            "last_updated_at": {"$lt": cutoff},
+            # Carries a marker, but not one of a review still awaiting a decision.
+            "meta_summary.pending_review_uuid": {"$nin": [None, *pending_uuids]},
+        },
+        {
+            "$set": {
+                "status": "failed",
+                "finished_at": now,
+                "last_updated_at": now,
+                "error": (
+                    "Timed out — the review this run was waiting on is no "
+                    "longer pending and the run never resumed."
+                ),
+            },
+            "$unset": {"meta_summary.pending_review_uuid": ""},
+        },
+    )
+
+    if result.modified_count or orphaned.modified_count:
         logger.info(
-            "Reaped %d stale activity events (threshold=%d min)",
-            result.modified_count, threshold_minutes,
+            "Reaped %d stale activity events and %d parked on a decided review "
+            "(threshold=%d min)",
+            result.modified_count, orphaned.modified_count, threshold_minutes,
         )

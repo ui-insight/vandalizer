@@ -12,7 +12,9 @@ import {
   ShieldCheck,
   FolderInput,
   Check,
+  Download,
 } from 'lucide-react'
+import { exportSearchSetUrl } from '../../api/extractions'
 import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { AuthorChip } from '../shared/AuthorChip'
@@ -350,6 +352,17 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       label="Edit"
                       onClick={() => {
                         onEdit(item)
+                        setMenuOpen(false)
+                      }}
+                    />
+                  )}
+                  {(item.set_type === 'prompt' || item.set_type === 'formatter') && item.item_uuid && (
+                    <MenuItem
+                      icon={<Download size={14} />}
+                      label="Download JSON"
+                      title="Download as a shareable JSON file"
+                      onClick={() => {
+                        window.open(exportSearchSetUrl(item.item_uuid!), '_blank')
                         setMenuOpen(false)
                       }}
                     />

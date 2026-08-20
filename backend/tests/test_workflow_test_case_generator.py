@@ -372,6 +372,15 @@ async def test_accept_raises_when_workflow_not_found():
 # ---------------------------------------------------------------------------
 
 
+# Synthesis reads the step list to draft an input the workflow can act on, so
+# every synthesis test needs a workflow that has at least one step.
+_SYNTH_WF_DATA = {
+    "name": "X",
+    "description": "Y",
+    "steps": [{"name": "Summarize", "is_output": True, "tasks": []}],
+}
+
+
 @pytest.mark.asyncio
 async def test_synthesize_returns_label_and_text():
     user = MagicMock(); user.user_id = "u"
@@ -380,7 +389,7 @@ async def test_synthesize_returns_label_and_text():
         patch("app.services.workflow_service.get_authorized_workflow",
               new=AsyncMock(return_value=_make_workflow())),
         patch("app.services.workflow_service.get_workflow",
-              new=AsyncMock(return_value={"name": "X", "description": "Y", "steps": []})),
+              new=AsyncMock(return_value=_SYNTH_WF_DATA)),
         patch("app.services.workflow_test_case_generator._run_llm",
               new=AsyncMock(return_value='{"label": "Sample", "text": "Some doc text"}')),
     ):
@@ -399,9 +408,29 @@ async def test_synthesize_raises_when_no_text():
         patch("app.services.workflow_service.get_authorized_workflow",
               new=AsyncMock(return_value=_make_workflow())),
         patch("app.services.workflow_service.get_workflow",
-              new=AsyncMock(return_value={"name": "X", "description": "Y", "steps": []})),
+              new=AsyncMock(return_value=_SYNTH_WF_DATA)),
         patch("app.services.workflow_test_case_generator._run_llm",
               new=AsyncMock(return_value='{"label": "X", "text": ""}')),
     ):
         with pytest.raises(ValueError, match="no content"):
             await synthesize_seed_input("wfid", user)
+
+
+@pytest.mark.asyncio
+async def test_synthesize_rejects_workflow_with_no_steps():
+    """A stepless workflow has nothing to draft an input for — refuse before
+    spending a call on it."""
+    user = MagicMock(); user.user_id = "u"
+    llm = AsyncMock(return_value='{"label": "Sample", "text": "Some doc text"}')
+
+    with (
+        patch("app.services.workflow_service.get_authorized_workflow",
+              new=AsyncMock(return_value=_make_workflow())),
+        patch("app.services.workflow_service.get_workflow",
+              new=AsyncMock(return_value={"name": "X", "description": "Y", "steps": []})),
+        patch("app.services.workflow_test_case_generator._run_llm", new=llm),
+    ):
+        with pytest.raises(ValueError, match="no steps yet"):
+            await synthesize_seed_input("wfid", user)
+
+    llm.assert_not_awaited()

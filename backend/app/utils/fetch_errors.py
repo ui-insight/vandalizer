@@ -26,9 +26,12 @@ _UPLOAD_HINT = (
     "directly instead."
 )
 
+# Deliberately not "the site blocks automated tools like Vandalizer": on the
+# reported case (#566) the refusal came from the site's CDN by network
+# reputation, and a stock browser from the same host was refused identically —
+# so the old wording implied a fault on our side that wasn't there.
 _BLOCKED_HINT = (
-    "This usually means the site blocks automated tools like Vandalizer. "
-    + _UPLOAD_HINT
+    "The site's CDN refused this connection. " + _UPLOAD_HINT
 )
 
 

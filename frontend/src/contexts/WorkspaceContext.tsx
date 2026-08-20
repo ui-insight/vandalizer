@@ -24,7 +24,7 @@ export interface VerificationCompletion {
 export interface ViewDocumentRequest {
   uuid: string
   title: string
-  highlight?: { terms: string[]; page: number | null }
+  highlight?: { terms: string[]; page: number | null; pageApproximate?: boolean }
 }
 
 export interface PendingExtractionResults {
@@ -147,7 +147,14 @@ interface UIStateContextValue {
   // source tracking) — lets the viewer jump to the right page even when the
   // passage itself can't be text-matched.
   highlightPage: number | null
-  setHighlightTerms: (terms: string[], page?: number | null) => void
+  // True when that page was interpolated from OCR text rather than read from
+  // the document's own structure, so the viewer can hedge instead of asserting
+  // it. Travels with the page for the same reason the page travels with the
+  // terms: a stale flag on a new highlight would be worse than none.
+  highlightPageApproximate: boolean
+  setHighlightTerms: (
+    terms: string[], page?: number | null, pageApproximate?: boolean,
+  ) => void
   activitySignal: number
   bumpActivitySignal: () => void
   viewDocumentRequest: ViewDocumentRequest | null
@@ -157,6 +164,11 @@ interface UIStateContextValue {
   setVerificationSession: (s: VerificationSession | null) => void
   verificationCompletion: VerificationCompletion | null
   setVerificationCompletion: (c: VerificationCompletion | null) => void
+  // The document the file viewer currently holds (null when it is showing the
+  // browser instead). Panels that link into the viewer read this to tell
+  // "open it" from "it is already open" — see the chat citation menu.
+  openDocumentUuid: string | null
+  setOpenDocumentUuid: (uuid: string | null) => void
 }
 
 const UIStateContext = createContext<UIStateContextValue | null>(null)
@@ -276,11 +288,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
   const [highlightTerms, _setHighlightTerms] = useState<string[]>([])
   const [highlightPage, setHighlightPage] = useState<number | null>(null)
-  // Terms and their page hint always move together — a stale page from a
-  // previous highlight must never survive a new set/clear.
-  const setHighlightTerms = useCallback((terms: string[], page?: number | null) => {
+  const [highlightPageApproximate, setHighlightPageApproximate] = useState(false)
+  // Terms, their page hint and whether that page is an estimate always move
+  // together — a stale value from a previous highlight must never survive a
+  // new set/clear.
+  const setHighlightTerms = useCallback((
+    terms: string[], page?: number | null, pageApproximate?: boolean,
+  ) => {
     _setHighlightTerms(terms)
     setHighlightPage(page ?? null)
+    setHighlightPageApproximate(Boolean(pageApproximate))
   }, [])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
@@ -310,6 +327,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [viewDocumentRequest, setViewDocumentRequest] = useState<ViewDocumentRequest | null>(null)
   const [verificationSession, setVerificationSession] = useState<VerificationSession | null>(null)
   const [verificationCompletion, setVerificationCompletion] = useState<VerificationCompletion | null>(null)
+  const [openDocumentUuid, setOpenDocumentUuid] = useState<string | null>(null)
   const pendingExtractionResultsRef = useRef<PendingExtractionResults | null>(null)
   const pendingWorkflowSessionRef = useRef<string | null>(null)
   const [workflowOpenSignal, setWorkflowOpenSignal] = useState(0)
@@ -739,20 +757,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     chatSplitOpen, setChatSplitOpen,
-    highlightTerms, highlightPage, setHighlightTerms,
+    highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     verificationSession, setVerificationSession,
     verificationCompletion, setVerificationCompletion,
+    openDocumentUuid, setOpenDocumentUuid,
   }), [
     selectedDocUuids, selectedDocNames, selectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     chatSplitOpen, setChatSplitOpen,
-    highlightTerms, highlightPage, setHighlightTerms,
+    highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     verificationSession, verificationCompletion,
+    openDocumentUuid,
   ])
 
   return (

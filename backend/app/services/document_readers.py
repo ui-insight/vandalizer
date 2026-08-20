@@ -4,6 +4,7 @@ Ported from Flask app/utilities/document_readers.py.
 All functions are synchronous — safe for Celery workers.
 """
 
+import io
 import logging
 import re
 from datetime import date, datetime, time
@@ -149,6 +150,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     import time as _time
 
     import httpx
+    last_error: Exception | None = None
     for attempt in range(retries):
         try:
             with httpx.Client(timeout=timeout) as client:
@@ -162,18 +164,40 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                     use_async=use_async,
                 )
         except ocr_client.OcrRequestError as e:
+            last_error = e
             logger.warning(
                 "OCR attempt %d failed against %s: %s — body: %s",
                 attempt + 1, ocr_endpoint, e, e.body,
             )
         except Exception as e:
+            last_error = e
             logger.warning("OCR attempt %d raised: %s", attempt + 1, e)
+        if not ocr_client.is_retryable(last_error):
+            # Nothing another attempt can fix — stop burning attempts and let
+            # the caller degrade to PyMuPDF.
+            break
         if attempt < retries - 1:
-            _time.sleep(2 ** attempt)
+            wait = getattr(last_error, "retry_after", None)
+            _time.sleep(wait if wait is not None else 2 ** attempt)
 
-    # OCR failure is a handled degradation — the caller falls back to PyMuPDF —
-    # so log at warning, not error. An OCR outage (or a file removed mid-flight)
-    # must not page Sentry as a fault on every attempt-exhaustion.
+    # These three attempts span about 3 seconds, which is a network blip, not an
+    # outage. When the failure looks transient, raise so the task layer's own
+    # backoff (minutes, not seconds) gets a turn — returning "" here is what
+    # made a brief OCR outage indistinguishable from a document that genuinely
+    # has no text. See #633.
+    if last_error is not None and ocr_client.is_retryable(last_error):
+        logger.warning(
+            "OCR unavailable after %d attempts for %s; deferring to task retry",
+            retries, pdf_path,
+        )
+        raise ocr_client.OcrUnavailableError(
+            f"OCR service did not respond after {retries} attempts: {last_error}",
+            retry_after=getattr(last_error, "retry_after", None),
+        )
+
+    # A permanent failure (or no OCR configured at all) is a handled
+    # degradation — the caller falls back to PyMuPDF — so log at warning, not
+    # error, and don't page Sentry on every attempt-exhaustion.
     logger.warning("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
 
@@ -458,6 +482,77 @@ def extract_sheet_json_from_xlsx(xlsx_path: str) -> dict:
     return {"sheets": sheets}
 
 
+def extract_sheet_json_from_csv(csv_path: str) -> dict:
+    """Render a .csv as the same sheet JSON shape the viewer expects.
+
+    Parsing moved server-side so the browser stops running a spreadsheet parser
+    over untrusted uploads; a CSV needs nothing more than the stdlib to do it.
+    Delimiter sniffing covers the semicolon and tab variants Excel emits under
+    non-US locales, falling back to a comma when the sample is inconclusive.
+    """
+    import csv as _csv
+
+    raw = _read_text_with_fallback(csv_path)
+    sample = raw[:8192]
+    try:
+        dialect = _csv.Sniffer().sniff(sample, delimiters=",;\t|")
+    except _csv.Error:
+        dialect = _csv.excel
+
+    grid = [list(row) for row in _csv.reader(io.StringIO(raw), dialect)]
+    width = max((len(r) for r in grid), default=0)
+    grid = [r + [""] * (width - len(r)) for r in grid]
+
+    headers = grid[0] if grid else []
+    rows = grid[1:] if len(grid) > 1 else []
+    return {"sheets": [{
+        "name": "Sheet1", "headers": headers, "rows": rows, "hidden": False,
+    }]}
+
+
+def extract_sheet_json_from_xls(xls_path: str) -> dict:
+    """Render a legacy binary .xls as the same sheet JSON shape.
+
+    xlrd reads .xls only — it dropped .xlsx years ago — which is why it is a
+    much smaller thing to depend on than a general spreadsheet library, and why
+    it runs here rather than in a reader's browser.
+
+    .xls has no cached-vs-formula split to reconcile: the format stores
+    computed values, so what is read is what Excel last calculated.
+    """
+    import xlrd
+
+    book = xlrd.open_workbook(xls_path)
+    sheets = []
+    for ws in book.sheets():
+        grid = [
+            [_stringify_cell_value(ws.cell_value(r, c)) for c in range(ws.ncols)]
+            for r in range(ws.nrows)
+        ]
+        headers = grid[0] if grid else []
+        rows = grid[1:] if len(grid) > 1 else []
+        sheets.append({
+            "name": ws.name,
+            "headers": headers,
+            "rows": rows,
+            # xlrd exposes visibility as 0 visible / 1 hidden / 2 very hidden.
+            "hidden": getattr(ws, "visibility", 0) != 0,
+        })
+    return {"sheets": sheets}
+
+
+def _read_text_with_fallback(path: str) -> str:
+    """Decode a text file, tolerating the encodings spreadsheets arrive in."""
+    for encoding in ("utf-8-sig", "utf-8", "cp1252", "latin-1"):
+        try:
+            with open(path, encoding=encoding) as f:
+                return f.read()
+        except UnicodeDecodeError:
+            continue
+    with open(path, encoding="utf-8", errors="replace") as f:
+        return f.read()
+
+
 _DOCX_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
@@ -565,18 +660,30 @@ def _interpolate_page_markers(text: str, num_pages: int) -> list[dict]:
     from a service that didn't preserve page structure (the OCR endpoint).
     Treats the text as uniformly dense — a rough heuristic, but good enough
     for "this answer is from somewhere around page 234" citations.
+
+    Markers carry ``"approximate": True`` so consumers can tell an estimated
+    boundary from a measured one (``_pymupdf_extract_with_pages`` emits the
+    same shape without the flag). Anything that shows a page number to a user
+    or a model should hedge accordingly — a confident citation off an
+    interpolated offset is a fabricated one. Markers persisted before this
+    flag existed have no key, and read as exact.
     """
     if num_pages <= 0 or not text:
         return []
     length = len(text)
     step = max(1, length // num_pages)
     return [
-        {"char_offset": min(length - 1, i * step), "kind": "page", "value": i + 1}
+        {
+            "char_offset": min(length - 1, i * step),
+            "kind": "page",
+            "value": i + 1,
+            "approximate": True,
+        }
         for i in range(num_pages)
     ]
 
 
-def _pdf_page_count(pdf_path: str) -> int:
+def pdf_page_count(pdf_path: str) -> int:
     """Cheap page-count read via PyMuPDF. Returns 0 if it can't open the file."""
     try:
         import pymupdf
@@ -725,13 +832,20 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
         # Prefer OCR text for accuracy. When OCR is used we lose true page
         # boundaries, so fall back to interpolating against PyMuPDF's page
         # count — approximate, but enough for "around page N" citations.
+        from app.services import ocr_client
+
         try:
             ocr_text = ocr_extract_text_from_pdf(file_path)
+        except ocr_client.OcrUnavailableError:
+            # Deliberately not swallowed: a transient outage must reach the task
+            # layer so the whole extraction is retried later, rather than being
+            # degraded to whatever PyMuPDF can scrape off a scanned page now.
+            raise
         except Exception as e:
             logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
             ocr_text = ""
         if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
-            num_pages = _pdf_page_count(file_path)
+            num_pages = pdf_page_count(file_path)
             return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
         # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
         # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
@@ -748,7 +862,7 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
                     file_path, e,
                 )
                 return ocr_text, _interpolate_page_markers(
-                    ocr_text, _pdf_page_count(file_path)
+                    ocr_text, pdf_page_count(file_path)
                 )
             raise
 

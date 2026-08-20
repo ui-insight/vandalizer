@@ -168,7 +168,7 @@ class TestKbIngestDocument:
         calls = db.knowledge_base_sources.update_one.call_args_list
         error_call = calls[1][0]
         assert error_call[1]["$set"]["status"] == "error"
-        assert "no text content" in error_call[1]["$set"]["error_message"]
+        assert "no extractable text" in error_call[1]["$set"]["error_message"]
 
     @patch("app.services.document_manager.get_document_manager")
     @patch("app.tasks.knowledge_base_tasks._get_db")

@@ -14,6 +14,7 @@ from celery.result import AsyncResult
 
 from app.celery_app import celery_app
 from app.models.document import SmartDocument
+from app.models.library import LibraryItemKind
 from app.models.search_set import SearchSetItem
 from app.models.workflow import (
     Workflow,
@@ -65,16 +66,31 @@ async def create_workflow(name: str, user_id: str, description: str | None = Non
         created_by_user_id=user_id,
     )
     await wf.insert()
+
+    # Bookmark here, not in the caller. This is the path that produces the most
+    # workflows and it was the last one still leaving the bookmark to a second
+    # request from the client: LibraryTab makes it only when a personal library
+    # happens to be loaded, and useWorkflows.create never made it at all — so a
+    # workflow created through that hook was born invisible while still holding
+    # its name against name_conflicts, which is the whole defect.
+    from app.services import library_service
+
+    await library_service.ensure_bookmark(
+        wf.id, LibraryItemKind.WORKFLOW, user_id,
+    )
     return wf
 
 
-async def list_workflows(
+def _visible_workflows_query(
     user: User,
-    skip: int = 0,
-    limit: int = 100,
     scope: str | None = None,
     search: str | None = None,
-) -> list[Workflow]:
+) -> dict | None:
+    """Mongo filter for the workflows *user* may list, or None for "nothing".
+
+    Shared by :func:`list_workflows` and :func:`count_workflows` so a paged
+    listing and its total can never disagree about what is visible.
+    """
     # Scope queries to the user's current team (matches Library behavior)
     current_team = str(user.current_team) if user.current_team else None
 
@@ -85,7 +101,7 @@ async def list_workflows(
             query["team_id"] = {"$in": [current_team, None]}
     elif scope == "team":
         if not current_team:
-            return []
+            return None
         query = {"team_id": current_team, "user_id": {"$ne": user.user_id}}
     else:
         # Default: user's own (in current team) + all current team items
@@ -100,9 +116,43 @@ async def list_workflows(
 
     # Add text search filter
     if search:
-        query["name"] = {"$regex": search, "$options": "i"}
+        query["name"] = {"$regex": re.escape(search), "$options": "i"}
 
-    return await Workflow.find(query).skip(skip).limit(limit).to_list()
+    return query
+
+
+async def list_workflows(
+    user: User,
+    skip: int = 0,
+    limit: int = 100,
+    scope: str | None = None,
+    search: str | None = None,
+) -> list[Workflow]:
+    query = _visible_workflows_query(user, scope=scope, search=search)
+    if query is None:
+        return []
+    # Newest first. Unsorted, Mongo returns natural (insertion) order, so a
+    # capped page showed the user's oldest workflows and hid everything made
+    # since — the opposite of what a listing is for.
+    return (
+        await Workflow.find(query)
+        .sort("-created_at", "-_id")
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+
+
+async def count_workflows(
+    user: User,
+    scope: str | None = None,
+    search: str | None = None,
+) -> int:
+    """Total workflows matching the same filter :func:`list_workflows` pages."""
+    query = _visible_workflows_query(user, scope=scope, search=search)
+    if query is None:
+        return 0
+    return await Workflow.find(query).count()
 
 
 async def get_workflow(
@@ -320,6 +370,14 @@ async def duplicate_workflow(
         validation_inputs=validation_inputs,
     )
     await new_wf.insert()
+    # Bookmark the copy here rather than leaving it to the caller: "Make a copy"
+    # in the workflow editor never made that follow-up call, so every copy it
+    # produced was invisible in the library while still holding its name.
+    from app.services import library_service
+
+    await library_service.ensure_bookmark(
+        new_wf.id, LibraryItemKind.WORKFLOW, user_id,
+    )
 
     return await get_workflow(str(new_wf.id))
 
@@ -513,6 +571,11 @@ async def run_workflow(
         if not wf:
             raise ValueError("Workflow not found")
 
+    if not await workflow_has_executable_steps(wf):
+        raise ValueError(
+            "This workflow has no steps yet — add at least one step before running it.",
+        )
+
     if not model:
         model = await get_user_model_name(user_id)
 
@@ -621,15 +684,42 @@ async def cancel_workflow(
     if not result:
         return None
 
-    terminal = {"completed", "error", "failed", "canceled"}
-    if result.status in terminal:
+    if result.status in _TERMINAL_STATUSES:
         return {"session_id": session_id, "status": result.status}
 
+    await _cancel_result(result)
+    return {"session_id": session_id, "status": result.status}
+
+
+_TERMINAL_STATUSES = {"completed", "error", "failed", "canceled"}
+
+
+async def _cancel_result(result) -> None:
+    """Flip one WorkflowResult to ``canceled`` and interrupt its worker.
+
+    Shared by single-run (:func:`cancel_workflow`) and batch (:func:`cancel_batch`)
+    cancellation. The caller is responsible for authorization and for skipping
+    results that are already terminal.
+    """
     # Set the terminal state first so the UI reflects the stop immediately and
     # the engine's cooperative check (if it happens to be between steps) bails.
+    #
+    # An atomic, guarded update rather than result.save(): Beanie's save() emits
+    # a $set over every field of the in-memory copy, and over a batch the caller
+    # loops serially with a DB write, a Celery call and an activity write per
+    # run. A run that completes inside that window would be written back from
+    # the pre-completion snapshot — discarding the final_output the user already
+    # paid for — and a run that reached an approval gate would have its
+    # approval_request_id reset to None, orphaning the ApprovalRequest. The
+    # guard also means a run that finished a moment ago is left alone.
+    updated = await WorkflowResult.get_motor_collection().update_one(
+        {"_id": result.id, "status": {"$nin": list(_TERMINAL_STATUSES)}},
+        {"$set": {"status": "canceled", "error": "Canceled by user"}},
+    )
+    if updated.matched_count == 0:
+        return
     result.status = "canceled"
     result.error = "Canceled by user"
-    await result.save()
 
     # Interrupt the worker. revoke(terminate=True) kills the prefork child
     # running this task id; if the task is still queued it is dropped before it
@@ -642,7 +732,7 @@ async def cancel_workflow(
         except Exception:
             logger.warning(
                 "Failed to revoke Celery task %s for session %s",
-                result.celery_task_id, session_id, exc_info=True,
+                result.celery_task_id, result.session_id, exc_info=True,
             )
 
     # Best-effort: mark the matching activity-rail entry canceled too, so the
@@ -651,20 +741,24 @@ async def cancel_workflow(
         from app.models.activity import ActivityEvent, ActivityStatus
 
         act = await ActivityEvent.find_one(
-            ActivityEvent.workflow_session_id == session_id,
+            ActivityEvent.workflow_session_id == result.session_id,
         )
         if act and act.is_running:
             act.status = ActivityStatus.CANCELED.value
             act.error = "Canceled by user"
             act.finished_at = datetime.datetime.now(datetime.timezone.utc)
+            # Drop the pending-review marker: the run is not waiting on anyone
+            # any more. Leaving it makes the row exempt from the stale reaper
+            # for good, and any surface reading the marker keeps offering a
+            # review for a run that has stopped.
+            if isinstance(act.meta_summary, dict):
+                act.meta_summary.pop("pending_review_uuid", None)
             await act.save()
     except Exception:
         logger.warning(
             "Failed to mark activity canceled for session %s",
-            session_id, exc_info=True,
+            result.session_id, exc_info=True,
         )
-
-    return {"session_id": session_id, "status": result.status}
 
 
 async def run_workflow_batch(
@@ -702,6 +796,11 @@ async def run_workflow_batch(
         if not wf:
             raise ValueError("Workflow not found")
 
+    if not await workflow_has_executable_steps(wf):
+        raise ValueError(
+            "This workflow has no steps yet — add at least one step before running it.",
+        )
+
     if not model:
         model = await get_user_model_name(user_id)
 
@@ -713,6 +812,12 @@ async def run_workflow_batch(
         doc_title = doc.title if doc else doc_uuid
 
         session_id = str(uuid_mod.uuid4())[:8]
+        # Generate the task id up front and persist it, exactly as run_workflow
+        # does. Without it _cancel_result has nothing to revoke, and revocation
+        # is the *only* thing that interrupts a step already in flight — the
+        # engine's cooperative check runs between steps, so a one-step batch
+        # run past that point would finish its LLM call regardless of STOP.
+        celery_task_id = str(uuid_mod.uuid4())
 
         result = WorkflowResult(
             workflow=wf.id,
@@ -722,6 +827,7 @@ async def run_workflow_batch(
             batch_id=batch_id,
             document_title=doc_title,
             model=model,
+            celery_task_id=celery_task_id,
         )
         await result.insert()
 
@@ -737,6 +843,7 @@ async def run_workflow_batch(
                 "activity_id": activity_id,
             },
             queue="workflows",
+            task_id=celery_task_id,
         )
 
     return batch_id
@@ -769,10 +876,15 @@ async def get_batch_status(
     total = len(results)
     completed = sum(1 for r in results if r.status == "completed")
     failed = sum(1 for r in results if r.status in ("error", "failed"))
+    canceled = sum(1 for r in results if r.status == "canceled")
     running = sum(1 for r in results if r.status in ("running", "queued"))
 
     if running > 0:
         overall_status = "running"
+    elif canceled > 0:
+        # The user stopped the batch; some runs may have finished first, but the
+        # batch as a whole is stopped, not complete.
+        overall_status = "canceled"
     elif failed == total:
         overall_status = "failed"
     elif completed + failed == total:
@@ -797,8 +909,145 @@ async def get_batch_status(
         "total": total,
         "completed": completed,
         "failed": failed,
+        # Already computed above for the overall status, and the card needs it
+        # to say how much of a stopped batch actually ran.
+        "canceled": canceled,
         "items": items,
     }
+
+
+async def get_batch_completed_outputs(
+    batch_id: str, user: User | None = None, share_token: str | None = None
+) -> list[dict] | None:
+    """Every completed run in a batch, in the shape the download renderers want.
+
+    Two queries for the whole batch rather than two per run. ``get_workflow_status``
+    does a ``find_one`` plus a ``Workflow.get`` each time, so bundling a
+    300-document batch meant ~600 sequential round trips in one request; nothing
+    caps batch size, and a folder can expand one arbitrarily.
+
+    Authorization is unchanged in strength. Every run in a batch is created
+    against the same workflow, so authorizing that workflow once is what the
+    per-run check was doing N times — and any row that somehow points elsewhere
+    is dropped rather than trusted.
+
+    Returns ``None`` when the batch is unknown or the caller is not authorized
+    for it, matching :func:`get_batch_status`.
+    """
+    results = await WorkflowResult.find(
+        WorkflowResult.batch_id == batch_id,
+    ).to_list()
+    if not results:
+        return None
+
+    first = results[0]
+    if not first.workflow:
+        return None
+    workflow = await get_authorized_workflow(
+        str(first.workflow), user, share_token=share_token
+    ) if user is not None else await Workflow.get(first.workflow)
+    if not workflow:
+        return None
+
+    workflow_name = getattr(workflow, "name", None)
+    authorized_workflow_id = first.workflow
+
+    outputs: list[dict] = []
+    for r in results:
+        if r.status != "completed":
+            continue
+        if r.workflow != authorized_workflow_id:
+            # A batch is created against one workflow; anything else was not
+            # covered by the check above.
+            continue
+        outputs.append({
+            "session_id": r.session_id,
+            "status": r.status,
+            "final_output": r.final_output,
+            "steps_output": r.steps_output,
+            "output_step_names": r.output_step_names,
+            "workflow_name": workflow_name,
+            "document_title": r.document_title,
+        })
+    return outputs
+
+
+async def cancel_batch(
+    batch_id: str, user: User, share_token: str | None = None
+) -> dict | None:
+    """Cancel every in-flight run in a batch.
+
+    Flips each non-terminal run in the batch to ``canceled`` and revokes its
+    Celery task, mirroring :func:`cancel_workflow` for the single-run case. Runs
+    that already finished (completed/error/failed/canceled) are left untouched,
+    so this is safe to call on a partially-complete batch. Returns ``None`` when
+    the batch is unknown or the user is not authorized for it.
+    """
+    results = await WorkflowResult.find(
+        WorkflowResult.batch_id == batch_id,
+    ).to_list()
+
+    if not results:
+        return None
+
+    # Authorize against the batch's workflow — same rule as get_batch_status.
+    first = results[0]
+    if not first.workflow:
+        return None
+    workflow = await get_authorized_workflow(
+        str(first.workflow), user, share_token=share_token
+    )
+    if not workflow:
+        return None
+
+    canceled = 0
+    canceled_ids = []
+    for r in results:
+        if r.status in _TERMINAL_STATUSES:
+            continue
+        await _cancel_result(r)
+        canceled_ids.append(r.id)
+        canceled += 1
+
+    await _expire_approvals_for(canceled_ids)
+
+    return {"batch_id": batch_id, "status": "canceled", "canceled": canceled}
+
+
+async def _expire_approvals_for(workflow_result_ids: list) -> None:
+    """Close any approval still pending on a run we just canceled.
+
+    ``pending_approval`` is not a terminal status, so a run parked at a gate is
+    canceled along with the rest of the batch — but its ApprovalRequest stayed
+    pending in the reviewer's inbox. Approving it fired
+    ``tasks.workflow.resume_after_approval``, which restarted a run the user had
+    explicitly stopped, spending tokens hours after the fact. (The resume task
+    now refuses a canceled run as well; this stops the review being offered at
+    all, which is the part the reviewer sees.)
+
+    Best-effort: a stopped batch must not fail because of the inbox.
+    """
+    if not workflow_result_ids:
+        return
+    try:
+        from app.models.approval import STATUS_EXPIRED, STATUS_PENDING, ApprovalRequest
+
+        await ApprovalRequest.get_motor_collection().update_many(
+            {
+                "workflow_result_id": {"$in": workflow_result_ids},
+                "status": STATUS_PENDING,
+            },
+            {"$set": {
+                "status": STATUS_EXPIRED,
+                "expired_at": datetime.datetime.now(datetime.timezone.utc),
+                "reviewer_comments": "Run canceled by user",
+            }},
+        )
+    except Exception:
+        logger.warning(
+            "Failed to expire approvals for canceled runs %s",
+            workflow_result_ids, exc_info=True,
+        )
 
 
 async def test_step(task_name: str, task_data: dict, document_uuids: list[str], user_id: str, model: str | None = None) -> str:
@@ -883,6 +1132,53 @@ async def reorder_steps(workflow_id: str, step_ids: list[str], user: User) -> bo
 # ---------------------------------------------------------------------------
 # Validation Plan
 # ---------------------------------------------------------------------------
+
+def _is_trigger_step(step: dict) -> bool:
+    """True for the empty "Document" step that stands in for the run's input.
+
+    The engine prepends one of these at execution time, and some stored
+    workflows carry their own copy — which the design canvas hides. A workflow
+    whose only step is that trigger is empty as far as the user is concerned.
+    """
+    return step.get("name") == "Document" and not step.get("tasks")
+
+
+def workflow_has_steps(wf_data: dict | None) -> bool:
+    """True when the dereferenced definition has a step that does something."""
+    return any(
+        not _is_trigger_step(step)
+        for step in ((wf_data or {}).get("steps") or [])
+    )
+
+
+async def workflow_has_executable_steps(wf: Workflow) -> bool:
+    """``workflow_has_steps`` for a raw Workflow doc, whose steps are ids.
+
+    One query, and none at all for the empty case — this sits on the run path.
+    """
+    if not wf.steps:
+        return False
+    steps = await WorkflowStep.find({"_id": {"$in": wf.steps}}).to_list()
+    return any(
+        not _is_trigger_step({"name": step.name, "tasks": step.tasks})
+        for step in steps
+    )
+
+
+def require_workflow_steps(wf_data: dict | None, action: str) -> None:
+    """Reject validation work on a workflow that has no steps yet.
+
+    Every validation surface reads the step list to decide what the output
+    should contain. With no steps that read silently yields nothing, so the
+    LLM drafts a plan from the name alone and grades a run whose only output
+    is an internal id — burning tokens to report failures against fields the
+    workflow does not have.
+    """
+    if not workflow_has_steps(wf_data):
+        raise ValueError(
+            f"This workflow has no steps yet — add at least one step before {action}.",
+        )
+
 
 def compute_workflow_definition_hash(wf_data: dict | None) -> str:
     """Deterministic hash of the parts of a workflow that a validation plan depends on.
@@ -1396,6 +1692,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     wf_data = await get_workflow(workflow_id)
     if not wf_data:
         raise ValueError("Workflow not found")
+    require_workflow_steps(wf_data, "generating a validation plan")
 
     # Build a data-flow-aware analysis of the workflow for the LLM.
     # For each step, describe what it does, what data it produces, and what
@@ -2399,11 +2696,12 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         if not wf:
             raise ValueError("Workflow not found")
 
+    wf_data = await get_workflow(workflow_id)
+    require_workflow_steps(wf_data, "validating it")
+
     plan = wf.validation_plan
     if not plan:
         raise ValueError("No validation plan - generate or add checks first")
-
-    wf_data = await get_workflow(workflow_id)
 
     # Flag runs graded against a stale plan — the grade card renders a caveat
     # so a low grade caused by orphaned/drifted checks isn't mistaken for a

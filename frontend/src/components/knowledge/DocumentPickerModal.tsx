@@ -26,6 +26,16 @@ const ALLOWED_EXTS = ['pdf', 'doc', 'docx', 'xlsx', 'xls', 'csv', 'txt', 'md']
 const ACCEPT_ATTR = ALLOWED_EXTS.map(e => `.${e}`).join(',')
 const ALLOWED_HINT = ALLOWED_EXTS.join(', ')
 
+// Rough "this will take a while to index" thresholds. Indexing time scales with
+// text volume; token_count is the closest proxy the search API returns, with
+// page count as a fallback for documents whose text isn't extracted yet.
+const LARGE_DOC_TOKENS = 50_000
+const LARGE_DOC_PAGES = 100
+
+function isLargeDoc(doc: SearchResult): boolean {
+  return doc.token_count >= LARGE_DOC_TOKENS || doc.num_pages >= LARGE_DOC_PAGES
+}
+
 function getExt(name: string): string {
   const i = name.lastIndexOf('.')
   return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
@@ -234,6 +244,9 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
   }
 
   const uploadingCount = uploads.filter(u => u.status === 'uploading').length
+  // Only counts docs in the current result set; a selection carried over from an
+  // earlier search won't warn, which is acceptable for a heads-up.
+  const selectedLargeCount = results.filter(d => selected.has(d.uuid) && isLargeDoc(d)).length
   const sortedFolders = [...folders].sort((a, b) => a.path.localeCompare(b.path))
 
   return (
@@ -488,6 +501,9 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                         {doc.extension.toUpperCase()}
                         {doc.num_pages > 0 ? ` · ${doc.num_pages} pages` : ''}
                         {folderPath ? ` · ${folderPath}` : ''}
+                        {isLargeDoc(doc) && (
+                          <span style={{ color: '#d97706' }}> · Large — slower to index</span>
+                        )}
                       </div>
                     </div>
                   </button>
@@ -496,6 +512,21 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             </div>
           )}
         </div>
+
+        {/* Heads-up before committing to a slow index */}
+        {selectedLargeCount > 0 && (
+          <div role="status" aria-live="polite" style={{
+            fontSize: 12, color: '#d97706', marginBottom: 10,
+            padding: '8px 12px', borderRadius: 6,
+            backgroundColor: 'rgba(217, 119, 6, 0.1)',
+            border: '1px solid rgba(217, 119, 6, 0.25)',
+          }}>
+            {selectedLargeCount === 1
+              ? "One selected document is large — indexing it can take a few minutes."
+              : `${selectedLargeCount} selected documents are large — indexing them can take a few minutes.`}
+            {' '}You can keep working while it runs.
+          </div>
+        )}
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

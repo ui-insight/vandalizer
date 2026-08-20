@@ -72,6 +72,10 @@ async def chat(
     team_access = await access_control.get_team_access_context(user)
 
     authorized_document_uuids: list[str] = []
+    # Captured as we authorize, so recording the turn's scope costs no extra
+    # lookups. Titles go in alongside the uuids because a uuid stops resolving
+    # once the document is deleted, which is when the record matters most.
+    source_documents: list[dict] = []
     for doc_uuid in document_uuids:
         doc = await access_control.get_authorized_document(
             doc_uuid,
@@ -82,6 +86,7 @@ async def chat(
         if not doc:
             raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
         authorized_document_uuids.append(doc.uuid)
+        source_documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
     document_uuids = authorized_document_uuids
 
     # The KB scope passed to retrieval. A project scope overrides it with the
@@ -145,6 +150,9 @@ async def chat(
                 ):
                     document_uuids.append(doc.uuid)
                     existing.add(doc.uuid)
+                    source_documents.append(
+                        {"uuid": doc.uuid, "title": doc.title or doc.uuid},
+                    )
 
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
@@ -219,8 +227,17 @@ async def chat(
     if not conversation:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
-    # Save user message
-    await conversation.add_message(ChatRole.USER, message)
+    # Save user message, with the scope it was asked against.
+    #
+    # A KB-grounded answer already recorded what it drew on (``citations`` on
+    # the assistant turn), while a direct-document answer recorded nothing —
+    # even though the fully resolved, authorized set is right here. Without it
+    # a saved conversation cannot say which documents produced which answer,
+    # and continuing a conversation across a changed selection (which is
+    # deliberate and useful) leaves no trace of the change.
+    await conversation.add_message(
+        ChatRole.USER, message, source_documents=source_documents or None,
+    )
 
     async def generate():
         try:
@@ -567,6 +584,41 @@ async def list_conversations(
     ]
 
 
+async def _refresh_openable_citations(messages: list[dict], user_id: str) -> None:
+    """Re-decide, at read time, which stored citations can open their document.
+
+    ``document_uuid`` is stamped onto a citation when the answer is generated,
+    so a conversation reopened later carries a decision made against the world
+    as it was then. A document soft-deleted since would still offer "open" and
+    404 in the viewer. Re-resolving against the reader also applies the access
+    check to messages stored before that check existed.
+
+    Mutates ``messages`` in place. Best-effort, exactly like the write-time
+    resolution: reading a conversation must not fail over a display nicety.
+    """
+    cited = [
+        c
+        for m in messages
+        for c in (m.get("citations") or [])
+        if c.get("document_id")
+    ]
+    if not cited:
+        return
+    try:
+        from app.services.knowledge_service import resolve_openable_documents
+
+        openable = await resolve_openable_documents(
+            [c["document_id"] for c in cited], user_id=user_id
+        )
+    except Exception:
+        return
+    for c in cited:
+        doc_uuid = openable.get(c["document_id"])
+        if doc_uuid:
+            c["document_uuid"] = doc_uuid
+        else:
+            c.pop("document_uuid", None)
+
 @router.get("/history/{conversation_uuid}")
 async def get_chat_history(
     conversation_uuid: str,
@@ -581,6 +633,7 @@ async def get_chat_history(
         return {"messages": [], "url_attachments": [], "file_attachments": []}
 
     messages = await conversation.get_messages()
+    await _refresh_openable_citations(messages, user.user_id)
     url_attachments = await conversation.get_url_attachments()
     file_attachments = await conversation.get_file_attachments()
 

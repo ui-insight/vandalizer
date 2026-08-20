@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react'
 import { downloadFileUrl, fetchSheetJson, type SheetJsonResponse } from '../../api/files'
-import * as XLSX from 'xlsx'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 
 type ServerSheet = SheetJsonResponse['sheets'][number]
@@ -20,7 +19,6 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [rows, setRows] = useState<string[][]>([])
   const [sheets, setSheets] = useState<string[]>([])
   const [activeSheet, setActiveSheet] = useState(0)
-  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [serverSheets, setServerSheets] = useState<ServerSheet[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -91,19 +89,6 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const url = downloadFileUrl(docUuid)
   const zoomLevel = ZOOM_LEVELS[zoom]
 
-  function loadSheet(wb: XLSX.WorkBook, index: number) {
-    const sheet = wb.Sheets[wb.SheetNames[index]]
-    const data: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-    if (data.length > 0) {
-      setHeaders(data[0].map(String))
-      setRows(data.slice(1).map(row => row.map(String)))
-    } else {
-      setHeaders([])
-      setRows([])
-    }
-    setActiveSheet(index)
-  }
-
   function showServerSheet(sheets: ServerSheet[], index: number) {
     const s = sheets[index]
     setHeaders(s?.headers ?? [])
@@ -111,15 +96,16 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
     setActiveSheet(index)
   }
 
-  // Fetch and parse spreadsheet. Prefer the backend's evaluated JSON for
-  // .xlsx (so formulas without cached values still render); fall back to
-  // client-side SheetJS parsing for .csv / .xls / older deployments.
+  // Load the spreadsheet. Parsing happens on the server for every format we
+  // render — .xlsx, .xls and .csv — so the browser never runs a spreadsheet
+  // parser over an untrusted upload. It used to: SheetJS handled .csv and .xls
+  // here, and that package left npm at 0.18.5 carrying two HIGH CVEs with no
+  // upgrade path, one of them prototype pollution on a crafted workbook.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     setServerSheets(null)
-    setWorkbook(null)
 
     fetchSheetJson(docUuid)
       .then((json) => {
@@ -129,44 +115,19 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
         showServerSheet(json.sheets, 0)
         setLoading(false)
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return
-        fetch(url, { credentials: 'include' })
-          .then(async (resp) => {
-            if (cancelled) return
-            const ct = resp.headers.get('content-type') || ''
-
-            if (ct.includes('csv') || ct.includes('text/plain')) {
-              const text = await resp.text()
-              if (cancelled) return
-              const wb = XLSX.read(text, { type: 'string' })
-              setWorkbook(wb)
-              setSheets(wb.SheetNames)
-              loadSheet(wb, 0)
-            } else {
-              const buf = await resp.arrayBuffer()
-              if (cancelled) return
-              const wb = XLSX.read(buf, { type: 'array' })
-              setWorkbook(wb)
-              setSheets(wb.SheetNames)
-              loadSheet(wb, 0)
-            }
-            setLoading(false)
-          })
-          .catch((err) => {
-            if (!cancelled) {
-              setError(err instanceof Error ? err.message : 'Failed to load spreadsheet')
-              setLoading(false)
-            }
-          })
+        setError(
+          err instanceof Error ? err.message : 'Failed to load spreadsheet',
+        )
+        setLoading(false)
       })
 
     return () => { cancelled = true }
-  }, [docUuid, url])
+  }, [docUuid])
 
   const handleSheetChange = (index: number) => {
     if (serverSheets) showServerSheet(serverSheets, index)
-    else if (workbook) loadSheet(workbook, index)
   }
 
   const btnStyle: React.CSSProperties = {

@@ -36,9 +36,16 @@ from app.services.context_budget import (
     DocumentSegment,
     effective_input_window,
     estimate_next_request_tokens,
+    estimate_input_tokens,
     plan_and_compact_context,
     resolve_context_window,
 )
+from app.services.model_routing import (
+    RoutingDecision,
+    choose_document_model,
+    suggest_document_model,
+)
+from app.services.page_locator import locator_for_meta
 from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
     build_project_kb_empty_reminder,
@@ -133,6 +140,138 @@ class _ThinkTagParser:
         if last_lt == -1:
             return len(text)
         return last_lt
+
+
+def annotate_pages(text: str, markers: list[dict] | None) -> str:
+    """Insert ``[p. N]`` boundaries into document text using its page markers.
+
+    Page structure is computed at ingest and stored on the document
+    (``SmartDocument.text_markers``, one ``{"char_offset", "kind": "page",
+    "value": n}`` per page). Extraction sources and KB chat already resolve it;
+    document chat previously sent ``raw_text`` flat, so the model had no way to
+    attribute a fact to a page even though the data was sitting right there.
+
+    Returns *text* unchanged when there is no usable page structure — non-PDF
+    formats, and PDFs ingested before markers were persisted. Callers get a
+    plain document rather than an error. See #603.
+    """
+    if not text or not markers:
+        return text
+
+    positions: list[tuple[int, int, bool]] = []
+    for m in markers:
+        if not isinstance(m, dict) or m.get("kind") != "page":
+            continue  # XLSX markers describe sheets, not pages
+        page = m.get("value")
+        offset = m.get("char_offset")
+        if not isinstance(page, int) or not isinstance(offset, bool | int):
+            continue
+        if isinstance(offset, bool) or not 0 <= offset <= len(text):
+            # raw_text can be re-saved shorter than when markers were computed.
+            continue
+        positions.append((offset, page, bool(m.get("approximate"))))
+
+    if not positions:
+        return text
+
+    positions.sort()
+    out: list[str] = []
+    cursor = 0
+    for offset, page, approximate in positions:
+        out.append(text[cursor:offset])
+        # OCR'd pages are evenly-spaced estimates, so the boundary is a guess.
+        # The tilde keeps the model from quoting an estimate as a fact.
+        out.append(f"[p. ~{page}]\n" if approximate else f"[p. {page}]\n")
+        cursor = offset
+    out.append(text[cursor:])
+    return "".join(out)
+
+
+def page_note_for(markers: list[dict] | None, *, annotated: bool) -> str:
+    """The instruction that tells the model how to cite pages in this document.
+
+    Returns "" when the document got no page markers — promising citations the
+    model has no way to make is worse than saying nothing (non-PDF formats, or
+    PDFs ingested before page markers existed).
+
+    The two notes are deliberately parallel in force. An earlier version made
+    the measured-page note conditional ("cite when you quote or reference a
+    specific passage") while the interpolated one was a directive, so the
+    document whose page numbers were *trustworthy* carried the weaker
+    instruction. Measured against a live 30B: the scanned document was cited,
+    the digital one on one question in three.
+
+    The interpolated note rules out asserting exactness by name. Telling a
+    model to hedge left room for it to hedge *and* claim a passage was
+    "explicitly stated" on a page, which is what it did — five times out of
+    five at temperature 0, on a document whose page markers are 100%
+    interpolated.
+    """
+    if not annotated or not _has_page_markers(markers):
+        return ""
+    if _has_approximate_pages(markers):
+        # Boundaries were interpolated from character offsets, so an
+        # exact-sounding citation is invented precision.
+        return (
+            "\n_`[p. ~N]` marks the *estimated* start of page N — this document "
+            "was scanned, so page positions are approximate. Always give pages "
+            "as approximate, e.g. \"around p. 4\". Never state a page as exact "
+            "and never say a passage is \"explicitly\" or \"clearly\" on a given "
+            "page._\n"
+        )
+    return (
+        "\n_`[p. N]` marks the start of page N. Cite the page for every fact you "
+        "take from this document, e.g. \"p. 3\"._\n"
+    )
+
+
+def _has_page_markers(markers: list[dict] | None) -> bool:
+    return any(
+        isinstance(m, dict) and m.get("kind") == "page" for m in (markers or [])
+    )
+
+
+def _has_approximate_pages(markers: list[dict] | None) -> bool:
+    """True when any usable page marker came from interpolation, not measurement."""
+    return any(
+        isinstance(m, dict) and m.get("kind") == "page" and m.get("approximate")
+        for m in markers or []
+    )
+
+
+def build_document_segments(
+    documents: list,
+) -> tuple[list[DocumentSegment], list[str], list[str], list[str]]:
+    """Turn selected documents into trimmable context segments.
+
+    One segment per document so the budget planner can trim each independently.
+    Returns ``(segments, skipped_no_text, errored, low_quality)`` — the last
+    three are titles the caller warns the user about. ``skipped_no_text`` and
+    ``errored`` never reach the model; ``low_quality`` documents do, but their
+    text layer is garbled, so the answer is unreliable (see #609).
+    """
+    segments: list[DocumentSegment] = []
+    skipped_no_text: list[str] = []
+    errored: list[str] = []
+    low_quality: list[str] = []
+
+    for doc in documents:
+        if doc.raw_text:
+            markers = getattr(doc, "text_markers", None)
+            body = annotate_pages(doc.raw_text, markers)
+            page_note = page_note_for(markers, annotated=body != doc.raw_text)
+            segments.append(DocumentSegment(
+                label=f"doc:{doc.title or doc.uuid}",
+                text=f"\n\n## Document: {doc.title}\n{page_note}{body}",
+            ))
+            if document_service.is_extraction_low_quality(doc):
+                low_quality.append(doc.title or doc.uuid)
+        elif doc.task_status == "error":
+            errored.append(doc.title or doc.uuid)
+        else:
+            skipped_no_text.append(doc.title or doc.uuid)
+
+    return segments, skipped_no_text, errored, low_quality
 
 
 def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
@@ -769,6 +908,43 @@ def _hold_message_for_unreadable_docs(
     )
 
 
+def _suggest_model_for_overflow(
+    compacted,
+    model_name: str,
+    model_config: Optional[dict],
+    sys_config_doc: dict,
+    input_tokens: int,
+) -> Optional[dict]:
+    """A larger model to offer, or None when nothing needs offering.
+
+    Only when the request actually overflowed — a suggestion on a request that
+    fit would be noise, and the dialog it feeds only opens on overflow.
+
+    ``input_tokens`` must be the size of the request *before* compaction. The
+    question being asked is "could another model have held what the user
+    actually sent?", and the compacted total cannot answer it: compaction is
+    defined as making the request fit, so ``compacted.plan.total_input_tokens``
+    is always within the current model's budget. Passing it made
+    :func:`suggest_document_model` return None every time and the dialog's
+    fourth option could never appear.
+    """
+    if not compacted.actions:
+        return None
+    suggestion = suggest_document_model(
+        current_name=model_name,
+        current_config=model_config,
+        models=(sys_config_doc or {}).get("available_models") or [],
+        input_tokens=input_tokens,
+    )
+    if not suggestion:
+        return None
+    return {
+        "name": suggestion.get("name", ""),
+        "tag": suggestion.get("tag", ""),
+        "context_window": suggestion.get("context_window", 0),
+    }
+
+
 async def chat_stream(
     message: str,
     document_uuids: list[str],
@@ -968,22 +1144,9 @@ async def chat_stream(
 
     # Document segments — one entry per SmartDocument so each can be trimmed
     # independently by the budget planner.
-    doc_segments: list[DocumentSegment] = []
-    skipped_no_text: list[str] = []
-    errored_docs: list[str] = []
-    low_quality_docs: list[str] = []
-    for doc in documents:
-        if doc.raw_text:
-            doc_segments.append(DocumentSegment(
-                label=f"doc:{doc.title or doc.uuid}",
-                text=f"\n\n## Document: {doc.title}\n{doc.raw_text}",
-            ))
-            if document_service.is_extraction_low_quality(doc):
-                low_quality_docs.append(doc.title or doc.uuid)
-        elif doc.task_status == "error":
-            errored_docs.append(doc.title or doc.uuid)
-        else:
-            skipped_no_text.append(doc.title or doc.uuid)
+    doc_segments, skipped_no_text, errored_docs, low_quality_docs = (
+        build_document_segments(documents)
+    )
 
     # Warn the caller about any selected document that the model won't see
     # because text extraction hasn't finished, errored out, or the doc is gone.
@@ -1055,7 +1218,7 @@ async def chat_stream(
         try:
             kb_segment, kb_sources = await _build_kb_segment(
                 kb_uuid, message, model_name, manifest=kb_manifest,
-                history=previous_messages,
+                history=previous_messages, user_id=user_id,
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
@@ -1247,6 +1410,45 @@ async def chat_stream(
     # The reminder bundle is counted with the system prompt: it isn't part of
     # the instructions, but it's per-turn overhead the budget must reserve.
     # (model_config was fetched above, before the micro-compaction check.)
+
+    # A whole document is the unit people actually work in — a grant proposal
+    # arrives as one file and gets read as one. When it doesn't fit, trimming
+    # answers from part of it. If the deployment nominated a bigger model, use
+    # it rather than silently dropping the middle. See services/model_routing.
+    # Measured before any trimming: both routing and the dialog's suggestion
+    # ask "could another model have held what the user actually sent?", and the
+    # post-compaction total cannot answer that — it always fits by definition.
+    # `model_config` carries this model's token safety margin, so the estimate
+    # is an upper bound rather than an optimistic one. Routing decides off this
+    # number: an estimate that reads low makes the router see headroom that is
+    # not there and decline to move a request that does not fit.
+    requested_input_tokens = estimate_input_tokens(
+        model_name=model_name,
+        system_prompt=system_prompt or "",
+        user_message=message,
+        history=previous_messages,
+        documents=doc_segments,
+        attachments=attachment_segments,
+        model_config=model_config,
+    )
+
+    routing = RoutingDecision(model_name, False, "")
+    candidate_name = (sys_config_doc or {}).get("long_document_model") or ""
+    if candidate_name and (doc_segments or attachment_segments):
+        candidate_config = await get_llm_model_by_name(candidate_name)
+        routing = choose_document_model(
+            current_name=model_name,
+            current_config=model_config,
+            candidate_name=candidate_name,
+            candidate_config=candidate_config,
+            input_tokens=requested_input_tokens,
+        )
+        if routing.switched:
+            logger.info(
+                "Routing to %s: request does not fit %s", candidate_name, model_name
+            )
+            model_name, model_config = routing.model_name, candidate_config
+
     compacted = plan_and_compact_context(
         model_name=model_name,
         model_config=model_config,
@@ -1264,7 +1466,25 @@ async def chat_stream(
         "kind": "context_budget",
         "content": "",
         "plan": compacted.plan.to_dict(),
+        # Offered to the user when their request didn't fit, so the context
+        # dialog can propose keeping the whole document instead of dropping
+        # part of it. Computed server-side under the same privacy rule as
+        # automatic routing — picking a model from the list in the browser
+        # would walk around that gate.
+        "suggested_model": _suggest_model_for_overflow(
+            compacted, model_name, model_config, sys_config_doc,
+            requested_input_tokens,
+        ),
     }) + "\n"
+    # Switching the model without saying so is the same failure as trimming a
+    # document without saying so — the answer looks identical either way.
+    if routing.reason:
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": routing.reason,
+            "action": "model_routed" if routing.switched else "model_not_routed",
+            "tokens_dropped": 0,
+        }) + "\n"
     for action in compacted.actions:
         yield json.dumps({
             "kind": "context_notice",
@@ -2085,6 +2305,7 @@ async def _build_kb_segment(
     model_name: str,
     manifest: Optional[list[dict]] = None,
     history: Optional[list[ModelMessage]] = None,
+    user_id: Optional[str] = None,
 ) -> tuple[Optional[DocumentSegment], list[dict]]:
     """Retrieve KB context for one chat turn.
 
@@ -2175,6 +2396,29 @@ async def _build_kb_segment(
         return None, []
 
     kb_sources: list[dict] = []
+    snippet_blocks: list[str] = []
+    any_approximate = False
+    for r in kb_results:
+        meta = r.get("metadata") or {}
+        src = meta.get("source_name", "Unknown")
+        page = meta.get("page")
+        sheet = meta.get("sheet")
+        approximate = bool(meta.get("page_approximate"))
+        locator = locator_for_meta(meta)
+        label = f"{src} ({locator})" if locator else src
+        any_approximate = any_approximate or approximate
+        snippet_blocks.append(f"\n**Source: {label}**\n{r['content']}\n")
+        kb_sources.append({
+            "document_id": meta.get("source_id"),
+            "document_title": src,
+            "page": page if isinstance(page, int) else None,
+            "page_approximate": approximate,
+            "sheet": sheet if isinstance(sheet, str) else None,
+            "chunk_id": r.get("chunk_id"),
+            "score": r.get("score"),
+            "similarity": r.get("similarity"),
+            "content_preview": (r.get("content") or "")[:240],
+        })
     kb_text = (
         "\n\n## Retrieved Knowledge Base Snippets\n"
         "_The following are partial excerpts from a larger corpus, ranked "
@@ -2182,27 +2426,38 @@ async def _build_kb_segment(
         "off-topic, or miss the best answer. Cite by filename only when a "
         "snippet actually supports your claim._\n"
     )
-    for r in kb_results:
-        meta = r.get("metadata") or {}
-        src = meta.get("source_name", "Unknown")
-        page = meta.get("page")
-        sheet = meta.get("sheet")
-        label = src
-        if isinstance(page, int):
-            label = f"{src} (p. {page})"
-        elif isinstance(sheet, str) and sheet:
-            label = f"{src} ({sheet})"
-        kb_text += f"\n**Source: {label}**\n{r['content']}\n"
-        kb_sources.append({
-            "document_id": meta.get("source_id"),
-            "document_title": src,
-            "page": page if isinstance(page, int) else None,
-            "sheet": sheet if isinstance(sheet, str) else None,
-            "chunk_id": r.get("chunk_id"),
-            "score": r.get("score"),
-            "similarity": r.get("similarity"),
-            "content_preview": (r.get("content") or "")[:240],
-        })
+    if any_approximate:
+        # A tilde the model has not had explained to it does not survive: it
+        # gets normalised away and the estimate is restated as fact. Measured
+        # five times out of five at temperature 0 on a fully interpolated
+        # document, which is why page_note_for rules out exactness by name for
+        # document chat. The same labels reach the model here.
+        kb_text += (
+            "_A page written as `p. ~N` is an *estimate* — that source was "
+            "scanned, so page positions were interpolated rather than read. "
+            "Give such pages as approximate, e.g. \"around p. 4\". Never state "
+            "one as exact and never say a passage is \"explicitly\" or "
+            "\"clearly\" on it._\n"
+        )
+    kb_text += "".join(snippet_blocks)
+
+    # Attach the openable SmartDocument behind each cited source, so the UI can
+    # offer "open the document at the cited page" and not just a text preview —
+    # the page numbers are a retrieval heuristic, so verifying them in the
+    # document itself is exactly what a reader needs to do. URL sources,
+    # deleted documents, and documents this reader cannot view resolve to
+    # nothing and stay preview-only.
+    from app.services.knowledge_service import resolve_openable_documents
+
+    openable = await resolve_openable_documents(
+        [s["document_id"] for s in kb_sources if s.get("document_id")],
+        user_id=user_id,
+    )
+    for src_dict in kb_sources:
+        doc_uuid = openable.get(src_dict.get("document_id") or "")
+        if doc_uuid:
+            src_dict["document_uuid"] = doc_uuid
+
     return DocumentSegment(label="kb", text=kb_text), kb_sources
 
 

@@ -27,7 +27,10 @@ async def _authorize_submission_target(item_kind: str, item_id: str, user: User)
     if item_kind == "workflow":
         obj = await access_control.get_authorized_workflow(item_id, user)
     elif item_kind == "search_set":
+        # item_id may be a UUID or an ObjectId (library rows send the ObjectId)
         obj = await access_control.get_authorized_search_set(item_id, user)
+        if not obj:
+            obj = await access_control.get_authorized_search_set_by_id(item_id, user)
     elif item_kind == "knowledge_base":
         # item_id may be an ObjectId or a UUID — try both
         obj = await access_control.get_authorized_knowledge_base_by_id(item_id, user)

@@ -1,18 +1,18 @@
 import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Sparkles } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound, Inbox } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
-import { useOptimizerInboxCount } from '../../hooks/useOptimizerInboxCount'
+import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import { VersionMenuFooter } from './VersionMenuFooter'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
   const { user, logout } = useAuth()
   const certPanel = useCertificationPanel()
-  const { actionable: tuningActionable } = useOptimizerInboxCount()
+  const { count: pendingReviews } = useMyReviewCount()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -179,24 +179,26 @@ export function TeamsDropdown() {
             <span>Credentials</span>
           </Link>
 
-          {/* Tuning suggestions — always listed (even at zero) so the surface
-              is discoverable; the rail badge is what draws attention when
-              something is actually waiting. */}
+          {/* Reviews — always listed, even at zero. This is the entry point a
+              reviewer can find without a notification: someone assigned an
+              approval while away had no way to learn the queue existed. The
+              rail badge is what draws attention once something is waiting. */}
           <Link
-            to="/tuning"
+            to="/reviews"
             role="menuitem"
             tabIndex={-1}
             onClick={() => closeMenu()}
             className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
           >
-            <Sparkles className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-            <span>Tuning suggestions</span>
-            {tuningActionable > 0 && (
+            <Inbox className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+            <span>Reviews</span>
+            {pendingReviews > 0 && (
               <span
+                aria-label={`${pendingReviews} pending`}
                 className="ml-auto rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
                 style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
               >
-                {tuningActionable}
+                {pendingReviews}
               </span>
             )}
           </Link>

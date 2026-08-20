@@ -41,6 +41,21 @@ class WorkflowResponse(BaseModel):
     created_by: Optional[AuthorRef] = None
 
 
+class WorkflowPageResponse(BaseModel):
+    """One page of workflows plus the size of the full result set.
+
+    ``total`` counts every workflow matching the same scope/search filter, not
+    just the ones on this page, so a client can tell "these are all of them"
+    apart from "there are more you cannot see" — the confusion that let
+    workflows past the first page go unnoticed.
+    """
+
+    items: list[WorkflowResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 # ---------------------------------------------------------------------------
 # Steps & Tasks
 # ---------------------------------------------------------------------------

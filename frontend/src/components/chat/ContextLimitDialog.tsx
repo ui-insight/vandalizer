@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
-import { Scissors, Minimize2, Trash2, X, Loader2 } from 'lucide-react'
+import { Scissors, Minimize2, Trash2, X, Loader2, Sparkles } from 'lucide-react'
+import type { SuggestedModel } from '../../types/chat'
 
 interface ContextLimitDialogProps {
   open: boolean
@@ -8,6 +9,11 @@ interface ContextLimitDialogProps {
   onTruncate: () => Promise<void>
   onCompact: () => Promise<void>
   onClear: () => Promise<void>
+  /** A larger model that would hold this request, or null when the server had
+   *  none to offer — a single-model deployment, or nothing that passes its
+   *  privacy rule. Null means the option is not shown at all. */
+  suggestedModel?: SuggestedModel | null
+  onUseModel?: (name: string) => Promise<void>
   percent: number
 }
 
@@ -17,6 +23,8 @@ export function ContextLimitDialog({
   onTruncate,
   onCompact,
   onClear,
+  suggestedModel = null,
+  onUseModel,
   percent,
 }: ContextLimitDialogProps) {
   const [loading, setLoading] = useState<string | null>(null)
@@ -110,6 +118,49 @@ export function ContextLimitDialog({
 
         {/* Options */}
         <div style={{ padding: '12px 20px 20px' }}>
+          {/* Offered first because it is the only option that keeps everything.
+              Rendered only when the server found a model — a deployment with a
+              single model has nothing to switch to. */}
+          {suggestedModel && onUseModel && (
+            <button
+              type="button"
+              onClick={() => handleAction('model', () => onUseModel(suggestedModel.name))}
+              disabled={loading !== null}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 12,
+                padding: '12px 14px',
+                background: loading === 'model' ? '#f9fafb' : '#f8fafc',
+                border: '1px solid #bfdbfe',
+                borderRadius: 'var(--ui-radius, 12px)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                textAlign: 'left',
+                marginBottom: 8,
+                transition: 'background 0.15s, border-color 0.15s',
+                opacity: loading && loading !== 'model' ? 0.5 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!loading) (e.currentTarget as HTMLButtonElement).style.borderColor = '#60a5fa'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.borderColor = '#bfdbfe'
+              }}
+            >
+              <Sparkles size={18} style={{ marginTop: 2, color: '#2563eb', flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  Answer with {suggestedModel.tag || suggestedModel.name}
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  Its {suggestedModel.context_window.toLocaleString()}-token context holds this
+                  conversation whole. Nothing is dropped or summarised.
+                </div>
+              </div>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => handleAction('truncate', onTruncate)}

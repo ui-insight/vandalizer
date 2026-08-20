@@ -1,10 +1,22 @@
 """Integration tests for automation API routes."""
 
 import datetime
+import secrets
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+from app.config import Settings
+from app.utils.security import create_access_token
+
+_TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
+
+
+def _auth(user_id: str = "testuser"):
+    token = create_access_token(user_id, _TEST_SETTINGS)
+    csrf = secrets.token_urlsafe(32)
+    return {"access_token": token, "csrf_token": csrf}, {"X-CSRF-Token": csrf}
 
 
 def _make_api_user(user_id="testuser", current_team=None):
@@ -35,6 +47,23 @@ def _make_automation(action_type="extraction", action_id="search-set-1"):
     auto.action_id = action_id
     auto.output_config = {}
     return auto
+
+
+def _response_stub(action_type):
+    """Minimal payload satisfying AutomationResponse, so the route's own logic
+    is what these tests exercise rather than _to_response's DB lookups."""
+    now = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    return {
+        "id": "automation-id",
+        "name": "My Automation",
+        "enabled": True,
+        "trigger_type": "folder_watch",
+        "trigger_config": {},
+        "action_type": action_type,
+        "user_id": "testuser",
+        "created_at": now,
+        "updated_at": now,
+    }
 
 
 @pytest.fixture
@@ -157,3 +186,64 @@ class TestAutomationTriggerAuth:
             user_id="testuser",
             extraction_event_id="ext-event-1",
         )
+
+
+class TestUpdateActionType:
+    """Switching action type has to drop an action_id that named the other kind
+    of resource — validating the stale id against the new type 404'd the PATCH,
+    which the UI showed as the click doing nothing."""
+
+    async def _patch_action_type(self, client, *, current_type, current_id, new_type):
+        user = _make_api_user()
+        auto = _make_automation(action_type=current_type, action_id=current_id)
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": user.user_id, "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.automations._load_authorized_automation",
+                   new=AsyncMock(return_value=(auto, MagicMock()))), \
+             patch("app.routers.automations.svc.apply_automation_update",
+                   new_callable=AsyncMock) as mock_apply, \
+             patch("app.routers.automations._to_response",
+                   new=AsyncMock(return_value=_response_stub(new_type))):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_apply.return_value = auto
+
+            resp = await client.patch(
+                "/api/automations/automation-id",
+                json={"action_type": new_type},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        return resp, mock_apply
+
+    @pytest.mark.asyncio
+    async def test_workflow_to_extraction_clears_stale_workflow_link(self, client):
+        resp, mock_apply = await self._patch_action_type(
+            client, current_type="workflow", current_id="wf-1", new_type="extraction"
+        )
+
+        assert resp.status_code == 200
+        assert mock_apply.await_args.kwargs["clear_action_id"] is True
+
+    @pytest.mark.asyncio
+    async def test_extraction_to_workflow_clears_stale_extraction_link(self, client):
+        resp, mock_apply = await self._patch_action_type(
+            client, current_type="extraction", current_id="search-set-1", new_type="workflow"
+        )
+
+        assert resp.status_code == 200
+        assert mock_apply.await_args.kwargs["clear_action_id"] is True
+
+    @pytest.mark.asyncio
+    async def test_workflow_to_task_keeps_the_link(self, client):
+        """Both execute the same Workflow, so the selection stays valid."""
+        with patch("app.routers.automations.get_authorized_workflow",
+                   new=AsyncMock(return_value=MagicMock())):
+            resp, mock_apply = await self._patch_action_type(
+                client, current_type="workflow", current_id="wf-1", new_type="task"
+            )
+
+        assert resp.status_code == 200
+        assert mock_apply.await_args.kwargs["clear_action_id"] is False

@@ -462,6 +462,37 @@ class TestPdfInspectorFastPath:
         assert text == ocr_result
 
 
+class TestPageMarkerProvenance:
+    """Interpolated and real page markers are the same shape, so nothing
+    downstream could tell an estimated page boundary from a measured one.
+    Consumers that cite pages need to know which they are holding."""
+
+    def test_interpolated_markers_are_flagged_approximate(self):
+        from app.services.document_readers import _interpolate_page_markers
+
+        markers = _interpolate_page_markers("x" * 100, 4)
+
+        assert len(markers) == 4
+        assert all(m["approximate"] is True for m in markers)
+
+    def test_real_page_markers_are_not_flagged(self, tmp_path):
+        """Regression guard rather than a red-green test: measured boundaries
+        must never acquire the flag, or every citation becomes hedged."""
+        import pymupdf
+
+        from app.services.document_readers import _pymupdf_extract_with_pages
+
+        doc = pymupdf.open()
+        for line in ("Page one body text", "Page two body text"):
+            doc.new_page().insert_text((72, 72), line)
+        path = _save_pdf(doc, tmp_path, "two_pages.pdf")
+
+        _, markers = _pymupdf_extract_with_pages(path)
+
+        assert [m["value"] for m in markers] == [1, 2]
+        assert not any(m.get("approximate") for m in markers)
+
+
 class TestExtractWithMarkersOcrFallback:
     """When OCR returns short-but-valid text and the PyMuPDF page-boundary
     refinement fails (corrupt PDF, or the source file removed mid-processing),
@@ -474,7 +505,7 @@ class TestExtractWithMarkersOcrFallback:
         with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
              patch.object(dr, "_pymupdf_extract_with_pages",
                           side_effect=FileNotFoundError("no such file: 'gone.pdf'")), \
-             patch.object(dr, "_pdf_page_count", return_value=1):
+             patch.object(dr, "pdf_page_count", return_value=1):
             text, markers = dr.extract_text_with_markers("gone.pdf", "pdf")
 
         assert text == "short ocr text"

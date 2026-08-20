@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import {
   Award,
-  Sparkles,
+  ClipboardCheck,
   MessageSquare,
   Workflow,
   ListChecks,
@@ -18,7 +18,7 @@ import {
   SquarePen,
 } from 'lucide-react'
 import { useActivities } from '../../hooks/useActivities'
-import { useOptimizerInboxCount } from '../../hooks/useOptimizerInboxCount'
+import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import { deleteActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -69,11 +69,38 @@ function statusMetaClass(status: ActivityEvent['status']) {
   }
 }
 
+// A workflow run parked on an approval gate carries the pending review's uuid
+// in meta_summary. The status stays "running" (ActivityStatus has no paused
+// member), so this marker is what separates "waiting on a person" from
+// "waiting on a worker" everywhere in the rail.
+export function pendingReviewUuid(activity: ActivityEvent): string | null {
+  const uuid = (activity.meta_summary as { pending_review_uuid?: unknown } | undefined)
+    ?.pending_review_uuid
+  return typeof uuid === 'string' && uuid ? uuid : null
+}
+
+/** The review a row is *currently* waiting on, or null.
+ *
+ * The marker records that a run paused on a review; it does not record that it
+ * still is. Several exits leave it behind — cancelling rewrites the activity
+ * without touching meta_summary, and a failure stamped after the marker keeps
+ * it — so reading the marker alone makes a terminal row render as awaiting
+ * approval, with a clock, a live link to a review nobody can act on, and its
+ * real error text suppressed. Only a live row can be waiting on anyone.
+ */
+export function activeReviewUuid(activity: ActivityEvent): string | null {
+  const live = activity.status === 'running' || activity.status === 'queued'
+  return live ? pendingReviewUuid(activity) : null
+}
+
 // Threshold mirrors SystemConfig.retention_config.activity_stale_threshold_minutes
 // (default 30 min) so the UI flips to "timed out" the instant the threshold
 // passes, instead of waiting for the next backend reap cycle.
-function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
+export function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
   if (activity.status !== 'running' && activity.status !== 'queued') return false
+  // A run waiting on a reviewer reports no progress by design — it is stalled
+  // only in the sense that a person has not acted, which is not a timeout.
+  if (pendingReviewUuid(activity)) return false
   const ts = activity.last_updated_at || activity.started_at
   if (!ts) return false
   const age = Date.now() - new Date(ts).getTime()
@@ -83,7 +110,7 @@ function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
 export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolean }) {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
-  const { counts: tuningCounts, actionable: tuningActionable } = useOptimizerInboxCount()
+  const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
@@ -144,6 +171,11 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
         closeAutomation()
         setActiveRightTab('assistant')
         setLoadConversationId(activity.conversation_id)
+      } else if (activity.type === 'workflow_run' && pendingReviewUuid(activity)) {
+        // The run is frozen at the gate — there is nothing to see in the editor
+        // that the review does not show, and the review is the only thing that
+        // moves it forward.
+        navigate({ to: '/reviews/$uuid', params: { uuid: pendingReviewUuid(activity)! } })
       } else if (activity.type === 'workflow_run' && activity.workflow_id) {
         openWorkflow(activity.workflow_id, activity.workflow_session_id ?? undefined)
       } else if (activity.type === 'search_set_run' && activity.search_set_uuid) {
@@ -160,7 +192,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
         openExtraction(activity.search_set_uuid, initialResults, initialSources)
       }
     },
-    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation],
+    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
   )
 
   const isRunning = (status: ActivityEvent['status']) =>
@@ -214,15 +246,13 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
             )}
           </div>
 
-          {/* Tuning suggestions — only when something is actually waiting, so
-              the rail stays quiet on a healthy account. The always-present
-              entry point is the account menu. */}
-          {tuningActionable > 0 && (
+          {/* Pending reviews — only when something is actually waiting, so the
+              rail stays quiet for the many users who never review anything.
+              The always-present entry point is the account menu. */}
+          {pendingReviews > 0 && (
             <div
-              onClick={() => navigate({ to: '/tuning' })}
-              title={`${tuningCounts?.needs_review || 0} tuning suggestion(s) to review${
-                tuningCounts?.failed ? `, ${tuningCounts.failed} failed run(s)` : ''
-              }`}
+              onClick={() => navigate({ to: '/reviews' })}
+              title={`${pendingReviews} approval${pendingReviews === 1 ? '' : 's'} waiting on you`}
               className={cn(
                 'flex items-center gap-2 rounded-lg cursor-pointer p-2',
                 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
@@ -231,7 +261,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
               )}
             >
               <div className="relative shrink-0 w-4 text-center text-[#806600]">
-                <Sparkles className="h-4 w-4" />
+                <ClipboardCheck className="h-4 w-4" />
                 {visualDocked && (
                   <span
                     className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
@@ -242,13 +272,13 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
               {!visualDocked && (
                 <>
                   <div className="min-w-0 flex-1 text-[11px] leading-[1.4] text-[#111]">
-                    Tuning suggestions
+                    Reviews
                   </div>
                   <span
                     className="shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
                     style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
                   >
-                    {tuningActionable}
+                    {pendingReviews}
                   </span>
                 </>
               )}
@@ -257,14 +287,23 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
           <div className="h-[5px]" />
 
           {activities.map((activity) => {
-            const Icon = activityIcon(activity.type)
+            const awaitingReview = activeReviewUuid(activity)
+            const Icon = awaitingReview ? ClipboardCheck : activityIcon(activity.type)
             const stale = isStale(activity, staleThresholdMinutes)
-            const running = isRunning(activity.status) && !stale
+            // A paused run is not "running": the shimmer would claim work is
+            // happening while it sits on a reviewer, possibly for days.
+            const running = isRunning(activity.status) && !stale && !awaitingReview
             const titleFresh = freshTitleIds.has(activity.id)
-            const effectiveStatus: ActivityEvent['status'] = stale ? 'failed' : activity.status
+            // "queued" renders the clock — the honest icon for a run parked on
+            // a person. The spinner would imply a worker is still churning.
+            const effectiveStatus: ActivityEvent['status'] =
+              stale ? 'failed' : awaitingReview ? 'queued' : activity.status
             const staleTooltip = stale
               ? `Timed out: no progress for over ${staleThresholdMinutes} minutes.`
               : undefined
+            const rowTooltip = awaitingReview
+              ? 'Paused — waiting on your approval. Opens the review.'
+              : staleTooltip
             const aiTitleReady = (activity.meta_summary as { description_generated?: boolean } | undefined)
               ?.description_generated === true
             // Once the activity is done but the title generator hasn't
@@ -284,6 +323,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
               <div
                 key={activity.id}
                 onClick={() => handleClick(activity)}
+                title={rowTooltip}
                 className={cn(
                   'rail-shimmer-running group relative flex items-center gap-2 rounded-lg cursor-pointer',
                   'transition-[background-color,box-shadow] duration-200',
@@ -303,8 +343,17 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
                 }
               >
                 {/* Type icon */}
-                <div className={cn('shrink-0 w-4 text-center', running ? 'text-white' : visualDocked ? 'text-[#999]' : 'text-[#333]')}>
+                <div className={cn(
+                  'relative shrink-0 w-4 text-center',
+                  running ? 'text-white' : awaitingReview ? 'text-[#806600]' : visualDocked ? 'text-[#999]' : 'text-[#333]',
+                )}>
                   <Icon className="h-4 w-4" />
+                  {awaitingReview && railDocked && (
+                    <span
+                      className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
+                      style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
+                    />
+                  )}
                 </div>
 
                 {!visualDocked && (
@@ -326,12 +375,17 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
                       >
                         {displayTitle}
                       </div>
+                      {awaitingReview && (
+                        <div className="text-[10px] leading-[1.4] font-semibold text-[#806600]">
+                          Awaiting approval →
+                        </div>
+                      )}
                     </div>
 
                     {/* Status icon */}
                     <div
                       className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(effectiveStatus))}
-                      title={staleTooltip ?? (activity.status === 'failed' && activity.error ? activity.error : undefined)}
+                      title={rowTooltip ?? (activity.status === 'failed' && activity.error ? activity.error : undefined)}
                     >
                       <StatusIcon status={effectiveStatus} />
                     </div>

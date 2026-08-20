@@ -8,6 +8,7 @@ from app.services.kb_test_query_import import (
     MAX_IMPORT_ROWS,
     TestQueryImportError,
     parse_test_query_import,
+    _split_source_labels,
 )
 
 
@@ -144,3 +145,147 @@ class TestFileTypeDispatch:
     def test_unknown_extension_rejected(self):
         with pytest.raises(TestQueryImportError, match="Unsupported"):
             parse_test_query_import("set.txt", b"Question\nQ1\n")
+
+
+# ---------------------------------------------------------------------------
+# Source-label separators
+# ---------------------------------------------------------------------------
+
+
+def test_semicolons_separate_labels():
+    assert _split_source_labels("Subpart A; Subpart B") == [
+        "Subpart A", "Subpart B",
+    ]
+
+
+def test_semicolon_cell_keeps_commas_inside_labels():
+    # The real failure: "Subpart D-iii — Monitoring, Reporting, Remedies &
+    # Closeout | §§200.328-200.346" is ONE source. Splitting it on commas
+    # invented two labels that match nothing, and tripled the denominator of
+    # the retrieval-precision score.
+    cell = (
+        "Subpart D-iii — Monitoring, Reporting, Remedies & Closeout "
+        "| §§200.328-200.346; Subpart E-i — Cost Principles"
+    )
+    assert _split_source_labels(cell) == [
+        "Subpart D-iii — Monitoring, Reporting, Remedies & Closeout "
+        "| §§200.328-200.346",
+        "Subpart E-i — Cost Principles",
+    ]
+
+
+def test_quoted_label_keeps_its_commas():
+    cell = '"Appendices I–IV | NOFO, Contract Provisions, Indirect Cost"'
+    assert _split_source_labels(cell) == [
+        "Appendices I–IV | NOFO, Contract Provisions, Indirect Cost",
+    ]
+
+
+def test_quoted_and_bare_labels_mix():
+    assert _split_source_labels('"Monitoring, Reporting"; Subpart E') == [
+        "Monitoring, Reporting", "Subpart E",
+    ]
+
+
+def test_quoting_a_single_label_within_a_comma_list_is_not_supported():
+    """Quoting *part* of a comma list cannot be made to work.
+
+    csv.reader consumes CSV quoting before this module runs, so the form is
+    unreachable for the format most authors use — a cell written
+    ``"A, B", C`` arrives here as ``A, B, C`` with nothing left to distinguish
+    the intended grouping. Rather than support it only for XLSX and silently
+    mis-split every CSV, the supported forms are the semicolon separator and a
+    cell that names one real source. This test pins the actual behaviour so the
+    limitation is visible rather than assumed away.
+    """
+    assert _split_source_labels('"A, B", C') == ['"A', 'B"', "C"]
+    # The supported way to say the same thing:
+    assert _split_source_labels("A, B; C") == ["A, B", "C"]
+
+
+def test_a_cell_naming_one_real_source_is_not_split():
+    """The rescue for an author who wrote a comma-bearing source name plainly.
+
+    This is how the 2 CFR 200 set was poisoned: the name was written as-is,
+    split into three labels that named nothing, and every question carrying it
+    scored 0 retrieval precision on every run.
+    """
+    known = ["Subpart D-iii — Monitoring, Reporting, Remedies & Closeout | §§200.328-200.346"]
+    cell = "Subpart D-iii — Monitoring, Reporting, Remedies & Closeout | §§200.328-200.346"
+
+    assert _split_source_labels(cell, known) == [cell]
+    # With no KB to check against, the old comma behaviour is unchanged.
+    assert len(_split_source_labels(cell)) == 3
+
+
+def test_a_comma_list_of_two_real_sources_still_splits():
+    """The known-source check must not glue genuinely separate labels together."""
+    known = ["Subpart A — Acronyms", "Subpart B — General"]
+    assert _split_source_labels("Subpart A — Acronyms, Subpart B — General", known) == [
+        "Subpart A — Acronyms", "Subpart B — General",
+    ]
+
+
+def test_a_label_containing_a_quote_is_not_corrupted():
+    """The old per-character scanner consumed quote characters wherever they
+    appeared, so a source genuinely named with them no longer matched."""
+    assert _split_source_labels('Section 2 "Definitions"') == ['Section 2 "Definitions"']
+
+
+def test_plain_comma_list_still_splits():
+    assert _split_source_labels("Subpart A, Subpart B") == [
+        "Subpart A", "Subpart B",
+    ]
+
+
+def test_blank_and_empty_segments_dropped():
+    assert _split_source_labels("") == []
+    assert _split_source_labels("   ") == []
+    assert _split_source_labels("A;;B") == ["A", "B"]
+    assert _split_source_labels(" A , B ") == ["A", "B"]
+
+
+# ---------------------------------------------------------------------------
+# Through the CSV layer, not just the splitter
+# ---------------------------------------------------------------------------
+
+
+def test_a_quoted_csv_cell_survives_as_one_label():
+    """The gap that let the original fix ship broken.
+
+    Every separator test above calls ``_split_source_labels`` with a raw
+    string, which is not how the value arrives: ``csv.reader`` consumes the
+    quoting first, so a quoted cell reached the splitter as bare text and was
+    split on its commas anyway — the exact defect being fixed. Only an
+    end-to-end parse can catch that.
+    """
+    known = ["Subpart D-ii — Procurement, Property & Subawards"]
+    csv_text = (
+        "Question,Source\n"
+        'Q1,"Subpart D-ii — Procurement, Property & Subawards"\n'
+    ).encode()
+
+    rows, errors = parse_test_query_import(
+        "t.csv", csv_text, known_source_names=known,
+    )
+    assert errors == []
+    assert rows[0]["expected_source_labels"] == [
+        "Subpart D-ii — Procurement, Property & Subawards",
+    ]
+
+
+def test_a_semicolon_csv_cell_survives_as_two_labels():
+    csv_text = (
+        "Question,Source\n"
+        'Q1,"Subpart A — Acronyms; Subpart B — General"\n'
+    ).encode()
+    rows, _ = parse_test_query_import("t.csv", csv_text)
+    assert rows[0]["expected_source_labels"] == [
+        "Subpart A — Acronyms", "Subpart B — General",
+    ]
+
+
+def test_parsing_without_kb_context_keeps_the_old_comma_behaviour():
+    csv_text = ("Question,Source\n" 'Q1,"Alpha, Beta"\n').encode()
+    rows, _ = parse_test_query_import("t.csv", csv_text)
+    assert rows[0]["expected_source_labels"] == ["Alpha", "Beta"]

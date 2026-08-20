@@ -18,11 +18,12 @@ import type { Folder } from '../../types/document'
 export function LeftPanel() {
   const {
     setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids,
-    highlightTerms, highlightPage, setHighlightTerms,
+    highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
     focusChat, openWorkflow,
     activeProjectRootFolder, activeProjectTitle, activeProjectTeamId,
+    workspaceMode, setOpenDocumentUuid,
   } = useWorkspace()
   const { toast } = useToast()
   // Folder targeted by the workflow / KB picker modals (null = closed).
@@ -124,7 +125,11 @@ export function LeftPanel() {
       setSelectedDocUuids([viewDocumentRequest.uuid])
       setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
       if (viewDocumentRequest.highlight) {
-        setHighlightTerms(viewDocumentRequest.highlight.terms, viewDocumentRequest.highlight.page)
+        setHighlightTerms(
+          viewDocumentRequest.highlight.terms,
+          viewDocumentRequest.highlight.page,
+          viewDocumentRequest.highlight.pageApproximate,
+        )
       } else {
         setHighlightTerms([])
       }
@@ -156,6 +161,17 @@ export function LeftPanel() {
       cancelled = true
     }
   }, [verificationSession?.uuid, verificationSession?.created_at, verificationSession?.status, setVerificationSession])
+
+  // Publish the document the viewer is showing, so panels that link into it
+  // (chat source citations) can tell "open this" from "already open". Only
+  // while this panel is on screen: WorkspaceLayout collapses it to zero width
+  // outside files mode, and a document nobody can see is not open.
+  useEffect(() => {
+    const visible = workspaceMode === 'files'
+    setOpenDocumentUuid(visible ? (viewingDoc?.uuid ?? null) : null)
+  }, [workspaceMode, viewingDoc?.uuid, setOpenDocumentUuid])
+
+  useEffect(() => () => setOpenDocumentUuid(null), [setOpenDocumentUuid])
 
   // Sync processing state to workspace context so ChatPanel can show it
   useEffect(() => {
@@ -350,6 +366,7 @@ export function LeftPanel() {
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
             highlightPage={highlightPage}
+            highlightPageApproximate={highlightPageApproximate}
             onClearHighlights={verificationActive ? undefined : () => setHighlightTerms([])}
             processing={viewingDoc.processing}
             taskStatus={viewingDoc.taskStatus}

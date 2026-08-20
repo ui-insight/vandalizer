@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink, Pin, Wrench, UserCheck } from 'lucide-react'
 import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
@@ -60,7 +60,7 @@ function ListDetail({ label, items }: { label: string; items?: string[] }) {
   )
 }
 
-export function VerificationQueue() {
+export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: string } = {}) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const [view, setView] = useState<QueueView>('pending')
@@ -103,6 +103,26 @@ export function VerificationQueue() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // A notification names one submission, so open it rather than dropping the
+  // reviewer on a queue to search — which is the moment they have the least
+  // context about which row the mail was for, and gets worse as the queue
+  // grows. Runs once the row exists; if the request is not in the current view
+  // (already decided, say) nothing happens and the plain queue is shown.
+  const focusedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!focusRequestUuid || loading) return
+    if (focusedRef.current === focusRequestUuid) return
+    if (!requests.some(r => r.uuid === focusRequestUuid)) return
+    focusedRef.current = focusRequestUuid
+    setExpandedId(focusRequestUuid)
+    // Let the expanded body render before scrolling to it.
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-request-uuid="${focusRequestUuid}"]`)
+        ?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+  }, [focusRequestUuid, loading, requests])
 
   const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review' | 'returned') => {
     const oIds = action === 'approved' && reviewOrgIds.length > 0 ? reviewOrgIds : undefined
@@ -254,6 +274,7 @@ export function VerificationQueue() {
             return (
               <div
                 key={req.id}
+                data-request-uuid={req.uuid}
                 className="border border-gray-200 rounded-lg bg-white"
               >
                 <div className="p-4">

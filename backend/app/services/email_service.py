@@ -405,10 +405,21 @@ def verification_submitted_email(
     item_name: str,
     summary: str | None,
     frontend_url: str,
+    request_uuid: str | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, html_body) telling a reviewer a new submission is queued."""
     kind_label = item_kind.replace("_", " ")
     subject = f'New verification submission: "{item_name}"'
+    # Link to the submission, not the queue. A reviewer clicking through
+    # otherwise has to find the right row themselves, which is worst at exactly
+    # this moment — they have the least context about which item the mail was
+    # for — and gets worse as the queue grows. The approval flow already links
+    # to /reviews/{uuid}; this is the same idea for verification.
+    queue_link = f"{frontend_url}/verification"
+    button_label = "Open Queue"
+    if request_uuid:
+        queue_link = f"{queue_link}?request={request_uuid}"
+        button_label = "Open Submission"
 
     summary_block = ""
     if summary:
@@ -423,7 +434,7 @@ def verification_submitted_email(
       <h1>New submission awaiting review</h1>
       <p>Hi {reviewer_name}, <strong style="color:#fff">{submitter_name}</strong> submitted the {kind_label} <span class="highlight">{item_name}</span> for verification.</p>
       {summary_block}
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/verification">Open Queue</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{queue_link}">{button_label}</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

@@ -86,6 +86,9 @@ function KBGridCard({
   // A broken bookmark has no underlying KB to open — the card is inert except
   // for its Remove button.
   const isUnavailable = kb.status === 'unavailable'
+  // Cloning copies source references. A KB with none yields another empty KB,
+  // which the backend now refuses — the card says so instead of offering it.
+  const canClone = !isUnavailable && kb.total_sources > 0
   // The id a project pins is the canonical KB uuid — for a reference card that's
   // the original it points at, matching what onChat uses.
   const canonicalUuid = isReference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid
@@ -295,13 +298,18 @@ function KBGridCard({
         )}
         {onClone && !isUnavailable && (
           <button
-            onClick={(e) => { e.stopPropagation(); onClone(canonicalUuid) }}
-            title="Make an editable copy of this knowledge base"
+            onClick={(e) => { e.stopPropagation(); if (canClone) onClone(canonicalUuid) }}
+            disabled={!canClone}
+            title={canClone
+              ? 'Make an editable copy of this knowledge base'
+              : 'This knowledge base has no sources to copy yet'}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-              color: '#ccc', backgroundColor: 'transparent',
-              border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
+              color: canClone ? '#ccc' : '#777', backgroundColor: 'transparent',
+              border: `1px solid ${C.border}`, borderRadius: 4,
+              cursor: canClone ? 'pointer' : 'default',
+              opacity: canClone ? 1 : 0.5,
             }}
           >
             <Copy size={11} />

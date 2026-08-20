@@ -187,13 +187,17 @@ def summarize_results(
         "validation_feedback": summary.get("feedback", ""),
         "validating": False,
     }
-    if not background:
-        update_fields["task_status"] = "complete"
 
     db.smart_document.update_one(
         {"uuid": document_uuid},
         {"$set": update_fields},
     )
+    # Compliance validation says nothing about whether the text could be read,
+    # so it must not overwrite an extraction failure with a green checkmark.
+    if not background:
+        from app.tasks.document_tasks import mark_complete_unless_errored
+
+        mark_complete_unless_errored(db, document_uuid)
 
     logger.info(
         "Document %s validation updated: valid=%s, background=%s",
@@ -233,19 +237,28 @@ def perform_document_validation(
             "validation_feedback": "Compliance checks disabled.",
             "validating": False,
         }
-        if not background:
-            skip_fields["task_status"] = "complete"
         db.smart_document.update_one(
             {"uuid": document_uuid},
             {"$set": skip_fields},
         )
+        # Skipping a check the deployment turned off is not evidence that the
+        # document was read successfully.
+        if not background:
+            from app.tasks.document_tasks import mark_complete_unless_errored
+
+            mark_complete_unless_errored(db, document_uuid)
         logger.info("Compliance disabled — skipping validation for %s", document_uuid)
         return ""
 
-    update_fields = {"validating": True}
+    db.smart_document.update_one(
+        {"uuid": document_uuid}, {"$set": {"validating": True}}
+    )
     if not background:
-        update_fields["task_status"] = "security"
-    db.smart_document.update_one({"uuid": document_uuid}, {"$set": update_fields})
+        # Same guard as every other status write: an in-progress marker on a
+        # document that already failed extraction erases the failure.
+        from app.tasks.document_tasks import advance_task_status
+
+        advance_task_status(db, document_uuid, "security")
 
     start = time.perf_counter()
 

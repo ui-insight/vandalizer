@@ -98,6 +98,43 @@ class TestVerificationRouteAuthz:
         mock_svc.submit_for_verification.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_submit_search_set_falls_back_to_object_id_lookup(self, client):
+        """Library rows submit search sets by ObjectId; the uuid lookup misses
+        and the by-id lookup must be tried before returning 404."""
+        user = _make_user("owner")
+        cookies, headers = _auth("owner")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "owner", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.verification.access_control.get_authorized_search_set",
+                new_callable=AsyncMock,
+            ) as mock_by_uuid,
+            patch(
+                "app.routers.verification.access_control.get_authorized_search_set_by_id",
+                new_callable=AsyncMock,
+            ) as mock_by_id,
+            patch("app.routers.verification.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_by_uuid.return_value = None
+            mock_by_id.return_value = MagicMock()
+            mock_svc.submit_for_verification = AsyncMock(return_value={"uuid": "req-1"})
+
+            resp = await client.post(
+                "/api/verification/submit",
+                json={"item_kind": "search_set", "item_id": "507f1f77bcf86cd799439011"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        mock_by_uuid.assert_awaited_once()
+        mock_by_id.assert_awaited_once()
+        mock_svc.submit_for_verification.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_regular_user_cannot_view_other_users_request(self, client):
         user = _make_user("viewer")
         cookies, headers = _auth("viewer")

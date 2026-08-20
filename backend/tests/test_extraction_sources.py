@@ -64,6 +64,52 @@ MARKERS = [
 ]
 
 
+class TestPageProvenance:
+    """An extracted fact's page comes from the same markers KB chat uses, and
+    OCR'd documents only have interpolated boundaries — so a source pin that
+    reads "p. 4" on a scanned proposal is an estimate presented as a location.
+    See #603."""
+
+    def test_marker_is_returned_so_callers_can_read_its_provenance(self):
+        from app.services.extraction_sources import page_marker_for_offset
+
+        assert page_marker_for_offset(150, MARKERS) == MARKERS[1]
+        assert page_marker_for_offset(5, []) is None
+
+    def test_approximate_flag_survives_resolution(self):
+        from app.services.extraction_sources import page_marker_for_offset
+
+        markers = [dict(m, approximate=True) for m in MARKERS]
+        marker = page_marker_for_offset(150, markers)
+        assert marker is not None and marker["approximate"] is True
+
+    QUOTE = "Cost sharing is required for this award."
+    DOC = "a" * 120 + QUOTE + "b" * 60  # quote lands at offset 120 → page 2
+
+    def _resolve(self, markers: list[dict]) -> dict:
+        entities = [{
+            "Cost Sharing": "Yes",
+            SOURCE_KEY: {"Cost Sharing": {"quote": self.QUOTE}},
+        }]
+        resolve_entity_sources(
+            entities, self.DOC,
+            {"uuid": "U1", "title": "T&C", "text_markers": markers},
+        )
+        return entities[0][SOURCE_KEY]["Cost Sharing"]
+
+    def test_sidecar_flags_an_estimated_page(self):
+        src = self._resolve([dict(m, approximate=True) for m in MARKERS])
+        assert src["page"] == 2
+        assert src["page_approximate"] is True
+
+    def test_sidecar_omits_the_flag_for_a_measured_page(self):
+        """Measured sources keep the shape they have always had, so stored
+        results stay comparable across the change."""
+        src = self._resolve(MARKERS)
+        assert src["page"] == 2
+        assert "page_approximate" not in src
+
+
 class TestPageResolution:
     def test_page_for_offset(self):
         assert page_for_offset(0, MARKERS) == 1

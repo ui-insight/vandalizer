@@ -42,6 +42,7 @@ import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
 import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
 import { getModels } from '../../api/config'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
+import { formatPageLocator } from '../../utils/pageLocator'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -333,13 +334,19 @@ export function ExtractionEditorPanel() {
 
     const src: ExtractionFieldSource | undefined = resultSources[field]
     if (src && src.verified && src.quote) {
-      const highlight = { terms: [src.quote], page: src.page ?? null }
+      const highlight = {
+        terms: [src.quote],
+        page: src.page ?? null,
+        // The badge the user just clicked already reads "p. ~12" when the page
+        // is interpolated; the viewer must not then assert it as fact.
+        pageApproximate: src.page_approximate ?? false,
+      }
       if (src.document_uuid) {
         // Routes through the open-document request so this works even when
         // the source document isn't the one currently in the viewer.
         viewDocument(src.document_uuid, src.document_title ?? 'Document', highlight)
       } else {
-        setHighlightTerms(highlight.terms, highlight.page)
+        setHighlightTerms(highlight.terms, highlight.page, highlight.pageApproximate)
       }
       return
     }
@@ -889,6 +896,7 @@ export function ExtractionEditorPanel() {
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
           searchSetUuid={openExtractionId ?? undefined}
+          hasFields={items.length > 0}
           onExportDefinition={() => openExtractionId && window.open(exportSearchSetUrl(openExtractionId), '_blank')}
           onImportDefinition={() => importDefInputRef.current?.click()}
         />
@@ -1597,7 +1605,7 @@ function DesignTab({
                   const clickTitle = !clickable
                     ? undefined
                     : hasSource
-                      ? `Click to show the source passage${src?.page != null ? ` (page ${src.page})` : ''}`
+                      ? `Click to show the source passage${formatPageLocator(src?.page, src?.page_approximate) ? ` (${formatPageLocator(src?.page, src?.page_approximate)})` : ''}`
                       : noSource
                         ? 'No source found for this value — click to copy'
                         : 'Click to highlight in PDF'
@@ -1633,7 +1641,7 @@ function DesignTab({
                           background: '#eff6ff', borderRadius: 3, padding: '1px 4px',
                           whiteSpace: 'nowrap',
                         }}>
-                          p. {src.page}
+                          {formatPageLocator(src.page, src.page_approximate)}
                         </span>
                       )}
                       {clickable && noSource && (
@@ -1975,12 +1983,13 @@ function ToolCard({
 
 /* ── Advanced Tab ── */
 
-function AdvancedTab({
+export function AdvancedTab({
   config,
   useDefaults,
   onSetUseDefaults,
   onSaveConfig,
   searchSetUuid,
+  hasFields,
   onExportDefinition,
   onImportDefinition,
 }: {
@@ -1989,6 +1998,7 @@ function AdvancedTab({
   onSetUseDefaults: (v: boolean) => void
   onSaveConfig: (c: ExtractionConfig) => void
   searchSetUuid?: string
+  hasFields: boolean
   onExportDefinition: () => void
   onImportDefinition: () => void
 }) {
@@ -2011,7 +2021,9 @@ function AdvancedTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Import / Export Definition */}
+      {/* Import / Export Definition. Import is at its most useful on an empty
+          extraction, so it stays available; export has nothing to write out
+          until there is at least one field. */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <ToolCard
           title="Import Definition"
@@ -2020,7 +2032,10 @@ function AdvancedTab({
         />
         <ToolCard
           title="Export Definition"
-          description="Download as a shareable JSON file"
+          description={hasFields
+            ? 'Download as a shareable JSON file'
+            : 'Add a field first — there is nothing to export yet'}
+          disabled={!hasFields}
           onClick={onExportDefinition}
         />
       </div>
@@ -2180,7 +2195,22 @@ function AdvancedTab({
         )}
       </div>
 
-      {searchSetUuid && <ApiTab searchSetUuid={searchSetUuid} />}
+      {/* The endpoint would accept a call against a fieldless extraction and
+          return nothing useful, so hold the copy-ready snippets back and say
+          why rather than grey out a section that is only informational. */}
+      {searchSetUuid && (hasFields ? (
+        <ApiTab searchSetUuid={searchSetUuid} />
+      ) : (
+        <div style={cardStyle}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+            Run this extraction via API
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+            Add at least one field to this extraction and the endpoint, its UUID, and ready-to-copy
+            Python and cURL examples will appear here.
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

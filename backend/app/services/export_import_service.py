@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.knowledge import KnowledgeBase
 
 from app.models.extraction_test_case import ExtractionTestCase
+from app.models.library import LibraryItemKind
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 from app.services import name_conflicts, search_set_service, verification_service, workflow_service
@@ -258,6 +259,22 @@ async def _reconstruct_task_references(
     return data
 
 
+async def _bookmark(
+    item_id: PydanticObjectId, kind: LibraryItemKind, user_id: str
+) -> None:
+    """Give an imported object a library bookmark so the importer can find it.
+
+    Imports run from several surfaces (the library's upload-JSON modal, the
+    examiner catalog importer, the ``/import`` endpoint used by scripts), and
+    only the first one ever added the bookmark client-side. Objects from the
+    others were invisible in every listing while still holding their name, so
+    bookmarking moved server-side where all three paths meet.
+    """
+    from app.services import library_service
+
+    await library_service.ensure_bookmark(item_id, kind, user_id)
+
+
 async def import_workflow(
     data: dict,
     user_id: str,
@@ -314,6 +331,7 @@ async def import_workflow(
         validation_inputs=item.get("validation_inputs", []),
     )
     await new_wf.insert()
+    await _bookmark(new_wf.id, LibraryItemKind.WORKFLOW, user_id)
 
     return await workflow_service.get_workflow(str(new_wf.id))
 
@@ -508,6 +526,12 @@ async def import_search_set(
         )
         await tc.insert()
 
+    # Only a set this import *created* needs a bookmark. On the append branch
+    # `result` is the caller's existing target, which may be a team set they
+    # manage but do not own — filing it into their personal library on an
+    # import of fields is not something they asked for.
+    if target is None:
+        await _bookmark(result.id, LibraryItemKind.SEARCH_SET, user_id)
     return result
 
 

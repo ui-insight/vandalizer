@@ -6,6 +6,7 @@ import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useConfirm } from '../shared/useConfirm'
+import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
@@ -26,6 +27,7 @@ export function AutomationEditorPanel() {
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
   const confirm = useConfirm()
+  const { toast } = useToast()
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
   const [showActionPicker, setShowActionPicker] = useState(false)
@@ -60,10 +62,16 @@ export function AutomationEditorPanel() {
   const save = useCallback(async (updates: Parameters<typeof updateAutomation>[1]) => {
     if (!openAutomationId) return
     if (automation && !automation.can_manage) return
-    const updated = await updateAutomation(openAutomationId, updates)
-    setAutomation(updated)
-    window.dispatchEvent(new Event('automations-updated'))
-  }, [openAutomationId, automation])
+    try {
+      const updated = await updateAutomation(openAutomationId, updates)
+      setAutomation(updated)
+      window.dispatchEvent(new Event('automations-updated'))
+    } catch (err) {
+      // A rejected save used to leave the panel showing the old value with no
+      // explanation, reading as "the click did nothing".
+      toast(err instanceof Error ? err.message : 'Failed to save automation', 'error')
+    }
+  }, [openAutomationId, automation, toast])
 
   const debouncedSave = useCallback((updates: Parameters<typeof updateAutomation>[1]) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -117,7 +125,10 @@ export function AutomationEditorPanel() {
 
   const handleActionTypeChange = async (type: ActionType) => {
     if (!canManage) return
-    await save({ action_type: type, action_id: undefined })
+    // Omitting action_id lets the server drop the old link when the new type
+    // names a different resource — sending undefined here read as "clear it"
+    // but JSON.stringify drops the key, so the stale id survived the switch.
+    await save({ action_type: type })
   }
 
   const handleActionSelect = async (id: string) => {

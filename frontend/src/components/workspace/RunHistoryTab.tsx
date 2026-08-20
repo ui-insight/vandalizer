@@ -1,5 +1,6 @@
+import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download, ClipboardCheck } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
@@ -19,6 +20,8 @@ export interface HistoryRun {
   steps_total?: number
   session_id?: string
   result_snapshot: Record<string, unknown>
+  /** Set while the run is parked on an approval gate — links to the review. */
+  pending_review_uuid?: string | null
 }
 
 function formatDuration(ms: number): string {
@@ -31,6 +34,7 @@ function formatDuration(ms: number): string {
 }
 
 function StatusIcon({ status }: { status: string }) {
+  if (status === 'awaiting approval') return <ClipboardCheck style={{ width: 14, height: 14, color: '#a16207', flexShrink: 0 }} />
   if (status === 'completed') return <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />
   if (status === 'failed' || status === 'error') return <XCircle style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />
   if (status === 'running' || status === 'queued') return <Loader2 style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
@@ -196,6 +200,17 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
 
 function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction' }) {
   const [expanded, setExpanded] = useState(false)
+  // A run parked on an approval gate keeps the activity status "running", which
+  // reads as a run that has been going for three days. The marker is the only
+  // thing that distinguishes it, so the row relabels itself and offers the one
+  // link that moves the run forward.
+  // Only a live run can still be waiting on a reviewer. The marker records the
+  // pause, not that it is ongoing, and several exits leave it behind — so
+  // without this a canceled or failed run shows an amber "awaiting approval"
+  // pill over its real status, plus a link to a review nobody can act on.
+  const runIsLive = run.status === 'running' || run.status === 'queued'
+  const reviewUuid = runIsLive ? (run.pending_review_uuid || null) : null
+  const displayStatus = reviewUuid ? 'awaiting approval' : run.status
   const hasSnapshot = run.result_snapshot && Object.keys(run.result_snapshot).length > 0
   // Workflow runs don't snapshot their output into the history payload — the
   // full result is fetched by session_id on expand instead.
@@ -222,7 +237,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           textAlign: 'left',
         }}
       >
-        <StatusIcon status={run.status} />
+        <StatusIcon status={displayStatus} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -234,10 +249,10 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
               fontWeight: 500,
               padding: '1px 6px',
               borderRadius: 4,
-              backgroundColor: run.status === 'completed' ? '#dcfce7' : run.status === 'failed' || run.status === 'error' ? '#fef2f2' : '#f3f4f6',
-              color: run.status === 'completed' ? '#166534' : run.status === 'failed' || run.status === 'error' ? '#991b1b' : '#6b7280',
+              backgroundColor: reviewUuid ? '#fef3c7' : run.status === 'completed' ? '#dcfce7' : run.status === 'failed' || run.status === 'error' ? '#fef2f2' : '#f3f4f6',
+              color: reviewUuid ? '#92400e' : run.status === 'completed' ? '#166534' : run.status === 'failed' || run.status === 'error' ? '#991b1b' : '#6b7280',
             }}>
-              {run.status}
+              {displayStatus}
             </span>
           </div>
 
@@ -280,6 +295,21 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
             : <ChevronRight style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
         )}
       </button>
+
+      {/* Outside the button on purpose — an anchor nested in a button is
+          invalid markup and swallows the link's own keyboard activation. */}
+      {reviewUuid && (
+        <Link
+          to={'/reviews/$uuid' as never}
+          params={{ uuid: reviewUuid } as never}
+          style={{
+            display: 'inline-block', margin: '-6px 0 12px 48px',
+            fontSize: 12, fontWeight: 600, color: '#0ea5e9', textDecoration: 'none',
+          }}
+        >
+          Open review →
+        </Link>
+      )}
 
       {expanded && hasResults && (
         <div style={{ padding: '0 24px 12px 48px' }}>

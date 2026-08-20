@@ -95,6 +95,9 @@ _SHARE_ERROR_MESSAGES = {
         "The original workflow or extraction this library item points to no longer "
         "exists. Refresh the library and try again."
     ),
+    "source_not_shareable": (
+        "This item can't be shared yet. Open it and check it has content to copy."
+    ),
     "clone_failed": (
         "Something went wrong while sharing this item. The error has been logged — "
         "please try again, and contact support if it keeps happening."
@@ -113,7 +116,7 @@ async def share_to_team(req: ShareToTeamRequest, user: User = Depends(get_curren
             req.item_id, user, req.team_id, comment=req.comment, force=req.force
         )
     except svc.ShareError as exc:
-        detail = _SHARE_ERROR_MESSAGES.get(exc.code, exc.code)
+        detail = exc.message or _SHARE_ERROR_MESSAGES.get(exc.code, exc.code)
         raise HTTPException(status_code=exc.status, detail=detail)
     return LibraryItemResponse(**item)
 

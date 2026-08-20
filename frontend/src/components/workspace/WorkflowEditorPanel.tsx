@@ -6,7 +6,7 @@ import {
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
   ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical,
-  Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
+  Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
 } from 'lucide-react'
@@ -18,7 +18,7 @@ import { useConfirm } from '../shared/useConfirm'
 import { getProjectDocuments } from '../../api/projects'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
-  updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
+  updateWorkflow, updateStep, downloadResults, downloadBatchResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow, runWorkflow, streamWorkflowStatus, createTempDocuments,
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan, validationReportUrl,
@@ -48,6 +48,7 @@ import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { computeReorderedIds } from '../../utils/reorder'
+import { formatPageLocator } from '../../utils/pageLocator'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -60,6 +61,7 @@ import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { getReview, approveReview, rejectReview } from '../../api/reviews'
+import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import type { ReviewDetail } from '../../api/reviews'
 import { ColdStartHero } from '../shared/ColdStartHero'
 import { TermDef } from '../shared/TermDef'
@@ -558,9 +560,15 @@ export function WorkflowEditorPanel() {
   // — unless a project is active, in which case the run falls back to all of
   // the project's files.
   const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : (selectedDocUuids.length === 0 && !activeProjectUuid)
+  // A workflow with nothing to do still "runs": it completes in milliseconds
+  // and hands back the input document's uuid as its output. The empty
+  // "Document" step is the run's own input placeholder — the canvas hides it,
+  // so a workflow carrying only that one reads as empty and is treated as
+  // such here too.
+  const hasSteps = (workflow?.steps ?? []).some(s => !(s.name === 'Document' && s.tasks.length === 0))
 
   const handleRun = async () => {
-    if (!openWorkflowId) return
+    if (!openWorkflowId || !hasSteps) return
 
     try {
       if (isNoInput) {
@@ -883,6 +891,7 @@ export function WorkflowEditorPanel() {
               runnerStatus={runner.status}
               runnerRunning={runner.running}
               runnerSessionId={runner.sessionId}
+              runnerBatchId={runner.batchId}
               batchStatus={runner.batchStatus}
               runElapsed={runElapsed}
               showDownloadPopup={showDownloadPopup}
@@ -963,21 +972,31 @@ export function WorkflowEditorPanel() {
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
         {activeTab === 'validate' && (
-          <ValidateTab
-            workflowId={openWorkflowId}
-            itemTitle={workflow?.name}
-            selectedDocUuids={selectedDocUuids}
-            bumpActivitySignal={bumpActivitySignal}
-            canManage={canManage}
-            onValidated={() => {
-              refreshSparkline()
-              if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
-            }}
-          />
+          hasSteps ? (
+            <ValidateTab
+              workflowId={openWorkflowId}
+              itemTitle={workflow?.name}
+              selectedDocUuids={selectedDocUuids}
+              bumpActivitySignal={bumpActivitySignal}
+              canManage={canManage}
+              onValidated={() => {
+                refreshSparkline()
+                if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
+              }}
+            />
+          ) : (
+            <NoStepsNotice
+              headline="Add a step before validating"
+              body="Validation grades what this workflow produces against a checklist drawn from its steps. With no steps there is nothing to run, grade, or improve yet."
+              actionLabel={canManage ? 'Go to Design' : undefined}
+              onAction={canManage ? () => setActiveTab('design') : undefined}
+            />
+          )
         )}
         {activeTab === 'advanced' && (
           <AdvancedTab
             workflowId={workflow.id}
+            hasSteps={hasSteps}
             onImportDefinition={() => importInputRef.current?.click()}
             onExportDefinition={() => window.open(exportWorkflowUrl(workflow.id), '_blank')}
           />
@@ -1069,7 +1088,13 @@ export function WorkflowEditorPanel() {
             </label>
           )
         )}
-        {!isTextInput && !isNoInput && selectedDocUuids.length === 0 && (
+        {!hasSteps && (
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Info style={{ width: 12, height: 12 }} />
+            Add a step below — there is nothing for this workflow to do yet
+          </div>
+        )}
+        {hasSteps && !isTextInput && !isNoInput && selectedDocUuids.length === 0 && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <FileText style={{ width: 12, height: 12 }} />
             {activeProjectUuid ? 'Will run on all files in this project' : 'Select a document to run this workflow'}
@@ -1081,9 +1106,10 @@ export function WorkflowEditorPanel() {
             No input required, runs directly
           </div>
         )}
-        {runner.running && !runner.batchId ? (
-          // Single run in progress — offer an active STOP (red, matches the
-          // app's destructive-action convention; same geometry as RUN).
+        {runner.running && (runner.batchId || runner.sessionId) ? (
+          // Run in progress (single or batch) — offer an active STOP (red,
+          // matches the app's destructive-action convention; same geometry as
+          // RUN). For a batch this cancels every per-document run.
           <button
             onClick={runner.stop}
             disabled={runner.cancelling}
@@ -1112,15 +1138,15 @@ export function WorkflowEditorPanel() {
         ) : (
           <button
             onClick={handleRun}
-            disabled={runner.running || missingInput}
-            title={runner.running && runner.batchId ? 'Stop is not yet available for batch runs' : undefined}
+            disabled={runner.running || missingInput || !hasSteps}
+            title={!hasSteps ? 'Add at least one step before running this workflow' : undefined}
             style={{
               width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
               fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
               backgroundColor: 'var(--highlight-color, #eab308)',
               color: 'var(--highlight-text-color, #000)',
-              cursor: runner.running || missingInput ? 'not-allowed' : 'pointer',
-              opacity: missingInput && !runner.running ? 0.5 : 1,
+              cursor: runner.running || missingInput || !hasSteps ? 'not-allowed' : 'pointer',
+              opacity: (missingInput || !hasSteps) && !runner.running ? 0.5 : 1,
               textTransform: 'uppercase', letterSpacing: '0.05em',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -1309,6 +1335,7 @@ function DesignCanvas({
   runnerStatus,
   runnerRunning,
   runnerSessionId,
+  runnerBatchId,
   batchStatus,
   runElapsed,
   showDownloadPopup,
@@ -1324,6 +1351,7 @@ function DesignCanvas({
   runnerStatus: WorkflowStatus | null
   runnerRunning: boolean
   runnerSessionId: string | null
+  runnerBatchId: string | null
   batchStatus: BatchStatus | null
   runElapsed: number
   showDownloadPopup: boolean
@@ -1497,6 +1525,7 @@ function DesignCanvas({
         <>
           <ConnectionLine />
           <BatchOutputCard
+            batchId={runnerBatchId}
             batchStatus={batchStatus}
             running={runnerRunning}
             runElapsed={runElapsed}
@@ -2754,6 +2783,41 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       setTestError(err instanceof Error ? err.message : 'Failed to start test')
       if (testMsgRef.current) { clearInterval(testMsgRef.current); testMsgRef.current = null }
     }
+  }
+
+  // Download the in-memory Test Step output. Test runs have no WorkflowResult /
+  // session, so there's no server download endpoint — build the file
+  // client-side from the result already in state.
+  //
+  // What arrives here is the return of _format_final_output, which stringifies
+  // everything *except* a {type: "file_download"} payload, which it passes
+  // through as a dict. So a "is it a string?" split gets both cases backwards:
+  // a genuinely structured result has already been json.dumps'd server-side and
+  // is a string, while the only non-string is the one payload that must not be
+  // written as JSON. DocumentRenderer, DataExport and PackageBuilder steps are
+  // all testable and all produce it — saving a rendered .docx as a JSON blob of
+  // base64 is not a download of anything the user asked for. The server's own
+  // multi-output path (_zip_member_for_step) decodes it, and so does this.
+  const handleDownloadTestResult = () => {
+    // The label shown in the editor, which is what the user is looking at.
+    // task.name is the node *type*, so three differently-named Prompt steps
+    // would all download as "Prompt-test.txt".
+    const label = (taskData.name as string) || task.name || 'step'
+    const plan = planTestResultDownload(testResult, label)
+    if (!plan) return
+
+    const blob = plan.kind === 'file'
+      ? new Blob([base64ToBytes(plan.content)], { type: plan.mime })
+      : new Blob([plan.content], { type: plan.mime })
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = plan.filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
   }
 
   const getTextValue = (key: string): string => {
@@ -4251,6 +4315,31 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 }}>
                   <CheckCircle style={{ width: 14, height: 14 }} />
                   Test Completed
+                  <button
+                    type="button"
+                    onClick={handleDownloadTestResult}
+                    // A step can complete having produced nothing —
+                    // _format_final_output(None) is "" — and the block above
+                    // still renders. Offering a button that writes a 0-byte
+                    // file is worse than saying there is nothing to save.
+                    disabled={testResult === '' || testResult === undefined}
+                    title={
+                      testResult === '' || testResult === undefined
+                        ? 'This step produced no output'
+                        : 'Download this output'
+                    }
+                    style={{
+                      marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4,
+                      padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6,
+                      backgroundColor: '#fff', color: '#374151',
+                      cursor: testResult === '' || testResult === undefined ? 'not-allowed' : 'pointer',
+                      opacity: testResult === '' || testResult === undefined ? 0.5 : 1,
+                    }}
+                  >
+                    <Download style={{ width: 13, height: 13 }} />
+                    Download
+                  </button>
                 </div>
                 <div style={{
                   backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
@@ -4809,6 +4898,9 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   showDownloadPopup: boolean
   setShowDownloadPopup: (v: boolean) => void
 }) {
+  // Same as the batch card: a share-link recipient authorizes with the token.
+  const { openWorkflowShareToken } = useWorkspace()
+  const shareToken = openWorkflowShareToken ?? undefined
   const isCompleted = status?.status === 'completed'
   const isError = status?.status === 'error' || status?.status === 'failed'
   const isCanceled = status?.status === 'canceled'
@@ -4821,6 +4913,8 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   const [approvalError, setApprovalError] = useState<string | null>(null)
   const [showSaveToFolder, setShowSaveToFolder] = useState(false)
   const { toast } = useToast()
+  // Deciding here clears the same queue the nav badge counts.
+  const { refresh: refreshReviewCount } = useMyReviewCount()
 
   useEffect(() => {
     if (!isPendingApproval || !status?.approval_request_id) return
@@ -4834,6 +4928,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     try {
       await approveReview(approval.uuid, { comments: approvalComments })
       setApproval({ ...approval, status: 'approved' })
+      void refreshReviewCount()
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
     } finally {
@@ -4848,6 +4943,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     try {
       await rejectReview(approval.uuid, approvalComments)
       setApproval({ ...approval, status: 'rejected' })
+      void refreshReviewCount()
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
     } finally {
@@ -5141,7 +5237,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
                     key={label}
-                    href={downloadResults(sessionId, fmt, { parseStructured })}
+                    href={downloadResults(sessionId, fmt, { parseStructured, shareToken })}
                     onClick={() => setShowDownloadPopup(false)}
                     style={{
                       display: 'flex', flexDirection: 'column', gap: 1,
@@ -5235,7 +5331,7 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
       {expanded && (
         <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {sources.map((c, i) => {
-            const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
+            const locator = formatPageLocator(c.page, c.page_approximate) ?? (c.sheet || null)
             const label = locator ? `${c.document_title} · ${locator}` : c.document_title
             const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
             const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' - ')
@@ -5320,15 +5416,90 @@ function ConvertWorkflowDocsButton({
 // Batch output card
 // ---------------------------------------------------------------------------
 
-function BatchOutputCard({ batchStatus, running, runElapsed }: {
+export type TestDownloadPlan = {
+  kind: 'file' | 'json' | 'text'
+  filename: string
+  /** Base64 payload for kind 'file'; the text to write otherwise. */
+  content: string
+  mime: string
+}
+
+/** Decide what a Test Step result should be saved as.
+ *
+ * The result is the return of the engine's _format_final_output, which
+ * stringifies everything *except* a {type: "file_download"} payload — that one
+ * comes through as an object. So "is it a string?" gets both cases backwards:
+ * a genuinely structured result is already JSON text, while the sole non-string
+ * is the payload that must not be written as JSON.
+ */
+export function planTestResultDownload(
+  result: unknown, label: string,
+): TestDownloadPlan | null {
+  if (result === null || result === undefined || result === '') return null
+
+  const safeName =
+    (label || 'step').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '') || 'step'
+
+  if (typeof result === 'object') {
+    const payload = result as Record<string, unknown>
+    if (payload.type === 'file_download') {
+      return {
+        kind: 'file',
+        filename: (payload.filename as string) || `${safeName}-test.bin`,
+        content: String(payload.data_b64 ?? ''),
+        mime: 'application/octet-stream',
+      }
+    }
+    return {
+      kind: 'json',
+      filename: `${safeName}-test.json`,
+      content: JSON.stringify(payload, null, 2),
+      mime: 'application/json',
+    }
+  }
+
+  const text = String(result)
+  const looksJson = /^[[{]/.test(text.trimStart()) && (() => {
+    try { JSON.parse(text); return true } catch { return false }
+  })()
+  return {
+    kind: looksJson ? 'json' : 'text',
+    filename: `${safeName}-test.${looksJson ? 'json' : 'txt'}`,
+    content: text,
+    mime: looksJson ? 'application/json' : 'text/plain',
+  }
+}
+
+// Decode a base64 payload to bytes. File-producing steps hand back their
+// artifact as data_b64, and writing that string into a Blob would save the
+// base64 text rather than the file it encodes.
+function base64ToBytes(b64: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(b64)
+  // Back the view with a concrete ArrayBuffer: since TS 5.7 Uint8Array is
+  // generic over its buffer, and only Uint8Array<ArrayBuffer> satisfies
+  // BlobPart — a bare `new Uint8Array(n)` widens to ArrayBufferLike.
+  const buffer = new ArrayBuffer(binary.length)
+  const bytes = new Uint8Array(buffer)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+
+function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
+  batchId: string | null
   batchStatus: BatchStatus
   running: boolean
   runElapsed: number
 }) {
+  // A recipient who reached this workflow through a share link authorizes with
+  // the token, not team membership — without it both downloads 404 on a batch
+  // they just watched run.
+  const { openWorkflowShareToken } = useWorkspace()
+  const shareToken = openWorkflowShareToken ?? undefined
   const isCompleted = batchStatus.status === 'completed'
   const isError = batchStatus.status === 'failed'
-  const isDone = isCompleted || isError
+  const isCanceled = batchStatus.status === 'canceled'
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+  const completedCount = batchStatus.items.filter(it => it.status === 'completed').length
 
   const renderOutput = (data: unknown): string => {
     if (data === null || data === undefined) return ''
@@ -5345,18 +5516,21 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
     <div style={{
       backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
       boxShadow: '0 6px 18px rgba(0,0,0,0.05)', padding: 20,
-      border: isDone
-        ? (isError ? '2px solid #fca5a5' : '2px solid #86efac')
+      border: isError ? '2px solid #fca5a5'
+        : isCompleted ? '2px solid #86efac'
         : '2px solid #e5e7eb',
     }}>
       <div style={{ fontWeight: 600, fontSize: 14, color: '#202124', marginBottom: 8 }}>
-        {running ? 'Batch Running' : isCompleted ? 'Batch Complete' : isError ? 'Batch Failed' : 'Batch Output'}
+        {running ? 'Batch Running' : isCompleted ? 'Batch Complete' : isError ? 'Batch Failed' : isCanceled ? 'Batch Stopped' : 'Batch Output'}
       </div>
 
       {/* Progress summary */}
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
         {batchStatus.completed} of {batchStatus.total} completed
         {batchStatus.failed > 0 && <span style={{ color: '#dc2626' }}> ({batchStatus.failed} failed)</span>}
+        {(batchStatus.canceled ?? 0) > 0 && (
+          <span style={{ color: '#b45309' }}> ({batchStatus.canceled} stopped)</span>
+        )}
         {running && <span> - {runElapsed}s elapsed</span>}
       </div>
 
@@ -5381,6 +5555,11 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
           const itemDone = item.status === 'completed'
           const itemFailed = item.status === 'error' || item.status === 'failed'
           const itemRunning = item.status === 'running'
+          // Without its own state a stopped run falls through to the gray dot
+          // used for "queued", so a halted 20-document batch shows 17 identical
+          // dots and no way to tell which ones actually ran — which is the
+          // question someone asks immediately after pressing STOP.
+          const itemCanceled = item.status === 'canceled'
           const isExpanded = expandedIdx === idx
 
           return (
@@ -5396,18 +5575,38 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
                   cursor: itemDone ? 'pointer' : 'default',
-                  backgroundColor: itemDone ? '#f0fdf4' : itemFailed ? '#fef2f2' : '#fff',
+                  backgroundColor: itemDone ? '#f0fdf4' : itemFailed ? '#fef2f2' : itemCanceled ? '#fffbeb' : '#fff',
                 }}
               >
                 {itemDone && <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />}
                 {itemFailed && <XCircle style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />}
                 {itemRunning && <Loader2 aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, animation: 'spin 1s linear infinite' }} />}
-                {!itemDone && !itemFailed && !itemRunning && <Circle style={{ width: 14, height: 14, color: '#d1d5db', flexShrink: 0 }} />}
+                {itemCanceled && <MinusCircle aria-label="Stopped" style={{ width: 14, height: 14, color: '#b45309', flexShrink: 0 }} />}
+                {!itemDone && !itemFailed && !itemRunning && !itemCanceled && <Circle style={{ width: 14, height: 14, color: '#d1d5db', flexShrink: 0 }} />}
                 <span style={{ fontSize: 13, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {item.document_title || item.session_id}
                 </span>
                 {itemRunning && item.current_step_name && (
                   <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>{item.current_step_name}</span>
+                )}
+                {itemDone && (
+                  <a
+                    href={downloadResults(item.session_id, 'json', { shareToken })}
+                    onClick={e => e.stopPropagation()}
+                    // The row cancels Enter/Space to toggle itself, which would
+                    // swallow the link's own activation for a keyboard user.
+                    onKeyDown={e => e.stopPropagation()}
+                    title="Download this output (JSON)"
+                    aria-label={`Download output for ${item.document_title || item.session_id}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', flexShrink: 0,
+                      color: '#6b7280', textDecoration: 'none',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = '#111827' }}
+                    onMouseLeave={e => { e.currentTarget.style.color = '#6b7280' }}
+                  >
+                    <Download style={{ width: 14, height: 14 }} />
+                  </a>
                 )}
                 {itemDone && (
                   <ChevronDown style={{
@@ -5436,6 +5635,26 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
           )
         })}
       </div>
+
+      {/* Download all completed outputs as a ZIP of JSON files. Shown as soon as
+          any run finishes, so completed outputs are grabbable mid-batch. */}
+      {batchId && completedCount > 0 && (
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <a
+            href={downloadBatchResults(batchId, 'json', { shareToken })}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+              fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6,
+              backgroundColor: '#fff', cursor: 'pointer', color: '#374151', textDecoration: 'none',
+            }}
+          >
+            <Package style={{ width: 14, height: 14 }} />
+            Download all (.zip)
+            {completedCount < batchStatus.total && <span style={{ fontWeight: 400, color: '#6b7280' }}>({completedCount})</span>}
+          </a>
+        </div>
+      )}
     </div>
   )
 }
@@ -8163,41 +8382,55 @@ function AdvancedToolCard({
   title,
   description,
   onClick,
+  disabled = false,
+  disabledReason,
   style,
 }: {
   title: string
   description: string
   onClick: () => void
+  disabled?: boolean
+  disabledReason?: string
   style?: CSSProperties
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
+      title={disabled ? disabledReason : undefined}
       style={{
         display: 'flex', flexDirection: 'column', gap: 6, padding: 16,
-        border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff',
-        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+        border: '1px solid #e5e7eb', borderRadius: 8,
+        backgroundColor: disabled ? '#f9fafb' : '#fff',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.6 : 1,
+        textAlign: 'left', fontFamily: 'inherit',
         transition: 'box-shadow 0.15s', ...style,
       }}
     >
       <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{title}</div>
-      <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
+      <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>
+        {disabled && disabledReason ? disabledReason : description}
+      </div>
     </button>
   )
 }
 
 function AdvancedTab({
   workflowId,
+  hasSteps,
   onImportDefinition,
   onExportDefinition,
 }: {
   workflowId: string
+  hasSteps: boolean
   onImportDefinition: () => void
   onExportDefinition: () => void
 }) {
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Import / Export Definition */}
+      {/* Import / Export Definition — import stays available with no steps,
+          since importing is one way to fill an empty workflow. */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <AdvancedToolCard
           title="Import Definition"
@@ -8208,10 +8441,66 @@ function AdvancedTab({
           title="Export Definition"
           description="Download as a shareable JSON file"
           onClick={onExportDefinition}
+          disabled={!hasSteps}
+          disabledReason="Add at least one step before exporting — there is nothing to share yet"
         />
       </div>
 
-      <WorkflowApiSection workflowId={workflowId} />
+      {hasSteps ? (
+        <WorkflowApiSection workflowId={workflowId} />
+      ) : (
+        <div style={{
+          padding: 16, backgroundColor: '#f9fafb', borderRadius: 8,
+          border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <Info style={{ width: 16, height: 16, color: '#6b7280', flexShrink: 0 }} />
+          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+            Add at least one step to run this workflow via the API. Instructions
+            and code samples appear here once it does something.
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* Shown in place of a tab whose whole purpose needs steps to exist. */
+function NoStepsNotice({
+  headline,
+  body,
+  actionLabel,
+  onAction,
+}: {
+  headline: string
+  body: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
+  return (
+    <div style={{ padding: 24 }}>
+      <div style={{
+        padding: 24, border: '1px solid #e5e7eb', borderRadius: 8,
+        backgroundColor: '#fafafa', display: 'flex', gap: 12, alignItems: 'flex-start',
+      }}>
+        <ClipboardCheck style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0, marginTop: 2 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{headline}</div>
+          <div style={{ fontSize: 13, color: '#5f6368', marginTop: 6, lineHeight: 1.5 }}>{body}</div>
+          {actionLabel && onAction && (
+            <button
+              type="button"
+              onClick={onAction}
+              style={{
+                marginTop: 14, padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                fontFamily: 'inherit', borderRadius: 6, border: '1px solid #d1d5db',
+                backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
+              }}
+            >
+              {actionLabel}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

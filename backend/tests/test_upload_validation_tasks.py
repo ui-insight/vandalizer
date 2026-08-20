@@ -170,12 +170,16 @@ class TestSummarizeResults:
         summary = summarize_results(results, "doc-uuid", False)
 
         assert summary["valid"] is True
-        db.smart_document.update_one.assert_called_once()
-        update_args = db.smart_document.update_one.call_args[0]
+        update_args = db.smart_document.update_one.call_args_list[0][0]
         assert update_args[0] == {"uuid": "doc-uuid"}
         assert update_args[1]["$set"]["valid"] is True
         assert update_args[1]["$set"]["validating"] is False
-        assert update_args[1]["$set"]["task_status"] == "complete"
+        # The status transition is a separate, guarded write: compliance
+        # validation must not overwrite a failed extraction with "complete".
+        assert "task_status" not in update_args[1]["$set"]
+        status_call = db.smart_document.update_one.call_args_list[-1][0]
+        assert status_call[0] == {"uuid": "doc-uuid", "task_status": {"$ne": "error"}}
+        assert status_call[1]["$set"]["task_status"] == "complete"
 
     @patch("app.tasks.upload_validation_tasks._get_secure_agent")
     @patch("app.tasks.upload_validation_tasks._get_db")
@@ -204,7 +208,7 @@ class TestSummarizeResults:
         summary = summarize_results(results, "doc-uuid", False)
 
         assert summary["valid"] is False
-        update_args = db.smart_document.update_one.call_args[0]
+        update_args = db.smart_document.update_one.call_args_list[0][0]
         assert update_args[1]["$set"]["valid"] is False
 
     @patch("app.tasks.upload_validation_tasks._get_secure_agent")
@@ -251,7 +255,11 @@ class TestSummarizeResults:
         assert summary["valid"] is False
         assert "PII detected" in summary["feedback"]
         # Should still persist to DB despite agent error
-        db.smart_document.update_one.assert_called_once()
+        # Two writes now: the validation result, then a guarded status change.
+        assert db.smart_document.update_one.call_count == 2
+        assert "validation_feedback" in (
+            db.smart_document.update_one.call_args_list[0][0][1]["$set"]
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -73,6 +73,7 @@ async def apply_automation_update(
     action_id: str | None = None,
     shared_with_team: bool | None = None,
     output_config: dict | None = None,
+    clear_action_id: bool = False,
 ) -> Automation:
     if name is not None:
         auto.name = name
@@ -86,7 +87,11 @@ async def apply_automation_update(
         auto.trigger_config = trigger_config
     if action_type is not None:
         auto.action_type = action_type
-    if action_id is not None:
+    # None means "not supplied" for every other field here, so clearing the
+    # link needs its own flag.
+    if clear_action_id:
+        auto.action_id = None
+    elif action_id is not None:
         auto.action_id = action_id
     if shared_with_team is not None:
         auto.shared_with_team = shared_with_team

@@ -47,3 +47,35 @@ export function normalizeWithMap(text: string): { norm: string; map: number[] } 
   }
   return { norm, map }
 }
+
+// Longest anchor phrase we ask the viewer to find. Chunk previews run to a few
+// hundred characters, but the longer the needle the likelier it straddles a
+// page break, a header, or a hyphenated line the text layer renders
+// differently — and a miss costs the highlight entirely.
+const ANCHOR_MAX_CHARS = 120
+
+// Turn a retrieved chunk's preview text into a phrase worth searching for in
+// the document it came from. Previews are cut to a fixed character budget
+// server-side, so they routinely end mid-word; a truncated needle matches
+// nothing. Returns '' when nothing usable is left.
+export function citationAnchor(preview: string | null | undefined): string {
+  const text = (preview ?? '').replace(/\s+/g, ' ').trim()
+  if (!text) return ''
+  if (text.length <= ANCHOR_MAX_CHARS) {
+    // Short enough to use whole, and short enough to prove it was never cut:
+    // the server truncates content_preview at 240 chars (_build_kb_segment),
+    // well above this branch, so the last word is already complete. Trimming
+    // it anyway costs precision on the anchors with the least to spare —
+    // "Section 3 Reporting" would become "Section 3", which matches half the
+    // document.
+    return text
+  }
+  return trimPartialWord(text.slice(0, ANCHOR_MAX_CHARS))
+}
+
+// Drop everything after the last space, so the phrase ends on a whole word.
+// A single unbroken run (a long URL, say) is returned as-is.
+function trimPartialWord(text: string): string {
+  const lastSpace = text.lastIndexOf(' ')
+  return lastSpace > 0 ? text.slice(0, lastSpace) : text
+}

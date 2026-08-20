@@ -537,6 +537,7 @@ export function ConfigTab() {
         ref={modelEditorRef}
         models={cfg.available_models}
         defaultModel={cfg.default_model}
+        longDocumentModel={cfg.long_document_model ?? ''}
         onConfigPatch={applyModelConfigPatch}
         onReadinessChange={refreshReadiness}
         error={error}

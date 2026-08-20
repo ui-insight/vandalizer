@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
@@ -15,6 +15,9 @@ help:
 	@printf "  make frontend-ci       Run frontend typecheck, lint, tests, and build\n"
 	@printf "  make ci                Run backend and frontend CI checks\n"
 	@printf "  make release-check     Run CI checks and both Docker builds\n"
+	@printf "  make security          Full vulnerability report (deps, images, secrets, config)\n"
+	@printf "  make security-gate     Release-gating scan: fails on CRITICAL or a leaked secret\n"
+	@printf "  make security-built-images  Scan the published images (run after docker-build)\n"
 
 backend-install:
 	cd $(BACKEND_DIR) && uv sync --frozen --extra dev
@@ -105,4 +108,92 @@ docker-build:
 		--build-arg VITE_SENTRY_RELEASE="$$VITE_SENTRY_RELEASE" \
 		-t vandalizer-frontend ./frontend
 
-release-check: backend-static ci docker-build
+release-check: backend-static ci security-gate docker-build
+
+# ---------------------------------------------------------------------------
+# Vulnerability scanning (Trivy)
+# ---------------------------------------------------------------------------
+# Covers three things bandit / pip-audit / npm audit cannot see:
+#
+#   1. OS packages inside the runtime container images. Nothing scanned these
+#      before, and they are where the highest-severity findings usually live —
+#      the backend runtime (python:3.12-slim) currently carries ~23 HIGH, most
+#      of them one util-linux CVE fanning across several packages and already
+#      fixed upstream, so `docker build --pull` clears the bulk.
+#   2. Committed secrets.
+#   3. Dockerfile / IaC misconfiguration.
+#
+# It also reads both lockfiles, so it is the one place to look for dependency
+# CVEs across Python and npm rather than reading two tools' output.
+#
+# Install: brew install trivy  (or see https://trivy.dev/latest/getting-started/installation/)
+
+TRIVY ?= trivy
+# Base images to scan. The frontend *builder* (node:24-alpine) is deliberately
+# absent: its packages never reach a shipped artifact, and including it would
+# put findings in front of reviewers that they cannot act on and should not
+# care about. Scan what runs in production.
+RUNTIME_IMAGES := python:3.12-slim nginx:alpine
+
+security:
+	@printf "\n=== Dependencies, secrets, and config ===\n"
+	-$(TRIVY) fs --scanners vuln,secret,misconfig --severity HIGH,CRITICAL .
+	@printf "\n=== Runtime base images ===\n"
+	@for img in $(RUNTIME_IMAGES); do \
+		printf "\n--- %s ---\n" "$$img"; \
+		$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL "$$img" || true; \
+	done
+
+# Release gate. Deliberately narrower than `make security`:
+#
+#   CRITICAL-with-a-fix-available, and leaked secrets, fail the build. Both are
+#   zero today, so this is enforceable from the day it lands rather than being
+#   switched on "later" — which is how the existing HIGH backlog became
+#   invisible in the first place.
+#
+#   --ignore-unfixed is load-bearing, not a loophole. python:3.12-slim carries
+#   four CRITICAL perl-base CVEs that Debian has published no fix for
+#   (CVE-2026-13221, -42496, -57433, -8376). A gate that fails on those cannot
+#   be made to pass by any action a developer can take, so it would be disabled
+#   or bypassed within a week and would protect nothing. `make security` still
+#   reports them; the *gate* is scoped to what someone can actually act on.
+#   Track the unfixed ones by rebasing the image when Debian ships fixes, or by
+#   moving off a base that ships perl at all.
+#
+#   HIGH stays advisory *for now*, matching the backend-typecheck / backend-audit
+#   convention above. The difference from before is that it is now reported
+#   rather than hidden: `npm audit --audit-level=critical` silently passed six
+#   HIGH findings, and pip-audit's twenty-nine sat in a non-blocking target
+#   nobody read. Tighten `--severity` here to HIGH,CRITICAL once the backlog is
+#   worked down.
+security-gate:
+	$(TRIVY) fs --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 .
+	$(TRIVY) fs --scanners secret --exit-code 1 .
+	@for img in $(RUNTIME_IMAGES); do \
+		$(TRIVY) image --scanners vuln --severity CRITICAL --ignore-unfixed --exit-code 1 "$$img" || exit 1; \
+	done
+	@printf "\nNo fixable CRITICAL vulnerabilities and no leaked secrets.\n"
+
+# Scans the images we *publish*, which is what a deploying campus actually
+# pulls from ghcr.io. This is strictly broader than scanning the base images
+# above, and the difference is not academic:
+#
+#   backend/Dockerfile runs `playwright install --with-deps chromium`, which
+#   installs Chromium and its entire apt dependency tree into the shipped
+#   runtime image. Those packages appear in neither uv.lock nor the
+#   python:3.12-slim base scan, so until now nothing looked at them at all —
+#   and the browser path they serve became more heavily used when the
+#   blocked-URL fallback was fixed.
+#
+# Requires `make docker-build` first (the images must exist locally).
+# Advisory rather than gating for now: the Chromium dependency set has never
+# been scanned, so the finding count is unknown and a gate switched on blind
+# would either be vacuous or block the release pipeline on day one. Promote it
+# to security-gate once a few runs have established the real baseline.
+BUILT_IMAGES := vandalizer-backend vandalizer-frontend
+
+security-built-images:
+	@for img in $(BUILT_IMAGES); do \
+		printf "\n--- %s (published artifact) ---\n" "$$img"; \
+		$(TRIVY) image --scanners vuln --severity HIGH,CRITICAL "$$img" || true; \
+	done

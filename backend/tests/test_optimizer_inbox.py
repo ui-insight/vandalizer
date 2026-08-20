@@ -22,6 +22,9 @@ _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="develop
 
 _NOW = datetime.datetime(2026, 7, 20, 12, 0, tzinfo=datetime.timezone.utc)
 
+# A syntactically valid ObjectId, so the real access layer gets past its parse.
+_WF_OID = "507f1f77bcf86cd799439011"
+
 
 def _make_user(user_id="user1"):
     user = MagicMock()
@@ -116,13 +119,22 @@ class _InboxHarness:
         self.kb, self.extraction, self.workflow = list(kb), list(extraction), list(workflow)
         self.authorized = authorized
         self.can_manage = can_manage
-        self.kb_doc = kb_doc or SimpleNamespace(title="Compliance KB", uuid="kb-1")
+        # ``user_id="user1"`` on each stand-in: these tests stub the authorized
+        # lookups to cover categorization and naming, but the router still asks
+        # whether a *view-only* row belongs to the caller before keeping it
+        # (see ``_is_own_or_team_item``). Owning them keeps that orthogonal —
+        # TestRealAccessScoping is where the ownership rule itself is tested.
+        self.kb_doc = kb_doc or SimpleNamespace(
+            title="Compliance KB", uuid="kb-1", user_id="user1", team_id=None,
+            shared_with_team=False,
+        )
         self.ss_doc = ss_doc or SimpleNamespace(
-            title="Budget fields", uuid="ss-1",
+            title="Budget fields", uuid="ss-1", user_id="user1", team_id=None,
             extraction_config_override=None, extraction_config_override_set_at=None,
         )
         self.wf_doc = wf_doc or SimpleNamespace(
-            name="Proposal intake", config_override=None, config_override_set_at=None,
+            name="Proposal intake", user_id="user1", team_id=None,
+            config_override=None, config_override_set_at=None,
         )
         self._stack = []
 
@@ -412,3 +424,180 @@ class TestDismiss:
                 "/api/optimizer/inbox/kb/nope/dismiss", cookies=cookies, headers=headers,
             )
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Access scoping against the REAL access-control layer
+#
+# Every test above stubs ``access_control.get_authorized_*``, which makes them
+# blind to what those functions actually grant. That blindness is how a
+# support ticket ("any authenticated user sees every team's optimizer runs")
+# got past a green suite: view access to a *verified catalog KB*, a *global
+# search set*, or a *workflow published to the catalog library* is granted to
+# every authenticated user by design, and the inbox was accepting it as
+# grounds to show a row. These tests drive the real predicates.
+# ---------------------------------------------------------------------------
+
+
+class _RealAccessHarness:
+    """Patch the DB reads under the real access-control functions, nothing more.
+
+    Each surface gets one run pointing at one item owned by ``victim`` in team
+    ``team-uuid``; the item's shape (verified / global / library-published) and
+    the caller's relationship to it are what each test varies.
+    """
+
+    def __init__(self, *, caller="attacker", role=None, examiner=False,
+                 kb_fields=None, ss_fields=None, wf_in_verified_library=False):
+        self.caller, self.role, self.examiner = caller, role, examiner
+        self.kb_fields = kb_fields or {}
+        self.ss_fields = ss_fields or {}
+        self.wf_in_verified_library = wf_in_verified_library
+        self._stack = []
+
+    def __enter__(self):
+        from app.routers import optimizer_inbox as oi
+        from app.services import access_control as ac
+        import app.models.search_set as ss_mod
+        import app.models.workflow as wf_mod
+
+        self.user = _make_user(self.caller)
+        self.user.is_examiner = self.examiner
+
+        wf = SimpleNamespace(
+            id=_WF_OID, user_id="victim", team_id="team-uuid", share_token=None,
+            name="Victim proposal intake", config_override=None,
+            config_override_set_at=None,
+        )
+        kb = SimpleNamespace(**{
+            "id": "kb-oid", "uuid": "kb-1", "user_id": "victim", "team_id": "team-uuid",
+            "shared_with_team": False, "verified": False, "organization_ids": [],
+            "title": "Victim KB", **self.kb_fields,
+        })
+        ss = SimpleNamespace(**{
+            "id": "ss-oid", "uuid": "ss-1", "user_id": "victim", "team_id": "team-uuid",
+            "is_global": False, "title": "Victim budget fields",
+            "extraction_config_override": None,
+            "extraction_config_override_set_at": None, **self.ss_fields,
+        })
+
+        patches = [
+            patch.object(oi, "KBOptimizationRun"),
+            patch.object(oi, "ExtractionOptimizationRun"),
+            patch.object(oi, "WorkflowOptimizationRun"),
+            patch.object(ac, "TeamMembership"),
+            patch.object(ac, "Team"),
+            patch.object(ac, "LibraryItem"),
+            patch.object(ac, "Library"),
+            patch.object(ac, "VerificationRequest"),
+            patch.object(ac, "VerifiedItemMetadata"),
+            patch.object(ac, "KnowledgeBase"),
+            patch.object(wf_mod, "Workflow"),
+            patch.object(ss_mod, "SearchSet"),
+            patch("app.services.organization_service.get_user_org_ancestry",
+                  new_callable=AsyncMock, return_value=[]),
+        ]
+        (MK, ME, MW, MTM, MT, MLI, MLIB, MVR, MVM, MKB, MWF,
+         MSS, _org) = [p.__enter__() for p in patches]
+        self._stack = patches
+
+        MK.find = MagicMock(return_value=_find_chain([_run(uuid="kb-run", kb_uuid="kb-1")]))
+        ME.find = MagicMock(return_value=_find_chain([_run(uuid="ex-run", search_set_uuid="ss-1")]))
+        MW.find = MagicMock(return_value=_find_chain([_run(uuid="wf-run", workflow_id=_WF_OID)]))
+
+        if self.role:
+            MTM.find = MagicMock(return_value=_find_chain(
+                [SimpleNamespace(team="team-oid", role=self.role)]))
+            MT.find = MagicMock(return_value=_find_chain(
+                [SimpleNamespace(id="team-oid", uuid="team-uuid")]))
+        else:
+            MTM.find = MagicMock(return_value=_find_chain([]))
+            MT.find = MagicMock(return_value=_find_chain([]))
+
+        if self.wf_in_verified_library:
+            from app.models.library import LibraryScope
+
+            MLI.find = MagicMock(return_value=_find_chain(
+                [SimpleNamespace(id="li", kind=MagicMock(value="workflow"), item_id=_WF_OID)]))
+            MLIB.find = MagicMock(return_value=_find_chain(
+                [SimpleNamespace(scope=LibraryScope.VERIFIED, owner_user_id="victim", team=None)]))
+        else:
+            MLI.find = MagicMock(return_value=_find_chain([]))
+            MLIB.find = MagicMock(return_value=_find_chain([]))
+
+        MVR.find_one = AsyncMock(return_value=None)
+        MVM.find_one = AsyncMock(return_value=None)
+        MKB.find_one = AsyncMock(return_value=kb)
+        MWF.get = AsyncMock(return_value=wf)
+        MSS.find_one = AsyncMock(return_value=ss)
+        return self
+
+    def __exit__(self, *exc):
+        for p in reversed(self._stack):
+            p.__exit__(*exc)
+        return False
+
+    async def surfaces(self):
+        """``{surface: can_manage}`` for the rows this caller actually gets."""
+        from app.routers.optimizer_inbox import _collect
+
+        items = await _collect(self.user, days=14, include_dismissed=False)
+        return {i["surface"]: i["can_manage"] for i in items}
+
+
+class TestRealAccessScoping:
+    @pytest.mark.asyncio
+    async def test_outsider_sees_nothing(self):
+        """The plain cross-team case: no membership, no rows."""
+        with _RealAccessHarness() as h:
+            assert await h.surfaces() == {}
+
+    @pytest.mark.asyncio
+    async def test_verified_catalog_kb_does_not_expose_its_runs(self):
+        """A verified KB is readable fleet-wide; its tuning runs are not."""
+        with _RealAccessHarness(kb_fields={"verified": True}) as h:
+            assert "kb" not in await h.surfaces()
+
+    @pytest.mark.asyncio
+    async def test_global_search_set_does_not_expose_its_runs(self):
+        with _RealAccessHarness(ss_fields={"is_global": True}) as h:
+            assert "extraction" not in await h.surfaces()
+
+    @pytest.mark.asyncio
+    async def test_catalog_published_workflow_does_not_expose_its_runs(self):
+        """Publishing a workflow to the verified library shares the workflow,
+        not the quality scores and failure detail of runs against it."""
+        with _RealAccessHarness(wf_in_verified_library=True) as h:
+            assert "workflow" not in await h.surfaces()
+
+    @pytest.mark.asyncio
+    async def test_owner_sees_all_three_with_manage(self):
+        with _RealAccessHarness(caller="victim") as h:
+            assert await h.surfaces() == {"kb": True, "extraction": True, "workflow": True}
+
+    @pytest.mark.asyncio
+    async def test_teammate_still_sees_team_items(self):
+        """The view-only row is the point of the inbox for non-managers —
+        a shared team KB and workflow must survive the scoping fix."""
+        with _RealAccessHarness(caller="colleague", role="member",
+                                kb_fields={"shared_with_team": True}) as h:
+            surfaces = await h.surfaces()
+        assert surfaces["workflow"] is False   # visible, not actionable
+        assert surfaces["kb"] is False
+        assert "extraction" in surfaces
+
+    @pytest.mark.asyncio
+    async def test_unshared_team_kb_stays_private_to_its_owner(self):
+        """``shared_with_team`` is opt-in; membership alone isn't visibility."""
+        with _RealAccessHarness(caller="colleague", role="member") as h:
+            assert "kb" not in await h.surfaces()
+
+    @pytest.mark.asyncio
+    async def test_examiner_keeps_verified_kb_rows_they_can_act_on(self):
+        """Examiners curate verified KBs, so those rows are theirs to triage —
+        the scoping fix must not take the catalog-governance role's work away."""
+        with _RealAccessHarness(examiner=True, kb_fields={"verified": True}) as h:
+            surfaces = await h.surfaces()
+        assert surfaces["kb"] is True
+        # ...but the examiner flag grants nothing on the other two surfaces.
+        assert "workflow" not in surfaces and "extraction" not in surfaces

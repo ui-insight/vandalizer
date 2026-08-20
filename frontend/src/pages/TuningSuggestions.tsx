@@ -8,6 +8,12 @@ import { OptimizerInbox } from '../components/shared/OptimizerInbox'
  * The per-item "Validate & improve" tabs stay the place you *launch* tuning
  * from; this page answers the question those tabs can't: "did anything the
  * system tuned on its own need me?"
+ *
+ * Deliberately unlinked from the main nav. It used to have an always-on
+ * account-menu item and an activity-rail badge, which put a power-user surface
+ * in front of every research administrator — nearly all of whom own nothing
+ * the optimizer tunes. The route stays live for bookmarks and notification
+ * links, and Admin → Optimizer activity links here.
  */
 export default function TuningSuggestions() {
   return (

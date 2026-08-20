@@ -517,3 +517,74 @@ async def test_normal_page_is_not_flagged_truncated():
         result = await fetch_url("https://example.com/policy", settings=settings)
 
     assert result.truncated is False
+
+
+# ---------------------------------------------------------------------------
+# A refused static fetch still gets the browser fallback (#566)
+# ---------------------------------------------------------------------------
+
+
+def _mock_blocked_client(status: int = 403):
+    """A client whose response raises HTTPStatusError, as a WAF block does."""
+    resp = MagicMock()
+    resp.text = "Access Denied"
+    resp.status_code = status
+    resp.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError(
+        str(status), request=MagicMock(), response=resp,
+    ))
+    client = MagicMock()
+    client.get = AsyncMock(return_value=resp)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_blocked_static_fetch_falls_back_to_browser():
+    """`raise_for_status()` used to short-circuit the browser path entirely, so
+    a site that refuses httpx but renders in a real browser was unreachable by
+    any route — the fallback below could never run."""
+    settings = Settings(web_fetcher_browser_enabled=True)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_blocked_client(403)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/blocked"), \
+         patch("app.services.web_fetcher._render_with_browser",
+               new=AsyncMock(return_value=STATIC_PAGE_HTML)) as mock_render:
+        result = await fetch_url("https://example.com/blocked", settings=settings)
+
+    assert mock_render.await_count == 1
+    assert result.used_browser is True
+    assert "reimburse employees" in result.text
+
+
+@pytest.mark.asyncio
+async def test_blocked_fetch_raises_original_error_when_browser_also_fails():
+    """The browser is a second chance, not a way to turn a block into an empty
+    page — the caller must still see the status error."""
+    settings = Settings(web_fetcher_browser_enabled=True)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_blocked_client(403)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/blocked"), \
+         patch("app.services.web_fetcher._render_with_browser",
+               new=AsyncMock(return_value=None)):
+        with pytest.raises(httpx.HTTPStatusError):
+            await fetch_url("https://example.com/blocked", settings=settings)
+
+
+@pytest.mark.asyncio
+async def test_blocked_fetch_raises_immediately_when_browser_disabled():
+    settings = Settings(web_fetcher_browser_enabled=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_blocked_client(403)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/blocked"), \
+         patch("app.services.web_fetcher._render_with_browser") as mock_render:
+        with pytest.raises(httpx.HTTPStatusError):
+            await fetch_url("https://example.com/blocked", settings=settings)
+
+    assert mock_render.called is False

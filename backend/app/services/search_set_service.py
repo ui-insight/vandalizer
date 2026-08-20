@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
@@ -45,6 +46,16 @@ async def create_search_set(
         extraction_config=extraction_config or {},
     )
     await ss.insert()
+
+    # Same reasoning as create_workflow: extraction sets are listed only through
+    # library bookmarks, and LibraryTab made the bookmark in a second request
+    # guarded on a personal library being loaded.
+    from app.models.library import LibraryItemKind
+    from app.services import library_service
+
+    await library_service.ensure_bookmark(
+        ss.id, LibraryItemKind.SEARCH_SET, user_id,
+    )
     return ss
 
 
@@ -83,7 +94,10 @@ async def list_search_sets(
 
     # Add text search filter
     if search:
-        query["title"] = {"$regex": search, "$options": "i"}
+        # Escape before it reaches $regex: a title containing (, +, [ or * is
+        # ordinary text, not a pattern. Unescaped, searching for "C++ (v2)"
+        # raises an invalid-pattern error and returns nothing.
+        query["title"] = {"$regex": re.escape(search), "$options": "i"}
 
     return await SearchSet.find(query).skip(skip).limit(limit).to_list()
 

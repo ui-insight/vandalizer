@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearch } from '@tanstack/react-router'
 import { ShieldCheck, BookOpen, FolderOpen, Users, Pin } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { VerificationQueue } from '../components/library/VerificationQueue'
@@ -20,6 +21,9 @@ const TABS: { key: Tab; label: string; icon: typeof ShieldCheck; adminOnly?: boo
 
 export default function Verification() {
   const { user } = useAuth()
+  const search = useSearch({ strict: false }) as { request?: string }
+  // A notification links to the submission it is about, so open on the queue
+  // with that row in view rather than making the reviewer find it.
   const [activeTab, setActiveTab] = useState<Tab>('queue')
 
   if (!user?.is_examiner) {
@@ -80,7 +84,7 @@ export default function Verification() {
 
         {/* Content */}
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
-          {activeTab === 'queue' && <VerificationQueue />}
+          {activeTab === 'queue' && <VerificationQueue focusRequestUuid={search.request} />}
           {activeTab === 'catalog' && <VerifiedCatalog />}
           {activeTab === 'coverage' && <CatalogCoverageTab />}
           {activeTab === 'collections' && <CollectionsManager />}

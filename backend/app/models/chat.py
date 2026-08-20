@@ -42,6 +42,20 @@ def wrap_queued_user_message(text: str) -> str:
         "[The user sent this message while you were working. Address it as "
         "part of your current reply.]\n" + text
     )
+# A selection can expand to a lot of documents — folder expansion alone allows
+# 500 per folder — and this is written on every turn. Past this the record says
+# so rather than growing without bound.
+MAX_RECORDED_SOURCE_DOCUMENTS = 500
+
+
+def _cap_source_documents(docs: Optional[list[dict]]) -> Optional[list[dict]]:
+    """Bound what one turn records, saying so rather than silently dropping."""
+    if not docs:
+        return None
+    if len(docs) <= MAX_RECORDED_SOURCE_DOCUMENTS:
+        return docs
+    kept = docs[:MAX_RECORDED_SOURCE_DOCUMENTS]
+    return [*kept, {"truncated": len(docs) - MAX_RECORDED_SOURCE_DOCUMENTS}]
 
 
 class ChatMessage(Document):
@@ -53,6 +67,16 @@ class ChatMessage(Document):
     tool_results: Optional[list[dict]] = None
     segments: Optional[list[dict]] = None
     citations: Optional[list[dict]] = None
+    # The documents in scope when this turn was asked: ``{uuid, title}`` each,
+    # plus ``{"truncated": n}`` as a final entry if the selection was larger
+    # than we record.
+    #
+    # Titles are stored alongside the uuids deliberately. The point of the
+    # record is to be readable later, and a uuid stops resolving the moment the
+    # document is deleted — which is exactly when someone wants to know what an
+    # old answer was based on. Both are already in hand when the router
+    # authorizes the selection, so this costs no extra lookups.
+    source_documents: Optional[list[dict]] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
@@ -72,6 +96,8 @@ class ChatMessage(Document):
             d["segments"] = self.segments
         if self.citations:
             d["citations"] = self.citations
+        if self.source_documents:
+            d["source_documents"] = self.source_documents
         return d
 
     def to_model_messages(
@@ -295,6 +321,7 @@ class ChatConversation(Document):
         tool_results: Optional[list[dict]] = None,
         segments: Optional[list[dict]] = None,
         citations: Optional[list[dict]] = None,
+        source_documents: Optional[list[dict]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -305,6 +332,7 @@ class ChatConversation(Document):
             tool_results=tool_results or None,
             segments=segments or None,
             citations=citations or None,
+            source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()
         self.messages.append(msg.id)

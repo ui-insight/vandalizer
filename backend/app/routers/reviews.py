@@ -6,6 +6,7 @@ assigned reviewer / workflow manager — not the global admin flag.
 """
 
 import datetime
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -22,7 +23,9 @@ from app.models.approval import (
 from app.models.document import SmartDocument
 from app.models.user import User
 from app.models.workflow import Workflow, WorkflowResult
-from app.services import access_control, audit_service
+from app.services import access_control, approval_service, audit_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -110,10 +113,31 @@ async def _approval_full(a: ApprovalRequest) -> dict:
 
 
 async def _can_view_approval(approval: ApprovalRequest, user: User) -> bool:
-    """User can see this review if assigned, or if they manage the workflow."""
+    """User can see this review if assigned, if they ran it, or if they manage
+    the workflow.
+
+    Viewing is not deciding — :func:`_can_decide_approval` is a strictly
+    narrower check, so nothing here grants the right to approve or reject.
+    """
     if user.user_id in (approval.assigned_to_user_ids or []):
         return True
     if user.user_id == approval.requester_user_id:
+        return True
+    # The person who actually ran the workflow. requester_user_id is the
+    # workflow's *owner*, which is often someone else: a team member running a
+    # shared workflow, or a share-link recipient. Their own activity row links
+    # straight here, so without this they follow a link from their own run and
+    # get "Review not found" — having also lost the previous behaviour, where
+    # clicking that row opened the workflow.
+    try:
+        result = await WorkflowResult.get(approval.workflow_result_id)
+    except Exception:  # pragma: no cover - defensive
+        logger.warning(
+            "Could not load run %s while checking review visibility",
+            approval.workflow_result_id, exc_info=True,
+        )
+        result = None
+    if result is not None and result.user_id == user.user_id:
         return True
     # Workflow manage rights (covers team admins on team-scoped workflows)
     workflow = await access_control.get_authorized_workflow(
@@ -296,6 +320,17 @@ async def reject_review(
         result.status = "failed"
         result.current_step_detail = f"Rejected by reviewer: {body.comments}" if body.comments else "Rejected by reviewer"
         await result.save()
+
+    # The run is out of its approval wait and will not resume — close the
+    # activity so the rail shows a rejected run instead of one still spinning.
+    await approval_service.end_approval_wait(
+        approval.workflow_result_id,
+        approval_uuid=approval.uuid,
+        error=(
+            f"Rejected by reviewer: {body.comments}" if body.comments
+            else "Rejected by reviewer."
+        ),
+    )
 
     await audit_service.log_event(
         action="workflow.reject",

@@ -103,27 +103,90 @@ async def test_repair_uses_bundled_text(tmp_path, monkeypatch):
 
 
 async def test_repair_refetches_non_ecfr_broken_sources(monkeypatch, tmp_path):
+    """The refetch fetches first and replaces chunks through
+    ``ingest_text_into_source``, which does its own replacement — so there is
+    no separate delete to get stranded if the fetch fails."""
     monkeypatch.setattr(repair_mod, "DEFAULT_OUT_DIR", tmp_path)
     monkeypatch.setattr(repair_mod, "_load_manifest", lambda: {})
     kb = _kb()
     broken = _source(url="https://grants.gov/policies", status="error",
                      error_message="Blocked by bot protection")
     ingest_text = AsyncMock(return_value=1)
-    ingest_url = AsyncMock(return_value=object())
     recalc = AsyncMock()
     dm = MagicMock()
+    fetched = SimpleNamespace(text="Real policy content. " * 60, status_code=200)
     p_kb, p_src = _patch_models(kb, [broken])
     with p_kb, p_src, \
          patch("app.services.knowledge_service.ingest_text_into_source", ingest_text), \
-         patch("app.services.knowledge_service._ingest_url_source", ingest_url), \
+         patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=fetched)), \
          patch("app.services.knowledge_service.recalculate_stats", recalc), \
          patch("app.services.document_manager.get_document_manager", return_value=dm):
         await repair(dry_run=False, refetch_others=True)
 
-    ingest_text.assert_not_awaited()
-    dm.delete_kb_source.assert_called_once_with(kb.uuid, broken.uuid)
-    ingest_url.assert_awaited_once_with(broken, kb)
+    ingest_text.assert_awaited_once()
+    assert ingest_text.await_args.args[0] is broken
+    dm.delete_kb_source.assert_not_called()
     recalc.assert_awaited_once()
+
+
+async def test_repair_keeps_existing_chunks_when_a_refetch_is_unusable(
+    monkeypatch, tmp_path,
+):
+    """The destructive case: the old path deleted a source's chunks and *then*
+    refetched, so a URL that no longer returns usable content — or one this
+    sweep misjudged as broken — left a working source with nothing indexed and
+    no recovery inside the run.
+    """
+    monkeypatch.setattr(repair_mod, "DEFAULT_OUT_DIR", tmp_path)
+    monkeypatch.setattr(repair_mod, "_load_manifest", lambda: {})
+    kb = _kb()
+    broken = _source(url="https://grants.gov/policies", status="ready",
+                     error_message=None)
+    ingest_text = AsyncMock(return_value=1)
+    dm = MagicMock()
+    # A chrome-only shell: fetched fine, worth nothing.
+    shell = SimpleNamespace(
+        text=(
+            "An official website of the United States government Here's how you "
+            "know. A lock ( Lock Locked padlock icon ) means secure. "
+            "Your session will expire in 5 minutes. "
+            "To continue working, click on the button below."
+        ),
+        status_code=200,
+    )
+    p_kb, p_src = _patch_models(kb, [broken])
+    with p_kb, p_src, \
+         patch("app.services.knowledge_service.ingest_text_into_source", ingest_text), \
+         patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=shell)), \
+         patch("app.services.knowledge_service.recalculate_stats", AsyncMock()), \
+         patch("app.services.document_manager.get_document_manager", return_value=dm):
+        await repair(dry_run=False, refetch_others=True)
+
+    dm.delete_kb_source.assert_not_called()
+    ingest_text.assert_not_awaited()
+
+
+async def test_repair_keeps_existing_chunks_when_a_refetch_raises(
+    monkeypatch, tmp_path,
+):
+    monkeypatch.setattr(repair_mod, "DEFAULT_OUT_DIR", tmp_path)
+    monkeypatch.setattr(repair_mod, "_load_manifest", lambda: {})
+    kb = _kb()
+    broken = _source(url="https://grants.gov/policies", status="ready",
+                     error_message=None)
+    ingest_text = AsyncMock(return_value=1)
+    dm = MagicMock()
+    p_kb, p_src = _patch_models(kb, [broken])
+    with p_kb, p_src, \
+         patch("app.services.knowledge_service.ingest_text_into_source", ingest_text), \
+         patch("app.services.web_fetcher.fetch_url",
+               AsyncMock(side_effect=OSError("connection reset"))), \
+         patch("app.services.knowledge_service.recalculate_stats", AsyncMock()), \
+         patch("app.services.document_manager.get_document_manager", return_value=dm):
+        await repair(dry_run=False, refetch_others=True)
+
+    dm.delete_kb_source.assert_not_called()
+    ingest_text.assert_not_awaited()
 
 
 async def test_repair_aborts_when_vector_store_readonly(monkeypatch, tmp_path):

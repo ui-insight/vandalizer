@@ -23,6 +23,7 @@ from bs4 import BeautifulSoup
 
 from app.services.extraction_engine import ExtractionEngine
 from app.services.llm_service import create_chat_agent
+from app.services.page_locator import locator_for_meta
 
 logger = logging.getLogger(__name__)
 
@@ -425,8 +426,19 @@ class MultiTaskNode(Node):
         self.tasks.extend(tasks)
 
     def process_task(self, task):
-        result = task.process(task.inputs)
-        return task._apply_post_process(result)
+        # Capture per task, not per step: each task runs in its own copied
+        # context (see process below), so the sink only sees this task's LLM
+        # calls — including the post-process pass and any nested sub-calls.
+        from app.services.llm_service import capture_truncation, describe_truncation
+
+        with capture_truncation() as truncations:
+            result = task.process(task.inputs)
+            result = task._apply_post_process(result)
+        if truncations and isinstance(result, dict):
+            warning = describe_truncation(truncations)
+            existing = result.get("warning")
+            result["warning"] = f"{existing} | {warning}" if existing else warning
+        return result
 
     def process(self, inputs):
         import contextvars
@@ -1348,6 +1360,13 @@ KB_PASSAGES_HEADER = (
     "critically, not as a complete document."
 )
 
+KB_APPROXIMATE_PAGE_RULE = (
+    "- A page written as `p. ~N` is an *estimate*: that source was scanned, so "
+    "page positions were interpolated rather than read. Keep the tilde when you "
+    "cite it and describe the location as approximate. Never restate such a page "
+    "as exact and never say a passage is \"explicitly\" or \"clearly\" on it.\n"
+)
+
 KB_ANSWER_INSTRUCTION = (
     "Answer the QUESTION below using ONLY the retrieved knowledge-base "
     "passages in the CONTEXT block.\n"
@@ -1356,8 +1375,9 @@ KB_ANSWER_INSTRUCTION = (
     "each one before relying on it, and ignore passages that are clearly "
     "irrelevant.\n"
     "- Cite the source line shown above each passage (filename plus "
-    "page/sheet, e.g. [PAPPG.pdf · p. 234]) for every factual claim. Never "
-    "attribute a claim to a passage that does not support it.\n"
+    "page/sheet, e.g. [PAPPG.pdf · p. 234]) for every factual claim, copying "
+    "the locator exactly as shown. Never attribute a claim to a passage that "
+    "does not support it.\n"
     "- If the passages do not contain a clear answer, say so explicitly "
     "instead of guessing.\n\n"
 )
@@ -1460,16 +1480,15 @@ class KnowledgeBaseQueryNode(Node):
             source_name = meta.get("source_name", "Unknown source")
             page = meta.get("page")
             sheet = meta.get("sheet")
-            label = source_name
-            if isinstance(page, int):
-                label = f"{source_name} · p. {page}"
-            elif isinstance(sheet, str) and sheet:
-                label = f"{source_name} · {sheet}"
+            approximate = bool(meta.get("page_approximate"))
+            locator = locator_for_meta(meta)
+            label = f"{source_name} · {locator}" if locator else source_name
             parts.append(f"[{i}] {label}\n{r['content']}")
             sources.append({
                 "document_id": meta.get("source_id"),
                 "document_title": source_name,
                 "page": page if isinstance(page, int) else None,
+                "page_approximate": approximate,
                 "sheet": sheet if isinstance(sheet, str) else None,
                 "chunk_id": r.get("chunk_id"),
                 "score": r.get("score"),
@@ -1478,6 +1497,11 @@ class KnowledgeBaseQueryNode(Node):
             })
 
         passages = "\n\n---\n\n".join(parts)
+        # The hedged label alone does not survive the model: an unexplained
+        # tilde gets normalised away and the estimate is restated as fact.
+        instruction = KB_ANSWER_INSTRUCTION
+        if any(src.get("page_approximate") for src in sources):
+            instruction += KB_APPROXIMATE_PAGE_RULE
 
         if mode != "answer":
             return self._result(f"{KB_PASSAGES_HEADER}\n\n{passages}", inputs, sources=sources)
@@ -1485,7 +1509,7 @@ class KnowledgeBaseQueryNode(Node):
         self.report_progress("Synthesizing answer from retrieved passages…")
         answer = llm_chat_model(
             model=self.data.get("model"),
-            prompt=KB_ANSWER_INSTRUCTION + f"QUESTION:\n{query}",
+            prompt=instruction + f"QUESTION:\n{query}",
             data=passages,
             include_next_step=False,
             system_config_doc=self._sys_cfg,

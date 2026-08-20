@@ -935,6 +935,8 @@ async def judge_test_queries(
 
                 return {
                     "query_uuid": getattr(tq, "uuid", ""),
+                    "external_id": getattr(tq, "external_id", None) or "",
+                    "expected_answer": getattr(tq, "expected_answer", None) or "",
                     "query": tq.query,
                     "category": getattr(tq, "category", None),
                     "actual_answer": (actual_answer or "")[:2000],
@@ -949,6 +951,8 @@ async def judge_test_queries(
                 logger.exception("judge_test_queries: per-query failure for %s: %s", getattr(tq, "uuid", "?"), e)
                 return {
                     "query_uuid": getattr(tq, "uuid", ""),
+                    "external_id": getattr(tq, "external_id", None) or "",
+                    "expected_answer": getattr(tq, "expected_answer", None) or "",
                     "query": tq.query,
                     "category": getattr(tq, "category", None),
                     "actual_answer": "",
@@ -1333,6 +1337,24 @@ async def check_chunk_coverage(kb_uuid: str) -> dict:
     }
 
 
+def _query_identity(tq) -> dict:
+    """The fields a run needs to stay readable after the live test set changes.
+
+    An export re-joins each result row against the *current* test queries to
+    recover the question's expected answer and external id. Prune the set and
+    those columns come back blank for every deleted question — the run keeps
+    its score and the answer that was given, and silently loses the thing the
+    score was measured against. Recording them on the row makes an export
+    reproducible from the run alone.
+    """
+    return {
+        "query_uuid": getattr(tq, "uuid", "") or "",
+        "external_id": getattr(tq, "external_id", None) or "",
+        "expected_answer": getattr(tq, "expected_answer", None) or "",
+        "category": getattr(tq, "category", None),
+    }
+
+
 async def check_retrieval_precision(
     kb_uuid: str,
     test_queries: list[KBTestQuery],
@@ -1353,6 +1375,7 @@ async def check_retrieval_precision(
             results = await asyncio.to_thread(dm.query_kb, kb_uuid, tq.query, 8)
         except Exception as e:
             details.append({
+                **_query_identity(tq),
                 "query": tq.query,
                 "precision": 0.0,
                 "error": str(e)[:200],
@@ -1360,7 +1383,10 @@ async def check_retrieval_precision(
             continue
 
         if not results:
-            details.append({"query": tq.query, "precision": 0.0, "retrieved_sources": []})
+            details.append({
+                **_query_identity(tq),
+                "query": tq.query, "precision": 0.0, "retrieved_sources": [],
+            })
             continue
 
         # query_kb returns list[dict] with shape {"content", "metadata"}; tuple-unpacking
@@ -1393,6 +1419,7 @@ async def check_retrieval_precision(
 
         precision_sum += precision
         details.append({
+            **_query_identity(tq),
             "query": tq.query,
             "precision": round(precision, 3),
             "retrieved_sources": retrieved_sources[:5],

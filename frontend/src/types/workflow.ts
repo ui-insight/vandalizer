@@ -89,12 +89,19 @@ export interface WorkflowErrorPayload {
   code: string;
   suggested_action?: 'convert_to_kb';
   oversize_documents?: Array<{ uuid: string; title: string; token_count: number }>;
+  // 'single' — one document is too large on its own; 'combined' — the package
+  // only overflows once concatenated into a single prompt.
+  overflow_kind?: 'single' | 'combined';
+  total_tokens?: number;
+  input_budget?: number;
 }
 
 export interface WorkflowCitation {
   document_id?: string | null;
   document_title: string;
   page?: number | null;
+  /** Page was interpolated from OCR text, not measured. See #603. */
+  page_approximate?: boolean;
   sheet?: string | null;
   chunk_id?: string | null;
   score?: number | null;

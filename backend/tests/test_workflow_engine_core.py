@@ -1033,3 +1033,72 @@ class TestLlmChatModelPrompt:
         prompt = self._run("Prior step said the deadline is March 3.")
         assert "ONLY the CONTEXT" in prompt
         assert "Prior step said the deadline is March 3." in prompt
+
+
+# ---------------------------------------------------------------------------
+# Truncation warnings
+# ---------------------------------------------------------------------------
+
+class _TruncatingNode(Node):
+    """Stub node whose LLM call stops at the model's output cap."""
+
+    def __init__(self, name="Prompt", warning=None):
+        super().__init__(name)
+        self.data = {}
+        self.warning = warning
+
+    def process(self, inputs):
+        from app.services.llm_service import record_truncation
+
+        record_truncation("qwen3", 8192)
+        result = {"output": "Domain 10 of 14, cut off mid-", "step_name": self.name}
+        if self.warning:
+            result["warning"] = self.warning
+        return result
+
+
+def test_truncated_step_reports_a_warning():
+    node = MultiTaskNode("Report")
+    node.add_task(_TruncatingNode())
+    out = node.process({"output": "input"})
+
+    assert "cut off" in out["warning"]
+    assert "8,192-token output limit" in out["warning"]
+    # The partial output still flows through — a truncated answer is better
+    # than none, as long as the user is told it is partial.
+    assert out["output"] == "Domain 10 of 14, cut off mid-"
+
+
+def test_truncation_warning_joins_an_existing_step_warning():
+    node = MultiTaskNode("Report")
+    node.add_task(_TruncatingNode(warning="Knowledge base returned no passages."))
+    out = node.process({"output": "input"})
+
+    assert "Knowledge base returned no passages." in out["warning"]
+    assert "cut off" in out["warning"]
+
+
+def test_clean_step_gets_no_warning():
+    class _CleanNode(_TruncatingNode):
+        def process(self, inputs):
+            return {"output": "complete", "step_name": self.name}
+
+    node = MultiTaskNode("Report")
+    node.add_task(_CleanNode())
+    assert "warning" not in node.process({"output": "input"})
+
+
+def test_truncation_in_one_task_does_not_taint_its_siblings():
+    class _CleanNode(_TruncatingNode):
+        def process(self, inputs):
+            return {"output": "complete", "step_name": "Clean"}
+
+    # Tasks run in parallel on copied contexts; only the truncated one's step
+    # result should carry the warning. MultiTaskNode merges into one step, so
+    # assert on the per-task results instead.
+    node = MultiTaskNode("Report")
+    truncated = node.process_task(_TruncatingNode())
+    clean = node.process_task(_CleanNode())
+
+    assert "warning" in truncated
+    assert "warning" not in clean

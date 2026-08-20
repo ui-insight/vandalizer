@@ -77,6 +77,35 @@ jobs:
         continue-on-error: true
         run: make backend-audit
 
+  # Covers what bandit / pip-audit / npm audit cannot: OS packages in the
+  # runtime container images, committed secrets, and Dockerfile misconfig.
+  # Split into a blocking half and an advisory half on purpose — see the
+  # security-gate comment in the Makefile for why the gate is scoped to
+  # fixable findings.
+  security-scan:
+    name: Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: v0.74.0
+
+      # Blocking. Fixable CRITICALs and leaked secrets are zero today, so this
+      # gates from the day it lands rather than "once we get to it".
+      - name: Release gate — fixable CRITICAL and secrets
+        run: make security-gate
+
+      # Advisory, but *visible*. The 35 HIGH findings on this repo accumulated
+      # precisely because npm audit gated at critical and pip-audit sat in a
+      # non-blocking target nobody read. Printing them in their own job is the
+      # point. Flip continue-on-error to false once the backlog is worked down.
+      - name: Full report — HIGH and above (advisory)
+        continue-on-error: true
+        run: make security
+
   backend-test:
     name: Backend Tests (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
@@ -202,3 +231,16 @@ jobs:
 
       - name: Build release containers
         run: make docker-build
+
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: v0.74.0
+
+      # Scans the artifact a deploying campus actually pulls, base layers and
+      # our dependencies together. Notably the only thing that sees the
+      # Chromium apt tree that `playwright install --with-deps` bakes in.
+      # Advisory until a baseline exists -- see the Makefile comment.
+      - name: Scan published images (advisory)
+        continue-on-error: true
+        run: make security-built-images

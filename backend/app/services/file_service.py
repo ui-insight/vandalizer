@@ -165,21 +165,30 @@ async def upload_document(
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
 
+# Spreadsheet formats the viewer can render, and the reader for each. Parsing
+# happens here rather than in the browser: these are untrusted uploads rendered
+# in other people's sessions, and the client-side parser that used to handle
+# .csv and .xls carried two unfixable HIGH CVEs (SheetJS left npm at 0.18.5,
+# and prototype pollution on a crafted workbook is exactly this path).
+SHEET_EXTENSIONS = ("xlsx", "xls", "csv")
+
+
 async def render_xlsx_sheets(
     doc_uuid: str, settings: Settings, *, user: User
 ) -> dict | None:
-    """Evaluate formulas in an .xlsx file and return per-sheet JSON.
+    """Render a spreadsheet as per-sheet JSON for the document viewer.
 
-    Returns None when the document doesn't exist, isn't an .xlsx, or the
-    user lacks access. Returns None on parser failure too — caller can
-    decide to surface a 404 in either case.
+    Handles .xlsx (evaluating formulas), .xls and .csv. Returns None when the
+    document doesn't exist, isn't a spreadsheet, or the user lacks access.
+    Returns None on parser failure too — caller can decide to surface a 404 in
+    either case.
     """
     doc = await access_control.get_authorized_document(doc_uuid, user)
     if not doc:
         return None
 
     extension = (doc.extension or "").lower().lstrip(".")
-    if extension != "xlsx":
+    if extension not in SHEET_EXTENSIONS:
         return None
 
     from app.services.storage import get_storage
@@ -191,13 +200,23 @@ async def render_xlsx_sheets(
     except Exception:
         return None
 
-    from app.services.document_readers import extract_sheet_json_from_xlsx
+    from app.services.document_readers import (
+        extract_sheet_json_from_csv,
+        extract_sheet_json_from_xls,
+        extract_sheet_json_from_xlsx,
+    )
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    readers = {
+        "xlsx": extract_sheet_json_from_xlsx,
+        "xls": extract_sheet_json_from_xls,
+        "csv": extract_sheet_json_from_csv,
+    }
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
     try:
         tmp.write(data)
         tmp.close()
-        return extract_sheet_json_from_xlsx(tmp.name)
+        return readers[extension](tmp.name)
     except Exception as e:
         logger.warning("sheet-json rendering failed for %s: %s", doc_uuid, e)
         return None

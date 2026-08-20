@@ -16,11 +16,14 @@ from app.services import ocr_client
 from app.services.ocr_client import OcrRequestError
 
 
-def _response(status_code=200, json_payload=None, text=""):
+def _response(status_code=200, json_payload=None, text="", headers=None):
     resp = MagicMock()
     resp.status_code = status_code
     resp.text = text
     resp.json.return_value = json_payload
+    # A real dict, not a MagicMock: Retry-After parsing reads this, and a
+    # MagicMock would make every response look like it carried a header.
+    resp.headers = dict(headers or {})
     return resp
 
 
@@ -373,8 +376,14 @@ class TestDocumentReadersWiring:
         assert result == "legacy text"
         assert "file" in client.post.call_args[1]["files"]
 
-    def test_docling_failure_degrades_to_empty_string(self, pdf):
-        # OCR failure is handled degradation — callers fall back to PyMuPDF.
+    def test_docling_config_error_degrades_without_retrying(self, pdf):
+        """A 422 is docling's "your options JSON is wrong" answer — permanent.
+
+        Still handled degradation (callers fall back to PyMuPDF), but it now
+        stops after one attempt instead of three: retrying a misconfigured
+        endpoint can't fix it, and against the task-level backoff added for
+        #633 it would cost minutes per document rather than seconds.
+        """
         client = MagicMock()
         client.post.return_value = _response(422, text="field required")
 
@@ -385,4 +394,139 @@ class TestDocumentReadersWiring:
         }, client)
 
         assert result == ""
-        assert client.post.call_count == 3  # retried before giving up
+        assert client.post.call_count == 1  # permanent — no point retrying
+
+
+# ---------------------------------------------------------------------------
+# Retry classification and outage escalation (#633)
+# ---------------------------------------------------------------------------
+
+
+class TestRetryClassification:
+    """Which OCR failures are worth waiting on, and which are hopeless."""
+
+    @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
+    def test_transient_statuses_are_retryable(self, status):
+        from app.services.ocr_client import OcrRequestError, is_retryable
+
+        assert is_retryable(OcrRequestError("boom", status_code=status)) is True
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 413, 415, 422])
+    def test_permanent_statuses_are_not_retryable(self, status):
+        from app.services.ocr_client import OcrRequestError, is_retryable
+
+        assert is_retryable(OcrRequestError("boom", status_code=status)) is False
+
+    def test_non_http_failure_is_retryable(self):
+        """A malformed body or a transport error carries no status. Treated as
+        retryable: a delayed document beats a silently degraded one."""
+        from app.services.ocr_client import OcrRequestError, is_retryable
+
+        assert is_retryable(OcrRequestError("not JSON")) is True
+        assert is_retryable(RuntimeError("connection reset")) is True
+
+    def test_missing_input_file_is_not_retryable(self):
+        """The upload was deleted mid-processing. OCR was never the problem and
+        waiting won't bring the file back."""
+        from app.services.ocr_client import is_retryable
+
+        assert is_retryable(FileNotFoundError("no such file")) is False
+        assert is_retryable(PermissionError("denied")) is False
+
+    def test_connection_failure_stays_retryable_despite_being_an_oserror(self):
+        """ConnectionError is an OSError too — but a refused connection to the
+        OCR host is exactly the outage this classification exists for."""
+        from app.services.ocr_client import is_retryable
+
+        assert is_retryable(ConnectionRefusedError("refused")) is True
+
+    @pytest.mark.parametrize(
+        "raw,expected",
+        [("30", 30.0), ("0", 0.0), ("2.5", 2.5), (None, None), ("", None),
+         ("Wed, 21 Oct 2026 07:28:00 GMT", None), ("-5", None)],
+    )
+    def test_parse_retry_after(self, raw, expected):
+        from app.services.ocr_client import parse_retry_after
+
+        assert parse_retry_after(raw) == expected
+
+
+class TestOutageEscalation:
+    """A brief outage must not read as 'this document has no text'."""
+
+    def _run(self, pdf, config, client):
+        from app.services import document_readers as dr
+
+        db = MagicMock()
+        db.system_config.find_one.return_value = config
+        httpx_client = MagicMock()
+        httpx_client.__enter__ = MagicMock(return_value=client)
+        httpx_client.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.tasks.get_sync_db", return_value=db), \
+             patch("app.utils.encryption.decrypt_value", side_effect=lambda v: v or ""), \
+             patch("httpx.Client", return_value=httpx_client), \
+             patch("time.sleep"):
+            return dr.ocr_extract_text_from_pdf(pdf)
+
+    _CONFIG = {
+        "ocr_endpoint": "https://ocr.example.edu",
+        "ocr_api_key": "",
+        "ocr_provider": "raw",
+    }
+
+    def test_service_outage_raises_rather_than_returning_empty(self, pdf):
+        """Returning "" here is what let a 3-second outage be recorded as an
+        unreadable document — the caller could not tell the two apart."""
+        from app.services.ocr_client import OcrUnavailableError
+
+        client = MagicMock()
+        client.post.return_value = _response(503, text="GPU held by llm-svc")
+
+        with pytest.raises(OcrUnavailableError):
+            self._run(pdf, self._CONFIG, client)
+
+        assert client.post.call_count == 3  # fast in-process attempts first
+
+    def test_outage_error_is_a_connection_error(self):
+        """Must be caught by the tasks' TRANSIENT_EXCEPTIONS tuple, which is
+        what engages Celery's autoretry. OcrRequestError subclasses
+        RuntimeError and never was."""
+        from app.tasks import TRANSIENT_EXCEPTIONS
+        from app.services.ocr_client import OcrUnavailableError
+
+        assert issubclass(OcrUnavailableError, TRANSIENT_EXCEPTIONS)
+
+    def test_permanent_failure_still_degrades_quietly(self, pdf):
+        """415 means this file can't be OCR'd at all — falling back to PyMuPDF
+        is right, and waiting 25 minutes to do it is not."""
+        client = MagicMock()
+        client.post.return_value = _response(415, text="unsupported media type")
+
+        assert self._run(pdf, self._CONFIG, client) == ""
+        assert client.post.call_count == 1
+
+    def test_retry_after_is_honored_between_attempts(self, pdf):
+        from app.services import document_readers as dr
+        from app.services.ocr_client import OcrUnavailableError
+
+        client = MagicMock()
+        client.post.return_value = _response(
+            429, text="slow down", headers={"Retry-After": "7"},
+        )
+        db = MagicMock()
+        db.system_config.find_one.return_value = self._CONFIG
+        httpx_client = MagicMock()
+        httpx_client.__enter__ = MagicMock(return_value=client)
+        httpx_client.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.tasks.get_sync_db", return_value=db), \
+             patch("app.utils.encryption.decrypt_value", side_effect=lambda v: v or ""), \
+             patch("httpx.Client", return_value=httpx_client), \
+             patch("time.sleep") as mock_sleep:
+            with pytest.raises(OcrUnavailableError) as exc:
+                dr.ocr_extract_text_from_pdf(pdf)
+
+        # The service's own number, not our 1s/2s exponential default.
+        assert [c[0][0] for c in mock_sleep.call_args_list] == [7.0, 7.0]
+        assert exc.value.retry_after == 7.0

@@ -863,6 +863,19 @@ async def update_item_metadata(
         )
         await meta.insert()
 
+    # Org scoping is enforced on the KnowledgeBase document itself
+    # (can_view_knowledge_base) while the catalog filters on this metadata.
+    # Mirror the scope onto the KB so "visible in the catalog" and
+    # "adoptable" can't diverge.
+    if item_kind == "knowledge_base" and organization_ids is not None:
+        try:
+            kb = await KnowledgeBase.get(PydanticObjectId(item_id))
+        except Exception:
+            kb = None
+        if kb and kb.organization_ids != organization_ids:
+            kb.organization_ids = organization_ids
+            await kb.save()
+
     return {
         "id": str(meta.id),
         "item_kind": meta.item_kind,
@@ -1443,6 +1456,26 @@ async def sync_verified_kb_tags(kb: KnowledgeBase) -> None:
             await item.save()
 
 
+async def sync_verified_kb_org_scope(kb: KnowledgeBase) -> None:
+    """Push the KB's org scoping onto its catalog metadata, if any.
+
+    Called after a user edits organization_ids on a verified KB so the Explore
+    catalog's visibility filter (VerifiedItemMetadata.organization_ids) stays
+    in step with the access check (KnowledgeBase.organization_ids). No-op for
+    unverified KBs or KBs with no catalog metadata row.
+    """
+    if not kb.verified:
+        return
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == "knowledge_base",
+        VerifiedItemMetadata.item_id == str(kb.id),
+    )
+    new_org_ids = list(kb.organization_ids or [])
+    if meta and meta.organization_ids != new_org_ids:
+        meta.organization_ids = new_org_ids
+        await meta.save()
+
+
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
     """Mark the underlying item as verified and add to the verified library."""
     from app.services.library_service import get_or_create_verified_library
@@ -1599,7 +1632,7 @@ async def _notify_examiners(req: VerificationRequest) -> None:
                 kind="verification_submitted",
                 title=f'New submission: "{item_name}"',
                 body=f"{submitter_display} submitted a {req.item_kind.replace('_', ' ')} for verification.",
-                link="/verification",
+                link=f"/verification?request={req.uuid}",
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
                 item_name=item_name,
@@ -1619,6 +1652,7 @@ async def _notify_examiners(req: VerificationRequest) -> None:
                 item_name=item_name,
                 summary=req.summary,
                 frontend_url=settings.frontend_url,
+                request_uuid=req.uuid,
             )
             await send_email(reviewer.email, subject, html, settings, email_type="verification_submitted")
     except Exception:

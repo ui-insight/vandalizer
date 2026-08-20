@@ -29,6 +29,7 @@ from app.services.access_control import (
     get_authorized_search_set,
     get_authorized_workflow,
     get_team_access_context,
+    has_open_verification_review_access,
 )
 
 # ---------------------------------------------------------------------------
@@ -508,6 +509,38 @@ class TestKnowledgeBaseAccess:
             user,
             access,
             user_org_ancestry=["org-b"],
+        ) is False
+
+    def test_none_ancestry_bypasses_org_scope(self):
+        # None follows the get_user_org_ancestry contract: bypass filtering
+        # (admins/examiners, or a deployment with no orgs configured). A
+        # catalog item they can see must also be viewable/adoptable.
+        user = _make_user("examiner1", is_examiner=True)
+        kb = _make_knowledge_base(
+            user_id="owner1",
+            verified=True,
+            organization_ids=["org-a"],
+        )
+        access = _team_access()
+        assert can_view_knowledge_base(
+            kb, user, access, user_org_ancestry=None,
+        ) is True
+        assert can_manage_knowledge_base(
+            kb, user, access, user_org_ancestry=None,
+        ) is True
+
+    def test_empty_ancestry_still_denies_org_scoped_kb(self):
+        # [] means "org-less user in an org-enabled deployment" — org-scoped
+        # items stay hidden, unlike the None bypass.
+        user = _make_user("viewer")
+        kb = _make_knowledge_base(
+            user_id="owner1",
+            verified=True,
+            organization_ids=["org-a"],
+        )
+        access = _team_access()
+        assert can_view_knowledge_base(
+            kb, user, access, user_org_ancestry=[],
         ) is False
 
     def test_team_admin_can_manage_shared_kb(self):
@@ -1178,6 +1211,186 @@ class TestGetAuthorizedWorkflow:
             )
 
         assert result is None
+
+    async def test_examiner_can_view_workflow_with_open_verification_request(self):
+        """The cross-team reviewer case: examiner outside the submitter's team.
+
+        Regression test for reviewers getting "Workflow not found" on every
+        submission from a team they don't belong to.
+        """
+        user = _make_user("examiner1", is_examiner=True)
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.id = "workflow-oid"
+        wf.share_token = None
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.access_control.has_open_verification_review_access",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_review_access,
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access()
+            )
+
+        assert result is wf
+        mock_review_access.assert_awaited_once_with("workflow", "workflow-oid", user)
+
+    async def test_verification_review_access_does_not_grant_manage(self):
+        """Reviewers read and test-run a submission — they never edit it."""
+        user = _make_user("examiner1", is_examiner=True)
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.id = "workflow-oid"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.access_control.has_open_verification_review_access",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_review_access,
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), manage=True
+            )
+
+        assert result is None
+        mock_review_access.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# TestHasOpenVerificationReviewAccess
+# ---------------------------------------------------------------------------
+
+
+class TestHasOpenVerificationReviewAccess:
+    def _patch_request(self, found):
+        return patch(
+            "app.services.access_control.VerificationRequest.find_one",
+            new_callable=AsyncMock,
+            return_value=found,
+        )
+
+    async def test_non_examiner_never_granted(self):
+        """A plain user gains nothing, even while a request is open."""
+        user = _make_user("outsider")
+
+        with self._patch_request(MagicMock()) as mock_find:
+            result = await has_open_verification_review_access(
+                "workflow", "wf-oid", user
+            )
+
+        assert result is False
+        mock_find.assert_not_awaited()  # short-circuits before touching the DB
+
+    async def test_examiner_with_open_request_granted(self):
+        user = _make_user("examiner1", is_examiner=True)
+
+        with (
+            patch(
+                "app.services.access_control.PydanticObjectId",
+                side_effect=lambda x: x,
+            ),
+            self._patch_request(MagicMock()),
+        ):
+            result = await has_open_verification_review_access(
+                "workflow", "wf-oid", user
+            )
+
+        assert result is True
+
+    async def test_admin_with_open_request_granted(self):
+        """Admins are notified alongside examiners, so they get the same access."""
+        user = _make_user("admin1", is_admin=True)
+
+        with (
+            patch(
+                "app.services.access_control.PydanticObjectId",
+                side_effect=lambda x: x,
+            ),
+            self._patch_request(MagicMock()),
+        ):
+            result = await has_open_verification_review_access(
+                "workflow", "wf-oid", user
+            )
+
+        assert result is True
+
+    async def test_examiner_without_open_request_denied(self):
+        """No open request (or a terminal one) means no carve-out."""
+        user = _make_user("examiner1", is_examiner=True)
+
+        with (
+            patch(
+                "app.services.access_control.PydanticObjectId",
+                side_effect=lambda x: x,
+            ),
+            self._patch_request(None),
+        ):
+            result = await has_open_verification_review_access(
+                "workflow", "wf-oid", user
+            )
+
+        assert result is False
+
+    async def test_query_is_scoped_to_kind_and_open_statuses(self):
+        """Guard the predicate itself: right kind, right id, terminal excluded."""
+        user = _make_user("examiner1", is_examiner=True)
+
+        with (
+            patch(
+                "app.services.access_control.PydanticObjectId",
+                side_effect=lambda x: x,
+            ),
+            self._patch_request(MagicMock()) as mock_find,
+        ):
+            await has_open_verification_review_access(
+                "knowledge_base", "kb-oid", user
+            )
+
+        query = mock_find.await_args.args[0]
+        assert query["item_kind"] == "knowledge_base"
+        assert query["item_id"] == "kb-oid"
+        statuses = set(query["status"]["$in"])
+        assert statuses == {"submitted", "in_review", "returned"}
+        assert "approved" not in statuses
+        assert "rejected" not in statuses
+        assert "draft" not in statuses
+
+    async def test_invalid_object_id_returns_false(self):
+        user = _make_user("examiner1", is_examiner=True)
+
+        with (
+            patch(
+                "app.services.access_control.PydanticObjectId",
+                side_effect=Exception("invalid id"),
+            ),
+            self._patch_request(MagicMock()) as mock_find,
+        ):
+            result = await has_open_verification_review_access(
+                "workflow", "bad-id", user
+            )
+
+        assert result is False
+        mock_find.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

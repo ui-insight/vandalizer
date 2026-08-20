@@ -35,10 +35,10 @@ export default function Automation() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getAutomationStats(), listWorkflows()])
-      .then(([s, w]) => {
+    Promise.all([getAutomationStats(), listWorkflows({ limit: 500 })])
+      .then(([s, page]) => {
         setStats(s)
-        setWorkflows(w)
+        setWorkflows(page.items)
       })
       .catch(() => {})
       .finally(() => setLoading(false))

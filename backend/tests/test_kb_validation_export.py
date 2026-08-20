@@ -248,3 +248,85 @@ def test_xlsx_strips_illegal_control_characters():
     header = [c.value for c in results[1]]
     first = dict(zip(header, next(results.iter_rows(min_row=2, values_only=True))))
     assert first["actual_answer"] == "badcontrolchars kept text"
+
+
+# ---------------------------------------------------------------------------
+# A run's own record of what it scored against
+# ---------------------------------------------------------------------------
+
+
+def test_a_recorded_expected_answer_survives_the_query_being_deleted():
+    """The failure this closes: the export re-joined the *live* test set for
+    expected_answer and external_id, so pruning the set blanked those columns
+    on runs that had already scored those questions. The run kept its score and
+    the answer that was given, and silently lost the thing the score was
+    measured against — which is what makes the export useful at all.
+    """
+    from app.services.kb_validation_export import build_kb_validation_results_export
+
+    vr = SimpleNamespace(
+        uuid="run-1",
+        created_at=None,
+        score=88.0,
+        model="judge-model",
+        run_type="full",
+        result_snapshot={
+            "retrieval_precision": {
+                "details": [{
+                    "query_uuid": "gone-1",
+                    "query": "Who signs the subaward?",
+                    "expected_answer": "The authorized organizational representative",
+                    "external_id": "SUB-002",
+                    "precision": 1.0,
+                }],
+            },
+        },
+    )
+
+    # The query has since been deleted, so nothing to re-join against.
+    _payload, _meta, rows = build_kb_validation_results_export(
+        kb=SimpleNamespace(uuid="kb-1", title="KB", tags=[], total_sources=1, total_chunks=2),
+        vr=vr,
+        test_queries=[],
+        catalog_version=None,
+        exported_by_user_id="u1",
+        exported_at="2026-08-20T00:00:00Z",
+    )
+
+    assert rows[0]["expected_answer"] == "The authorized organizational representative"
+    assert rows[0]["external_id"] == "SUB-002"
+
+
+def test_an_older_run_still_falls_back_to_the_live_test_set():
+    """Runs recorded before the fields were persisted have nothing on the row,
+    so the re-join has to stay."""
+    from app.services.kb_validation_export import build_kb_validation_results_export
+
+    vr = SimpleNamespace(
+        uuid="run-2",
+        created_at=None,
+        score=70.0,
+        model="judge-model",
+        run_type="full",
+        result_snapshot={
+            "retrieval_precision": {
+                "details": [{"query_uuid": "q-1", "query": "Old question?", "precision": 0.5}],
+            },
+        },
+    )
+    live = [SimpleNamespace(
+        uuid="q-1", query="Old question?", expected_answer="From the live set",
+        external_id="OLD-1", category="factual", expected_source_labels=[],
+    )]
+
+    _payload, _meta, rows = build_kb_validation_results_export(
+        kb=SimpleNamespace(uuid="kb-1", title="KB", tags=[], total_sources=1, total_chunks=2),
+        vr=vr,
+        test_queries=live,
+        catalog_version=None,
+        exported_by_user_id="u1",
+        exported_at="2026-08-20T00:00:00Z",
+    )
+
+    assert rows[0]["expected_answer"] == "From the live set"
+    assert rows[0]["external_id"] == "OLD-1"

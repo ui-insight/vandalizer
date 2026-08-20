@@ -22,6 +22,15 @@
  * Deliberately NOT claimed (not user-reachable): the browser-automation Chrome
  * extension (UI integration paused) and a live M365 inbox UI (intake is
  * admin-configured, event-driven — no real-time inbox screen).
+ *
+ * A note on data residency: documents never leave your infrastructure UNLESS an
+ * administrator configures one of two opt-in integrations, both unset by default.
+ * A commercial model receives the *text* of a document when it is processed. A
+ * remote OCR endpoint receives the *whole file* — see services/ocr_client.py,
+ * which POSTs the PDF itself to whatever conversion service is configured. Keep
+ * the exception attached to the claim wherever the claim appears — unqualified
+ * "never leaves your infrastructure" is only true of a deployment that has
+ * configured neither, i.e. a local model paired with local OCR.
  */
 import {
   Landmark,
@@ -36,7 +45,7 @@ export type AudienceId = 'leadership' | 'deploy' | 'team' | 'researchers'
 export interface ElevatorPitch {
   /** ~30 seconds, conversational — meant to be read aloud. */
   spoken: string
-  /** One tight paragraph for an email or a proposal. */
+  /** For an email or a proposal. Blank lines separate paragraphs. */
   written: string
 }
 
@@ -60,10 +69,15 @@ export interface Track {
   id: AudienceId
   /** Short nav label, e.g. "For Leadership". */
   label: string
-  /** One line under the label. */
+  /**
+   * One line under the label. Must match this audience's card description on
+   * the hub — the two are read as the same promise.
+   */
   tagline: string
   icon: LucideIcon
-  /** 3–5 skimmable bullets for the hub card and the top of the read page. */
+  /** Lead-in sentence(s) above the value props, framing what this page is for. */
+  overview: string
+  /** 3–6 skimmable bullets for the hub card and the top of the read page. */
   valueProps: string[]
   pitch: ElevatorPitch
   /** Ordered deck. */
@@ -79,21 +93,25 @@ export interface Track {
 const leadership: Track = {
   id: 'leadership',
   label: 'For Leadership',
-  tagline: 'What you need to know to say yes',
+  tagline: 'Communicate the value of Vandalizer to leadership',
   icon: Landmark,
+  overview:
+    'Vandalizer is designed to reliably and securely streamline RA workflows. This page offers critical information for your leadership to begin evaluating Vandalizer for security, accuracy, reproducibility, and flexibility. Vandalizer satisfies these critical benchmarks for research administration:',
   valueProps: [
-    'Self-hosted: your documents never leave your infrastructure',
-    'Make it your own: your institution’s name, logo, icon, and brand color',
-    'Open source (GPL v3): no per-seat license fee, no vendor lock-in',
-    'Works with any AI provider: cloud or fully on-premise / air-gapped',
+    'Self-hosted — your documents never leave your infrastructure, unless you use a commercial model',
+    'Open source (GPL v3) — no per-seat license fee, no vendor lock-in',
     'Built at the University of Idaho under NSF GRANTED (Award #2427549)',
-    'Runs on a single commodity server: no GPU required with a cloud model',
+    'Customizable — insert your institution’s name, logo, icon, and brand color',
+    'Works with any AI provider: cloud deployments or fully air-gapped, on-premises environments',
+    'Runs on a single commodity server — no GPU required with a cloud model',
   ],
   pitch: {
     spoken:
-      "Vandalizer is an open-source AI platform we can run on our own servers to read the mountain of PDFs that flow through research administration (proposals, award letters, sponsor terms) and pull out the dates, budgets, and requirements automatically. Because it's self-hosted, our documents never leave our infrastructure, and it works with whatever AI provider we choose, cloud or on-premise. It was built at the University of Idaho with NSF GRANTED funding, it's free to license, and it runs on a single commodity server. The ask is simple: let us stand up a pilot and measure the hours it gives back to staff.",
-    written:
-      'Vandalizer is an open-source, self-hosted AI document-intelligence platform built for research administration. It extracts structured data from the proposals, awards, and compliance documents our staff process by hand today, lets them ask questions of those documents and get answers cited back to the source, and automates the repetitive routing in between. Because it runs on our own infrastructure with the AI provider of our choice, sensitive data never leaves the institution and there is no vendor lock-in or per-seat license fee. Developed at the University of Idaho under the NSF GRANTED program (Award #2427549) and released under GPL v3, it runs on a single commodity server and is designed for other institutions to adopt.',
+      "Today’s information climate is straining RA professionals, who are tasked with managing heavy loads of administrative documents every day. Vandalizer addresses these challenges by offering a suite of AI tools designed to streamline RA workflows. Vandalizer is an open-source AI platform, designed specifically for research administration. Vandalizer would allow us to use whatever AI provider we choose, and it remains secure because we can run the platform on our own servers. This means that our administrative documents would never leave our infrastructure, unless we opt for a commercial model — and if we run a local one, nothing leaves at all. Vandalizer was built at the University of Idaho with NSF GRANTED funding, so it’s free to license, and it runs on a single commodity server. And it’s easy to try it out: all we have to do is visit the Vandalizer web page and request access to a two-week trial.",
+    written: [
+      'Today’s information climate is straining RA professionals, who are tasked with managing heavy loads of administrative documents every day. Vandalizer addresses these challenges by offering a suite of AI tools designed to reduce the amount of time RAs spend on structured, repeatable tasks. Vandalizer is an open-source, self-hosted AI platform, designed specifically for research administration.',
+      'Vandalizer extracts structured data from the proposals, awards, and compliance documents our staff process by hand today. From there, RAs can ask the AI questions about those documents (with answers cited back to the source) and prompt Vandalizer to generate new administrative documents. Vandalizer allows us to select the AI provider of our choice, and it can support either cloud-based deployment or an air-gapped, on-premises environment. Because it runs on our own infrastructure, our documents never leave the institution unless we use a commercial model, and there is no vendor lock-in or per-seat license fee. Developed at the University of Idaho under the NSF GRANTED program (Award #2427549) and released under GPL v3, it runs on a single commodity server and is designed for other institutions to adopt.',
+    ].join('\n\n'),
   },
   slides: [
     {
@@ -106,7 +124,7 @@ const leadership: Track = {
       id: 'problem',
       title: 'The problem we already have',
       body: [
-        '- Hundreds of PDFs per funding cycle, read and re-keyed **by hand**',
+        '- Hundreds of PDFs per funding cycle — read and reread **by hand**',
         '- Deadlines, budgets, and sponsor requirements buried in long documents',
         '- Institutional knowledge walks out the door when staff leave',
         '- Every missed requirement is a compliance and funding risk',
@@ -126,9 +144,10 @@ const leadership: Track = {
       id: 'safe',
       title: 'Why it is safe to say yes',
       body: [
-        '- **Self-hosted:** runs on our servers; data stays on our infrastructure',
-        '- **Your choice of AI:** cloud provider, or a local model fully air-gapped',
-        '- **Open source, GPL v3:** auditable, forkable, no black box',
+        '- **Self-hosted** — runs on our servers; documents never leave our',
+        '  infrastructure, unless we use a commercial model',
+        '- **Your choice of AI** — commercial provider, or a local model fully air-gapped',
+        '- **Open source, GPL v3** — the platform is auditable, forkable, no black box',
         '- **No vendor lock-in** and **no per-seat license fee**',
       ].join('\n'),
     },
@@ -177,8 +196,9 @@ const leadership: Track = {
       title: 'The ask',
       body: [
         '1. Approve a **time-boxed pilot** in one office',
-        '2. We measure **hours saved** and **error reduction** on real documents',
-        '3. Decide on a wider rollout from evidence, not a sales deck',
+        '2. Pilot staff get fluent through the built-in **certification** course',
+        '3. We measure **hours saved** and **error reduction** on real documents',
+        '4. Decide on a wider rollout from evidence, not a sales deck',
         '',
         'Try the live demo: **/demo**',
       ].join('\n'),
@@ -189,22 +209,22 @@ const leadership: Track = {
     {
       id: 'problem',
       heading: 'The problem this solves',
-      body: 'Research administration runs on documents: grant proposals, award letters, sponsor terms, regulatory filings. Today, staff read and re-key hundreds of these PDFs by hand every funding cycle. Deadlines and requirements are buried in long documents, work is inconsistent between people, and institutional knowledge leaves when staff do. Vandalizer turns that manual burden into repeatable, audited, AI-assisted workflows.',
+      body: 'Research administration runs on documents — grant proposals, award letters, sponsor terms, regulatory filings. Today, staff read and reread hundreds of these PDFs by hand every funding cycle. Deadlines and requirements are buried in long documents, work is inconsistent between people, and institutional knowledge leaves when staff do. Vandalizer turns that manual burden into repeatable, audited, AI-assisted workflows.',
     },
     {
       id: 'value',
       heading: 'Why it is safe to adopt',
-      body: 'Vandalizer is **self-hosted**: it runs on your own servers and your documents never leave your infrastructure. You choose the AI provider: a cloud model, or a local model running fully air-gapped on premise. It is **open source under GPL v3**, so there is no black box, no vendor lock-in, and no per-seat license fee. Governance is built in: role-based access, review and sign-off steps, an immutable audit log, and configurable data retention.',
+      body: 'Vandalizer is **self-hosted**: it runs on your own servers and your documents never leave your infrastructure, unless you use a commercial model — in which case the text of a document is sent to that vendor when it is processed, under that vendor’s terms. Choose a local model running air-gapped on premise and nothing leaves the institution at all. The platform itself is **open source under GPL v3**, so there is no black box on our side of the line, no vendor lock-in, and no per-seat license fee. Governance is built in: role-based access, review and sign-off steps, an immutable audit log, and configurable data retention.',
     },
     {
       id: 'yours',
       heading: 'Make it your own',
-      body: 'Vandalizer white-labels to your institution. From the admin console you set the organization name, upload a logo and a square icon, and pick a brand color, and they thread through the header, the sign-in page, the browser tab, the in-app chat, and the system emails your staff receive. To your team it reads as *your* institution’s tool, not a generic deployment, and because branding is a runtime setting it applies the moment you save, with no redeploy. Vandalizer is open source under GPL v3, so a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement stay in the footer, so creator and funder lineage remain visible.',
+      body: 'Vandalizer white-labels to your institution, so the platform presents as an institutional tool rather than a generic deployment. From the admin console you set the organization name, upload a logo and a square icon, and pick a brand color. Your branding is then carried into the platform header, the sign-in page, the browser tab, the in-app chat, and the system emails sent to staff members. Branding is a runtime setting, so Vandalizer applies these changes the moment you save them in the admin console, with no redeploy necessary. Vandalizer is open source under GPL v3, so a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement stay in the footer — creator and funder lineage remain visible.',
     },
     {
       id: 'cost',
       heading: 'What it costs',
-      body: 'The software is free. The hardware is a single commodity server (around 16 GB of RAM): **no GPU is required** when you point it at a cloud LLM. AI usage is pay-as-you-go to your chosen provider, or zero with a local model. A guided installer (`setup.sh`) stands the whole system up, including an admin account and a starter catalog of templates.',
+      body: 'The software is free. The hardware is a single commodity server (around 16 GB of RAM). **No GPU is required** if you choose to deploy a cloud-based LLM. AI usage is pay-as-you-go to your chosen provider, where token costs can be zero with a local model. A guided installer (`setup.sh`) stands the whole system up, including an admin account and a starter catalog of templates.',
     },
     {
       id: 'provenance',
@@ -213,8 +233,8 @@ const leadership: Track = {
     },
     {
       id: 'next',
-      heading: 'How to evaluate it',
-      body: 'Start with the live **demo** to see it on real-looking documents. Stand up a **time-boxed pilot** in a single office and measure hours saved and error reduction. Staff can become fluent through the built-in **certification** course (Vandal Workflow Architect). Decide on wider rollout from the evidence.',
+      heading: 'Evaluation and next steps',
+      body: 'Start with the live **demo** to see how it works on sample documents. Stand up a **time-boxed pilot** in a single office; pilot staff get fluent through the built-in **certification** course (Vandal Workflow Architect) as part of onboarding, then measure hours saved and error reduction on real work. Decide on wider rollout based on those measured results.',
     },
   ],
 }
@@ -226,21 +246,23 @@ const leadership: Track = {
 const deploy: Track = {
   id: 'deploy',
   label: 'For IT & Deployment',
-  tagline: 'Architecture, requirements, and your options',
+  tagline: 'Communicate the safety and flexibility of Vandalizer to IT and Deployment',
   icon: Server,
+  overview:
+    'Vandalizer is designed to reliably and securely streamline RA workflows. This page offers critical information for your IT department to begin evaluating Vandalizer for security and flexibility. Vandalizer satisfies these critical benchmarks for research administration:',
   valueProps: [
     'Docker Compose stack: FastAPI, Celery, MongoDB, Redis, ChromaDB, nginx',
-    'Guided setup.sh installer: admin account and starter catalog included',
-    '~16 GB RAM on one server; no GPU required with a cloud LLM',
-    'LLM endpoints and keys configured at runtime in the admin UI',
+    'Works with any AI provider, cloud or on-premises: ~16 GB RAM on a single commodity server, with a GPU needed only if you run a large model locally',
     'Self-hosted with encrypted secrets; on-prem / air-gapped option',
-    'White-label in-app: name, logo, icon, color, and email; no redeploy',
+    'Guided setup.sh installer — admin account and starter catalog included',
+    'LLM endpoints and keys configured at runtime in the admin UI',
+    'White-label in-app — name, logo, icon, color, and email; no redeploy',
   ],
   pitch: {
     spoken:
-      "Vandalizer ships as a set of Docker containers: a FastAPI backend, Celery workers, MongoDB, Redis, and a ChromaDB vector store behind nginx. A guided setup script stands the whole thing up, including an admin account and a starter catalog. It needs about sixteen gigs of RAM on a single server, and no GPU as long as you point it at a cloud model. If you want everything on-premise you can run a local model through Ollama or vLLM, even fully air-gapped. LLM endpoints and keys are configured at runtime in the admin UI, and secrets are encrypted at rest.",
+      'Vandalizer is designed to offer practical and secure implementation for our institution while augmenting RA workflows. The platform ships as a set of Docker containers — a FastAPI backend, Celery workers, MongoDB, Redis, and a ChromaDB vector store behind nginx. It needs about sixteen gigs of RAM on a single server and can run with no GPU if you direct it to a cloud model. If you want everything on-premises, you can run a local model through Ollama or vLLM; this can run fully air-gapped. LLM endpoints and keys are configured at runtime in the admin UI, and secrets are encrypted at rest.',
     written:
-      'Vandalizer deploys as a Docker Compose stack: a FastAPI backend, Celery workers, MongoDB (application data), Redis (task broker), and a ChromaDB vector store, served behind nginx. A guided `setup.sh` installer provisions the system, an admin account, and a starter catalog; a manual compose path exists for scripted environments. It runs on a single commodity server (~16 GB RAM) with no GPU required when using a cloud LLM, or fully on-premise/air-gapped with a local model via Ollama or vLLM. LLM providers, OCR endpoints, and auth methods are configured at runtime in the admin UI, and secrets (API keys, tokens) are encrypted at rest.',
+      'Vandalizer is designed to offer practical and secure implementation for our institution while augmenting RA workflows. Vandalizer deploys as a Docker Compose stack — a FastAPI backend, Celery workers, MongoDB (application data), Redis (task broker), and a ChromaDB vector store, served behind nginx. A guided `setup.sh` installer provisions the system, an admin account, and a starter catalog; a manual compose path exists for scripted environments. It runs on a single commodity server (~16 GB RAM) with no GPU required when using a cloud LLM, or fully on-premises/air-gapped with a local model via Ollama or vLLM. LLM providers, OCR endpoints, and auth methods are configured at runtime in the admin UI, and secrets (API keys, tokens) are encrypted at rest.',
   },
   slides: [
     {
@@ -303,7 +325,10 @@ const deploy: Track = {
       id: 'security',
       title: 'Security & data residency',
       body: [
-        '- Self-hosted: documents and vectors stay on your infrastructure',
+        '- Self-hosted — documents and vectors never leave your infrastructure,',
+        '  unless you configure a **commercial model**',
+        '- Commercial model: document text goes to that vendor when processed',
+        '- Local model (Ollama / vLLM): nothing leaves — fully air-gapped',
         '- Secrets (LLM keys, OAuth tokens) **encrypted at rest** (Fernet)',
         '- JWT sessions; OAuth (Azure AD, Google, Okta) and SAML supported',
         '- Optional M365 / Graph integration: off unless you configure it',
@@ -334,27 +359,27 @@ const deploy: Track = {
     {
       id: 'requirements',
       heading: 'System requirements',
-      body: 'For evaluation: 4 cores, 8–10 GB RAM, 50 GB storage, on a laptop or small VM. For a department: 8 cores, 16 GB RAM, 100 GB+ storage. **No GPU is required** when using a cloud LLM; a GPU is only needed if you choose to run a large model locally. The only host prerequisites are Docker and Docker Compose.',
+      body: 'For an evaluation deployment, a host with 4 CPU cores, 8–10 GB of RAM, and 50 GB of storage is sufficient — a laptop or small virtual machine. For a departmental deployment, we recommend a host with 8 CPU cores, 16 GB of RAM, and at least 100 GB of available storage. **A GPU is not required** when Vandalizer uses a cloud-based LLM provider; a GPU is only needed if you choose to run a large model locally. The only host prerequisites are Docker and Docker Compose.',
     },
     {
       id: 'llm',
       heading: 'LLM options',
-      body: 'Vandalizer talks to any OpenAI-compatible endpoint and to Anthropic natively. For on-premise or air-gapped deployments, run a local model through **Ollama** or **vLLM**. OpenRouter and custom endpoints are also supported. Models, keys, and endpoints are configured **at runtime in the admin UI**, so you can add or switch providers without a redeploy.',
+      body: 'Vandalizer talks to any OpenAI-compatible endpoint and to Anthropic natively. For on-premises deployments, including air-gapped environments, Vandalizer runs a local model through **Ollama** or **vLLM**. OpenRouter and custom endpoints are also supported. Models, keys, and endpoints are configured **at runtime in the admin UI** — you can add or switch providers without a redeploy.',
     },
     {
       id: 'install',
       heading: 'Deployment options',
-      body: 'The supported path is the guided installer: `./setup.sh` provisions the full stack, creates an admin account, and seeds a starter catalog. For scripted or CI environments, drive Docker Compose (`compose.yaml`) directly. **DEPLOY.md** covers production hardening, TLS, and backups.',
+      body: 'The supported path for Vandalizer deployment is the guided installer: `./setup.sh` provisions the full stack, creates an admin account, and seeds a starter catalog. For scripted or CI environments, drive Docker Compose (`compose.yaml`) directly. **DEPLOY.md** covers production hardening, TLS, and backups.',
     },
     {
       id: 'security',
       heading: 'Security & data residency',
-      body: 'Everything runs on your infrastructure, so documents and their vector embeddings never leave the institution. Secrets, including LLM API keys and OAuth tokens, are encrypted at rest with a Fernet key. Sessions use JWTs; sign-in supports OAuth (Azure AD, Google, Okta) and SAML. The Microsoft 365 / Graph integration is optional and inert unless an administrator configures it. A fully air-gapped deployment is possible by pairing a local LLM with a local OCR endpoint.',
+      body: 'Vandalizer runs on your infrastructure, so documents and their vector embeddings never leave the institution — **unless you configure a commercial model**. In that case the text of a document is sent to that vendor when it is processed, under that vendor’s terms; the corpus itself, the uploads, and the vector store still stay on your servers, and there is no vendor-side copy of them. Run a local model through Ollama or vLLM instead and nothing leaves at all. The same applies to OCR: scanned documents are read locally unless an administrator points Vandalizer at an external OCR endpoint, which receives the file itself. Secrets — LLM API keys and OAuth tokens — are encrypted at rest with a Fernet key. Sessions use JWTs; sign-in supports OAuth (Azure AD, Google, Okta) and SAML. The Microsoft 365 / Graph integration is optional and inert unless an administrator configures it. A fully air-gapped deployment is possible by pairing a local LLM with a local OCR endpoint.',
     },
     {
       id: 'ops',
       heading: 'Day-2 operations',
-      body: 'Back up three things: the MongoDB data volume, the uploads volume, and the ChromaDB volume. Redis is an ephemeral broker and needs no backup. Administrators manage models, OCR endpoints, authentication methods, and **white-label branding** (organization name, logo, icon, brand color, and the styling of outgoing email) from the **/admin** console; branding is a runtime setting stored in the database, so rebranding never requires a redeploy. Every administrative action is recorded in an immutable audit log.',
+      body: 'Three volumes require backup for ongoing maintenance: the MongoDB data volume, the uploads volume, and the ChromaDB volume. Redis is an ephemeral broker and needs no backup. Administrators manage models, OCR endpoints, authentication methods, and **white-label branding** — organization name, logo, icon, brand color, and the styling of outgoing email — from the **/admin** console; branding is a runtime setting stored in the database, so rebranding never requires a redeploy. Every administrative action is recorded in an immutable audit log.',
     },
   ],
 }
@@ -366,21 +391,23 @@ const deploy: Track = {
 const team: Track = {
   id: 'team',
   label: 'For Your Team',
-  tagline: 'A quick walkthrough of what it does',
+  tagline: 'Guide your team through a walkthrough of Vandalizer',
   icon: Users,
+  overview:
+    'Vandalizer is designed to reliably and securely save RAs time on structured, repeatable tasks. This page supports RAs conveying the value of Vandalizer while introducing the platform to departmental colleagues. With Vandalizer, RAs have the power to:',
   valueProps: [
     'Upload and organize documents into folders',
-    'Build an extraction workflow once, run it across a whole batch',
-    'Chat with your documents: answers cited back to the source',
+    'Use an AI chatbot to receive cited information about selected documents',
+    'Access a store of AI-powered workflows and apply them repeatedly to future documents; design, evaluate, and apply original workflows',
     'Gather everything for one grant into a Project: files, knowledge base, tools, and chat',
     'Automate processing so new files are handled on arrival',
     'Learn it through the built-in certification course',
   ],
   pitch: {
     spoken:
-      "Think of Vandalizer as a smart workspace for our documents. You drop in a stack of PDFs, and instead of reading each one, you build a workflow once that pulls out exactly the fields you care about (deadlines, budgets, PI names) and run it across the whole batch. You can chat with your documents and get answers cited back to the source, organize reference material into knowledge bases, and set up automations so new files get processed the moment they arrive. There's even a built-in certification course to get you fluent.",
+      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. Think of Vandalizer as a smart workspace for our documents. Vandalizer offers a store of "workflows" — a coordinated sequence of AI-powered processes. Workflows can be applied to quickly surface important information in selected documents, like deadlines, budgets, or PI names, and to generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to turn to responsibilities that require their institutional knowledge and professional judgment. The team that created Vandalizer also provides a certification course to help RAs achieve productive results with Vandalizer while remaining secure and compliant.',
     written:
-      'Vandalizer is a shared workspace for the documents your team works with every day. Upload PDFs, then build an extraction workflow once that pulls out exactly the fields you care about and run it across an entire batch instead of reading each file by hand. Ask plain-language questions of your documents and get answers cited to the source, organize reference material into searchable knowledge bases, and set up automations so new files are processed the moment they arrive. A built-in certification course (Vandal Workflow Architect) gets the whole team fluent.',
+      'Vandalizer offers RA organizations a suite of AI-powered tools that are specifically designed to streamline administrative processes. The platform introduces a shared workspace for RA organizations to process administrative documents with AI-powered tasks and automations. At its center is a store of "workflows" — coordinated sequences of AI-powered processes. Each workflow is designed to achieve a specific outcome, but generally they surface important information in selected documents (like deadlines, budgets, or PI names) and generate new documents like a Notice of Award summary or a budget justification. Vandalizer also gives RAs the power to set up automations, so new files get processed as they arrive. This platform eases the burden of structured, repeatable tasks, freeing up time for RAs to pursue responsibilities that require their institutional knowledge and professional judgment. The team that created Vandalizer also provides a certification course to help RAs ensure that they achieve productive results with Vandalizer while remaining secure and compliant in the process.',
   },
   slides: [
     {
@@ -399,7 +426,7 @@ const team: Track = {
     },
     {
       id: 'extract',
-      title: '2 · Build an extraction workflow',
+      title: '2 · Build an extraction task',
       body: [
         '- Define the fields you want: deadlines, budgets, PI names, terms',
         '- Chain steps together into a repeatable pipeline',
@@ -408,21 +435,21 @@ const team: Track = {
       ].join('\n'),
     },
     {
-      id: 'chat',
-      title: '3 · Chat with your documents',
-      body: [
-        '- Ask plain-language questions across a folder or knowledge base',
-        '- Every answer is **cited back to the source** document and page',
-        '- Attach files or URLs for extra context',
-      ].join('\n'),
-    },
-    {
       id: 'knowledge',
-      title: '4 · Knowledge bases',
+      title: '3 · Knowledge bases',
       body: [
         '- Collect documents, URLs, and notes into a reusable knowledge base',
         '- Share it with your team or keep it personal',
         '- It becomes searchable context for chat',
+      ].join('\n'),
+    },
+    {
+      id: 'chat',
+      title: '4 · Chat with your documents',
+      body: [
+        '- Ask plain-language questions across a folder or knowledge base',
+        '- Every answer is **cited back to the source** document and page',
+        '- Attach files or URLs for extra context',
       ].join('\n'),
     },
     {
@@ -465,22 +492,22 @@ const team: Track = {
     {
       id: 'upload',
       heading: 'Upload & organize',
-      body: 'Drag in PDFs (plus Word, Excel, and HTML), sort them into folders, and search across everything. Vandalizer reads the text out of each file (including scanned PDFs when an OCR endpoint is configured), so it is ready to work with.',
+      body: 'Drag in PDFs (plus Word, Excel, and HTML), sort them into folders, and search across documents. Vandalizer reads the text out of each file — including scanned PDFs when an OCR endpoint is configured — so it is ready to work with.',
     },
     {
       id: 'extract',
-      heading: 'Extraction workflows',
-      body: 'This is the core. Instead of reading every document, you define the fields you care about once (deadlines, budgets, PI names, sponsor terms) and chain steps into a repeatable pipeline. Test it on a single document, validate it against expected answers, then run it across an entire batch and download the results as JSON, CSV, or a ZIP. Workflows can be exported and shared as templates.',
-    },
-    {
-      id: 'chat',
-      heading: 'Chat with citations',
-      body: 'Ask plain-language questions across a folder or a knowledge base and get answers cited back to the exact source document and page, so you can trust and verify them. Attach extra files or URLs to bring more context into the conversation.',
+      heading: 'Extraction tasks',
+      body: 'Extraction tasks are where Vandalizer does its heaviest lifting. Instead of reading every document, you define the fields you care about once — deadlines, budgets, PI names, sponsor terms — and chain steps into a repeatable pipeline. Test it on a single document, validate it against expected answers, then run it across an entire batch and download the results as JSON, CSV, or a ZIP. A saved pipeline of steps is a **workflow**, and workflows can be exported and shared as templates.',
     },
     {
       id: 'knowledge',
       heading: 'Knowledge bases',
       body: 'Collect documents, URLs, and notes into a reusable knowledge base that becomes searchable context for chat. Keep it personal or share it with your team; administrators can curate verified knowledge bases for everyone.',
+    },
+    {
+      id: 'chat',
+      heading: 'Chat with citations',
+      body: 'Ask plain-language questions across a folder or a knowledge base and get answers cited back to the exact source document and page, so you can trust and verify them. Attach extra files or URLs to bring more context into the conversation.',
     },
     {
       id: 'projects',
@@ -490,12 +517,12 @@ const team: Track = {
     {
       id: 'automate',
       heading: 'Automations',
-      body: 'Put the repetitive parts on autopilot. Watch a folder and run a workflow on every new upload, run on a schedule, trigger via API, or intake from Microsoft 365 when an administrator has configured it. Each automation keeps a log of what it processed.',
+      body: 'Place repetitive processes on autopilot. Select a folder and run a workflow on every new upload, run automations on a schedule, trigger automations via API, or configure document intake from Microsoft 365. Vandalizer keeps a log of every automated process.',
     },
     {
       id: 'collaborate',
-      heading: 'Collaboration & certification',
-      body: 'Teams share workflows, documents, and knowledge bases with owner / admin / member roles. Work that needs approval can route through review and sign-off steps. New users get fluent through the built-in **Vandal Workflow Architect** certification, with hands-on lessons and exercises right inside the product.',
+      heading: 'Collaboration and certification',
+      body: 'Teams share workflows, documents, and knowledge bases with owner / admin / member roles. Work that needs approval can route through review and sign-off steps. New users get fluent through the built-in **Vandal Workflow Architect** certification, which provides hands-on lessons and exercises right inside the product.',
     },
   ],
 }
@@ -507,19 +534,21 @@ const team: Track = {
 const researchers: Track = {
   id: 'researchers',
   label: 'For Researchers & PIs',
-  tagline: 'What it means for your proposals',
+  tagline: 'Tell Researchers and PIs how Vandalizer streamlines the processing of their proposals',
   icon: GraduationCap,
+  overview:
+    'Vandalizer is implemented to streamline the processing of your research and proposal documents. With Vandalizer, you can:',
   valueProps: [
-    'Faster turnaround on the documents your office processes for you',
-    'Deadlines and formatting requirements surfaced automatically',
-    'Ask plain-language questions of long solicitations, with citations',
-    'More consistent support across submissions',
+    'Expect faster turnaround of the documents RAs process for you',
+    'Expect more consistent support across submissions',
+    'Ask plain-language questions of long solicitations, and receive answers with citations',
+    'Receive fast answers about compliance requirements — deadlines, formatting guidelines',
   ],
   pitch: {
     spoken:
-      "When you send a proposal through our office, Vandalizer helps us turn it around faster. It reads the solicitation and your documents to surface deadlines, formatting rules, and budget requirements automatically, so nothing slips through the cracks. You (or we) can ask plain-language questions of a long funding announcement and get answers with citations, instead of scrolling through eighty pages. It means quicker, more consistent support for your submissions.",
+      'Vandalizer is a suite of AI-powered tools that are specifically designed to streamline administrative processes. The platform helps your research administration office turn your proposals around faster and more consistently. For example, if you submit a solicitation document to us, we can use Vandalizer to quickly surface deadlines. You — or we — can also ask Vandalizer plain-language questions about the document and quickly receive answers with citations, saving us the burden of having to scroll through the document.',
     written:
-      "Vandalizer helps your research administration office turn your proposals around faster and more consistently. It reads solicitations and supporting documents to surface deadlines, formatting rules, and budget requirements automatically, and it lets anyone ask plain-language questions of a long funding announcement and get answers cited to the source rather than scrolling through dozens of pages. The result is quicker, more reliable support for your submissions, without your data leaving the institution.",
+      'Vandalizer is a suite of AI-powered tools that are specifically designed to streamline administrative processes. It supports our research administrators in performing faster turnaround on your research and proposal documents, and it helps us ensure that no details slip through the cracks. It reads solicitations and supporting documents to surface deadlines, formatting rules, and budget requirements automatically, and it lets anyone ask plain-language questions of a long funding announcement and get answers cited to the source rather than scrolling through dozens of pages. The result is quicker, more reliable support for your submissions — and because we run Vandalizer ourselves, your documents never leave the institution unless we use a commercial AI model.',
   },
   slides: [
     {
@@ -538,7 +567,7 @@ const researchers: Track = {
     },
     {
       id: 'ask',
-      title: 'Ask the documents',
+      title: 'Ask Vandalizer about the documents',
       body: [
         '- Pose a plain-language question to a long solicitation',
         '- Get an answer **cited to the exact page**',
@@ -550,7 +579,7 @@ const researchers: Track = {
       title: 'Your data stays put',
       body: [
         '- Runs on the institution’s own infrastructure',
-        '- Your proposals never leave our systems',
+        '- Your proposals never leave our systems, unless we use a commercial model',
         '- Open source and auditable',
       ].join('\n'),
     },
@@ -564,17 +593,17 @@ const researchers: Track = {
     {
       id: 'benefit',
       heading: 'What it means for you',
-      body: 'When your proposal goes through the research administration office, Vandalizer helps staff surface deadlines, formatting rules, and budget requirements automatically, so the easy-to-miss details on page 60 do not slip through. Every submission gets the same rigor, which means faster and more consistent support for you.',
+      body: 'When your proposal goes through the research administration office, Vandalizer helps surface deadlines, formatting rules, and budget requirements automatically, so the easy-to-miss details on page 60 do not slip through. Every submission gets the same rigor, which means faster and more consistent support for you.',
     },
     {
       id: 'ask',
-      heading: 'Ask the documents',
-      body: 'Long funding announcements are tedious to read end to end. Vandalizer lets staff (or you) ask plain-language questions of a solicitation and get answers cited back to the exact page, so the right requirement is found in seconds, with the receipts to prove it.',
+      heading: 'Ask Vandalizer about the documents',
+      body: 'Long funding announcements are tedious to read end to end. Vandalizer lets staff (or you) ask plain-language questions of a solicitation and get answers cited back to the exact page — so the right requirement is found in seconds, with the receipts to prove it.',
     },
     {
       id: 'trust',
       heading: 'Your data stays put',
-      body: 'Vandalizer is self-hosted on the institution’s own infrastructure, so your proposals and documents never leave our systems. It is open source and auditable, with no black box handling your work.',
+      body: 'Vandalizer is self-hosted on the institution’s own infrastructure, so your proposals and documents never leave our systems — unless we use a commercial AI model, in which case the text being analyzed is sent to that vendor to process it. Your office can tell you which model it runs. The platform is open source and auditable — no black box handling your work.',
     },
   ],
 }
@@ -592,7 +621,14 @@ export const TRACK_ORDER: AudienceId[] = ['leadership', 'deploy', 'team', 'resea
 
 export function getTrack(id: string | undefined): Track | undefined {
   if (!id) return undefined
-  return (TRACKS as Record<string, Track>)[id]
+  // Index only the audiences we actually define. A bare lookup resolves
+  // inherited members too, so /docs/present/toString returned
+  // Object.prototype.toString — truthy, so the caller's `if (!track)` redirect
+  // was skipped, and dereferencing .id and .slides on a Function threw. That
+  // route is public and unauthenticated, so the failure is a blank screen for
+  // anyone who can reach the page.
+  if (!TRACK_ORDER.includes(id as AudienceId)) return undefined
+  return TRACKS[id as AudienceId]
 }
 
 // Dev-time completeness guard — catches an audience added without full content.
@@ -607,5 +643,6 @@ if (import.meta.env?.DEV) {
       `[present] ${id}: needs both a spoken and a written pitch`,
     )
     console.assert(t.valueProps.length > 0, `[present] ${id}: needs value props`)
+    console.assert(t.overview.trim().length > 0, `[present] ${id}: needs an overview`)
   }
 }

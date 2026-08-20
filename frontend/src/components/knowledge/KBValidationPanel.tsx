@@ -21,6 +21,10 @@ interface Props {
   kbUuid: string
   kbReady: boolean
   canManage: boolean
+  /** Whether the KB has any sources at all. ``kbReady`` alone can't tell an
+   *  empty KB from one still indexing, and only the empty case gets the "add a
+   *  source" wording in History. */
+  kbHasSources?: boolean
   /** Called with the new KB's uuid after the user clones a KB they can't
    * manage, so the parent can navigate to their own copy. */
   onCloned?: (newUuid: string) => void
@@ -72,7 +76,7 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned, collapsed = false, onToggleCollapsed }: Props) {
+export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, collapsed = false, onToggleCollapsed }: Props) {
   const [tab, setTab] = useState<Tab>('autovalidate')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
@@ -429,6 +433,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned, collap
           onSwitchToAutovalidate={() => setTab('autovalidate')}
           refreshKey={historyRefreshKey}
           polling={running}
+          kbHasSources={kbHasSources}
         />
       )}
       </div>

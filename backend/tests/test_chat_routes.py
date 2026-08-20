@@ -599,3 +599,77 @@ class TestChatRemoveAttachments:
 
         assert resp.status_code == 200
         assert resp.json()["success"] is True
+
+
+class TestChatRecordsItsDocumentScope:
+    """The user turn is written with the documents it was asked against.
+
+    A KB-grounded answer already recorded its sources on the assistant turn;
+    a direct-document answer recorded nothing, even though the fully resolved,
+    authorized set is in hand at that moment.
+    """
+
+    @pytest.mark.asyncio
+    async def test_the_selected_documents_are_stored_with_the_question(self, client):
+        from types import SimpleNamespace
+
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        conversation = MagicMock()
+        conversation.uuid = "conv-1"
+        conversation.add_message = AsyncMock()
+        conversation.insert = AsyncMock()
+        conversation.save = AsyncMock()
+        conversation.generate_title = MagicMock()
+
+        docs = {
+            "d1": SimpleNamespace(uuid="d1", title="Proposal A.pdf"),
+            "d2": SimpleNamespace(uuid="d2", title="Proposal B.pdf"),
+        }
+
+        async def fake_authorized_document(doc_uuid, *a, **kw):
+            return docs.get(doc_uuid)
+
+        activity = MagicMock()
+        activity.id = "act-1"
+        activity.save = AsyncMock()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.chat.access_control.get_team_access_context", new_callable=AsyncMock), \
+             patch("app.routers.chat.access_control.get_authorized_document",
+                   new=AsyncMock(side_effect=fake_authorized_document)), \
+             patch("app.routers.chat.ChatConversation", return_value=conversation) as MockConv, \
+             patch("app.routers.chat.activity_service.activity_start",
+                   new=AsyncMock(return_value=activity)), \
+             patch("app.routers.chat.chat_stream") as mock_stream:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=conversation)
+
+            async def _empty(*a, **kw):
+                if False:
+                    yield ""
+            mock_stream.side_effect = _empty
+
+            resp = await client.post(
+                "/api/chat",
+                json={
+                    "message": "What is the budget?",
+                    "document_uuids": ["d1", "d2"],
+                    "conversation_uuid": "conv-1",
+                },
+                cookies=cookies,
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            # StreamingResponse: the body has to be consumed for the generator
+            # (and the message write before it) to run.
+            _ = resp.text
+
+        conversation.add_message.assert_awaited()
+        kwargs = conversation.add_message.await_args.kwargs
+        assert kwargs["source_documents"] == [
+            {"uuid": "d1", "title": "Proposal A.pdf"},
+            {"uuid": "d2", "title": "Proposal B.pdf"},
+        ]

@@ -171,6 +171,43 @@ class TestOutputCapAndTimeout:
         s = build_thinking_model_settings("m", system_config_doc=cfg)
         assert s["timeout"] == 600.0
 
+    def test_temperature_is_absent_when_the_model_does_not_set_one(self):
+        """Unconfigured models keep provider defaults — no silent behaviour change."""
+        s = build_thinking_model_settings("m", system_config_doc=_cfg(name="m"))
+        assert "temperature" not in s
+
+    def test_temperature_override_is_sent(self):
+        cfg = _cfg(name="m", temperature=0.2)
+        s = build_thinking_model_settings("m", system_config_doc=cfg)
+        assert s["temperature"] == 0.2
+
+    def test_temperature_zero_is_sent_not_treated_as_unset(self):
+        """0.0 is the whole point of the setting — the deterministic case.
+
+        A truthiness check (``value or default``) silently drops it, which is
+        indistinguishable from never having configured it.
+        """
+        cfg = _cfg(name="m", temperature=0)
+        s = build_thinking_model_settings("m", system_config_doc=cfg)
+        assert s["temperature"] == 0.0
+
+    def test_integer_temperature_is_accepted_as_a_float(self):
+        cfg = _cfg(name="m", temperature=1)
+        s = build_thinking_model_settings("m", system_config_doc=cfg)
+        assert s["temperature"] == 1.0
+
+    def test_out_of_range_temperature_is_ignored(self):
+        """Providers reject these outright; dropping the value keeps the request
+        working rather than failing every call until an admin notices."""
+        for bad in (-0.5, 2.5, 100):
+            s = build_thinking_model_settings("m", system_config_doc=_cfg(name="m", temperature=bad))
+            assert "temperature" not in s, bad
+
+    def test_non_numeric_temperature_is_ignored(self):
+        for bad in ("warm", "", None, True, [0.5]):
+            s = build_thinking_model_settings("m", system_config_doc=_cfg(name="m", temperature=bad))
+            assert "temperature" not in s, bad
+
     def test_thinking_model_gets_output_headroom(self):
         # Tiny window → reserve would be 1024; a thinking model needs room for
         # both reasoning and an answer, so the cap floors at 2048.
@@ -272,3 +309,60 @@ class TestPerLoopHttpClient:
         del loop, client
         gc.collect()
         assert len(llm_service._loop_http_clients) == 0
+
+
+class TestTruncationCapture:
+    """A response that stops at max_tokens is detectable by the caller."""
+
+    def test_events_land_in_the_open_sink(self):
+        from app.services.llm_service import capture_truncation, record_truncation
+
+        with capture_truncation() as events:
+            record_truncation("qwen3", 8192)
+        assert events == [{"model": "qwen3", "max_tokens": 8192}]
+
+    def test_no_sink_open_is_a_no_op(self):
+        from app.services.llm_service import record_truncation
+
+        record_truncation("qwen3", 8192)  # logs only; must not raise
+
+    def test_sinks_do_not_leak_to_the_next_block(self):
+        from app.services.llm_service import capture_truncation, record_truncation
+
+        with capture_truncation() as first:
+            record_truncation("qwen3", 8192)
+        with capture_truncation() as second:
+            pass
+        assert len(first) == 1
+        assert second == []
+
+    def test_note_finish_only_fires_on_length(self):
+        from unittest.mock import MagicMock
+
+        from app.services.llm_service import MeteredModel, capture_truncation
+
+        # Bypass WrapperModel.__init__ (it resolves a real provider) and hand
+        # the wrapper a stub; model_name delegates to it.
+        model = MeteredModel.__new__(MeteredModel)
+        model.wrapped = MagicMock(model_name="qwen3")
+        stopped = MagicMock(finish_reason="stop")
+        truncated = MagicMock(finish_reason="length")
+
+        with capture_truncation() as events:
+            model._note_finish(stopped, {"max_tokens": 8192})
+            model._note_finish(None, {"max_tokens": 8192})
+            model._note_finish(truncated, {"max_tokens": 8192})
+        assert [e["max_tokens"] for e in events] == [8192]
+
+    def test_describe_truncation_names_the_cap(self):
+        from app.services.llm_service import describe_truncation
+
+        text = describe_truncation([{"model": "qwen3", "max_tokens": 8192}])
+        assert "8,192-token output limit" in text
+        assert "Response reserve" in text
+
+    def test_describe_truncation_without_a_known_cap(self):
+        from app.services.llm_service import describe_truncation
+
+        text = describe_truncation([{"model": "qwen3", "max_tokens": None}])
+        assert "output limit" in text

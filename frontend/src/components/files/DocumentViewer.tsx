@@ -20,6 +20,9 @@ interface DocumentViewerProps {
   // to prefer matches on that page, and to still jump the viewer there when
   // the passage can't be text-matched at all.
   highlightPage?: number | null
+  /** The cited page was interpolated from OCR text, not read from the
+   *  document's structure — so the viewer must not state it as fact. */
+  highlightPageApproximate?: boolean
   onClearHighlights?: () => void
   processing?: boolean
   taskStatus?: string | null
@@ -118,7 +121,25 @@ function highlightHtmlSearch(root: HTMLElement, query: string): number {
   return count
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, onClearHighlights, processing, taskStatus, hideHighlightNavBar }: DocumentViewerProps) {
+/** What to say when the passage could not be found in the document.
+ *
+ * The page only gets stated as fact when it was *read* from the document's
+ * structure. When it was interpolated from OCR text it is an estimate, and
+ * this fallback fires hardest on exactly those documents — the quote came out
+ * of the OCR text while the search runs against the PDF's own text layer, so
+ * the two routinely disagree. Asserting the page here is the conflation the
+ * "p. ~N" notation exists to prevent.
+ */
+export function highlightMissLabel(
+  page: number | null | undefined, approximate: boolean,
+): string {
+  if (page == null) return 'not found in this document'
+  return approximate
+    ? `passage not matched — showing approximately page ${page}`
+    : `passage not matched — showing page ${page}`
+}
+
+export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = null, highlightPageApproximate = false, onClearHighlights, processing, taskStatus, hideHighlightNavBar }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -318,10 +339,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     // render canvas + text layer ourselves, so pdf.sandbox is never loaded and
     // that path is unreachable.
     //
-    // Before adding an annotation layer, switching to `pdfjs-dist/web/pdf_viewer`,
-    // or wiring PDFScriptingManager: upgrade pdfjs-dist to >=6.2.108 first, and
-    // pass enableScripting: false explicitly. Uploaded PDFs are untrusted and
-    // are rendered in other team members' browsers, and no CSP is set.
+    // That CVE is remediated as of pdfjs-dist 6.2.108, which this project now
+    // pins at or above. The caution still stands for the layers above: before
+    // adding an annotation layer, switching to `pdfjs-dist/web/pdf_viewer`, or
+    // wiring PDFScriptingManager, pass enableScripting: false explicitly.
+    // Uploaded PDFs are untrusted and are rendered in other team members'
+    // browsers, and no CSP is set.
     const loadTask = pdfjsLib.getDocument({
       url: inlineUrl,
       withCredentials: true,
@@ -329,7 +352,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     loadTask.promise
       .then((doc) => {
         if (cancelled) {
-          doc.destroy()
+          // pdfjs 6 removed PDFDocumentProxy.destroy(); tearing down the
+          // loading task disposes the document and its worker together, and
+          // the task is what we still hold here.
+          void loadTask.destroy()
           return
         }
         pdfDocRef.current = doc
@@ -341,11 +367,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
     return () => {
       cancelled = true
-      loadTask.destroy?.()
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy()
-        pdfDocRef.current = null
-      }
+      pdfDocRef.current = null
+      void loadTask.destroy()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPdf, inlineUrl])
@@ -443,6 +466,15 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       setTotalHighlights(0)
       setCurrentHighlight(0)
       setHighlightMiss(false)
+      // No passage to search for, but a caller can still know the page — a
+      // citation whose preview text is empty, say. Honour it rather than
+      // silently leaving the reader on page 1; there is no "miss" to report
+      // because no search was attempted.
+      if (preferPage != null) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => scrollToPage(preferPage))
+        })
+      }
       return
     }
 
@@ -589,7 +621,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             const termLower = term.toLowerCase().replace(/\s+/g, ' ').trim()
             if (!termLower || !fieldLower.includes(termLower)) continue
 
-            const [vx1, vy1, vx2, vy2] = viewport.convertToViewportRectangle(a.rect)
+            // pdfjs 6 dropped convertToViewportRectangle; it transformed the
+            // two corners, which is what convertToViewportPoint does one at a
+            // time. The min/abs below already normalise the result, so the
+            // corner order does not matter.
+            const [rx1, ry1, rx2, ry2] = a.rect
+            const [vx1, vy1] = viewport.convertToViewportPoint(rx1, ry1)
+            const [vx2, vy2] = viewport.convertToViewportPoint(rx2, ry2)
             const left = Math.min(vx1, vx2)
             const top = Math.min(vy1, vy2)
             const width = Math.abs(vx2 - vx1)
@@ -1178,9 +1216,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 </span>
               ) : (
                 <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 500 }}>
-                  {effectivePage != null
-                    ? `passage not matched — showing page ${effectivePage}`
-                    : 'not found in this document'}
+                  {highlightMissLabel(effectivePage, highlightPageApproximate)}
                 </span>
               )}
             </div>

@@ -11,6 +11,8 @@ from typing import Any, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
+from app.services.page_locator import location_meta
+
 logger = logging.getLogger(__name__)
 
 # Process-wide singletons. ChromaDB's default (ONNX MiniLM) does a stateful,
@@ -332,13 +334,7 @@ class DocumentManager:
                 "timestamp": datetime.now().isoformat(),
                 "user_id": user_id,
             }
-            location = _location_for_offset(offset, markers)
-            kind = location.get("kind")
-            value = location.get("value")
-            if kind == "page" and isinstance(value, int):
-                meta["page"] = value
-            elif kind == "sheet" and isinstance(value, str):
-                meta["sheet"] = value
+            meta.update(location_meta(_location_for_offset(offset, markers)))
             metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
@@ -472,13 +468,7 @@ class DocumentManager:
                 "total_chunks": len(text_splits),
                 "timestamp": datetime.now().isoformat(),
             }
-            location = _location_for_offset(offset, markers)
-            kind = location.get("kind")
-            value = location.get("value")
-            if kind == "page" and isinstance(value, int):
-                meta["page"] = value
-            elif kind == "sheet" and isinstance(value, str):
-                meta["sheet"] = value
+            meta.update(location_meta(_location_for_offset(offset, markers)))
             metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)

@@ -81,6 +81,11 @@ services:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
+      # Model vocabularies, read-only. Token counting reads tokenizer.json —
+      # not the weights, and not the GPU. Point HF_CACHE_PATH at your HF_HOME
+      # if you self-host models; leaving it unset is fine, and the budget
+      # falls back to estimating (and logs that it did).
+      - ${HF_CACHE_PATH:-./hf-cache}:/hf-cache:ro
     ulimits:
       nofile:
         soft: 65536
@@ -117,6 +122,11 @@ services:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
+      # Model vocabularies, read-only. Token counting reads tokenizer.json —
+      # not the weights, and not the GPU. Point HF_CACHE_PATH at your HF_HOME
+      # if you self-host models; leaving it unset is fine, and the budget
+      # falls back to estimating (and logs that it did).
+      - ${HF_CACHE_PATH:-./hf-cache}:/hf-cache:ro
     ulimits:
       nofile:
         soft: 65536

@@ -3660,9 +3660,11 @@ dependencies = [
     { name = "sentry-sdk", extra = ["celery", "fastapi"] },
     { name = "slowapi" },
     { name = "tiktoken" },
+    { name = "tokenizers" },
     { name = "trafilatura" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "werkzeug" },
+    { name = "xlrd" },
 ]
 
 [package.optional-dependencies]
@@ -3702,7 +3704,7 @@ requires-dist = [
     { name = "motor", specifier = ">=3.6,<4" },
     { name = "msal", specifier = ">=1.28,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
-    { name = "pdf-inspector", specifier = ">=0.2,<0.3" },
+    { name = "pdf-inspector", specifier = ">=0.2,<1.15" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.9,<3" },
     { name = "playwright", specifier = ">=1.49,<2" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0,<9" },
@@ -3726,9 +3728,11 @@ requires-dist = [
     { name = "sentry-sdk", extras = ["fastapi", "celery"], specifier = ">=2.0,<3" },
     { name = "slowapi", specifier = ">=0.1,<1" },
     { name = "tiktoken", specifier = ">=0.9,<1" },
+    { name = "tokenizers", specifier = ">=0.20,<1" },
     { name = "trafilatura", specifier = ">=1.12,<3" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
     { name = "werkzeug", specifier = ">=3.1,<4" },
+    { name = "xlrd", specifier = ">=2.0.2" },
 ]
 provides-extras = ["s3", "dev"]
 
@@ -3870,6 +3874,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/28/de/49493f962bd3c586ab4b88066e967aa2e0703d6ef2c43aa28cb83bf7b507/wrapt-1.17.3-cp312-cp312-win_amd64.whl", hash = "sha256:e71d5c6ebac14875668a1e90baf2ea0ef5b7ac7918355850c0908ae82bcb297c", size = 38877, upload-time = "2025-08-12T05:53:05.436Z" },
     { url = "https://files.pythonhosted.org/packages/f1/48/0f7102fe9cb1e8a5a77f80d4f0956d62d97034bbe88d33e94699f99d181d/wrapt-1.17.3-cp312-cp312-win_arm64.whl", hash = "sha256:604d076c55e2fdd4c1c03d06dc1a31b95130010517b5019db15365ec4a405fc6", size = 36885, upload-time = "2025-08-12T05:52:54.367Z" },
     { url = "https://files.pythonhosted.org/packages/1f/f6/a933bd70f98e9cf3e08167fc5cd7aaaca49147e48411c0bd5ae701bb2194/wrapt-1.17.3-py3-none-any.whl", hash = "sha256:7171ae35d2c33d326ac19dd8facb1e82e5fd04ef8c6c0e394d7af55a55051c22", size = 23591, upload-time = "2025-08-12T05:53:20.674Z" },
+]
+
+[[package]]
+name = "xlrd"
+version = "2.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/07/5a/377161c2d3538d1990d7af382c79f3b2372e880b65de21b01b1a2b78691e/xlrd-2.0.2.tar.gz", hash = "sha256:08b5e25de58f21ce71dc7db3b3b8106c1fa776f3024c54e45b45b374e89234c9", size = 100167, upload-time = "2025-06-14T08:46:39.039Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/62/c8d562e7766786ba6587d09c5a8ba9f718ed3fa8af7f4553e8f91c36f302/xlrd-2.0.2-py2.py3-none-any.whl", hash = "sha256:ea762c3d29f4cca48d82df517b6d89fbce4db3107f9d78713e48cd321d5c9aa9", size = 96555, upload-time = "2025-06-14T08:46:37.766Z" },
 ]
 
 [[package]]

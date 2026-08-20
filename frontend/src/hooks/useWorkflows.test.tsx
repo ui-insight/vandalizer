@@ -44,16 +44,46 @@ describe('useWorkflows', () => {
       { id: 'wf-1', name: 'Extract PI', steps: [] },
       { id: 'wf-2', name: 'Budget Review', steps: [] },
     ]
-    mockListWorkflows.mockResolvedValueOnce(workflows)
+    mockListWorkflows.mockResolvedValueOnce({ items: workflows, total: 2, skip: 0, limit: 500 })
 
     const { result } = renderHook(() => useWorkflows(), { wrapper: createWrapper() })
 
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.workflows).toEqual(workflows)
+    expect(result.current.total).toBe(2)
+    expect(result.current.hasMore).toBe(false)
+  })
+
+  it('passes search and paging to the API instead of filtering locally', async () => {
+    mockListWorkflows.mockResolvedValueOnce({ items: [], total: 0, skip: 40, limit: 20 })
+
+    const { result } = renderHook(
+      () => useWorkflows({ search: 'budget', skip: 40, limit: 20 }),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(mockListWorkflows).toHaveBeenCalledWith({ search: 'budget', skip: 40, limit: 20 })
+  })
+
+  it('reports hasMore when the server holds matches this page omits', async () => {
+    // The silent truncation that made workflows past the cap read as deleted.
+    mockListWorkflows.mockResolvedValueOnce({
+      items: [{ id: 'wf-1', name: 'Extract PI', steps: [] }],
+      total: 412,
+      skip: 0,
+      limit: 1,
+    })
+
+    const { result } = renderHook(() => useWorkflows({ limit: 1 }), { wrapper: createWrapper() })
+
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.total).toBe(412)
+    expect(result.current.hasMore).toBe(true)
   })
 
   it('create calls API and returns result', async () => {
-    mockListWorkflows.mockResolvedValue([])
+    mockListWorkflows.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 })
     const newWf = { id: 'wf-new', name: 'New Workflow' }
     mockCreateWorkflow.mockResolvedValueOnce(newWf)
 
@@ -84,7 +114,7 @@ describe('useWorkflows', () => {
   })
 
   it('duplicate calls API with workflow id', async () => {
-    mockListWorkflows.mockResolvedValue([])
+    mockListWorkflows.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 })
     const duplicated = { id: 'wf-dup', name: 'Test (copy)' }
     mockDuplicateWorkflow.mockResolvedValueOnce(duplicated)
 
@@ -101,7 +131,7 @@ describe('useWorkflows', () => {
   })
 
   it('provides a refresh function', async () => {
-    mockListWorkflows.mockResolvedValue([])
+    mockListWorkflows.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 })
 
     const { result } = renderHook(() => useWorkflows(), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.loading).toBe(false))

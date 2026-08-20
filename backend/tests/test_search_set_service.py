@@ -58,6 +58,7 @@ class TestCreateSearchSet:
         with (
             patch("app.services.search_set_service.SearchSet") as MockSS,
             patch("app.services.name_conflicts.ensure_search_set_title_available", new_callable=AsyncMock),
+            patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock),
         ):
             mock_ss = _make_search_set()
             MockSS.return_value = mock_ss
@@ -68,6 +69,31 @@ class TestCreateSearchSet:
 
         assert result is mock_ss
         mock_ss.insert.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_new_set_is_bookmarked_so_it_is_visible(self):
+        """Extraction sets are listed only through library bookmarks, exactly
+        like workflows, and creation left the bookmark to a second request from
+        LibraryTab that only fired when a personal library was loaded."""
+        from app.models.library import LibraryItemKind
+
+        with (
+            patch("app.services.search_set_service.SearchSet") as MockSS,
+            patch("app.services.name_conflicts.ensure_search_set_title_available", new_callable=AsyncMock),
+            patch("app.services.library_service.ensure_bookmark", new_callable=AsyncMock) as mock_bookmark,
+        ):
+            mock_ss = _make_search_set()
+            MockSS.return_value = mock_ss
+
+            from app.services.search_set_service import create_search_set
+
+            await create_search_set("My Set", "user1", "extraction")
+
+        mock_bookmark.assert_awaited_once()
+        args = mock_bookmark.await_args.args
+        assert args[0] is mock_ss.id
+        assert args[1] == LibraryItemKind.SEARCH_SET
+        assert args[2] == "user1"
 
 
 # ---------------------------------------------------------------------------
@@ -389,3 +415,41 @@ class TestEffectiveExtractionConfig:
     def test_dict_with_empty_extraction_config(self):
         from app.services.search_set_service import effective_extraction_config
         assert effective_extraction_config({}) == {}
+
+
+class TestSearchSetSearchEscaping:
+    @pytest.mark.asyncio
+    async def test_a_title_with_regex_characters_is_matched_literally(self):
+        """The search term is a title, not a pattern. Unescaped, "C++ (v2)"
+        reaches $regex as an invalid pattern and the search errors or silently
+        matches nothing — the same defect that was fixed for workflows.
+        """
+        import re
+
+        captured = {}
+
+        class _Find:
+            def skip(self, n): return self
+            def limit(self, n): return self
+            async def to_list(self): return []
+
+        def fake_find(query):
+            captured["query"] = query
+            return _Find()
+
+        user = MagicMock()
+        user.user_id = "user1"
+        user.current_team = None
+        user.is_admin = False
+
+        with patch("app.services.search_set_service.SearchSet") as MockSS:
+            MockSS.find = fake_find
+            from app.services.search_set_service import list_search_sets
+
+            await list_search_sets(user, search="C++ (v2)")
+
+        pattern = captured["query"]["title"]["$regex"]
+        # Compiles, and matches the literal title rather than treating + and ( )
+        # as operators.
+        assert re.search(pattern, "Budget C++ (v2) fields", re.I)
+        assert pattern != "C++ (v2)"

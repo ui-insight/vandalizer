@@ -7,6 +7,19 @@ export interface ChatMessage {
   tool_results?: ToolResultInfo[]
   segments?: StreamSegment[]
   citations?: Citation[]
+  /** Documents in scope when this turn was asked — `{uuid, title}` each, with
+   *  a final `{truncated: n}` when the selection was larger than is recorded.
+   *  Present on user turns; assistant turns carry `citations` instead. */
+  source_documents?: SourceDocument[]
+}
+
+/** A document that was attached when a question was asked. The title is stored
+ *  with the uuid so the record stays readable after the document is deleted. */
+export interface SourceDocument {
+  uuid?: string
+  title?: string
+  /** How many further documents were in scope but not recorded. */
+  truncated?: number
 }
 
 export interface ToolCallInfo {
@@ -137,8 +150,14 @@ export interface ContextMeterInfo {
 
 export interface Citation {
   document_id?: string | null
+  /** SmartDocument uuid behind this source, when one exists and is still
+   *  readable. Absent for URL-backed sources and deleted documents — those
+   *  stay preview-only because there is nothing to open. */
+  document_uuid?: string | null
   document_title: string
   page?: number | null
+  /** Page was interpolated from OCR text, not measured. See #603. */
+  page_approximate?: boolean
   sheet?: string | null
   chunk_id?: string | null
   score?: number | null
@@ -183,6 +202,10 @@ export interface StreamChunk {
   total_tokens?: number
   plan?: ContextBudgetPlan
   meter?: ContextMeterInfo
+  /** context_budget only: a larger model that would hold this request, when
+   *  one exists and passes the server's privacy rule. Absent means there is
+   *  nothing to offer — the dialog must not invent a choice. */
+  suggested_model?: SuggestedModel | null
   action?: string
   tokens_dropped?: number
   // compaction kind only: auto-compaction lifecycle for this turn.
@@ -196,4 +219,10 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+}
+
+export interface SuggestedModel {
+  name: string
+  tag: string
+  context_window: number
 }

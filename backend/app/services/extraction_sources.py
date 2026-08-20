@@ -96,17 +96,26 @@ def find_quote_offset(doc_text: str, quote: str,
     return index_map[nidx]
 
 
-def page_for_offset(offset: int, markers: list[dict]) -> Optional[int]:
-    """Page number of the most recent ``kind: "page"`` marker at or before *offset*."""
-    page: Optional[int] = None
+def page_marker_for_offset(offset: int, markers: list[dict]) -> Optional[dict]:
+    """The most recent ``kind: "page"`` marker at or before *offset*.
+
+    Returns the marker rather than just its number so callers can see where the
+    boundary came from — OCR'd documents carry ``approximate: True`` because
+    their page positions are interpolated, not measured (see #603).
+    """
+    found: Optional[dict] = None
     for m in markers or []:
         if m.get("char_offset", 0) > offset:
             break
-        if m.get("kind") == "page":
-            value = m.get("value")
-            if isinstance(value, int):
-                page = value
-    return page
+        if m.get("kind") == "page" and isinstance(m.get("value"), int):
+            found = m
+    return found
+
+
+def page_for_offset(offset: int, markers: list[dict]) -> Optional[int]:
+    """Page number of the most recent ``kind: "page"`` marker at or before *offset*."""
+    marker = page_marker_for_offset(offset, markers)
+    return marker.get("value") if marker else None
 
 
 def _doc_for_offset(offset: int, doc_spans: list[dict]) -> Optional[dict]:
@@ -151,10 +160,17 @@ def resolve_entity_sources(entities: list, doc_text: str, doc_meta: dict) -> Non
                 if span:
                     doc_uuid = span.get("uuid")
                     doc_title = span.get("title")
+            page_marker = (
+                page_marker_for_offset(offset, markers) if offset is not None else None
+            )
             sidecar[field] = {
                 "quote": quote,
-                "page": page_for_offset(offset, markers) if offset is not None else None,
+                "page": page_marker.get("value") if page_marker else None,
                 "document_uuid": doc_uuid,
                 "document_title": doc_title,
                 "verified": offset is not None,
             }
+            # Set only when true, so sidecars for measured pages keep the shape
+            # they have always had and existing results stay comparable.
+            if page_marker and page_marker.get("approximate"):
+                sidecar[field]["page_approximate"] = True

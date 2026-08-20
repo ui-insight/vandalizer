@@ -302,6 +302,58 @@ def _replay_step_entries(engine, steps_output: dict, upto_index: int) -> list[di
     return entries
 
 
+def _document_context_groups(steps_data: list[dict]) -> list[set[str]]:
+    """Group attached document uuids by what lands in one prompt together.
+
+    The Document trigger's docs are concatenated into the input that flows to
+    every downstream step, so they share a prompt with each step's own attached
+    doc. Docs attached to *different* steps never do — summing across the whole
+    workflow would refuse runs that fit fine.
+    """
+    trigger_uuids: set[str] = set()
+    for step in steps_data:
+        if step.get("name") != "Document":
+            continue
+        for u in (step.get("data", {}) or {}).get("doc_uuids", []) or []:
+            if u:
+                trigger_uuids.add(u)
+
+    groups: list[set[str]] = [set(trigger_uuids)] if trigger_uuids else []
+    for step in steps_data:
+        if step.get("name") == "Document":
+            continue
+        own: set[str] = set()
+        for task in step.get("tasks", []) or []:
+            sel = (task.get("data", {}) or {}).get("selected_document_uuid")
+            if sel:
+                own.add(sel)
+        for u in (step.get("data", {}) or {}).get("doc_uuids", []) or []:
+            if u:
+                own.add(u)
+        if own:
+            groups.append(own | trigger_uuids)
+    return groups
+
+
+def _document_token_counts(db, uuids: set[str]) -> dict[str, dict]:
+    """Fetch {uuid: {uuid, title, token_count}} for the given documents."""
+    if not uuids:
+        return {}
+    docs = db.smart_document.find(
+        {"uuid": {"$in": list(uuids)}},
+        {"uuid": 1, "title": 1, "token_count": 1},
+    )
+    return {
+        d["uuid"]: {
+            "uuid": d.get("uuid"),
+            "title": d.get("title") or d.get("uuid"),
+            "token_count": d.get("token_count") or 0,
+        }
+        for d in docs
+        if d.get("uuid")
+    }
+
+
 def _accumulate_activity_usage(db, workflow_result_id, engine, activity_id=None) -> None:
     """Fold one execution pass's token usage into the run's ActivityEvent.
 
@@ -360,6 +412,25 @@ def _make_progress_updater(db, workflow_result_id):
             )
 
     return update_progress
+
+
+def _clear_pause_marker(db, activity_id) -> None:
+    """Drop the ``meta_summary.pending_review_uuid`` marker from an activity.
+
+    Set by :func:`_pause_for_approval` while a run waits on a reviewer. Every
+    path that takes the run out of that wait — resume, reject, timeout — has to
+    clear it, or the row stays "awaiting approval" and the stale reaper keeps
+    skipping it forever.
+    """
+    import datetime as _dt
+
+    db.activity_event.update_one(
+        {"_id": activity_id},
+        {
+            "$unset": {"meta_summary.pending_review_uuid": ""},
+            "$set": {"last_updated_at": _dt.datetime.now(_dt.timezone.utc)},
+        },
+    )
 
 
 def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id,
@@ -478,7 +549,17 @@ def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_i
         try:
             db.activity_event.update_one(
                 {"_id": ObjectId(activity_id)},
-                {"$set": {"workflow_result": ObjectId(workflow_result_id)}},
+                {"$set": {
+                    "workflow_result": ObjectId(workflow_result_id),
+                    # Marks the run as parked on a human rather than stalled.
+                    # Three consumers read it: the activity rail and the run
+                    # history render "awaiting approval" with a link straight
+                    # to the review, and tasks.activity.reap_stale_running
+                    # skips the row instead of failing a run whose only crime
+                    # is that its reviewer has not looked yet.
+                    "meta_summary.pending_review_uuid": approval_uuid,
+                    "last_updated_at": datetime.now(timezone.utc),
+                }},
             )
         except Exception as e:
             logger.warning("Could not link activity %s to paused run: %s", activity_id, e)
@@ -747,69 +828,70 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         config_override=workflow_doc.get("config_override"),
     )
 
-    # Pre-flight oversize check: refuse the run cleanly when an attached
-    # document's token_count would blow the model's input budget on its own.
-    # The user sees a guided "Convert to Knowledge Base" affordance instead
-    # of a mid-step 400 from the LLM gateway.
+    # Pre-flight oversize check: refuse the run cleanly when the documents one
+    # step reads would blow the model's input budget — either a single giant
+    # doc, or a package that only overflows once concatenated. The user sees a
+    # guided "Convert to Knowledge Base" affordance instead of a mid-step 400
+    # from the LLM gateway.
     try:
-        from app.services.context_budget import find_oversize_documents
+        from app.services.context_budget import find_context_overflow
 
-        attached_uuids: set[str] = set()
-        for step in steps_data:
-            for task in step.get("tasks", []):
-                td = task.get("data", {}) or {}
-                sel = td.get("selected_document_uuid")
-                if sel:
-                    attached_uuids.add(sel)
-            for u in (step.get("data", {}) or {}).get("doc_uuids", []) or []:
-                if u:
-                    attached_uuids.add(u)
-
-        candidate_docs: list[dict] = []
-        for uuid in attached_uuids:
-            d = db.smart_document.find_one(
-                {"uuid": uuid},
-                {"uuid": 1, "title": 1, "token_count": 1},
-            )
-            if d:
-                candidate_docs.append({
-                    "uuid": d.get("uuid"),
-                    "title": d.get("title") or d.get("uuid"),
-                    "token_count": d.get("token_count") or 0,
-                })
-
-        # Resolve the actual model config so context_window override is honored.
+        # Resolve the actual model config so context_window and
+        # response_reserve_tokens overrides are honored.
         model_cfg = None
         for m in (sys_config.get("available_models") or []):
             if m.get("name") == model:
                 model_cfg = m
                 break
 
-        oversize = find_oversize_documents(
-            documents=candidate_docs,
-            model_name=model,
-            model_config=model_cfg,
-        )
-        if oversize:
-            titles = ", ".join(o.title for o in oversize[:3])
-            if len(oversize) > 3:
-                titles += f", and {len(oversize) - 3} more"
-            error_msg = (
-                f"{titles} is too large to read inline with the selected model. "
-                "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
+        groups = _document_context_groups(steps_data)
+        token_counts = _document_token_counts(db, set().union(*groups) if groups else set())
+
+        # Score every group; report the worst. Groups are per-step, so docs that
+        # never share a prompt are never summed together.
+        overflow = None
+        for group in groups:
+            candidate = find_context_overflow(
+                documents=[token_counts[u] for u in sorted(group) if u in token_counts],
+                model_name=model,
+                model_config=model_cfg,
             )
+            if candidate and (overflow is None or candidate.total_tokens > overflow.total_tokens):
+                overflow = candidate
+
+        if overflow:
+            docs = overflow.documents
+            titles = ", ".join(o.title for o in docs[:3])
+            if len(docs) > 3:
+                titles += f", and {len(docs) - 3} more"
+            if overflow.kind == "single":
+                error_msg = (
+                    f"{titles} is too large to read inline with the selected model. "
+                    "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
+                )
+            else:
+                error_msg = (
+                    f"These {len(docs)} documents total {overflow.total_tokens:,} tokens, "
+                    f"which exceeds the {overflow.budget:,} tokens the selected model can "
+                    f"read in one step ({titles}). Convert them to a Knowledge Base and use "
+                    "a Knowledge Base Query step instead, or run them one at a time."
+                )
             error_payload = {
                 "code": "context_over_budget_convertible",
                 "suggested_action": "convert_to_kb",
-                "oversize_documents": [o.to_dict() for o in oversize],
+                "oversize_documents": [o.to_dict() for o in docs],
+                "overflow_kind": overflow.kind,
+                "total_tokens": overflow.total_tokens,
+                "input_budget": overflow.budget,
             }
             _mark_workflow_failed(
                 db, workflow_result_id, activity_id, error_msg,
                 error_payload=error_payload,
             )
             logger.warning(
-                "Workflow %s aborted pre-flight: oversize docs %s for model=%s",
-                workflow_id, [o.uuid for o in oversize], model,
+                "Workflow %s aborted pre-flight: %s overflow, docs %s total=%s budget=%s model=%s",
+                workflow_id, overflow.kind, [o.uuid for o in docs],
+                overflow.total_tokens, overflow.budget, model,
             )
             return
     except Exception:
@@ -923,9 +1005,13 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         if isinstance(sources, list):
             retrieved_sources.extend(sources)
 
-    # Save final result
+    # Save final result. The status guard matters: cancellation flips the row to
+    # "canceled" out-of-band, and a step already in flight keeps running until
+    # the Celery revoke lands (or finishes first). Writing "completed"
+    # unconditionally would undo the user's stop and leave a batch they halted
+    # reporting success.
     db.workflow_result.update_one(
-        {"_id": ObjectId(workflow_result_id)},
+        {"_id": ObjectId(workflow_result_id), "status": {"$ne": "canceled"}},
         {"$set": {
             "status": "completed",
             "final_output": {"output": final_output, "data": data},
@@ -1185,11 +1271,20 @@ def resume_workflow_after_approval(self, approval_uuid):
     saved_output = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
     initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
 
-    # Update result to running
-    db.workflow_result.update_one(
-        {"_id": ObjectId(workflow_result_id)},
+    # Update result to running. Refuse if the run was canceled while it sat at
+    # the gate: cancel_batch expires the pending approvals it cancels, but a
+    # reviewer holding a stale page can still approve one, and resuming would
+    # restart a run the user explicitly stopped — spending tokens hours later.
+    resumed = db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id), "status": {"$ne": "canceled"}},
         {"$set": {"status": "running", "current_step_detail": "Resuming after approval"}},
     )
+    if resumed.matched_count == 0:
+        logger.info(
+            "Not resuming workflow_result %s after approval — it was canceled",
+            workflow_result_id,
+        )
+        return {"status": "canceled", "result_id": workflow_result_id}
 
     update_progress = _make_progress_updater(db, workflow_result_id)
 
@@ -1213,6 +1308,18 @@ def resume_workflow_after_approval(self, approval_uuid):
     _act = db.activity_event.find_one(
         {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
     )
+
+    # The run is moving again: drop the pause marker so the rail stops showing
+    # "awaiting approval" and the stale reaper starts covering this row again.
+    # Done before execute() rather than after, because a pass that fails or
+    # pauses on a second gate never reaches the finalize block below.
+    if _act:
+        try:
+            _clear_pause_marker(db, _act["_id"])
+        except Exception as e:
+            logger.warning(
+                "Could not clear pause marker on activity %s: %s", _act["_id"], e,
+            )
 
     try:
         from app.services.metering import metered

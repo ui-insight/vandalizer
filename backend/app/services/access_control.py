@@ -16,9 +16,21 @@ from app.models.knowledge import KnowledgeBase
 from app.models.library import Library, LibraryFolder, LibraryItem, LibraryItemKind, LibraryScope
 from app.models.team import Team, TeamMembership
 from app.models.user import User
-from app.models.verification import VerifiedItemMetadata
+from app.models.verification import VerificationRequest, VerificationStatus, VerifiedItemMetadata
 
 TEAM_MANAGE_ROLES = frozenset({"owner", "admin"})
+
+# Verification statuses where a submission is still open for review. Reviewer
+# access is granted only while the request sits in one of these — it ends once
+# the request reaches a terminal state (approved items become reachable through
+# the verified library instead; rejected ones go back to being private).
+OPEN_VERIFICATION_STATUSES = frozenset(
+    {
+        VerificationStatus.SUBMITTED.value,
+        VerificationStatus.IN_REVIEW.value,
+        VerificationStatus.RETURNED.value,
+    }
+)
 
 
 @dataclass(slots=True)
@@ -50,8 +62,11 @@ def _org_scope_allows(
 ) -> bool:
     if not organization_ids:
         return True
+    # None follows the get_user_org_ancestry contract: bypass org filtering
+    # (admins/examiners, or a deployment with no orgs configured). An org-less
+    # user in an org-enabled deployment gets [] and is denied.
     if user_org_ancestry is None:
-        return False
+        return True
     return bool(set(organization_ids) & set(user_org_ancestry))
 
 
@@ -417,6 +432,40 @@ async def has_library_backed_object_access(
     return False
 
 
+async def has_open_verification_review_access(
+    item_kind: str,
+    object_id: "PydanticObjectId | str",
+    user: User,
+) -> bool:
+    """View access for examiners while an item's verification request is open.
+
+    Reviewer eligibility for the verification queue is a *global* user flag
+    (``User.is_examiner``), and the queue notifies every examiner org-wide — but
+    item access is *team-scoped*. That mismatch meant an examiner outside the
+    submitter's team was mailed a review request for an item they structurally
+    could not open, and got "not found" on every cross-team submission.
+
+    This closes the gap for exactly as long as the review is open, and grants
+    view only — reviewers need to read and test-run a submission, never edit it.
+    """
+    if not (user.is_examiner or user.is_admin):
+        return False
+
+    try:
+        object_oid = PydanticObjectId(object_id)
+    except Exception:
+        return False
+
+    req = await VerificationRequest.find_one(
+        {
+            "item_kind": item_kind,
+            "item_id": object_oid,
+            "status": {"$in": sorted(OPEN_VERIFICATION_STATUSES)},
+        }
+    )
+    return req is not None
+
+
 async def get_authorized_library_item(
     item_id: str,
     user: User,
@@ -523,6 +572,8 @@ async def get_authorized_workflow(
             manage=manage,
             allow_admin=allow_admin,
         )
+    if not allowed and not manage:
+        allowed = await has_open_verification_review_access("workflow", wf.id, user)
     # A valid share token grants view-level access (run + poll status) only —
     # never manage rights. This lets share-link recipients run the workflow
     # against their own documents, mirroring the metadata-load path that
@@ -671,12 +722,13 @@ async def get_authorized_knowledge_base(
         return None
 
     access = team_access or await get_team_access_context(user)
+    ancestry = await _load_user_org_ancestry(user, user_org_ancestry, kb.organization_ids)
     allowed = (
         can_manage_knowledge_base(
             kb,
             user,
             access,
-            user_org_ancestry=user_org_ancestry,
+            user_org_ancestry=ancestry,
             allow_admin=allow_admin,
         )
         if manage
@@ -684,10 +736,12 @@ async def get_authorized_knowledge_base(
             kb,
             user,
             access,
-            user_org_ancestry=user_org_ancestry,
+            user_org_ancestry=ancestry,
             allow_admin=allow_admin,
         )
     )
+    if not allowed and not manage:
+        allowed = await has_open_verification_review_access("knowledge_base", kb.id, user)
     return kb if allowed else None
 
 
@@ -726,6 +780,8 @@ async def get_authorized_knowledge_base_by_id(
             allow_admin=allow_admin,
         )
     )
+    if not allowed and not manage:
+        allowed = await has_open_verification_review_access("knowledge_base", kb.id, user)
     return kb if allowed else None
 
 
@@ -798,6 +854,8 @@ async def get_authorized_search_set(
             manage=manage,
             allow_admin=allow_admin,
         )
+    if not allowed and not manage:
+        allowed = await has_open_verification_review_access("search_set", ss.id, user)
     return ss if allowed else None
 
 
@@ -832,4 +890,6 @@ async def get_authorized_search_set_by_id(
             manage=manage,
             allow_admin=allow_admin,
         )
+    if not allowed and not manage:
+        allowed = await has_open_verification_review_access("search_set", ss.id, user)
     return ss if allowed else None

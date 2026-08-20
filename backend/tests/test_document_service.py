@@ -105,6 +105,24 @@ class TestListContents:
         assert result["documents"][0]["uuid"] == "d1"
 
     @pytest.mark.asyncio
+    async def test_listing_reports_stored_page_count(self):
+        """num_pages is persisted at ingestion; the listing must surface the
+        stored value rather than the model default."""
+        docs = [_make_document(uuid="d1")]
+        user = _make_user()
+
+        with patch("app.services.document_service.SmartFolder") as MockFolder, \
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))):
+            MockFolder.find = MagicMock(return_value=_mock_find_chain([]))
+            MockDoc.find = MagicMock(return_value=_mock_find_chain(docs))
+
+            from app.services.document_service import list_contents
+            result = await list_contents(user=user)
+
+        assert result["documents"][0]["num_pages"] == 3
+
+    @pytest.mark.asyncio
     async def test_root_listing_scopes_to_user_and_excludes_soft_deleted(self):
         active_doc = _make_document(uuid="d1", soft_deleted=False)
         user = _make_user()

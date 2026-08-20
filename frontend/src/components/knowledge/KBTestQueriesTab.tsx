@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil, Upload } from 'lucide-react'
 import {
   createKBTestQuery,
   updateKBTestQuery,
   deleteKBTestQuery,
+  bulkDeleteKBTestQueries,
   generateKBTestQueriesAndWait,
   type KBTestQuery,
 } from '../../api/knowledge'
@@ -28,6 +29,17 @@ export type DraftShape = {
   notes: string
 }
 
+// Mirrors _TEST_QUERY_BULK_DELETE_MAX in backend/app/routers/knowledge.py.
+export const BULK_DELETE_BATCH = 2000
+
+/** Split ids into request-sized batches, so a selection larger than the
+ * server's cap deletes instead of being rejected whole. */
+export function chunkForBulkDelete(uuids: string[], size = BULK_DELETE_BATCH): string[][] {
+  const batches: string[][] = []
+  for (let i = 0; i < uuids.length; i += size) batches.push(uuids.slice(i, i + size))
+  return batches
+}
+
 export const EMPTY_DRAFT: DraftShape = {
   query: '',
   expected_answer: '',
@@ -37,6 +49,23 @@ export const EMPTY_DRAFT: DraftShape = {
 }
 
 const CATEGORIES = ['factual', 'summary', 'enumeration', 'boundary']
+
+/** Which slice of the test set the list is showing. Imported sets and LLM
+ * generation runs both land in the same list, so authorship is the axis
+ * evaluators actually prune along. */
+type SourceFilter = 'all' | 'user' | 'auto'
+
+const FILTER_LABELS: Record<SourceFilter, string> = {
+  all: 'All',
+  user: 'User-authored',
+  auto: 'Auto-generated',
+}
+
+function matchesFilter(q: KBTestQuery, filter: SourceFilter): boolean {
+  if (filter === 'auto') return q.auto_generated
+  if (filter === 'user') return !q.auto_generated
+  return true
+}
 
 /** Convert a saved query into the editable draft shape (comma-joined labels,
  * nulls coerced to empty strings). Single-sourced so the Test Queries tab and
@@ -77,6 +106,54 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
   const [editingUuid, setEditingUuid] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState<DraftShape>(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
+  const [filter, setFilter] = useState<SourceFilter>('all')
+  // Selection is keyed by uuid and kept across filter changes, so an
+  // evaluator can gather a batch from more than one slice before deleting.
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  const autoCount = useMemo(() => queries.filter(q => q.auto_generated).length, [queries])
+  const userCount = queries.length - autoCount
+  const visible = useMemo(
+    () => queries.filter(q => matchesFilter(q, filter)),
+    [queries, filter],
+  )
+  // Only queries still on screen count toward the selection UI — a stale id
+  // (deleted elsewhere, or filtered out) must not make the header claim a
+  // selection the user cannot see.
+  const selectedVisible = useMemo(
+    () => visible.filter(q => selected.has(q.uuid)),
+    [visible, selected],
+  )
+  const selectedCount = useMemo(
+    () => queries.filter(q => selected.has(q.uuid)).length,
+    [queries, selected],
+  )
+  const allVisibleSelected = visible.length > 0 && selectedVisible.length === visible.length
+
+  const toggleSelected = (uuid: string) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(uuid)) next.delete(uuid)
+      else next.add(uuid)
+      return next
+    })
+  }
+
+  const toggleSelectAllVisible = () => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (allVisibleSelected) visible.forEach(q => next.delete(q.uuid))
+      else visible.forEach(q => next.add(q.uuid))
+      return next
+    })
+  }
+
+  // Writing rows into a slice the current filter hides reads as a silent
+  // failure — generation has no success toast, so the only sign it worked is
+  // a counter ticking up in the filter bar, which invites a re-run and a
+  // duplicate batch. Any operation that adds rows returns the list to 'all'.
+  const revealNewRows = () => setFilter('all')
 
   const handleAdd = async () => {
     if (!draft.query.trim()) return
@@ -92,6 +169,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       })
       setDraft(EMPTY_DRAFT)
       setShowAdd(false)
+      revealNewRows()
       await onChange()
     } finally {
       setAdding(false)
@@ -124,7 +202,47 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
     })
     if (!ok) return
     await deleteKBTestQuery(kbUuid, q.uuid)
+    setSelected(prev => {
+      if (!prev.has(q.uuid)) return prev
+      const next = new Set(prev)
+      next.delete(q.uuid)
+      return next
+    })
     await onChange()
+  }
+
+  const handleDeleteSelected = async () => {
+    const uuids = queries.filter(q => selected.has(q.uuid)).map(q => q.uuid)
+    if (uuids.length === 0) return
+    const ok = await confirm({
+      title: `Delete ${uuids.length} test ${uuids.length === 1 ? 'query' : 'queries'}`,
+      message:
+        `Delete ${uuids.length} selected test ${uuids.length === 1 ? 'query' : 'queries'}? ` +
+        'This cannot be undone. Past runs keep the scores and answers they ' +
+        'recorded, but a validation run re-exported afterwards will have a ' +
+        'blank expected answer for any question deleted here.',
+      destructive: true,
+    })
+    if (!ok) return
+    setBulkDeleting(true)
+    try {
+      // The endpoint caps a batch, and "hundreds, imported repeatedly" is the
+      // population this feature exists for — one generation run from crossing
+      // it. Sending the lot would 400 the whole thing and delete nothing,
+      // leaving unchecking rows by hand as the only way forward.
+      let deleted = 0
+      for (const batch of chunkForBulkDelete(uuids)) {
+        deleted += (await bulkDeleteKBTestQueries(kbUuid, batch)).deleted
+      }
+      setSelected(new Set())
+      setEditingUuid(null)
+      await onChange()
+      toast(`Deleted ${deleted} test ${deleted === 1 ? 'query' : 'queries'}.`, 'success')
+    } catch (e) {
+      toast(`Delete failed: ${(e as Error).message}`, 'error')
+    } finally {
+      setBulkDeleting(false)
+    }
   }
 
   const handleGenerate = async (coverage: 'quick' | 'standard' | 'exhaustive') => {
@@ -134,6 +252,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       // Runs on a background worker and polls for completion — the inline LLM
       // call could exceed the proxy's gateway timeout and 502 on larger KBs.
       await generateKBTestQueriesAndWait(kbUuid, { coverage })
+      revealNewRows()
       await onChange()
     } catch (e) {
       toast(`Generation failed: ${(e as Error).message}`, 'error')
@@ -196,19 +315,106 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         </div>
       )}
 
+      {/* Filter + bulk-selection bar. Large test sets are mostly imported or
+          auto-generated, so pruning them is the common case, not the rare one. */}
+      {queries.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+          padding: '6px 8px', marginBottom: 8,
+          backgroundColor: '#222', border: '1px solid #333', borderRadius: 6,
+        }}>
+          {canManage && (
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: 5,
+              fontSize: 11, color: '#bbb', cursor: visible.length ? 'pointer' : 'default',
+            }}>
+              <input
+                type="checkbox"
+                checked={allVisibleSelected}
+                ref={el => { if (el) el.indeterminate = selectedVisible.length > 0 && !allVisibleSelected }}
+                onChange={toggleSelectAllVisible}
+                disabled={visible.length === 0}
+                aria-label={`Select all ${FILTER_LABELS[filter].toLowerCase()} test queries`}
+              />
+              Select all{filter === 'all' ? '' : ` ${FILTER_LABELS[filter].toLowerCase()}`}
+            </label>
+          )}
+
+          <div role="group" aria-label="Filter test queries" style={{ display: 'flex', gap: 4 }}>
+            {(['all', 'user', 'auto'] as SourceFilter[]).map(f => {
+              const count = f === 'all' ? queries.length : f === 'user' ? userCount : autoCount
+              const active = filter === f
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  aria-pressed={active}
+                  style={{
+                    padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    color: active ? '#e5e5e5' : '#888',
+                    backgroundColor: active ? '#333' : 'transparent',
+                    border: `1px solid ${active ? '#4a4a4a' : 'transparent'}`,
+                    borderRadius: 5, cursor: 'pointer',
+                  }}
+                >
+                  {FILTER_LABELS[f]} ({count})
+                </button>
+              )
+            })}
+          </div>
+
+          {canManage && selectedCount > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+              <span style={{ fontSize: 11, color: '#888' }} role="status">
+                {selectedCount} selected
+              </span>
+              <button
+                type="button"
+                onClick={() => setSelected(new Set())}
+                style={{
+                  background: 'transparent', border: 'none', padding: 0,
+                  fontSize: 11, fontFamily: 'inherit', color: '#888',
+                  textDecoration: 'underline', cursor: 'pointer',
+                }}
+              >
+                Clear
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={bulkDeleting}
+                style={btn(!bulkDeleting, '#dc2626')}
+              >
+                {bulkDeleting
+                  ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+                  : <Trash2 size={12} aria-hidden="true" />}
+                {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedCount})`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Queries list */}
       {queries.length === 0 ? (
         <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
           No test queries yet. Add some manually or auto-generate from KB content.
         </div>
+      ) : visible.length === 0 ? (
+        <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+          No {FILTER_LABELS[filter].toLowerCase()} test queries.
+        </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {queries.map(q => (
+          {visible.map(q => (
             <div
               key={q.uuid}
               style={{
-                padding: 10, backgroundColor: '#262626',
-                border: '1px solid #333', borderRadius: 6,
+                padding: 10,
+                backgroundColor: selected.has(q.uuid) ? '#2b3140' : '#262626',
+                border: `1px solid ${selected.has(q.uuid) ? '#3b82f6' : '#333'}`,
+                borderRadius: 6,
               }}
             >
               {editingUuid === q.uuid ? (
@@ -223,6 +429,15 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  {canManage && (
+                    <input
+                      type="checkbox"
+                      checked={selected.has(q.uuid)}
+                      onChange={() => toggleSelected(q.uuid)}
+                      aria-label={`Select test query: ${q.query}`}
+                      style={{ flexShrink: 0, marginTop: 2, cursor: 'pointer' }}
+                    />
+                  )}
                   {q.auto_generated ? (
                     <Bot size={13} style={{ color: '#7c3aed', flexShrink: 0, marginTop: 2 }} aria-label="Auto-generated" />
                   ) : (
@@ -292,7 +507,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       {showImport && (
         <ImportTestQueriesModal
           kbUuid={kbUuid}
-          onImported={onChange}
+          onImported={async () => { revealNewRows(); await onChange() }}
           onClose={() => setShowImport(false)}
         />
       )}

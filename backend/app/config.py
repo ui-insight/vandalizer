@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     # private-IP block still applies to every other host. Loopback, link-local,
     # and cloud-metadata addresses stay blocked regardless.
     ssrf_allowed_hosts: str = "mindrouter.uidaho.edu"
+    # Where this process looks for model vocabularies, in the standard
+    # HuggingFace cache layout (`<root>/hub/models--Org--Name/snapshots/<rev>/`).
+    # Set it to your HF_HOME. Token counting reads `tokenizer.json` from here —
+    # the vocabulary only, never the weights and never the GPU.
+    #
+    # Optional. When nothing is found the budget falls back to estimating with
+    # tiktoken plus a safety margin, and says so in the log once per model. That
+    # is the pre-existing behaviour, so leaving this unset costs accuracy for
+    # self-hosted models but breaks nothing.
+    tokenizer_cache_root: str = "/hf-cache"
 
     # Observability
     sentry_dsn: str = ""

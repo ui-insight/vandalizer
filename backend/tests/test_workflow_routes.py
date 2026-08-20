@@ -71,6 +71,7 @@ class TestListWorkflows:
              patch("app.routers.workflows.access_control") as mock_ac:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[mock_wf])
+            mock_svc.count_workflows = AsyncMock(return_value=1)
             mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.can_manage_workflow = MagicMock(return_value=True)
 
@@ -82,11 +83,14 @@ class TestListWorkflows:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 1
-        assert data[0]["name"] == "Extract Names"
-        assert data[0]["num_executions"] == 5
-        assert data[0]["team_id"] is None
-        assert data[0]["can_manage"] is True
+        assert data["total"] == 1
+        assert data["skip"] == 0
+        assert data["limit"] == 100
+        assert len(data["items"]) == 1
+        assert data["items"][0]["name"] == "Extract Names"
+        assert data["items"][0]["num_executions"] == 5
+        assert data["items"][0]["team_id"] is None
+        assert data["items"][0]["can_manage"] is True
 
     @pytest.mark.asyncio
     async def test_list_workflows_unauthenticated(self, client):

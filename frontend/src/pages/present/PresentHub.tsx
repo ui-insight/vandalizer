@@ -49,12 +49,16 @@ export function PresentHub() {
       {/* Hero */}
       <header>
         <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">
-          Present &amp; Pitch
+          Make a Case for Vandalizer
         </h1>
-        <p className="mt-4 text-lg text-gray-400 max-w-2xl leading-relaxed">
-          Ready-to-use material for introducing Vandalizer. Pick your audience, then
-          read it, present it live, or copy an elevator pitch. Everything here is public:
-          share any link, no account needed.
+        <p className="mt-5 text-lg text-gray-400 max-w-3xl leading-relaxed">
+          This page offers materials for you to introduce Vandalizer to your team of RAs
+          and collaborative entities. This presentation guide accounts for a variety of
+          audiences — RA team members, leadership, IT and deployment, and researchers
+          &amp; PIs. These materials are prepared for your direct use across multiple
+          modalities: presentation slides, oral pitch, and email pitch. Everything here is
+          for public use — no account is needed to share links, copy materials, or convert
+          materials to PDFs.
         </p>
       </header>
 

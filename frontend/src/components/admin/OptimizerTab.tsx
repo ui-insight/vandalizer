@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, CheckCircle2, Eye, Play, RefreshCw, Sparkles, XCircle,
@@ -17,7 +18,12 @@ import { KpiCard, StatusBadge } from './shared/primitives'
  * shows their own items, so neither answers "is the optimizer healthy?".
  * This tab does: run volume, what's waiting on a human, and which failures
  * are repeating. There are no actions here on purpose — applying a config
- * belongs to whoever owns the item, from their own inbox.
+ * belongs to whoever owns the item, from their own inbox at /tuning.
+ *
+ * This is now tuning's only entry point in the nav: the account-menu item and
+ * the activity-rail badge were removed because research administrators, who
+ * are most of the user base, never have a suggestion to act on. /tuning is
+ * still routable, and the link below is how an admin reaches it.
  */
 
 const SURFACE_LABEL: Record<string, string> = {
@@ -77,7 +83,10 @@ export function OptimizerTab() {
           </h2>
           <p style={{ fontSize: 12, color: '#6b7280', margin: '4px 0 0' }}>
             Every tuning run across workflows, extraction sets, and knowledge bases.
-            Read-only — owners act on their own suggestions from Tuning suggestions.
+            Read-only — applying a config happens in{' '}
+            <Link to={'/tuning' as never} style={{ color: '#0ea5e9', textDecoration: 'none', fontWeight: 600 }}>
+              your tuning inbox
+            </Link>, which only lists items you own.
           </p>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>

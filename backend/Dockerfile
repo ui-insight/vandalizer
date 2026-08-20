@@ -33,8 +33,17 @@ COPY --from=builder /app/.venv /app/.venv
 # ``--with-deps`` pulls in the system libraries Chromium needs (libnss3,
 # libdrm2, libxkbcommon0, libgbm1, libasound2, fontconfig, etc.).  Browsers
 # are written to PLAYWRIGHT_BROWSERS_PATH so they're readable by appuser.
-# Set WEB_FETCHER_BROWSER_ENABLED=false to skip this if you don't need
-# JS-rendered URL ingestion.
+#
+# WEB_FETCHER_BROWSER_ENABLED=false disables the *feature* at runtime. It does
+# NOT skip this install -- it is an application env var and cannot affect a
+# build-time RUN. A deployment that turns the feature off still ships the whole
+# Chromium dependency tree: measured at ~1.04 GB and 112 OS packages on top of
+# the base image (87 -> 199), including two CRITICAL CVEs with no Debian fix
+# (libglib2.0-0t64 CVE-2026-58016, libxml2 CVE-2026-6653).
+#
+# Making the install itself optional is tracked separately; _render_with_browser
+# already degrades to the static fetch on ImportError, so a Playwright-less
+# build needs no code change.
 RUN playwright install --with-deps chromium && \
     chmod -R a+rx /opt/ms-playwright
 

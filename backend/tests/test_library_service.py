@@ -252,6 +252,7 @@ class TestAddItem:
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.return_value = mock_item
+            MockItem.find_one = AsyncMock(return_value=None)
             MockWF.get = AsyncMock(return_value=mock_wf)
 
             from app.services.library_service import add_item
@@ -290,6 +291,7 @@ class TestAddItem:
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
             MockItem.return_value = _make_library_item()
+            MockItem.find_one = AsyncMock(return_value=None)
             MockWF.get = AsyncMock(return_value=mock_wf)
 
             from app.services.library_service import add_item
@@ -323,11 +325,12 @@ class TestAddItem:
 
         with (
             patch("app.services.library_service.access_control") as mock_ac,
-            patch("app.services.library_service.LibraryItem", side_effect=_capture),
+            patch("app.services.library_service.LibraryItem", side_effect=_capture) as MockItem,
             patch("app.services.library_service.Workflow") as MockWF,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
             mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
+            MockItem.find_one = AsyncMock(return_value=None)
             MockWF.get = AsyncMock(return_value=mock_wf)
 
             from app.services.library_service import add_item
@@ -355,17 +358,141 @@ class TestAddItem:
 
         with (
             patch("app.services.library_service.access_control") as mock_ac,
-            patch("app.services.library_service.LibraryItem", side_effect=_capture),
+            patch("app.services.library_service.LibraryItem", side_effect=_capture) as MockItem,
             patch("app.services.library_service.SearchSet") as MockSS,
         ):
             mock_ac.get_authorized_library = AsyncMock(return_value=lib)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=mock_ss)
+            MockItem.find_one = AsyncMock(return_value=None)
             MockSS.get = AsyncMock(return_value=mock_ss)
 
             from app.services.library_service import add_item
 
             await add_item(str(lib.id), user, item_id, "search_set")
             assert captured.get("verified") is False
+
+
+class TestAddItemIdempotency:
+    @pytest.mark.asyncio
+    async def test_returns_existing_bookmark_instead_of_duplicating(self):
+        # Creation paths bookmark server-side now, so a client that also calls
+        # add_item must not leave two identical rows in the same library.
+        lib = _make_library()
+        user = _make_user()
+        mock_wf = MagicMock()
+        mock_wf.name = "My WF"
+        mock_wf.description = "desc"
+        item_id = str(PydanticObjectId())
+        existing = _make_library_item(item_id=PydanticObjectId(item_id))
+
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Workflow") as MockWF,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
+            MockItem.find_one = AsyncMock(return_value=existing)
+            MockWF.get = AsyncMock(return_value=mock_wf)
+
+            from app.services.library_service import add_item
+
+            result = await add_item(str(lib.id), user, item_id, "workflow")
+
+            assert result is not None
+            MockItem.assert_not_called()
+            lib.save.assert_not_awaited()
+            assert lib.items == []
+
+
+# ---------------------------------------------------------------------------
+# has_bookmark / ensure_bookmark
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureBookmark:
+    @pytest.mark.asyncio
+    async def test_creates_bookmark_when_object_is_orphaned(self):
+        from app.models.library import LibraryItemKind
+
+        lib = _make_library()
+        new_item = _make_library_item()
+        wf_id = PydanticObjectId()
+
+        with (
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockItem.return_value = new_item
+            MockLib.find_one = AsyncMock(return_value=lib)
+
+            from app.services.library_service import ensure_bookmark
+
+            result = await ensure_bookmark(wf_id, LibraryItemKind.WORKFLOW, "user1")
+
+            assert result is new_item
+            new_item.insert.assert_awaited_once()
+            assert lib.items == [new_item.id]
+            lib.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_is_a_noop_when_a_live_bookmark_exists(self):
+        from app.models.library import LibraryItemKind
+
+        existing = _make_library_item()
+        wf_id = PydanticObjectId()
+
+        with (
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[existing])
+            MockItem.find = MagicMock(return_value=mock_find)
+            # Some library's items array still references the row.
+            MockLib.find_one = AsyncMock(return_value=_make_library())
+
+            from app.services.library_service import ensure_bookmark
+
+            result = await ensure_bookmark(wf_id, LibraryItemKind.WORKFLOW, "user1")
+
+            assert result is None
+            MockItem.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_readopts_when_the_row_is_in_no_library(self):
+        # A LibraryItem no Library.items references renders nowhere, so it does
+        # not keep the workflow reachable — the exact state the old delete left
+        # behind. Treat it as orphaned and issue a fresh bookmark.
+        from app.models.library import LibraryItemKind
+
+        stale = _make_library_item()
+        lib = _make_library()
+        new_item = _make_library_item()
+        wf_id = PydanticObjectId()
+
+        with (
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[stale])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockItem.return_value = new_item
+            # First call: no library references the stale row. Second: the
+            # personal-library lookup inside ensure_bookmark.
+            MockLib.find_one = AsyncMock(side_effect=[None, lib])
+
+            from app.services.library_service import ensure_bookmark
+
+            result = await ensure_bookmark(wf_id, LibraryItemKind.WORKFLOW, "user1")
+
+            assert result is new_item
+            new_item.insert.assert_awaited_once()
+            assert lib.items == [new_item.id]
 
 
 # ---------------------------------------------------------------------------
@@ -809,6 +936,40 @@ class TestShareToTeamErrors:
                 await share_to_team("item-1", _make_user(), str(team_oid))
             assert exc.value.code == "original_missing"
             assert exc.value.status == 404
+
+    @pytest.mark.asyncio
+    async def test_refused_clone_is_a_400_carrying_its_own_reason(self):
+        """A clone that declines for an actionable reason — an empty knowledge
+        base — must not land in the catch-all and become an opaque 500."""
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        reason = (
+            "This knowledge base has no sources yet — add at least one source "
+            "before cloning it."
+        )
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=_make_library(scope="team")),
+             ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(side_effect=ValueError(reason)),
+             ):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), str(team_oid))
+
+        assert exc.value.status == 400
+        assert exc.value.code == "source_not_shareable"
+        # The guard's own wording reaches the user, not a canned per-code string.
+        assert exc.value.message == reason
 
     @pytest.mark.asyncio
     async def test_raises_clone_failed_when_clone_raises_unexpected(self, caplog):

@@ -7,12 +7,35 @@ export function createWorkflow(data: { name: string; description?: string }) {
   return apiFetch<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(data) })
 }
 
-export function listWorkflows(params?: { scope?: string; search?: string }) {
+/** One page of workflows plus the size of the full match, per the list API. */
+export interface WorkflowPage {
+  items: Workflow[]
+  total: number
+  skip: number
+  limit: number
+}
+
+/**
+ * Fetch one page of workflows, newest first.
+ *
+ * `search` is applied server-side across every workflow the caller can see —
+ * filtering a fetched page in the client hid anything past the page cap, which
+ * is how workflows became unfindable. `total` reports the full match count so
+ * a caller can tell a complete list from a truncated one.
+ */
+export function listWorkflows(params?: {
+  scope?: string
+  search?: string
+  skip?: number
+  limit?: number
+}) {
   const sp = new URLSearchParams()
   if (params?.scope) sp.set('scope', params.scope)
   if (params?.search) sp.set('search', params.search)
+  if (params?.skip != null) sp.set('skip', String(params.skip))
+  if (params?.limit != null) sp.set('limit', String(params.limit))
   const qs = sp.toString()
-  return apiFetch<Workflow[]>(`/api/workflows${qs ? `?${qs}` : ''}`)
+  return apiFetch<WorkflowPage>(`/api/workflows${qs ? `?${qs}` : ''}`)
 }
 
 export function getWorkflow(id: string, shareToken?: string) {
@@ -139,6 +162,16 @@ export function cancelWorkflow(sessionId: string, shareToken?: string) {
   )
 }
 
+// Stop every in-flight run in a batch. The backend flips each unfinished run to
+// "canceled" and revokes its Celery task; already-finished runs are left as-is.
+export function cancelBatch(batchId: string, shareToken?: string) {
+  const qs = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ''
+  return apiFetch<{ batch_id: string; status: string; canceled: number }>(
+    `/api/workflows/batches/${encodeURIComponent(batchId)}/cancel${qs}`,
+    { method: 'POST' },
+  )
+}
+
 export interface BatchStatusItem {
   session_id: string
   document_title: string | null
@@ -154,6 +187,9 @@ export interface BatchStatus {
   total: number
   completed: number
   failed: number
+  /** Runs stopped by the user. Optional so a client polling an older backend
+   *  still typechecks; treat absent as zero. */
+  canceled?: number
   items: BatchStatusItem[]
 }
 
@@ -244,10 +280,31 @@ export function getTestStepStatus(taskId: string) {
   return apiFetch<{ status: string; result?: unknown; error?: string }>(`/api/workflows/steps/test/${taskId}`)
 }
 
-export function downloadResults(sessionId: string, format: string = 'json', opts?: { parseStructured?: boolean }) {
+export function downloadResults(
+  sessionId: string,
+  format: string = 'json',
+  opts?: { parseStructured?: boolean; shareToken?: string },
+) {
   const params = new URLSearchParams({ session_id: sessionId, format })
   if (opts?.parseStructured) params.set('parse_structured', 'true')
+  // The route authorizes with the share token when there is one; without it a
+  // share-link recipient who is not on the owner's team 404s on their own run.
+  if (opts?.shareToken) params.set('share_token', opts.shareToken)
   return `/api/workflows/download?${params.toString()}`
+}
+
+// URL for a ZIP bundling every completed run in a batch, one file per document
+// in the given format. Individual batch runs download via downloadResults with
+// their own session_id.
+export function downloadBatchResults(
+  batchId: string,
+  format: string = 'json',
+  opts?: { parseStructured?: boolean; shareToken?: string },
+) {
+  const params = new URLSearchParams({ batch_id: batchId, format })
+  if (opts?.parseStructured) params.set('parse_structured', 'true')
+  if (opts?.shareToken) params.set('share_token', opts.shareToken)
+  return `/api/workflows/batch-download?${params.toString()}`
 }
 
 export type SaveOutputFormat = 'pdf' | 'docx' | 'markdown' | 'csv' | 'json' | 'text'
@@ -580,6 +637,8 @@ export interface RunHistoryEntry {
   steps_total?: number
   session_id?: string
   result_snapshot: Record<string, unknown>
+  /** Set while the run is parked on an approval gate — links to the review. */
+  pending_review_uuid?: string | null
 }
 
 export function getWorkflowHistory(workflowId: string, limit = 50) {

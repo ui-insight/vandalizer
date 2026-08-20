@@ -53,3 +53,72 @@ class TestGenerateActivityDescription:
         # The activity is still marked done so the UI stops shimmering.
         set_ops = [c[0][1]["$set"] for c in db.activity_event.update_one.call_args_list]
         assert any(s.get("meta_summary.description_generated") for s in set_ops)
+
+
+class TestReapStaleRunning:
+    """A run parked on an approval gate is waiting on a person, not stalled.
+
+    It stops reporting progress by design, so the elapsed-time sweep used to
+    mark every review left overnight as a timeout and fail the run's activity.
+    """
+
+    def _reap(self, pending_uuids=()):
+        """Run the task and return (elapsed_time_query, decided_review_query)."""
+        import app.tasks.activity_tasks as at
+
+        db = MagicMock()
+        db.activity_event.update_many.return_value = MagicMock(modified_count=0)
+        db.approval_request.find.return_value = [{"uuid": u} for u in pending_uuids]
+        with patch.object(at, "_get_db", return_value=db), \
+             patch.object(at, "_resolve_stale_threshold_minutes", return_value=30):
+            at.reap_stale_running_task()
+        calls = db.activity_event.update_many.call_args_list
+        assert len(calls) == 2, f"expected two sweeps, got {len(calls)}"
+        return calls[0][0][0], calls[1][0][0]
+
+    def test_skips_runs_awaiting_approval(self):
+        elapsed, _ = self._reap()
+        # `None` matches both a null field and a missing one, so ordinary
+        # activities (which never carry the key) stay in scope.
+        assert elapsed["meta_summary.pending_review_uuid"] is None
+
+    def test_still_targets_stuck_running_events(self):
+        elapsed, _ = self._reap()
+        assert elapsed["status"] == {"$in": ["running", "queued"]}
+        assert "$lt" in elapsed["last_updated_at"]
+
+    def test_a_row_parked_on_a_decided_review_is_still_reaped(self):
+        """The exemption was unbounded. approve_review returns as soon as the
+        resume task is dispatched, and the marker is cleared deep inside that
+        task, after guards that raise. A lost message or a tripped guard left
+        the row at "running" forever — the exact condition the reaper exists to
+        catch, made unreachable by its own exemption.
+        """
+        _elapsed, decided = self._reap(pending_uuids=["still-waiting"])
+
+        # Reaps rows carrying a marker that is not one of the pending reviews.
+        assert decided["meta_summary.pending_review_uuid"]["$nin"] == [
+            None, "still-waiting",
+        ]
+        assert decided["status"] == {"$in": ["running", "queued"]}
+        assert "$lt" in decided["last_updated_at"]
+
+    def test_a_row_parked_on_a_review_still_awaiting_a_decision_is_left_alone(self):
+        _elapsed, decided = self._reap(pending_uuids=["a", "b"])
+        excluded = decided["meta_summary.pending_review_uuid"]["$nin"]
+        assert "a" in excluded and "b" in excluded
+
+    def test_the_decided_sweep_clears_the_marker_it_reaps(self):
+        """Otherwise the row stays exempt from the first sweep forever."""
+        import app.tasks.activity_tasks as at
+
+        db = MagicMock()
+        db.activity_event.update_many.return_value = MagicMock(modified_count=0)
+        db.approval_request.find.return_value = []
+        with patch.object(at, "_get_db", return_value=db), \
+             patch.object(at, "_resolve_stale_threshold_minutes", return_value=30):
+            at.reap_stale_running_task()
+
+        update = db.activity_event.update_many.call_args_list[1][0][1]
+        assert update["$unset"] == {"meta_summary.pending_review_uuid": ""}
+        assert update["$set"]["status"] == "failed"

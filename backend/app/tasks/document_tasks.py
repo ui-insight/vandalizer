@@ -12,6 +12,7 @@ import uuid
 from pathlib import Path
 
 from app.celery_app import celery_app
+from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
@@ -277,12 +278,21 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     notify_document_failed(db, doc=doc, error=message)
 
 
+# An OCR outage is measured in minutes — a GPU loading a model, a service
+# restarting during a deploy, a provider rate-limiting a burst. The previous
+# budget (backoff from 5s, 3 retries) was exhausted inside a minute and the
+# document was written off as unreadable. This spans roughly 1/2/4/8/10
+# minutes, about 25 minutes in total, with jitter so a batch upload doesn't
+# retry in lockstep. Permanent failures never reach here — they degrade to
+# PyMuPDF inside the reader (see ocr_client.PERMANENT_STATUS_CODES).
 @celery_app.task(
     bind=True,
     name="tasks.document.extraction",
     autoretry_for=TRANSIENT_EXCEPTIONS,
-    retry_backoff=True,
-    max_retries=3,
+    retry_backoff=60,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
     default_retry_delay=5,
 )
 def perform_extraction_and_update(self, document_uuid: str, extension: str) -> str:
@@ -319,6 +329,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
 
         raw_text = ""
         text_markers: list[dict] = []
+        # Only paginated formats get a page count. Marker count is not a
+        # substitute: XLSX markers are sheets, and PyMuPDF emits no marker for
+        # a page that has no text layer and no form fields.
+        num_pages: int | None = None
 
         if extension == "xlsx":
             from app.services.document_readers import extract_text_with_markers
@@ -342,16 +356,25 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     raw_text = (raw_text or "").rstrip() + "\n\n" + extras
 
         elif extension == "pdf":
-            from app.services.document_readers import extract_text_with_markers
+            from app.services.document_readers import (
+                extract_text_with_markers,
+                pdf_page_count,
+            )
             raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
+            # Read from the PDF rather than the markers so the count is exact on
+            # both the OCR and the direct-extraction path. Returns 0 if the file
+            # can't be opened, which is the same as the model default.
+            num_pages = pdf_page_count(str(absolute_path))
 
         else:
             raw_text = extract_text_from_file(str(absolute_path), extension)
 
-        # Count tokens using the same tokenizer the budget planner uses so the
-        # pre-flight oversize check is accurate.
-        from app.services.context_budget import count_tokens
-        token_count = count_tokens(raw_text) if raw_text else 0
+        # Stored raw, on purpose. The safety margin that makes a count safe to
+        # budget against depends on the model doing the reading, which is not
+        # known here and is not fixed for the life of the document — so
+        # find_oversize_documents applies it per-model at comparison time.
+        from app.services.context_budget import count_raw_tokens
+        token_count = count_raw_tokens(raw_text) if raw_text else 0
 
         from app.utils.extraction_quality import nonletter_ratio
         extraction_ratio = nonletter_ratio(raw_text) if raw_text else None
@@ -374,6 +397,9 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         "token_count": 0,
                         "text_markers": [],
                         "extraction_nonletter_ratio": None,
+                        # Don't leave a stale page count beside empty text when
+                        # a previously-good document is reprocessed.
+                        "num_pages": 0,
                         "task_status": "error",
                         "error_message": (
                             "We couldn't extract any text from this document. "
@@ -387,18 +413,20 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             )
             return ""
 
+        update_fields: dict = {
+            "raw_text": raw_text,
+            "processing": False,
+            "token_count": token_count,
+            "text_markers": text_markers,
+            "extraction_nonletter_ratio": extraction_ratio,
+            "error_message": None,
+        }
+        if num_pages is not None:
+            update_fields["num_pages"] = num_pages
+
         db.smart_document.update_one(
             {"uuid": document_uuid},
-            {
-                "$set": {
-                    "raw_text": raw_text,
-                    "processing": False,
-                    "token_count": token_count,
-                    "text_markers": text_markers,
-                    "extraction_nonletter_ratio": extraction_ratio,
-                    "error_message": None,
-                }
-            },
+            {"$set": update_fields},
         )
 
         return raw_text
@@ -415,6 +443,43 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         message = (
             "The uploaded file is no longer available "
             "(it may have been deleted during processing)."
+        )
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {
+                "$set": {
+                    "raw_text": "",
+                    "processing": False,
+                    "extraction_nonletter_ratio": None,
+                    "task_status": "error",
+                    "error_message": message,
+                }
+            },
+        )
+        _notify_document_processing_failed(db, document_uuid, message)
+        return ""
+
+    except OcrUnavailableError as e:
+        # Must be re-raised, not recorded: the catch-all below would swallow it
+        # before `autoretry_for` ever saw it, which is the exact shape of the
+        # original defect — an outage written off as an unreadable document.
+        if self.request.retries < self.max_retries:
+            logger.warning(
+                "OCR unavailable for document %s (attempt %d/%d) — retrying: %s",
+                document_uuid, self.request.retries + 1, self.max_retries, e,
+            )
+            raise
+        # Out of retries. Say *why* it failed — "we couldn't reach OCR" is a
+        # different instruction to the user than "this file has no text in it".
+        logger.warning(
+            "OCR still unavailable for document %s after %d attempts",
+            document_uuid, self.max_retries,
+        )
+        message = (
+            "We couldn't reach the text-recognition service for this document, "
+            "and kept trying for several minutes. The file itself looks fine — "
+            "retry once the service is back, or contact your administrator if "
+            "it keeps happening."
         )
         db.smart_document.update_one(
             {"uuid": document_uuid},
@@ -448,6 +513,56 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         )
         _notify_document_processing_failed(db, document_uuid, message)
         return ""
+
+
+def advance_task_status(db, document_uuid: str, status: str) -> bool:
+    """Move a document to ``status`` unless extraction already marked it failed.
+
+    Applies to *every* post-extraction status write, not just the terminal
+    "complete" one. An intermediate marker is just as destructive: setting
+    "readying" on a document that already failed erases the error, and then the
+    very next write legitimately advances the now-unmarked document to
+    "complete". That is how a zero-character document ends up carrying an
+    extraction error message and a green checkmark at the same time.
+
+    The exclusion lives in the query filter, not in a preceding read. These
+    tasks run concurrently on separate queues — extraction on `documents`,
+    compliance on `uploads` — so a read-then-write check can be overtaken
+    between the read and the update.
+
+    Note this is deliberately one-way: it never *clears* an error. Re-running
+    extraction is what resets a failed document, via the "extracting" write at
+    the top of `perform_extraction_and_update`, so a retry still works.
+
+    Returns True when the document was advanced.
+    """
+    result = db.smart_document.update_one(
+        {"uuid": document_uuid, "task_status": {"$ne": "error"}},
+        {"$set": {"task_status": status}},
+    )
+    if not result.matched_count:
+        logger.info(
+            "Leaving document %s in its failed state rather than setting %r",
+            document_uuid, status,
+        )
+    return bool(result.matched_count)
+
+
+def mark_complete_unless_errored(db, document_uuid: str) -> bool:
+    """Advance a document to "complete" unless extraction already failed."""
+    return advance_task_status(db, document_uuid, "complete")
+
+
+def _record_ingestion_result(db, document_uuid: str, fields: dict) -> None:
+    """Persist ingestion bookkeeping, then advance the status if it's allowed.
+
+    Two writes on purpose. Chunk counts and readiness flags are true whatever
+    extraction did, so they are always recorded; only the status transition is
+    conditional. Folding them into one guarded write would silently drop the
+    bookkeeping for documents that failed extraction.
+    """
+    db.smart_document.update_one({"uuid": document_uuid}, {"$set": fields})
+    mark_complete_unless_errored(db, document_uuid)
 
 
 @celery_app.task(
@@ -819,10 +934,10 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         logger.warning("Document %s not found for semantic ingestion", document_uuid)
         return ""
 
-    db.smart_document.update_one(
-        {"uuid": document_uuid},
-        {"$set": {"task_status": "readying"}},
-    )
+    # Guarded: a document whose extraction just failed must not be dragged back
+    # into an in-progress state, because that erases the error and lets the
+    # terminal write below mark it complete.
+    advance_task_status(db, document_uuid, "readying")
 
     # If the caller passed empty raw_text, fall back to whatever the
     # extraction task already wrote to the DB.
@@ -844,28 +959,24 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         )
     except Exception as e:
         logger.exception("Semantic ingestion failed for %s", document_uuid)
-        db.smart_document.update_one(
-            {"uuid": document_uuid},
+        _record_ingestion_result(
+            db,
+            document_uuid,
             {
-                "$set": {
-                    "task_status": "complete",
-                    "chromadb_ready": False,
-                    "chunk_count": 0,
-                    "ingest_error": str(e)[:500],
-                }
+                "chromadb_ready": False,
+                "chunk_count": 0,
+                "ingest_error": str(e)[:500],
             },
         )
         raise
 
-    db.smart_document.update_one(
-        {"uuid": document_uuid},
+    _record_ingestion_result(
+        db,
+        document_uuid,
         {
-            "$set": {
-                "task_status": "complete",
-                "chromadb_ready": chunk_count > 0,
-                "chunk_count": chunk_count,
-                "ingest_error": None,
-            }
+            "chromadb_ready": chunk_count > 0,
+            "chunk_count": chunk_count,
+            "ingest_error": None,
         },
     )
 

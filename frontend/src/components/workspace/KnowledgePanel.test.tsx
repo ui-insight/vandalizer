@@ -214,3 +214,48 @@ describe('KnowledgePanel add-source permissions', () => {
     expect(screen.getByText('Share with Team').closest('button')).not.toBeDisabled()
   }, 30000)
 })
+
+// Support ticket: an empty KB disabled Chat and the whole validation family,
+// but Export happily downloaded a file with no sources in it.
+describe('KnowledgePanel export on an empty KB', () => {
+  beforeEach(() => {
+    getKnowledgeBase.mockClear()
+  })
+
+  it('disables Export until the KB has a source, and says why', async () => {
+    detail.current = makeDetail({
+      status: 'empty',
+      total_sources: 0,
+      sources_ready: 0,
+      total_chunks: 0,
+      sources: [],
+    })
+    await openDetail()
+
+    const exportButton = screen.getByText('Export').closest('button')
+    expect(exportButton).toBeDisabled()
+    expect(exportButton).toHaveAttribute(
+      'title',
+      'Add at least one source to this knowledge base first',
+    )
+  }, 30000)
+
+  it('enables Export once a source exists', async () => {
+    detail.current = makeDetail({
+      status: 'ready',
+      total_sources: 1,
+      sources: [{
+        uuid: 'src-1',
+        source_type: 'url',
+        url: 'https://example.gov/rule',
+        url_title: 'A Rule',
+        status: 'ready',
+        chunk_count: 4,
+        created_at: '2026-01-01T00:00:00Z',
+      }],
+    })
+    await openDetail()
+
+    expect(screen.getByText('Export').closest('button')).not.toBeDisabled()
+  }, 30000)
+})

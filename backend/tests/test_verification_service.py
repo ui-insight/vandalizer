@@ -1251,7 +1251,9 @@ async def test_notify_examiners_notifies_admins_and_examiners(mock_name, mock_us
 
     assert [c[1]["user_id"] for c in mock_create.call_args_list] == ["admin", "exam"]
     assert mock_create.call_args_list[0][1]["kind"] == "verification_submitted"
-    assert mock_create.call_args_list[0][1]["link"] == "/verification"
+    # Deep-links the submission rather than the queue: the reviewer should
+    # not have to find the row the notification is about.
+    assert mock_create.call_args_list[0][1]["link"] == "/verification?request=req-uuid"
     # Only the reviewer with an email address gets mail
     mock_email.assert_awaited_once()
     assert mock_email.call_args[0][0] == "admin@example.com"
@@ -1343,3 +1345,49 @@ async def test_get_visible_verified_item_ids_kind_filter(mock_li, mock_vim):
 
     assert result == {"kb-1"}
     assert mock_li.find.call_args[0][0] == {"verified": True, "kind": "knowledge_base"}
+
+
+# ---------------------------------------------------------------------------
+# A submission notification names one submission — link to it
+# ---------------------------------------------------------------------------
+
+class TestVerificationSubmittedDeepLink:
+    """A reviewer clicking through from a notification should land on the
+    submission, not on a queue they then have to search. That is the moment
+    they have the least context about which item the mail was for, and it gets
+    worse as the queue grows. The approval flow already links to /reviews/{uuid}.
+    """
+
+    def test_email_button_targets_the_submission(self):
+        from app.services.email_service import verification_submitted_email
+
+        _subject, html = verification_submitted_email(
+            reviewer_name="Dana",
+            submitter_name="Sam",
+            item_kind="knowledge_base",
+            item_name="Uniform Guidance",
+            summary=None,
+            frontend_url="https://vandalizer.example.edu",
+            request_uuid="req-abc123",
+        )
+
+        assert "/verification?request=req-abc123" in html
+        assert "Open Submission" in html
+
+    def test_email_falls_back_to_the_queue_without_a_uuid(self):
+        """The parameter is optional, so an older caller still produces a
+        working link rather than one pointing at ?request=None."""
+        from app.services.email_service import verification_submitted_email
+
+        _subject, html = verification_submitted_email(
+            reviewer_name="Dana",
+            submitter_name="Sam",
+            item_kind="knowledge_base",
+            item_name="Uniform Guidance",
+            summary=None,
+            frontend_url="https://vandalizer.example.edu",
+        )
+
+        assert 'href="https://vandalizer.example.edu/verification"' in html
+        assert "request=" not in html
+        assert "Open Queue" in html

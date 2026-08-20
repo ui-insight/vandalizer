@@ -180,3 +180,20 @@ class TestApplyAutomationUpdate:
         assert auto.action_id == "wf-2"
         assert auto.shared_with_team is True
         assert auto.output_config == {"dest": "/out"}
+
+    @pytest.mark.asyncio
+    async def test_clear_action_id_drops_the_stale_link(self):
+        auto = _auto(action_type="workflow", action_id="wf-1")
+
+        await apply_automation_update(auto, action_type="extraction", clear_action_id=True)
+
+        assert auto.action_type == "extraction"
+        assert auto.action_id is None
+
+    @pytest.mark.asyncio
+    async def test_clear_action_id_defaults_off(self):
+        auto = _auto(action_type="workflow", action_id="wf-1")
+
+        await apply_automation_update(auto, name="Renamed")
+
+        assert auto.action_id == "wf-1"

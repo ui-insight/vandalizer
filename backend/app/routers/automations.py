@@ -32,6 +32,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+WORKFLOW_ACTION_TYPES = ("workflow", "task")
+
+
+def _action_target_family(action_type: str | None) -> str | None:
+    """Which kind of resource an action_type's action_id names.
+
+    workflow and task both link a Workflow, so an action_id stays valid across
+    that swap; extraction links a SearchSet and does not.
+    """
+    if action_type in WORKFLOW_ACTION_TYPES:
+        return "workflow"
+    return action_type
+
+
 async def _validate_action_target(
     action_type: str | None,
     action_id: str | None,
@@ -39,7 +53,7 @@ async def _validate_action_target(
 ) -> None:
     if not action_type or not action_id:
         return
-    if action_type in ("workflow", "task"):
+    if action_type in WORKFLOW_ACTION_TYPES:
         workflow = await get_authorized_workflow(action_id, user)
         if not workflow:
             raise HTTPException(status_code=404, detail="Linked workflow not found")
@@ -428,8 +442,19 @@ async def get_automation(automation_id: str, user: User = Depends(get_current_us
 async def update_automation(automation_id: str, req: UpdateAutomationRequest, user: User = Depends(get_current_user)):
     current, _ = await _load_authorized_automation(automation_id, user, manage=True)
 
+    # Switching to an action type that names a different kind of resource
+    # (workflow/task <-> extraction) leaves the stored action_id dangling: it
+    # points at a Workflow that can't resolve as a SearchSet, or vice versa.
+    # Drop the stale link instead of validating it against the new type — the
+    # UI's flow is pick the new type, then pick its target, same two-step shape
+    # as a trigger_type switch.
+    clear_action_id = (
+        req.action_type is not None
+        and req.action_id is None
+        and _action_target_family(req.action_type) != _action_target_family(current.action_type)
+    )
     action_type = req.action_type if req.action_type is not None else current.action_type
-    action_id = req.action_id if req.action_id is not None else current.action_id
+    action_id = None if clear_action_id else (req.action_id if req.action_id is not None else current.action_id)
     await _validate_action_target(action_type, action_id, user)
 
     auto = await svc.apply_automation_update(
@@ -441,6 +466,7 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
         trigger_config=req.trigger_config,
         action_type=req.action_type,
         action_id=req.action_id,
+        clear_action_id=clear_action_id,
         shared_with_team=req.shared_with_team,
         output_config=req.output_config,
     )
@@ -596,7 +622,12 @@ async def trigger_automation(
 
 
 async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None):
-    if auto.action_type in ("workflow", "task"):
+    if not auto.action_id:
+        raise HTTPException(
+            status_code=400,
+            detail="This automation has no action target selected yet.",
+        )
+    if auto.action_type in WORKFLOW_ACTION_TYPES:
         # Resolve document UUIDs to ObjectIds for the trigger event
         doc_records = await SmartDocument.find(
             {"uuid": {"$in": all_doc_uuids}},

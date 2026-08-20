@@ -93,9 +93,36 @@ def kb_ingest_document(self, source_uuid: str) -> None:
 
         raw_text = doc.get("raw_text", "")
         if not raw_text.strip():
+            # A document's text is populated asynchronously by the extraction
+            # worker, so a source queued right after upload routinely lands here
+            # while extraction is still in flight — for scanned PDFs the
+            # OCR-first path can take minutes. Park it as "pending" rather than
+            # failing it permanently: _resume_pending_kb_sources re-queues it
+            # once extraction finishes, and errors it if extraction fails.
+            from app.services.knowledge_service import IN_FLIGHT_TASK_STATUSES
+
+            task_status = doc.get("task_status")
+            in_flight = bool(doc.get("processing")) or task_status in IN_FLIGHT_TASK_STATUSES
+            if in_flight and task_status != "error":
+                # Guard on status: extraction can finish while this task runs,
+                # letting _resume_pending_kb_sources queue a second run that
+                # succeeds first. Parking unconditionally would knock that
+                # source back to "pending" with nothing left to re-trigger it.
+                db.knowledge_base_sources.update_one(
+                    {"uuid": source_uuid, "status": {"$ne": "ready"}},
+                    {"$set": {"status": "pending", "error_message": None}},
+                )
+                _recalculate_kb(db, kb_uuid)
+                return
             db.knowledge_base_sources.update_one(
                 {"uuid": source_uuid},
-                {"$set": {"status": "error", "error_message": "Document has no text content"}},
+                {
+                    "$set": {
+                        "status": "error",
+                        "error_message": doc.get("error_message")
+                        or "Document has no extractable text",
+                    }
+                },
             )
             _recalculate_kb(db, kb_uuid)
             return

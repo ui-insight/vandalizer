@@ -209,7 +209,11 @@ async def synthesize_seed_input(
           "synthesized": true,
         }
     """
-    from app.services.workflow_service import get_authorized_workflow, get_workflow
+    from app.services.workflow_service import (
+        get_authorized_workflow,
+        get_workflow,
+        require_workflow_steps,
+    )
 
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -218,6 +222,7 @@ async def synthesize_seed_input(
     wf_data = await get_workflow(workflow_id)
     if not wf_data:
         raise ValueError("Workflow not found")
+    require_workflow_steps(wf_data, "synthesizing a test input")
 
     prompt = _build_synthesis_prompt(wf_data)
     raw = await _run_llm(prompt, SYNTHESIS_SYSTEM_PROMPT, user.user_id)

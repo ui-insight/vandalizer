@@ -93,6 +93,7 @@ class TestWorkflowListScoping:
              patch("app.routers.workflows.access_control") as mock_ac:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[wf])
+            mock_svc.count_workflows = AsyncMock(return_value=1)
             mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             mock_ac.can_manage_workflow = MagicMock(return_value=True)
 
@@ -100,8 +101,9 @@ class TestWorkflowListScoping:
 
         assert resp.status_code == 200
         data = resp.json()
-        assert len(data) == 1
-        assert data[0]["user_id"] == "user1"
+        assert len(data["items"]) == 1
+        assert data["items"][0]["user_id"] == "user1"
+        assert data["total"] == 1
         mock_svc.list_workflows.assert_called_once()
 
 
@@ -480,6 +482,7 @@ class TestWorkflowRunAuthz:
              patch("beanie.PydanticObjectId", side_effect=lambda x: x):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.run_workflow = AsyncMock(return_value="session-123")
+            mock_svc.workflow_has_executable_steps = AsyncMock(return_value=True)
 
             resp = await client.post(
                 f"/api/workflows/{self._FAKE_OID}/run",
@@ -513,6 +516,7 @@ class TestWorkflowRunAuthz:
              patch("beanie.PydanticObjectId", side_effect=lambda x: x):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.run_workflow = AsyncMock(return_value="session-123")
+            mock_svc.workflow_has_executable_steps = AsyncMock(return_value=True)
 
             resp = await client.post(
                 f"/api/workflows/{self._FAKE_OID}/run",
