@@ -106,3 +106,4 @@ Copy `.env.example` to `.env`. Key variables: `redis_host`, `ENVIRONMENT` (devel
 - Celery tasks use `bind=True` and `autoretry_for` patterns
 - MongoDB database name: `vandalizer` (configurable via `MONGO_DB`)
 - Docker builds via `docker build -t vandalizer-backend ./backend` and `docker build -t vandalizer-frontend ./frontend` (or `make docker-build`)
+- When you add, remove, or rename a route in `backend/app/routers/` or a call in `frontend/src/api/*.ts`, run `make endpoint-map` and read the two orphan lists in `scripts/ui_endpoint_map.md` — a frontend call matching no route is a live 404. `make backend-static` gates this in CI.

@@ -137,7 +137,11 @@ make frontend-ci
 make release-check
 ```
 
-`make backend-static` runs the backend release-gating lint and security checks.
+`make backend-static` runs the backend release-gating lint and security checks,
+including `endpoint-map-check` — which fails if a call in `frontend/src/api/`
+hits a backend route that does not exist. If it fails, run `make endpoint-map`
+and read `scripts/ui_endpoint_map.md`: the first table lists the offending
+calls. That file is generated output and is not committed.
 
 `make backend-backlog` runs the current backend typecheck and dependency-audit backlog without gating releases.
 
