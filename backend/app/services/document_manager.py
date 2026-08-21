@@ -347,11 +347,7 @@ class DocumentManager:
         filter_docs: Optional[list[str]] = None,
         k: int = 4,
     ) -> list[dict[str, Any]]:
-        collection_name = f"user_{user_id}_docs"
-        try:
-            collection = self.client.get_collection(name=collection_name)
-        except ValueError:
-            return []
+        collection = self.get_user_collection(user_id)
 
         where_filter = None
         if filter_docs:
@@ -382,11 +378,7 @@ class DocumentManager:
         return output
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
-        collection_name = f"user_{user_id}_docs"
-        try:
-            collection = self.client.get_collection(name=collection_name)
-        except ValueError:
-            return False
+        collection = self.get_user_collection(user_id)
         results = collection.get(where={"document_id": document_id})
         return bool(results and results.get("ids"))
 
