@@ -70,3 +70,10 @@ demo-containers/
 
 # Benchmark harness output (benchmarks/corpus/*/tools/run_benchmark_http.py)
 benchmark-runs/
+
+# Per-developer AI/editor tool config, written into the repo root by tools like
+# code-review-graph's installer. Personal, not project config.
+.mcp.json
+.cursor/
+.kiro/
+.qoder/
