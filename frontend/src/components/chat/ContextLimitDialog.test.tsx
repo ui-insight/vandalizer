@@ -38,7 +38,7 @@ describe('ContextLimitDialog — larger model option', () => {
     // Same path as above from the UI's side: one model means the server has
     // nothing bigger to point at, so the field arrives null.
     renderDialog({ suggestedModel: null })
-    expect(screen.getByRole('button', { name: /truncate/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /trim older messages/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /answer with/i })).toBeNull()
   })
 
@@ -55,8 +55,9 @@ describe('ContextLimitDialog — larger model option', () => {
     })
     const labels = screen.getAllByRole('button').map(b => b.textContent ?? '')
     const model = labels.findIndex(t => /answer with/i.test(t))
-    const truncate = labels.findIndex(t => /truncate/i.test(t))
+    const truncate = labels.findIndex(t => /trim older messages/i.test(t))
     expect(model).toBeGreaterThanOrEqual(0)
+    expect(truncate).toBeGreaterThanOrEqual(0)
     expect(model).toBeLessThan(truncate)
   })
 

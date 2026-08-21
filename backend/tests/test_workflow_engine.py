@@ -328,10 +328,10 @@ class TestKnowledgeBaseQueryNodeApproximatePages:
 
         dm = MagicMock()
         dm.query_kb.return_value = [chunk]
-        # The node imports DocumentManager inside the function, so it has to be
+        # The node imports the accessor inside the function, so it has to be
         # patched where it is defined rather than on workflow_engine.
         from app.services import document_manager as dm_mod
-        monkeypatch.setattr(dm_mod, "DocumentManager", lambda *a, **k: dm)
+        monkeypatch.setattr(dm_mod, "get_document_manager", lambda *a, **k: dm)
         monkeypatch.setattr(we, "llm_chat_model", fake_llm_chat_model)
 
         node = we.KnowledgeBaseQueryNode({

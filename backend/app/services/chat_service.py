@@ -1424,7 +1424,13 @@ async def chat_stream(
     # not there and decline to move a request that does not fit.
     requested_input_tokens = estimate_input_tokens(
         model_name=model_name,
-        system_prompt=system_prompt or "",
+        # This branch builds the prompt as instructions plus a per-turn reminder
+        # bundle rather than a single `system_prompt`. Routing has to size the
+        # same text the budget planner does a few lines below, or the two
+        # disagree about what was sent.
+        system_prompt=(
+            instructions_text + ("\n\n" + reminder_bundle if reminder_bundle else "")
+        ),
         user_message=message,
         history=previous_messages,
         documents=doc_segments,

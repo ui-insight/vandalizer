@@ -17,6 +17,12 @@ vi.mock('../../contexts/CertificationPanelContext', () => ({
   useCertificationPanel: () => ({ openPanel: vi.fn() }),
 }))
 
+// ChatMessage calls useToast on this branch; matches the idiom used by the
+// other component suites.
+vi.mock('../../contexts/ToastContext', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}))
+
 vi.mock('../../api/feedback', () => ({
   submitChatFeedback: vi.fn(),
 }))

@@ -529,6 +529,9 @@ def _mock_blocked_client(status: int = 403):
     resp = MagicMock()
     resp.text = "Access Denied"
     resp.status_code = status
+    # safe_get checks is_redirect on every hop; without this a MagicMock reports
+    # every response as a redirect and the chain exhausts itself.
+    resp.is_redirect = False
     resp.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError(
         str(status), request=MagicMock(), response=resp,
     ))
