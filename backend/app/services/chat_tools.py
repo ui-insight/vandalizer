@@ -26,7 +26,6 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
-from app.services.document_manager import get_document_manager
 
 logger = logging.getLogger(__name__)
 
@@ -68,6 +67,59 @@ def _score_to_tier(score: float | None) -> str | None:
     if score >= 50:
         return "fair"
     return "poor"
+
+
+async def _extraction_set_staleness(
+    ss: "SearchSet",
+    latest_run,
+    current_keys: Optional[set[str]] = None,
+) -> tuple[bool, list[str]]:
+    """Whether *ss* has drifted from the config its latest validation measured.
+
+    Workflows already get a ``plan_stale`` check; extraction sets got nothing —
+    edit a template's fields or settings after validating and the quality badge
+    kept asserting a score for a configuration that no longer exists. Compares
+    the current effective extraction config hash and the current field set
+    against what the run recorded. Exception-safe: staleness detection failing
+    must never break quality reporting, so any error reports "not stale".
+    """
+    reasons: list[str] = []
+    if latest_run is None:
+        return False, reasons
+    try:
+        from app.services.quality_service import compute_config_hash
+        from app.services.search_set_service import effective_extraction_config
+
+        if latest_run.config_hash:
+            current_hash = compute_config_hash(effective_extraction_config(ss) or {})
+            if current_hash != latest_run.config_hash:
+                reasons.append("extraction settings changed since the last validation run")
+
+        validated_fields: set[str] = set()
+        for tc in (latest_run.result_snapshot or {}).get("test_cases", []) or []:
+            for fr in tc.get("fields", []) or []:
+                name = fr.get("field_name") if isinstance(fr, dict) else None
+                if name:
+                    validated_fields.add(name)
+        if validated_fields:
+            if current_keys is None:
+                items = await ss.get_extraction_items()
+                current_keys = {i.searchphrase for i in items if i.searchphrase}
+            if current_keys != validated_fields:
+                added = sorted(current_keys - validated_fields)
+                removed = sorted(validated_fields - current_keys)
+                detail = []
+                if added:
+                    detail.append(f"added: {', '.join(added[:5])}")
+                if removed:
+                    detail.append(f"removed: {', '.join(removed[:5])}")
+                reasons.append(
+                    "fields changed since the last validation run"
+                    + (f" ({'; '.join(detail)})" if detail else "")
+                )
+    except Exception as e:
+        logger.warning("Extraction-set staleness check failed for %s: %s", ss.uuid, e)
+    return bool(reasons), reasons
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +235,32 @@ def _err(message: str, hint: Optional[str] = None) -> dict:
     if hint:
         return {"error": message, "hint": hint}
     return {"error": message}
+
+
+def _doc_text_unavailable_err(doc: "SmartDocument") -> dict:
+    """Honest error for a document whose text is unavailable.
+
+    Distinguishes a permanent ingest failure (``task_status == "error"``) from
+    a document still processing — telling the user to "try again once
+    processing completes" for a document that permanently failed sends them
+    into a retry loop that can never succeed.
+    """
+    label = doc.title or doc.uuid
+    if getattr(doc, "task_status", None) == "error":
+        detail = getattr(doc, "error_message", None) or "text extraction failed"
+        return _err(
+            f'Text extraction FAILED for "{label}" ({detail}). This is a '
+            "permanent processing failure — retrying will not help.",
+            hint=(
+                "Tell the user this document could not be read and suggest "
+                "re-uploading it (or checking the OCR configuration if it is "
+                "a scanned PDF). Do not say it is still processing."
+            ),
+        )
+    return _err(
+        f'"{label}" has no extracted text yet — it is still processing.',
+        hint="Try again in a moment once processing completes.",
+    )
 
 
 def _confirm_fingerprint(tool_name: str, key: dict) -> str:
@@ -433,8 +511,48 @@ async def search_knowledge_base(
     if kb.status and kb.status != "ready":
         return [{"error": f"Knowledge base \"{kb.title}\" is currently {kb.status}. Try again in a few minutes once indexing completes."}]
 
-    dm = get_document_manager()
-    results = await asyncio.to_thread(dm.query_kb, uuid, query, 8)
+    # Go through the shared tuned retrieval pipeline — the same seam the
+    # classic KB chat path and the validation harness use — so the KB's
+    # Autovalidate-tuned knobs (k, min_similarity floor, query rewriting,
+    # rerank) apply on the agentic path too. A raw top-k vector query here
+    # would silently skip the relevance floor the platform advertises.
+    from app.services.kb_validation_service import (
+        _ensure_system_config_loaded,
+        retrieve_kb_chunks,
+    )
+
+    try:
+        await _ensure_system_config_loaded()
+        results, rag_cfg, _ = await retrieve_kb_chunks(
+            uuid, query, context.deps.model_name, per_step_timeout=6.0,
+        )
+        results = results[: rag_cfg.k]
+    except Exception as e:
+        # Distinguish infrastructure failure from an empty corpus: a Chroma /
+        # embedding outage must never be presented as "the KB had nothing".
+        logger.warning("KB retrieval failed for kb %s: %s", uuid, e)
+        return [_err(
+            f"Knowledge base search FAILED for \"{kb.title}\" — the retrieval "
+            "backend returned an error. The knowledge base was NOT searched.",
+            hint=(
+                "Tell the user the search itself failed (not that the KB had "
+                "no matching content) and suggest retrying in a moment. Do not "
+                "answer the question from general knowledge as if it were "
+                "grounded in this knowledge base."
+            ),
+        )]
+
+    if not results:
+        return [{
+            "no_results": True,
+            "note": (
+                f"No content in knowledge base \"{kb.title}\" matched this "
+                "query above its relevance threshold. Tell the user the "
+                "knowledge base had no matching content for this question. If "
+                "you answer from general knowledge instead, clearly label the "
+                "answer as NOT coming from their documents."
+            ),
+        }]
 
     # Record behavioral memory — best-effort, never blocks the tool.
     from app.services import user_memory_service
@@ -698,6 +816,27 @@ async def get_quality_info(
     except Exception as e:
         logger.warning("Optimization lookup failed for %s/%s: %s", item_kind, item_uuid, e)
 
+    # Extraction sets: surface config/field drift since the last validation —
+    # the score describes the configuration that was measured, and a template
+    # edited afterwards is wearing an unearned badge.
+    validation_stale = None
+    if item_kind == "search_set" and latest_run:
+        try:
+            ss = await SearchSet.find_one(SearchSet.uuid == item_uuid)
+            if ss:
+                validation_stale, stale_reasons = await _extraction_set_staleness(ss, latest_run)
+                result["validation_stale"] = validation_stale
+                if validation_stale:
+                    result["validation_stale_reasons"] = stale_reasons
+                    result["note_validation_stale"] = (
+                        "This extraction set changed after its last validation run "
+                        f"({'; '.join(stale_reasons)}). The quality score describes "
+                        "the previous configuration — recommend re-validating "
+                        "(run_validation) before relying on the score."
+                    )
+        except Exception as e:
+            logger.warning("Staleness lookup failed for search_set %s: %s", item_uuid, e)
+
     # Workflows: surface validation-plan staleness so the agent can offer the
     # one-click regenerate instead of validating against a drifted plan.
     plan_stale = None
@@ -732,6 +871,7 @@ async def get_quality_info(
             "active_alerts": alert_list,
             "optimization": optimization_summary,
             "plan_stale": plan_stale,
+            "stale": validation_stale if item_kind == "search_set" else plan_stale,
         }
 
     return result
@@ -1154,6 +1294,8 @@ async def _execute_extraction(
     # Authorize and load document texts
     doc_texts: list[str] = []
     doc_names: list[str] = []
+    doc_metadata: list[dict] = []
+    docs_unreadable: list[str] = []
     for doc_uuid in document_uuids[:10]:  # Cap at 10 documents
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
         if not doc:
@@ -1168,6 +1310,21 @@ async def _execute_extraction(
         if doc.raw_text:
             doc_texts.append(doc.raw_text)
             doc_names.append(doc.title or doc_uuid)
+            doc_metadata.append({
+                "uuid": doc_uuid,
+                "title": doc.title or doc_uuid,
+                "text_markers": doc.text_markers or [],
+            })
+        else:
+            # Accessible but has no text — a failed or unfinished ingest, not
+            # an authorization miss. Reported separately below so the model
+            # can't summarize a partially-failed run as complete.
+            status = getattr(doc, "task_status", None)
+            label = doc.title or doc_uuid
+            if status == "error":
+                docs_unreadable.append(f"{label} (text extraction FAILED)")
+            else:
+                docs_unreadable.append(f"{label} (still processing)")
 
     if not doc_texts:
         return _err(
@@ -1189,6 +1346,10 @@ async def _execute_extraction(
             doc_texts=doc_texts,
             extraction_config_override=ss.extraction_config or None,
             field_metadata=field_metadata,
+            # Per-field source tracking, same as the interactive run-sync
+            # endpoint — chat-dispatched runs must not ship untraced values.
+            capture_sources=True,
+            doc_metadata=doc_metadata,
         )
         return results, engine.tokens_in, engine.tokens_out
 
@@ -1237,20 +1398,74 @@ async def _execute_extraction(
     ).sort("-created_at").first_or_none()
 
     docs_requested = len(document_uuids)
-    docs_skipped = docs_requested - len(doc_names)
+    docs_skipped = docs_requested - len(doc_names) - len(docs_unreadable)
+
+    # Split the per-field source sidecar out of each entity (same shape as the
+    # interactive run-sync endpoint): `sources` stays index-aligned with
+    # `entities`. Quotes are previewed, not full — the page + verified flag is
+    # the trust signal; the full passage is one click away in the editor.
+    from app.services.extraction_sources import SOURCE_KEY
+
+    entities = results[:50]  # Cap output size
+    sources: list[dict] = []
+    fields_verified = 0
+    fields_unsourced = 0
+    for entity in entities:
+        entity_sources: dict = {}
+        raw_sidecar = entity.pop(SOURCE_KEY, None) if isinstance(entity, dict) else None
+        if isinstance(entity, dict):
+            for field_key, value in entity.items():
+                src = (raw_sidecar or {}).get(field_key)
+                if isinstance(src, dict) and src.get("quote"):
+                    entity_sources[field_key] = {
+                        "quote": (src.get("quote") or "")[:200],
+                        "page": src.get("page"),
+                        "page_approximate": src.get("page_approximate", False),
+                        "document_title": src.get("document_title"),
+                        "verified": bool(src.get("verified")),
+                    }
+                # Only extracted values need a source; a null/absent value
+                # has nothing to trace.
+                if value in (None, ""):
+                    continue
+                if isinstance(src, dict) and src.get("verified"):
+                    fields_verified += 1
+                else:
+                    fields_unsourced += 1
+        sources.append(entity_sources)
 
     response: dict = {
         "extraction_set": ss.title,
         "fields": keys,
         "documents": doc_names,
-        "entities": results[:50],  # Cap output size
+        "entities": entities,
         "entity_count": len(results),
+        "sources": sources,
+        "source_coverage": {
+            "fields_with_verified_source": fields_verified,
+            "fields_without_verified_source": fields_unsourced,
+        },
         "token_usage": {"input": tokens_in, "output": tokens_out},
     }
+    if fields_unsourced:
+        response["source_note"] = (
+            f"{fields_unsourced} extracted value(s) have no verified source "
+            "passage. Treat those values as unconfirmed — when you present "
+            "them, say they could not be traced to the document."
+        )
+    notes: list[str] = []
+    if docs_unreadable:
+        notes.append(
+            f"{len(docs_unreadable)} document(s) were NOT extracted because "
+            f"their text is unavailable: {'; '.join(docs_unreadable)}. Do not "
+            "present this run as covering those documents."
+        )
     if docs_skipped > 0:
-        response["note"] = f"{docs_skipped} of {docs_requested} document(s) were skipped (not found or not accessible)."
+        notes.append(f"{docs_skipped} of {docs_requested} document(s) were skipped (not found or not accessible).")
     if len(results) > 50:
-        response["note"] = response.get("note", "") + f" Results truncated to 50 of {len(results)} entities."
+        notes.append(f"Results truncated to 50 of {len(results)} entities.")
+    if notes:
+        response["note"] = " ".join(notes)
 
     # Quality sidecar — streaming layer strips "quality" key before LLM sees it
     if latest_run and latest_run.score is not None:
@@ -1261,6 +1476,21 @@ async def _execute_extraction(
             QualityAlert.acknowledged != True,  # noqa: E712
         ).sort("-created_at").limit(3).to_list()
 
+        # A badge for a configuration that no longer exists is worse than no
+        # badge — check whether the set drifted since this run was measured.
+        stale, stale_reasons = await _extraction_set_staleness(
+            ss, latest_run, current_keys=set(keys),
+        )
+        if stale:
+            # Model-visible (not stripped): the agent must caveat the score.
+            response["validation_stale"] = True
+            response["note_validation_stale"] = (
+                "The extraction set changed after its last validation run "
+                f"({'; '.join(stale_reasons)}). Its quality score describes "
+                "the previous configuration — present it as outdated and "
+                "recommend re-validating."
+            )
+
         response["quality"] = {
             "score": latest_run.score,
             "tier": _score_to_tier(latest_run.score),
@@ -1270,6 +1500,7 @@ async def _execute_extraction(
             "last_validated_at": latest_run.created_at.isoformat() if latest_run.created_at else None,
             "num_test_cases": latest_run.num_test_cases,
             "num_runs": latest_run.num_runs,
+            "stale": stale,
             "active_alerts": [
                 {"type": a.alert_type, "severity": a.severity, "message": a.message}
                 for a in alerts
@@ -2161,7 +2392,7 @@ async def propose_test_case(
         if doc.user_id != user_id:
             return {"error": "You do not have access to this document."}
     if not doc.raw_text:
-        return {"error": "Document has no extracted text yet."}
+        return _doc_text_unavailable_err(doc)
 
     items = await ss.get_extraction_items()
     keys = [item.searchphrase for item in items if item.searchphrase]
@@ -2175,6 +2406,11 @@ async def propose_test_case(
     ]
 
     sys_cfg = context.deps.system_config_doc
+    doc_metadata = [{
+        "uuid": document_uuid,
+        "title": doc.title or document_uuid,
+        "text_markers": doc.text_markers or [],
+    }]
 
     def _run():
         engine = ExtractionEngine(system_config_doc=sys_cfg, domain=ss.domain)
@@ -2183,6 +2419,10 @@ async def propose_test_case(
             doc_texts=[doc.raw_text],
             extraction_config_override=ss.extraction_config or None,
             field_metadata=field_metadata,
+            # These values seed the human-verification flow that produces
+            # ground-truth test cases — of all places, they must be traced.
+            capture_sources=True,
+            doc_metadata=doc_metadata,
         )
 
     try:
@@ -2190,20 +2430,33 @@ async def propose_test_case(
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out. Try a smaller extraction set."}
 
+    from app.services.extraction_sources import SOURCE_KEY
+
     flat: dict = {}
+    flat_sources: dict = {}
     if results and isinstance(results, list):
         for item in results:
             if isinstance(item, dict):
+                sidecar = item.pop(SOURCE_KEY, None)
+                if isinstance(sidecar, dict):
+                    flat_sources.update(sidecar)
                 flat.update(item)
 
-    fields = [
-        VerificationField(
+    def _field_for(k: str) -> VerificationField:
+        src = flat_sources.get(k)
+        src = src if isinstance(src, dict) else {}
+        page = src.get("page")
+        return VerificationField(
             key=k,
             extracted=str(flat.get(k)) if flat.get(k) is not None else "",
             status="pending",
+            source_quote=(src.get("quote") or None),
+            source_page=page if isinstance(page, int) else None,
+            source_page_approximate=bool(src.get("page_approximate")),
+            source_verified=bool(src.get("verified")) if src.get("quote") else None,
         )
-        for k in keys
-    ]
+
+    fields = [_field_for(k) for k in keys]
 
     session = VerificationSession(
         search_set_uuid=extraction_set_uuid,
@@ -2225,14 +2478,25 @@ async def propose_test_case(
         "label": session.label,
         "status": "pending_verification",
         "fields": [
-            {"key": f.key, "extracted": f.extracted, "status": f.status}
+            {
+                "key": f.key,
+                "extracted": f.extracted,
+                "status": f.status,
+                "source_page": f.source_page,
+                "source_verified": f.source_verified,
+            }
             for f in fields
         ],
         "field_count": len(fields),
+        "unverified_source_count": sum(
+            1 for f in fields if f.extracted and not f.source_verified
+        ),
         "message": (
             f"Opened a verification session for '{doc.title}'. "
             "Review each extracted value in the document viewer and approve or correct it. "
-            "The test case will be saved only after you finish verifying."
+            "The test case will be saved only after you finish verifying. "
+            "Values without a verified source passage could not be traced to "
+            "the document — point those out as needing the closest review."
         ),
     }
 
@@ -2303,11 +2567,35 @@ async def create_extraction_from_document(
             ),
         )
 
-    if any(not d.raw_text for d in docs):
-        # At least one doc is missing text — filter them out; reject if none remain
-        docs = [d for d in docs if d.raw_text]
-        if not docs:
-            return {"error": "Documents have no extracted text yet. Try again once processing completes."}
+    # Split out docs with no text and say WHY (permanent failure vs still
+    # processing) — silently dropping them lets the model present an analysis
+    # of 3 documents as covering 5.
+    unreadable = [d for d in docs if not d.raw_text]
+    docs = [d for d in docs if d.raw_text]
+    if not docs:
+        if len(unreadable) == 1:
+            return _doc_text_unavailable_err(unreadable[0])
+        failed = [d.title or d.uuid for d in unreadable if getattr(d, "task_status", None) == "error"]
+        if failed:
+            return _err(
+                "None of the documents are readable. Text extraction FAILED "
+                f"permanently for: {', '.join(failed)}. The rest are still processing.",
+                hint=(
+                    "Failed documents will not recover by retrying — suggest "
+                    "re-uploading them. Retry later only for the ones still processing."
+                ),
+            )
+        return {"error": "Documents have no extracted text yet. Try again once processing completes."}
+    unreadable_note: Optional[str] = None
+    if unreadable:
+        parts = [
+            f'"{d.title or d.uuid}" ({"text extraction FAILED" if getattr(d, "task_status", None) == "error" else "still processing"})'
+            for d in unreadable
+        ]
+        unreadable_note = (
+            f"{len(unreadable)} document(s) will NOT be analyzed: "
+            f"{', '.join(parts)}. Tell the user which documents are excluded."
+        )
 
     default_title = title or f"Extraction from {docs[0].title or doc_uuids[0]}"
 
@@ -2330,17 +2618,22 @@ async def create_extraction_from_document(
     )
     if active_project:
         preview_text += f' It will also be pinned to project "{active_project.title}".'
+    if unreadable_note:
+        preview_text += f" Note: {unreadable_note}"
+    preview_payload = {
+        "action": "create_extraction_from_document",
+        "preview": preview_text,
+        "needs_confirmation": True,
+        "document_count": len(docs),
+        "default_title": default_title,
+    }
+    if unreadable_note:
+        preview_payload["excluded_documents_note"] = unreadable_note
     gate = await _confirm_gate(
         context,
         tool_name="create_extraction_from_document",
         key={"docs": sorted(d.uuid for d in docs), "title": default_title},
-        preview={
-            "action": "create_extraction_from_document",
-            "preview": preview_text,
-            "needs_confirmation": True,
-            "document_count": len(docs),
-            "default_title": default_title,
-        },
+        preview=preview_payload,
         confirmed=confirmed,
     )
     if gate is not None:
@@ -2411,7 +2704,7 @@ async def create_extraction_from_document(
     pin_note = (
         f' It\'s pinned to project "{pinned_to_project}".' if pinned_to_project else ""
     )
-    return {
+    result = {
         "extraction_set_uuid": ss.uuid,
         "title": ss.title,
         "fields": discovered_fields,
@@ -2425,6 +2718,9 @@ async def create_extraction_from_document(
             "this same document as the first test case to lock in ground truth."
         ),
     }
+    if unreadable_note:
+        result["excluded_documents_note"] = unreadable_note
+    return result
 
 
 async def run_validation(
@@ -4079,7 +4375,11 @@ async def analyze_documents(
         if not (doc.raw_text or "").strip():
             skipped.append({
                 "uuid": doc_uuid,
-                "reason": "no text yet (still processing or extraction failed)",
+                "reason": (
+                    "text extraction FAILED (permanent — re-upload needed)"
+                    if getattr(doc, "task_status", None) == "error"
+                    else "no text yet (still processing)"
+                ),
             })
             continue
         ready.append({

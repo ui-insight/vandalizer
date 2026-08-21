@@ -720,6 +720,12 @@ async def _run_scripted_demo(
         quality_sidecar = None
 
         if doc_text and keys:
+            demo_doc_metadata = [{
+                "uuid": ctx.sample_doc_uuid,
+                "title": doc_title,
+                "text_markers": (doc.text_markers if doc else None) or [],
+            }]
+
             def _extract():
                 engine = ExtractionEngine(system_config_doc=sys_config_doc, domain=ss.domain if ss else None)
                 results = engine.extract(
@@ -727,6 +733,8 @@ async def _run_scripted_demo(
                     doc_texts=[doc_text],
                     extraction_config_override=ss.extraction_config if ss else None,
                     field_metadata=field_metadata,
+                    capture_sources=True,
+                    doc_metadata=demo_doc_metadata,
                 )
                 return results
 
@@ -738,12 +746,23 @@ async def _run_scripted_demo(
                 logger.warning("Scripted demo extraction timed out")
                 entities = []
 
+            # Same shape as the live run_extraction tool: pop the per-field
+            # source sidecar out of each entity into an index-aligned list.
+            from app.services.extraction_sources import SOURCE_KEY
+            entity_count_total = len(entities)
+            entities = entities[:50]
+            demo_sources: list[dict] = []
+            for entity in entities:
+                sidecar = entity.pop(SOURCE_KEY, None) if isinstance(entity, dict) else None
+                demo_sources.append(sidecar if isinstance(sidecar, dict) else {})
+
             extraction_result = {
                 "extraction_set": template_name,
                 "fields": keys,
                 "documents": [doc_title],
-                "entities": entities[:50],
-                "entity_count": len(entities),
+                "entities": entities,
+                "entity_count": entity_count_total,
+                "sources": demo_sources,
             }
 
             if latest_run and latest_run.score is not None:
@@ -770,9 +789,10 @@ async def _run_scripted_demo(
             acc_pct = round(latest_run.accuracy * 100)
             yield _text(
                 f"That pulled out **{field_count} structured fields** in seconds. "
-                f"Because this template was validated at **{acc_pct}% accuracy**, "
-                "you can trust these results for reporting, budgeting, and compliance — "
-                "not just hope the LLM got it right.\n\n"
+                f"This template measured **{acc_pct}% accuracy** on its test "
+                "cases, so you know how much to trust it before you start — "
+                "and every value still links back to the passage it came from, "
+                "so anything critical takes one click to verify.\n\n"
             )
         else:
             yield _text(
@@ -803,12 +823,19 @@ async def _run_scripted_demo(
             yield _tool_result("search_knowledge_base", call_id_3, kb_content)
 
             if kb_results:
+                # Scripted narration must not assert what the retrieved chunks
+                # say — this block fires on ANY non-empty result, and a
+                # templated policy claim wearing a retrieval costume is
+                # exactly the hallucination pattern the product exists to
+                # prevent. Point at the real snippets instead.
                 yield _text(
-                    "The PAPPG confirms that **equipment over $5,000 is excluded from the "
-                    "MTDC base** for indirect cost calculations — which lines up with the "
-                    "$61,100 equipment line in the extracted budget. "
-                    "This kind of automated cross-reference catches policy issues before they "
-                    "become audit findings.\n\n"
+                    "I pulled the PAPPG passages on **MTDC and equipment "
+                    "exclusions** — they're shown above with their sources, so "
+                    "you can read exactly what the policy says. In a real "
+                    "session I'd compare those passages against the extracted "
+                    "budget lines and flag anything that doesn't line up — "
+                    "automated cross-reference that catches policy issues "
+                    "before they become audit findings.\n\n"
                 )
             else:
                 yield _text(
@@ -1209,6 +1236,7 @@ async def chat_stream(
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     kb_sources: list[dict] = []
     kb_manifest: list[dict] = []
+    kb_retrieval_failed = False
     if kb_uuid:
         try:
             from app.services.knowledge_service import get_kb_manifest
@@ -1225,6 +1253,12 @@ async def chat_stream(
         except Exception as e:
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
             kb_sources = []
+            # A retrieval-backend outage is NOT an empty knowledge base. The
+            # empty-KB mode below permits general-knowledge answers, which
+            # would launder an infrastructure failure into "your documents had
+            # nothing" — so remember the difference and tell both the model
+            # and the user.
+            kb_retrieval_failed = True
 
     # Hold instead of hallucinate. The user attached document(s) but none are
     # readable — text extraction hasn't finished or it failed — and there's no
@@ -1286,6 +1320,21 @@ async def chat_stream(
         reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
     elif have_context:
         reminder_blocks.append(DOCUMENT_CHAT_RULES)
+    elif kb_uuid and kb_retrieval_failed:
+        # Retrieval itself errored (Chroma/embedding outage) — the KB was
+        # never searched. Distinct from the empty-KB mode below, whose rules
+        # permit general-knowledge answers: here the model must report the
+        # failure rather than answer as if the corpus had nothing.
+        kb_empty_mode = True
+        reminder_blocks.append(
+            "Knowledge-base retrieval FAILED for this turn — the search "
+            "backend returned an error, so the project's documents were NOT "
+            "searched. This is not an empty knowledge base. Tell the user "
+            "that document search is temporarily unavailable and they should "
+            "retry shortly. Do NOT answer questions about their documents "
+            "from memory or general knowledge, and do not present any answer "
+            "as grounded in their documents this turn."
+        )
     elif kb_uuid:
         # A project/KB chat was requested but retrieval returned nothing (empty
         # KB, docs not indexed yet, or no match). Do NOT skip the rules block —
@@ -1497,6 +1546,20 @@ async def chat_stream(
             "content": action.detail,
             "action": action.kind,
             "tokens_dropped": action.tokens_dropped,
+        }) + "\n"
+    if kb_retrieval_failed:
+        # Surface the outage to the user directly — the model is instructed to
+        # say so too, but an infrastructure failure should never depend on the
+        # model choosing to mention it.
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                "Document search is temporarily unavailable (retrieval "
+                "backend error) — this answer is not grounded in your "
+                "documents. Retry in a moment."
+            ),
+            "action": "kb_retrieval_failed",
+            "tokens_dropped": 0,
         }) + "\n"
 
     # Context meter (uplift plan Phase 2): estimate the request we're about
@@ -2464,7 +2527,13 @@ async def _build_kb_segment(
         if doc_uuid:
             src_dict["document_uuid"] = doc_uuid
 
-    return DocumentSegment(label="kb", text=kb_text), kb_sources
+    # required=True: the source chips emitted to the UI promise that the answer
+    # is grounded in exactly these snippets, so the budget planner must never
+    # trim or drop this segment behind the user's back. If a turn genuinely
+    # cannot fit the KB evidence, failing loudly (over-budget notice) is the
+    # honest outcome — an answer wearing citation chips for evidence the model
+    # never saw is not.
+    return DocumentSegment(label="kb", text=kb_text, required=True), kb_sources
 
 
 def _build_interrupted_body(full_response: list[str], reason: str) -> str:

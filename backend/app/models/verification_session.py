@@ -22,6 +22,14 @@ class VerificationField(BaseModel):
     extracted: str
     expected: Optional[str] = None  # User-corrected value, if any
     status: str = "pending"  # "pending" | "approved" | "corrected" | "skipped"
+    # Source tracking (see extraction_sources): the verbatim passage the value
+    # came from, resolved to a page and verified against the document text. A
+    # value with source_verified=False (or no source at all) could not be
+    # traced — the reviewer should scrutinize it, not rubber-stamp it.
+    source_quote: Optional[str] = None
+    source_page: Optional[int] = None
+    source_page_approximate: bool = False
+    source_verified: Optional[bool] = None
 
 
 class VerificationSession(Document):
