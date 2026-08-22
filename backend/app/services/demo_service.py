@@ -120,6 +120,59 @@ async def submit_application(
     return app
 
 
+def _email_domain(email: str) -> str:
+    """Bucket self-serve signups by email domain for per-org caps and stats."""
+    domain = (email or "").rsplit("@", 1)[-1].strip().lower()
+    return domain or "self-registered"
+
+
+async def begin_self_serve_trial(
+    user: User, settings: Settings | None = None
+) -> DemoApplication:
+    """Start the trial for a user who registered directly (no waitlist).
+
+    Marks the User as a demo account and mints — or adopts, for a pending
+    waitlist applicant who registered instead of waiting — an *active*
+    DemoApplication. The application record is what the whole trial lifecycle
+    keys on (check_expirations, send_expiry_warnings, the trial-end/renewal
+    screen, engagement scoring, the admin dashboard); without it a
+    self-registered "trial" never expires.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expires = now + datetime.timedelta(days=TRIAL_DAYS)
+
+    user.is_demo_user = True
+    user.demo_status = "active"
+    user.demo_expires_at = expires
+    await user.save()
+
+    email = (user.email or user.user_id or "").strip().lower()
+    app = await DemoApplication.find_one(DemoApplication.email == email)
+    if app is None:
+        app = DemoApplication(
+            uuid=secrets.token_urlsafe(16),
+            name=user.name or email,
+            email=email,
+            organization=_email_domain(email),
+            status="active",
+            user_id=user.user_id,
+            activated_at=now,
+            expires_at=expires,
+            created_at=now,
+        )
+        await app.insert()
+    else:
+        app.status = "active"
+        app.user_id = user.user_id
+        app.activated_at = now
+        app.expires_at = expires
+        await app.save()
+    return app
+
+
 async def get_waitlist_status(uuid: str) -> Optional[DemoApplication]:
     """Return current application status."""
     app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
@@ -288,12 +341,72 @@ async def _find_or_create_org_team(
     return team
 
 
+async def _backfill_orphan_trial_applications(now: datetime.datetime) -> int:
+    """Mint applications for trial users that predate begin_self_serve_trial.
+
+    Registration used to set only the User demo flags, so those accounts have
+    no DemoApplication and the expiry sweep could never see them. Give each an
+    active application carrying the user's original expiry (already-overdue
+    ones then expire in the same sweep that minted them).
+    """
+    users = await User.find(
+        User.is_demo_user == True,  # noqa: E712 — Beanie query expression
+        User.demo_status == "active",
+    ).to_list()
+    if not users:
+        return 0
+
+    linked_user_ids = {
+        app.user_id
+        for app in await DemoApplication.find(
+            DemoApplication.user_id != None  # noqa: E711 — Beanie query expression
+        ).to_list()
+    }
+
+    created = 0
+    for user in users:
+        if user.user_id in linked_user_ids:
+            continue
+        expires = user.demo_expires_at or now
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=datetime.timezone.utc)
+        activated = expires - datetime.timedelta(days=TRIAL_DAYS)
+
+        email = (user.email or user.user_id or "").strip().lower()
+        app = await DemoApplication.find_one(DemoApplication.email == email)
+        if app is None:
+            app = DemoApplication(
+                uuid=secrets.token_urlsafe(16),
+                name=user.name or email,
+                email=email,
+                organization=_email_domain(email),
+                status="active",
+                user_id=user.user_id,
+                activated_at=activated,
+                expires_at=expires,
+                created_at=activated,
+            )
+            await app.insert()
+        else:
+            app.status = "active"
+            app.user_id = user.user_id
+            app.activated_at = app.activated_at or activated
+            app.expires_at = expires
+            await app.save()
+        created += 1
+
+    if created:
+        logger.info("Backfilled %d orphan trial applications", created)
+    return created
+
+
 async def check_expirations(settings: Settings | None = None) -> int:
     """Lock expired demo accounts and send feedback emails. Returns count expired."""
     if settings is None:
         settings = Settings()
 
     now = datetime.datetime.now(datetime.timezone.utc)
+    await _backfill_orphan_trial_applications(now)
     expired_apps = await DemoApplication.find(
         DemoApplication.status == "active",
         DemoApplication.expires_at <= now,

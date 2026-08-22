@@ -271,6 +271,12 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
     text = str(exc)
     lower = text.lower()
 
+    # Trial account out of token budget — expected lifecycle event, not a bug.
+    from app.exceptions import TrialBudgetExceededError
+
+    if isinstance(exc, TrialBudgetExceededError):
+        return "warning", exc.message
+
     # Upstream LLM context window exceeded — user-input issue, not a bug.
     if "exceeds model's maximum context length" in lower or "context length" in lower:
         return "warning", (
@@ -785,8 +791,12 @@ async def chat_stream(
         team_id=getattr(conversation, "team_id", None),
         activity_id=activity_id,
     )
-    await _meter.__aenter__()
+    _meter_entered = False
     try:
+        # Entered inside the try so a trial-budget rejection at scope entry
+        # surfaces through the stream's error path instead of aborting the SSE.
+        await _meter.__aenter__()
+        _meter_entered = True
         think_parser = _ThinkTagParser()
 
         async with agent.iter(
@@ -909,7 +919,8 @@ async def chat_stream(
         except Exception as save_err:
             logger.error("Failed to persist interrupted chat: %s", save_err)
     finally:
-        await _meter.__aexit__(None, None, None)
+        if _meter_entered:
+            await _meter.__aexit__(None, None, None)
 
 
 

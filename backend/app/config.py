@@ -95,6 +95,10 @@ class Settings(BaseSettings):
 
     # Trial / demo system (disabled by default for self-hosters)
     enable_trial_system: bool = False
+    # Lifetime LLM token budget (input + output) per trial account, enforced at
+    # the metering chokepoint (services/trial_budget.py). Only applies while
+    # the trial system is enabled; 0 disables the cap.
+    trial_token_budget: int = 5_000_000
 
     # Upstream update check — hits api.github.com once per hour (cached in Redis)
     # to surface an "update available" banner to admins. Set to True to opt out

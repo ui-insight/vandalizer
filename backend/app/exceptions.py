@@ -40,3 +40,10 @@ class ConflictError(AppError):
 
     def __init__(self, message: str = "Resource conflict"):
         super().__init__(message, status_code=409)
+
+
+class TrialBudgetExceededError(AppError):
+    """A trial account has used up its included LLM token budget."""
+
+    def __init__(self, message: str = "Trial AI usage limit reached"):
+        super().__init__(message, status_code=402)
