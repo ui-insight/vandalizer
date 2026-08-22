@@ -472,10 +472,20 @@ async def update_profile(
     return await _user_response(user)
 
 
+def _email_prefs_response(prefs: dict | None) -> dict:
+    # Always return every known key so the settings UI never renders an
+    # undefined checkbox; missing keys default to enabled (opt-out model).
+    prefs = prefs or {}
+    return {
+        "onboarding": prefs.get("onboarding", True),
+        "nudges": prefs.get("nudges", True),
+    }
+
+
 @router.get("/email-preferences")
 async def get_email_preferences(user: User = Depends(get_current_user)):
     """Get the current user's email notification preferences."""
-    return user.email_preferences or {"onboarding": True, "nudges": True}
+    return _email_prefs_response(user.email_preferences)
 
 
 @router.put("/email-preferences")
@@ -490,7 +500,7 @@ async def update_email_preferences(
             prefs[key] = bool(body[key])
     user.email_preferences = prefs
     await user.save()
-    return prefs
+    return _email_prefs_response(prefs)
 
 
 @router.post("/account/delete/preflight")

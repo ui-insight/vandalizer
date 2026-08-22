@@ -23,7 +23,7 @@ import { stageCopy } from '../../utils/processingStatus'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Brewing', 'Crunching', 'Conjuring',
+  'Processing', 'Reading', 'Reviewing',
 ]
 
 function StreamingLabel() {
@@ -513,7 +513,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             Drop files to add to chat &amp; files
           </div>
           <div style={{ fontSize: 12, color: '#6b7280' }}>
-            pdf, doc, docx, xls, xlsx, csv
+            pdf, doc, docx, xls, xlsx, csv, txt, md
           </div>
         </div>
       )}

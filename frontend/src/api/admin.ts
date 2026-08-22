@@ -801,7 +801,6 @@ export interface CertificationProgressItem {
   modules_total: number
   certified: boolean
   certified_at: string | null
-  streak_days: number
   last_activity_date: string | null
   unlocked: boolean
   updated_at: string | null

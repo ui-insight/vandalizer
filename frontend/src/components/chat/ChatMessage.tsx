@@ -14,7 +14,7 @@ const ACTION_RE = /\[ACTION:([\w-]+)\](.*?)\[\/ACTION\]/g
 
 const THINKING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Brewing', 'Crunching', 'Conjuring',
+  'Processing', 'Reading', 'Reviewing',
 ]
 
 function ThinkingLabel() {

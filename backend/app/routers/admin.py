@@ -3208,7 +3208,6 @@ class CertificationProgressItem(BaseModel):
     modules_total: int
     certified: bool
     certified_at: Optional[datetime.datetime] = None
-    streak_days: int
     last_activity_date: Optional[str] = None
     unlocked: bool = False
     updated_at: Optional[datetime.datetime] = None
@@ -3259,7 +3258,6 @@ async def list_certification_progress(
                 modules_total=total_modules,
                 certified=p.certified,
                 certified_at=p.certified_at,
-                streak_days=p.streak_days,
                 last_activity_date=p.last_activity_date,
                 unlocked=p.unlocked,
                 updated_at=p.updated_at,
@@ -3300,7 +3298,6 @@ async def get_certification_progress_detail(
         modules_total=len(cert_svc.MODULE_ORDER),
         certified=p.certified,
         certified_at=p.certified_at,
-        streak_days=p.streak_days,
         last_activity_date=p.last_activity_date,
         unlocked=p.unlocked,
         updated_at=p.updated_at,

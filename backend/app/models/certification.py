@@ -14,8 +14,10 @@ class CertificationProgress(Document):
     level: str = "novice"
     certified: bool = False
     certified_at: Optional[datetime.datetime] = None
+    # Retired gamification counter — no longer updated or exposed. Kept so
+    # existing documents still validate; safe to drop in a future migration.
     streak_days: int = 0
-    last_activity_date: Optional[str] = None  # YYYY-MM-DD for streak tracking
+    last_activity_date: Optional[str] = None  # YYYY-MM-DD of last module/assessment activity
     unlocked: bool = False  # Admin debug flag — bypasses module prerequisite gating
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))

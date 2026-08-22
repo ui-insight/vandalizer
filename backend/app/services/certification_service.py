@@ -114,30 +114,20 @@ async def get_progress_dict(user_id: str) -> dict:
         "level": prog.level,
         "certified": prog.certified,
         "certified_at": prog.certified_at.isoformat() if prog.certified_at else None,
-        "streak_days": prog.streak_days,
         "last_activity_date": prog.last_activity_date,
         "unlocked": prog.unlocked,
     }
 
 
 # ---------------------------------------------------------------------------
-# Streak tracking
+# Activity tracking
 # ---------------------------------------------------------------------------
 
-def _update_streak(prog: CertificationProgress) -> None:
-    today = datetime.date.today().isoformat()
-    if prog.last_activity_date == today:
-        return
-    if prog.last_activity_date:
-        last = datetime.date.fromisoformat(prog.last_activity_date)
-        diff = (datetime.date.today() - last).days
-        if diff == 1:
-            prog.streak_days += 1
-        elif diff > 1:
-            prog.streak_days = 1
-    else:
-        prog.streak_days = 1
-    prog.last_activity_date = today
+def _touch_activity(prog: CertificationProgress) -> None:
+    # Deliberately not a streak: the audience is professionals, and a
+    # consecutive-day counter is daily-login pressure. Admin reporting only
+    # needs the most recent activity date.
+    prog.last_activity_date = datetime.date.today().isoformat()
 
 
 # ---------------------------------------------------------------------------
@@ -329,7 +319,7 @@ async def complete_module(user_id: str, module_id: str) -> dict:
         prog.certified = True
         prog.certified_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
-    _update_streak(prog)
+    _touch_activity(prog)
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await prog.save()
 
@@ -471,7 +461,7 @@ async def store_assessment(user_id: str, module_id: str, answers: dict) -> dict:
         "completed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
     }
     prog.modules[module_id] = module_data
-    _update_streak(prog)
+    _touch_activity(prog)
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await prog.save()
     return {"stored": True}

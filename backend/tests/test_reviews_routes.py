@@ -151,7 +151,7 @@ class TestReviewAuthorization:
         with patch("app.dependencies.decode_token", return_value={"sub": "randomuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.reviews.ApprovalRequest") as MockApproval, \
-             patch("app.routers.reviews.WorkflowResult") as MockResult, \
+             patch("app.routers.reviews.ActivityEvent") as MockActivity, \
              patch(
                  "app.routers.reviews.access_control.get_authorized_workflow",
                  new_callable=AsyncMock,
@@ -159,8 +159,8 @@ class TestReviewAuthorization:
              ):
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
-            # Somebody else's run, so the "you ran this" path does not apply.
-            MockResult.get = AsyncMock(return_value=SimpleNamespace(user_id="someone-else"))
+            # Somebody else's run: no activity row ties this user to it.
+            MockActivity.find_one = AsyncMock(return_value=None)
 
             resp = await client.get(
                 f"/api/reviews/{approval.uuid}",
@@ -188,7 +188,7 @@ class TestReviewAuthorization:
         with patch("app.dependencies.decode_token", return_value={"sub": "runner", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.reviews.ApprovalRequest") as MockApproval, \
-             patch("app.routers.reviews.WorkflowResult") as MockResult, \
+             patch("app.routers.reviews.ActivityEvent") as MockActivity, \
              patch("app.routers.reviews.User") as MockRouterUser, \
              patch(
                  "app.routers.reviews.access_control.get_authorized_workflow",
@@ -199,7 +199,11 @@ class TestReviewAuthorization:
             MockApproval.find_one = AsyncMock(return_value=approval)
             # Only used to render the requester's display name.
             MockRouterUser.find_one = AsyncMock(return_value=None)
-            MockResult.get = AsyncMock(return_value=SimpleNamespace(user_id="runner"))
+            # The runner's own activity row for this run exists — that is the
+            # record tying user to run (WorkflowResult has no user_id).
+            MockActivity.find_one = AsyncMock(
+                return_value=SimpleNamespace(user_id="runner"),
+            )
 
             resp = await client.get(
                 f"/api/reviews/{approval.uuid}",
@@ -217,7 +221,7 @@ class TestReviewAuthorization:
         with patch("app.dependencies.decode_token", return_value={"sub": "randomuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.reviews.ApprovalRequest") as MockApproval, \
-             patch("app.routers.reviews.WorkflowResult") as MockResult, \
+             patch("app.routers.reviews.ActivityEvent") as MockActivity, \
              patch(
                  "app.routers.reviews.access_control.get_authorized_workflow",
                  new_callable=AsyncMock,
@@ -225,7 +229,7 @@ class TestReviewAuthorization:
              ):
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
-            MockResult.get = AsyncMock(side_effect=RuntimeError("mongo down"))
+            MockActivity.find_one = AsyncMock(side_effect=RuntimeError("mongo down"))
 
             resp = await client.get(
                 f"/api/reviews/{approval.uuid}",

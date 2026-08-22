@@ -20,6 +20,7 @@ from app.models.approval import (
     STATUS_PENDING,
     STATUS_REJECTED,
 )
+from app.models.activity import ActivityEvent
 from app.models.document import SmartDocument
 from app.models.user import User
 from app.models.workflow import Workflow, WorkflowResult
@@ -128,16 +129,20 @@ async def _can_view_approval(approval: ApprovalRequest, user: User) -> bool:
     # shared workflow, or a share-link recipient. Their own activity row links
     # straight here, so without this they follow a link from their own run and
     # get "Review not found" — having also lost the previous behaviour, where
-    # clicking that row opened the workflow.
+    # clicking that row opened the workflow. WorkflowResult carries no user_id;
+    # the runner is recorded on their ActivityEvent for the run.
     try:
-        result = await WorkflowResult.get(approval.workflow_result_id)
+        ran_it = await ActivityEvent.find_one(
+            ActivityEvent.workflow_result == approval.workflow_result_id,
+            ActivityEvent.user_id == user.user_id,
+        )
     except Exception:  # pragma: no cover - defensive
         logger.warning(
-            "Could not load run %s while checking review visibility",
-            approval.workflow_result_id, exc_info=True,
+            "Could not check runner activity for run %s while checking review "
+            "visibility", approval.workflow_result_id, exc_info=True,
         )
-        result = None
-    if result is not None and result.user_id == user.user_id:
+        ran_it = None
+    if ran_it is not None:
         return True
     # Workflow manage rights (covers team admins on team-scoped workflows)
     workflow = await access_control.get_authorized_workflow(

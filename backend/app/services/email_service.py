@@ -176,6 +176,18 @@ _BASE_STYLE = """
 """
 
 
+def _prefs_footer(frontend_url: str) -> str:
+    """Footer for engagement (non-transactional) emails.
+
+    Every marketing-class email must carry a way off the list; the Account
+    page hosts the email-preference toggles.
+    """
+    return (
+        '<div class="footer">Vandalizer &middot; '
+        f'<a href="{frontend_url}/account" style="color:#6b7280">Manage email preferences</a></div>'
+    )
+
+
 def test_email(to: str) -> tuple[str, str]:
     """Returns (subject, html_body) for a deliverability test email."""
     subject = "Vandalizer Email Deliverability Test"
@@ -768,38 +780,40 @@ def quality_alert_email(
 # ---------------------------------------------------------------------------
 
 
+# Factual reminders only — no countdowns, scarcity, or "don't miss out"
+# framing. The audience is professionals; the sequence is capped at three
+# and stops the moment they sign in.
 _RECAPTURE_SEQUENCE = [
     {
-        "subject": "Your Vandalizer demo account is waiting for you",
+        "subject": "Your Vandalizer demo account is ready",
         "heading": "Ready when you are",
         "body": (
-            "You were activated for a Vandalizer demo "
-            "but we noticed you haven't logged in yet. "
-            "Your credentials were included in your activation email. "
-            "check your inbox (and spam folder) for an email from us."
+            "Your Vandalizer demo account was activated, but you haven't "
+            "signed in yet. Your credentials were included in your activation "
+            "email — check your inbox (and spam folder) for an email from us."
         ),
-        "cta": "Sign In Now",
+        "cta": "Sign In",
     },
     {
-        "subject": "Don't miss out on your Vandalizer trial",
-        "heading": "Your trial clock is running",
+        "subject": "Need a hand signing in to your Vandalizer demo?",
+        "heading": "Your demo is active",
         "body": (
-            "Your 2-week Vandalizer demo is already active, but you haven't "
-            "signed in yet. Every day you wait is a day less to explore the platform. "
-            "If you're having trouble logging in, just reply to this email and we'll help."
+            "Your 2-week Vandalizer demo is active, but you haven't signed in "
+            "yet. If the activation email went missing or something isn't "
+            "working, just reply to this email and we'll help."
         ),
-        "cta": "Log In Now",
+        "cta": "Sign In",
     },
     {
-        "subject": "Last reminder: your Vandalizer demo expires soon",
-        "heading": "Running out of time",
+        "subject": "Your Vandalizer demo expires soon",
+        "heading": "Before your demo window closes",
         "body": (
-            "This is our last reminder. Your Vandalizer demo trial will expire "
-            "soon and you haven't logged in yet. "
-            "We'd hate for you to miss the chance to try out AI-powered document intelligence. "
-            "If something went wrong with your account, reply to this email and we'll sort it out."
+            "A last note — we send at most three of these. Your demo account "
+            "will expire soon. If you'd still like a look, the button below "
+            "signs you in; if the timing didn't work out, reply to this email "
+            "and we'll set you up with a fresh window when you're ready."
         ),
-        "cta": "Try Vandalizer Now",
+        "cta": "Sign In",
     },
 ]
 
@@ -817,7 +831,7 @@ def recapture_email(
       <p>Hi {name}, {seq['body']}</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">{seq['cta']}</a></p>
       <p style="font-size:13px;color:#6b7280;margin-top:16px">Lost your credentials? <a href="{resend_url}" style="color:#f1b300">Resend them</a>.</p>
-      <div class="footer">Vandalizer</div>
+      <div class="footer">Vandalizer &middot; We send at most three of these reminders, and they stop as soon as you sign in.</div>
     </div></div></body></html>"""
     return subject, html
 
@@ -835,7 +849,7 @@ def onboarding_drip_email(
         1: "Welcome to Vandalizer: start your certification journey",
         2: f"Ready for hands-on? {module_title} is next",
         3: f"Keep building: {module_title} awaits",
-        4: "You're making great progress. Keep going!",
+        4: f"Your next module: {module_title}",
     }
     subject = subjects.get(step, f"Continue your certification: {module_title}")
 
@@ -845,8 +859,8 @@ def onboarding_drip_email(
       <h1>{module_title}</h1>
       <p>Hi {name}, {module_description}</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/certification">Open Certification</a></p>
-      <p style="font-size:13px;color:#6b7280;margin-top:16px">Complete modules to earn XP and work toward your Vandal Workflow Architect certification.</p>
-      <div class="footer">Vandalizer</div>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Each module is a short, hands-on step toward the Vandal Workflow Architect certification.</p>
+      {_prefs_footer(frontend_url)}
     </div></div></body></html>"""
     return subject, html
 
@@ -873,6 +887,6 @@ def inactivity_nudge_email(
       <ul style="padding-left:20px;margin:16px 0">{items_html}</ul>
       <p>These verified extractions and knowledge bases are ready to use in your workflows.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/library?tab=catalog">Browse Catalog</a></p>
-      <div class="footer">Vandalizer</div>
+      {_prefs_footer(frontend_url)}
     </div></div></body></html>"""
     return subject, html

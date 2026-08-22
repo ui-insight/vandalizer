@@ -89,6 +89,24 @@ export function updateProfile(data: { name?: string; email?: string; current_pas
   })
 }
 
+// Email preferences
+
+export interface EmailPreferences {
+  onboarding: boolean
+  nudges: boolean
+}
+
+export function getEmailPreferences() {
+  return apiFetch<EmailPreferences>('/api/auth/email-preferences')
+}
+
+export function updateEmailPreferences(prefs: Partial<EmailPreferences>) {
+  return apiFetch<EmailPreferences>('/api/auth/email-preferences', {
+    method: 'PUT',
+    body: JSON.stringify(prefs),
+  })
+}
+
 // API Token management
 
 export function generateApiToken() {
