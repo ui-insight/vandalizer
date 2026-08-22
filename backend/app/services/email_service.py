@@ -289,9 +289,20 @@ def trial_expired_email(name: str, trial_end_url: str) -> tuple[str, str]:
     return subject, html
 
 
-def trial_extended_email(name: str, expires_at: str, frontend_url: str) -> tuple[str, str]:
-    """Returns (subject, html_body) confirming a self-serve trial renewal."""
+def trial_extended_email(
+    name: str,
+    expires_at: str,
+    frontend_url: str,
+    magic_link: str | None = None,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) confirming a self-serve trial renewal.
+
+    Trial accounts sign in via magic link (their password is random and was
+    never disclosed), so the CTA carries one whenever the caller can mint it —
+    a bare /login link is a dead end for these users.
+    """
     subject = "Your Vandalizer trial is extended"
+    cta_url = magic_link or f"{frontend_url}/login"
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
@@ -300,7 +311,9 @@ def trial_extended_email(name: str, expires_at: str, frontend_url: str) -> tuple
          through <span class="highlight">{expires_at}</span>.</p>
       <p>Thanks for helping shape the product. As new releases land, you'll see
          them here first.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Back to Vandalizer</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{cta_url}">Back to Vandalizer</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Prefer a password?
+         Set one anytime via <a href="{frontend_url}/login" style="color:#f1b300">Forgot password</a> on the sign-in page.</p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

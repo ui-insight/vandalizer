@@ -37,6 +37,7 @@ export default function DemoTrialEnd() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [extended, setExtended] = useState(false)
+  const [loginUrl, setLoginUrl] = useState<string | null>(null)
   const [answers, setAnswers] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
@@ -59,7 +60,8 @@ export default function DemoTrialEnd() {
     setError('')
     setSubmitting(true)
     try {
-      await requestTrialExtension(token, notes)
+      const result = await requestTrialExtension(token, notes)
+      setLoginUrl(result.login_url ?? null)
       setExtended(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not extend your trial.')
@@ -69,6 +71,14 @@ export default function DemoTrialEnd() {
   }
 
   async function enterApp() {
+    // Trial accounts have no known password, and the renewal usually happens
+    // with no live session (locked accounts can't log in). The one-time magic
+    // link the extension returned signs them in server-side and lands on the
+    // app — use it whenever we have it; it works with or without a session.
+    if (loginUrl) {
+      window.location.assign(loginUrl)
+      return
+    }
     await refreshUser()
     navigate({
       to: '/',

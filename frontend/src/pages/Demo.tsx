@@ -109,8 +109,15 @@ function StatusCheck() {
           )}
           {status.status === 'active' && (
             <div className="mt-4 pt-4 border-t border-white/10">
+              {status.activation_email_failed && (
+                <div className="mb-3 rounded-md bg-amber-500/10 border border-amber-500/30 p-3 text-sm text-amber-300">
+                  Your account is active, but we couldn't deliver your sign-in
+                  email. Hit resend below — and check your spam folder if it
+                  keeps missing.
+                </div>
+              )}
               <p className="text-sm text-gray-400 mb-3">
-                Lost your login credentials? We'll send a new password to the email on file.
+                Can't find your sign-in email? We'll send a fresh one-click sign-in link to the email on file.
               </p>
               <button
                 onClick={handleResend}
@@ -118,7 +125,7 @@ function StatusCheck() {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#f1b300]/10 border border-[#f1b300]/20 px-4 py-2 text-sm font-bold text-[#f1b300] hover:bg-[#f1b300]/20 disabled:opacity-50 transition-colors"
               >
                 {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
-                Resend Login Credentials
+                Resend sign-in link
               </button>
             </div>
           )}
@@ -225,7 +232,7 @@ export default function Demo() {
               autoComplete="organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
-              placeholder="e.g., University of Idaho"
+              placeholder="e.g., State University"
               className={INPUT_CLASS}
             />
           </div>
@@ -324,8 +331,9 @@ export default function Demo() {
                 <CheckCircle className="w-16 h-16 text-green-400 mx-auto mb-6" />
                 <h2 className="text-2xl font-bold text-white mb-4">Application Received!</h2>
                 <p className="text-gray-400 mb-6">
-                  You're at position <span className="text-[#f1b300] font-bold">#{position}</span> on the waitlist.
-                  Check your email for a confirmation message.
+                  You're number <span className="text-[#f1b300] font-bold">#{position}</span> in
+                  line. Activation is automatic — when a trial slot is free (they
+                  usually are), your sign-in email arrives within about 15 minutes.
                 </p>
                 <div className="p-4 rounded-lg bg-white/5 border border-white/10 mb-6">
                   <p className="text-sm text-gray-500 mb-1">Your Application ID</p>

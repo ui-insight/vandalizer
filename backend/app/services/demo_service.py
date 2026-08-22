@@ -61,7 +61,7 @@ def _generate_demo_password() -> str:
 
 
 async def _create_magic_login_token(user_id: str, settings: Settings) -> str:
-    """Create a one-time magic login URL (48h TTL) for the given user."""
+    """Create a one-time magic login URL (TTL = MAGIC_LINK_TTL_SECONDS)."""
     token = secrets.token_urlsafe(32)
     r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
     try:
@@ -135,6 +135,30 @@ async def get_waitlist_status(uuid: str) -> Optional[DemoApplication]:
         app.waitlist_position = ahead + 1
 
     return app
+
+
+async def estimate_wait_text(app: DemoApplication) -> Optional[str]:
+    """Honest wait estimate for a pending application.
+
+    Activation is automatic — a beat job admits pending applications FIFO
+    every few minutes while slots are free — so the only real wait is a full
+    house. (The old "position × 1 day" formula described a review queue that
+    doesn't exist.)
+    """
+    if app.status != "pending" or not app.waitlist_position:
+        return None
+    active_count = await DemoApplication.find(
+        DemoApplication.status == "active"
+    ).count()
+    if app.waitlist_position <= MAX_ACTIVE_DEMOS - active_count:
+        return (
+            "Activation is automatic — expect your sign-in email within "
+            "about 15 minutes."
+        )
+    return (
+        "All trial slots are full right now. You'll be activated automatically "
+        "as soon as one opens, and we'll email you the moment it happens."
+    )
 
 
 async def process_waitlist(settings: Settings | None = None) -> int:
@@ -257,6 +281,11 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
             "but they have no way in — needs a resend)",
             app.email,
         )
+    # Persisted so the public status page can tell the applicant the email
+    # didn't go out and offer the resend button, instead of showing "active"
+    # with no way in. Cleared by a successful resend.
+    app.activation_email_failed = not sent
+    await app.save()
 
 
 async def _find_or_create_org_team(
@@ -435,14 +464,19 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> dic
     )
     if not sent:
         logger.error("Resend sign-in link FAILED to send for demo user %s", app.email)
+        app.activation_email_failed = True
+        await app.save()
         return {"status": "send_failed", "email": app.email}
 
     logger.info("Resent sign-in link for demo user %s", app.email)
+    if app.activation_email_failed:
+        app.activation_email_failed = False
+        await app.save()
     return {"status": "sent", "email": app.email}
 
 
 async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
-    """Generate a one-time magic login link for a demo user (48h TTL)."""
+    """Generate a one-time magic login link (TTL = MAGIC_LINK_TTL_SECONDS)."""
     app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
     if not app or app.status != "active" or not app.user_id:
         return None
@@ -634,9 +668,22 @@ async def self_extend_trial(
             user.demo_expires_at = new_expires
             await user.save()
 
+    # Trial accounts have a random password the user never saw — a magic link
+    # is their way back in, so the confirmation email and the renewal screen's
+    # "Enter" button both carry one instead of pointing at /login. Two separate
+    # tokens: magic-login is one-time, and either path must survive the other
+    # being used first.
+    email_link = None
+    screen_link = None
+    if app.user_id:
+        email_link = await _create_magic_login_token(app.user_id, settings)
+        screen_link = await _create_magic_login_token(app.user_id, settings)
+
     # Confirmation email
     expires_str = new_expires.strftime("%B %d, %Y")
-    subject, html = trial_extended_email(app.name, expires_str, settings.frontend_url)
+    subject, html = trial_extended_email(
+        app.name, expires_str, settings.frontend_url, magic_link=email_link
+    )
     await send_email(app.email, subject, html, settings, email_type="trial_extended")
 
     logger.info(
@@ -644,7 +691,11 @@ async def self_extend_trial(
         app.email,
         app.trial_extensions_used,
     )
-    return {"ok": True, "expires_at": new_expires.isoformat()}
+    return {
+        "ok": True,
+        "expires_at": new_expires.isoformat(),
+        "login_url": screen_link,
+    }
 
 
 async def admin_add_demo_user(
@@ -942,8 +993,8 @@ async def send_test_email(to: str, settings: Settings | None = None) -> bool:
 
 
 async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
-    """Reset passwords and resend activation emails for all active demo users
-    who have never logged in. Returns counts of successes and failures."""
+    """Resend fresh magic sign-in links to all active demo users who have
+    never logged in (no password rotation). Returns success/failure counts."""
     if settings is None:
         settings = Settings()
 

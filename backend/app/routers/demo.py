@@ -59,16 +59,12 @@ async def waitlist_status(uuid: str):
             status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
         )
 
-    estimated = None
-    if app.status == "pending" and app.waitlist_position:
-        # Rough estimate: ~5 activations per processing cycle
-        estimated = f"Approximately {app.waitlist_position * 1} day(s)"
-
     return WaitlistStatusResponse(
         uuid=app.uuid,
         status=app.status,
         waitlist_position=app.waitlist_position if app.status == "pending" else None,
-        estimated_wait=estimated,
+        estimated_wait=await demo_service.estimate_wait_text(app),
+        activation_email_failed=app.activation_email_failed,
     )
 
 
@@ -152,6 +148,7 @@ async def extend_trial(
         ok=True,
         message="Your trial has been extended. Welcome back!",
         expires_at=result.get("expires_at"),
+        login_url=result.get("login_url"),
     )
 
 
@@ -291,8 +288,8 @@ async def admin_bulk_resend_credentials(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    """Reset passwords and resend activation emails for all active demo users
-    who have never logged in. Use after fixing deliverability issues."""
+    """Resend fresh magic sign-in links to all active demo users who have
+    never logged in. Use after fixing deliverability issues."""
     _require_admin(user)
     result = await demo_service.bulk_resend_credentials(settings)
     return {"ok": True, **result}

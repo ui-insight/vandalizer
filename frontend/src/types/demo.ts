@@ -30,6 +30,8 @@ export interface WaitlistStatusResponse {
   status: string
   waitlist_position: number | null
   estimated_wait: string | null
+  /** The activation/resend email failed — steer the user to the resend button. */
+  activation_email_failed?: boolean
 }
 
 export interface PostExperienceRequest {
@@ -56,6 +58,8 @@ export interface TrialExtensionResult {
   ok: boolean
   message: string
   expires_at: string | null
+  /** One-time magic sign-in URL — the renewed account's way back in. */
+  login_url?: string | null
 }
 
 export interface DemoApplication {

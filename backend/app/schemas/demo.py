@@ -21,6 +21,9 @@ class WaitlistStatusResponse(BaseModel):
     status: str
     waitlist_position: Optional[int] = None
     estimated_wait: Optional[str] = None
+    # True when the activation/resend email couldn't be delivered — the status
+    # page uses this to steer the applicant to the resend button.
+    activation_email_failed: bool = False
 
 
 class ResendCredentialsResponse(BaseModel):
@@ -58,6 +61,9 @@ class TrialExtensionResponse(BaseModel):
     ok: bool
     message: str
     expires_at: Optional[str] = None
+    # One-time magic sign-in URL for the renewal screen's "Enter" button —
+    # trial accounts have no known password, so this is their way back in.
+    login_url: Optional[str] = None
 
 
 class DemoApplicationResponse(BaseModel):
