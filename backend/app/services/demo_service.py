@@ -206,7 +206,9 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
             if d not in ("Other", "I'm not in research administration"):
                 department = d
                 break
-    team = await _find_or_create_org_team(app.organization, user.user_id, department)
+    team = await _find_or_create_org_team(
+        app.organization, user.user_id, department, applicant_email=app.email
+    )
 
     # Add membership
     existing_membership = await TeamMembership.find_one(
@@ -259,20 +261,62 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
         )
 
 
+def _login_domain(identity: str) -> str:
+    """The email domain of a login identity, lowercased ('' when not an email)."""
+    identity = (identity or "").strip().lower()
+    return identity.rsplit("@", 1)[-1] if "@" in identity else ""
+
+
+async def _can_join_demo_team(team: Team, applicant_email: str) -> bool:
+    """Whether a demo applicant may be added to an existing team.
+
+    Two gates, both required. The team must be demo-created — the org name on
+    an application is self-asserted free text, and matching it against *any*
+    team let an applicant type a real team's name and read its shared
+    documents. And the applicant's email domain must match the team owner's:
+    the domain is the one piece of the org claim the applicant actually
+    demonstrated control of (they hold the magic-link inbox), so it, not the
+    typed string, is what earns cohort membership.
+    """
+    if not team.is_demo_team:
+        return False
+    applicant_domain = _login_domain(applicant_email)
+    if not applicant_domain:
+        return False
+    owner = await User.find_one(User.user_id == team.owner_user_id)
+    owner_identity = (owner.email if owner and owner.email else team.owner_user_id)
+    return _login_domain(owner_identity) == applicant_domain
+
+
 async def _find_or_create_org_team(
-    org_name: str, owner_user_id: str, department: str | None = None
+    org_name: str,
+    owner_user_id: str,
+    department: str | None = None,
+    applicant_email: str | None = None,
 ) -> Team:
-    """Find existing team for org+department or create a new one."""
+    """Find a joinable demo cohort team for org+department, or create one.
+
+    Only demo-created teams whose owner shares the applicant's email domain are
+    ever joined (see _can_join_demo_team); anything else gets a fresh team,
+    with a suffixed name if the plain one is already taken by a team the
+    applicant may not join.
+    """
     team_name = f"{org_name} - {department}" if department else org_name
     team = await Team.find_one(Team.name == team_name)
-    if team:
+    if team and await _can_join_demo_team(team, applicant_email or owner_user_id):
         return team
+    if team:
+        # The name belongs to a team this applicant may not join — a real
+        # (non-demo) team, or another domain's cohort. Keep names distinct so
+        # members can tell the two workspaces apart.
+        team_name = f"{team_name} ({secrets.token_hex(3)})"
 
     now = datetime.datetime.now(datetime.timezone.utc)
     team = Team(
         uuid=secrets.token_urlsafe(12),
         name=team_name,
         owner_user_id=owner_user_id,
+        is_demo_team=True,
         created_at=now,
     )
     await team.insert()

@@ -11,6 +11,11 @@ class Team(Document):
     name: str
     owner_user_id: str
     organization_id: Optional[str] = None  # org uuid for university hierarchy
+    # True for teams minted by the demo/trial system. Demo activation may only
+    # auto-join applicants into demo-created teams — never real workspaces
+    # (see demo_service._can_join_demo_team). Teams predating the flag read as
+    # False, which fails safe: they're treated as real and never auto-joined.
+    is_demo_team: bool = False
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
