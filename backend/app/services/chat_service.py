@@ -738,6 +738,7 @@ async def _run_scripted_demo(
                 )
                 return results
 
+            extract_failed = False
             try:
                 entities = await asyncio.wait_for(
                     asyncio.to_thread(_extract), timeout=120,
@@ -745,6 +746,14 @@ async def _run_scripted_demo(
             except asyncio.TimeoutError:
                 logger.warning("Scripted demo extraction timed out")
                 entities = []
+                extract_failed = True
+            except Exception as e:
+                # The engine raises on provider/parse failure (ExtractionError)
+                # instead of returning empties — a failed demo extraction must
+                # show as a failure, not as "0 fields found".
+                logger.warning("Scripted demo extraction failed: %s", e)
+                entities = []
+                extract_failed = True
 
             # Same shape as the live run_extraction tool: pop the per-field
             # source sidecar out of each entity into an index-aligned list.
@@ -756,14 +765,15 @@ async def _run_scripted_demo(
                 sidecar = entity.pop(SOURCE_KEY, None) if isinstance(entity, dict) else None
                 demo_sources.append(sidecar if isinstance(sidecar, dict) else {})
 
-            extraction_result = {
-                "extraction_set": template_name,
-                "fields": keys,
-                "documents": [doc_title],
-                "entities": entities,
-                "entity_count": entity_count_total,
-                "sources": demo_sources,
-            }
+            if not extract_failed:
+                extraction_result = {
+                    "extraction_set": template_name,
+                    "fields": keys,
+                    "documents": [doc_title],
+                    "entities": entities,
+                    "entity_count": entity_count_total,
+                    "sources": demo_sources,
+                }
 
             if latest_run and latest_run.score is not None:
                 score = latest_run.score
@@ -785,7 +795,14 @@ async def _run_scripted_demo(
         entity_count = extraction_result.get("entity_count", 0)
         field_count = len(keys) if keys else 0
 
-        if latest_run and latest_run.accuracy is not None:
+        if extraction_result.get("error"):
+            yield _text(
+                "The extraction hit a model error just now — that happens, and "
+                "when it does Vandalizer reports a **failed run** rather than "
+                "quietly showing empty fields. In your workspace you'd see the "
+                "failure in the activity rail and could simply re-run it.\n\n"
+            )
+        elif latest_run and latest_run.accuracy is not None:
             acc_pct = round(latest_run.accuracy * 100)
             yield _text(
                 f"That pulled out **{field_count} structured fields** in seconds. "
