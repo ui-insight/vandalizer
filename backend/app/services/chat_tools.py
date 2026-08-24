@@ -681,16 +681,39 @@ async def list_extraction_sets(
 
     sets = await SearchSet.find(filters).sort("-created_at").limit(MAX_RESULTS).to_list()
 
+    # Latest validation score per set: the tier is the primary sort key so the
+    # most trusted templates surface first (QUALITY_SIGNALS_EXPLAINED.md).
+    # Tier/score in a listing is deliberately model-visible — like
+    # get_quality_info, it helps the agent recommend trusted templates; the
+    # anti-inflation strip only applies to per-result badges.
+    scores: dict[str, float] = {}
+    uuids = [ss.uuid for ss in sets]
+    if uuids:
+        runs = await ValidationRun.find({
+            "item_kind": "search_set",
+            "item_id": {"$in": uuids},
+        }).sort("-created_at").to_list()
+        for run in runs:
+            if run.score is not None and run.item_id not in scores:
+                scores[run.item_id] = run.score
+
     results = []
     for ss in sets:
         field_count = len(ss.item_order) if ss.item_order else 0
-        results.append({
+        entry = {
             "uuid": ss.uuid,
             "title": ss.title,
             "verified": ss.verified or False,
             "field_count": field_count,
             "domain": ss.domain,
-        })
+        }
+        score = scores.get(ss.uuid)
+        if score is not None:
+            entry["quality_score"] = score
+            entry["quality_tier"] = _score_to_tier(score)
+        results.append(entry)
+    # Scored sets first (best score leading), unscored keep recency order.
+    results.sort(key=lambda r: (r.get("quality_score") is None, -(r.get("quality_score") or 0.0)))
     return results
 
 
@@ -1183,11 +1206,19 @@ async def get_document_text(
         if doc.user_id != context.deps.user_id:
             return {"error": "You do not have access to this document."}
 
-    text = doc.raw_text or ""
+    # Same page treatment as the attach path: insert [p. N] boundaries from
+    # the stored markers so an answer built on this tool has a page-citable
+    # substrate, and tell the model how to cite (with the approximate-page
+    # hedge preserved). Local import — chat_service imports this module.
+    from app.services.chat_service import annotate_pages, page_note_for
+
+    raw = doc.raw_text or ""
+    markers = getattr(doc, "text_markers", None)
+    text = annotate_pages(raw, markers)
     # Truncate to avoid overwhelming the LLM context
     max_chars = 30000
     truncated = len(text) > max_chars
-    return {
+    result = {
         "uuid": doc.uuid,
         "title": doc.title,
         "extension": doc.extension,
@@ -1196,6 +1227,16 @@ async def get_document_text(
         "truncated": truncated,
         "total_chars": len(text),
     }
+    citation_note = page_note_for(markers, annotated=text is not raw)
+    if citation_note:
+        result["page_citation_note"] = citation_note.strip()
+    if truncated:
+        result["note"] = (
+            f"Only the first {max_chars} characters were returned — do not "
+            "present conclusions as covering the whole document; say the read "
+            "was partial."
+        )
+    return result
 
 
 async def run_extraction(
@@ -1435,6 +1476,7 @@ async def _execute_extraction(
                         "quote": (src.get("quote") or "")[:200],
                         "page": src.get("page"),
                         "page_approximate": src.get("page_approximate", False),
+                        "document_uuid": src.get("document_uuid"),
                         "document_title": src.get("document_title"),
                         "verified": bool(src.get("verified")),
                     }
@@ -2022,6 +2064,48 @@ async def _execute_workflow(
     }
 
 
+async def _workflow_quality_sidecar(workflow_id: str, user) -> Optional[dict]:
+    """Quality sidecar for a completed workflow run, from the workflow's own
+    latest ValidationRun — QUALITY_SIGNALS_EXPLAINED.md promises signals on
+    workflow results. Same contract as run_extraction's sidecar: the streaming
+    layer strips the "quality" key before the model sees it.
+    """
+    latest = await ValidationRun.find(
+        ValidationRun.item_kind == "workflow",
+        ValidationRun.item_id == workflow_id,
+    ).sort("-created_at").first_or_none()
+    if not latest or latest.score is None:
+        return None
+    alerts = await QualityAlert.find(
+        QualityAlert.item_kind == "workflow",
+        QualityAlert.item_id == workflow_id,
+        QualityAlert.acknowledged != True,  # noqa: E712
+    ).sort("-created_at").limit(3).to_list()
+    sidecar: dict = {
+        "score": latest.score,
+        "tier": _score_to_tier(latest.score),
+        "grade": latest.grade,
+        "accuracy": latest.accuracy,
+        "consistency": latest.consistency,
+        "last_validated_at": latest.created_at.isoformat() if latest.created_at else None,
+        "num_test_cases": latest.num_test_cases,
+        "num_runs": latest.num_runs,
+        "active_alerts": [
+            {"type": a.alert_type, "severity": a.severity, "message": a.message}
+            for a in alerts
+        ],
+    }
+    try:
+        from app.services import workflow_service
+
+        plan_info = await workflow_service.get_validation_plan(workflow_id, user)
+        sidecar["plan_stale"] = bool(plan_info.get("plan_stale", False))
+    except Exception:
+        # A score without the staleness flag is still a real score.
+        pass
+    return sidecar
+
+
 async def get_workflow_status(
     context: RunContext[AgenticChatDeps],
     session_id: str,
@@ -2053,6 +2137,16 @@ async def get_workflow_status(
         "steps_total": status["num_steps_total"],
         "current_step": status.get("current_step_name"),
     }
+
+    if status["status"] == "completed" and status.get("workflow_id"):
+        try:
+            quality = await _workflow_quality_sidecar(
+                status["workflow_id"], context.deps.user,
+            )
+            if quality:
+                result["quality"] = quality
+        except Exception:
+            logger.exception("Workflow quality sidecar failed for %s", session_id)
 
     if status["status"] == "completed" and status.get("final_output"):
         final = status["final_output"]

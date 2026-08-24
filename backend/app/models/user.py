@@ -41,6 +41,9 @@ class User(Document):
     onboarding_drip_step: int = 0  # 0=not started, 1-4=sent step N
     onboarding_drip_next_at: Optional[datetime.datetime] = None  # when to send next drip
     last_nudge_sent_at: Optional[datetime.datetime] = None
+    # Shared across every marketing-class sender (drips, nudges, one-shot
+    # sends) — the cross-sequence frequency cap keys off this.
+    last_marketing_email_at: Optional[datetime.datetime] = None
     email_preferences: dict = {}  # {"onboarding": True, "nudges": True, "announcements": True}
 
     # v5.0 launch — one-time announcement send tracking

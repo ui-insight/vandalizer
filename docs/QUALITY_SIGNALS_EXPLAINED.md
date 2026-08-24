@@ -47,7 +47,7 @@ If a field is `null`, that signal hasn't been generated yet — usually because 
 
 | Tier | Score | Visual | Meaning |
 |---|---|---|---|
-| **Excellent** | 90–100 | Green | Validated against many test cases with high recent accuracy. Safe to act on. |
+| **Excellent** | 90–100 | Green | High recent accuracy on its validation runs. Check the test-case count before acting on it — a high score on a handful of cases is provisional (see the FAQ below), and the badge says so. |
 | **Good** | 75–89 | Blue | Reliable. Review before high-stakes use. |
 | **Fair** | 50–74 | Yellow | Use with care. Add more test cases to improve. |
 | **Poor** | 0–49 | Red | Needs attention. Accuracy or consistency is below threshold. |
@@ -79,8 +79,8 @@ Tiers are thresholds over `score`. The score itself is a weighted combination of
 
 If a template has been behaving badly, `active_alerts` carries one or more:
 
-- **`critical`** — accuracy dropped below an acceptable floor or a validation run errored out. The badge shows a red dot.
-- **`warning`** — consistency degraded, or it's been a while since the last validation. The badge shows a yellow dot.
+- **`critical`** — accuracy dropped below an acceptable floor or a validation run errored out. The badge's alert icon turns red.
+- **`warning`** — consistency degraded, or it's been a while since the last validation. The badge's alert icon is amber.
 
 Acknowledge alerts from the Quality panel once you've investigated. Unacknowledged alerts count against the tier.
 
@@ -92,7 +92,7 @@ Acknowledge alerts from the Quality panel once you've investigated. Unacknowledg
 - **Below extraction tables** — with accuracy/consistency breakout when you run `run_extraction`
 - **In validation run summaries** — the full score breakdown with accuracy %, consistency %, test-case count, and grade
 - **On extraction-set listings** (`list_extraction_sets` tool) — the tier is the primary sort key so the most trusted templates surface first
-- **On workflow results** (when the workflow includes an extraction step) — propagated from the underlying template
+- **On workflow results** — from the workflow's own validation runs, attached when a run completes (with the stale-plan flag when the plan has drifted)
 
 ---
 

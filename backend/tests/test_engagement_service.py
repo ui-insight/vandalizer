@@ -49,6 +49,7 @@ def _user(last_login_at, last_nudge_sent_at=None) -> SimpleNamespace:
         email_preferences={"nudges": True},
         last_login_at=last_login_at,
         last_nudge_sent_at=last_nudge_sent_at,
+        last_marketing_email_at=None,
     )
     user.save = AsyncMock()
     return user

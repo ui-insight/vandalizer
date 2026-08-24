@@ -63,6 +63,29 @@ def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
     return dt
 
 
+_MARKETING_EMAIL_MIN_GAP = datetime.timedelta(hours=20)
+
+
+def _marketing_capped(user: User, now: datetime.datetime) -> bool:
+    """True when this user already received a marketing-class email today.
+
+    One marketing email per user per day, across every sequence: a new user is
+    enrolled in the onboarding drip and the agentic drip at once, plus one-shot
+    sends, and without a shared cap they all fire on the same morning. A capped
+    sender must skip the user *before* advancing its own bookkeeping, so the
+    skipped email goes out on a later daily sweep instead of being dropped.
+    The gap is 20h, not 24h, so sweeps at a fixed hour don't perpetually miss
+    the window by minutes.
+    """
+    # getattr + type check, not attribute access: this module's rule is that
+    # an engagement sweep never raises, and a user document written before
+    # this field existed must not take down the whole batch.
+    last = getattr(user, "last_marketing_email_at", None)
+    if not isinstance(last, datetime.datetime):
+        return False
+    return (now - _as_aware_utc(last)) < _MARKETING_EMAIL_MIN_GAP
+
+
 async def process_onboarding_drips(settings: Settings | None = None) -> int:
     """Send due onboarding drip emails. Returns count sent."""
     if settings is None:
@@ -86,6 +109,8 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
             continue
         prefs = user.email_preferences or {}
         if not prefs.get("onboarding", True):
+            continue
+        if _marketing_capped(user, now):
             continue
 
         step = user.onboarding_drip_step  # 0-indexed, next step to send
@@ -117,6 +142,7 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
         success = await send_email(user.email, subject, html, settings, email_type="onboarding_drip")
         if success:
             sent += 1
+            user.last_marketing_email_at = now
 
         # Advance to next step
         user.onboarding_drip_step = step + 1
@@ -167,6 +193,8 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
         last_nudge = _as_aware_utc(user.last_nudge_sent_at)
         if last_nudge and last_nudge > nudge_cutoff:
             continue
+        if _marketing_capped(user, now):
+            continue
 
         last_login = _as_aware_utc(user.last_login_at)
         if last_login is None:
@@ -188,6 +216,7 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
         success = await send_email(user.email, subject, html, settings, email_type="inactivity_nudge")
         if success:
             sent += 1
+            user.last_marketing_email_at = now
 
         user.last_nudge_sent_at = now
         await user.save()
@@ -258,6 +287,10 @@ async def process_v5_launch_announcement(
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping v5 announcement")
+        return 0
+
     now = datetime.datetime.now(datetime.timezone.utc)
     sent = 0
 
@@ -273,6 +306,8 @@ async def process_v5_launch_announcement(
         # Respect announcement opt-out if set; default to opted-in
         if prefs.get("announcements") is False:
             continue
+        if _marketing_capped(user, now):
+            continue
 
         subject, html = v5_launch_announcement_email(
             name=user.name or user.user_id,
@@ -283,6 +318,7 @@ async def process_v5_launch_announcement(
         )
         if success:
             user.v5_announcement_sent_at = now
+            user.last_marketing_email_at = now
             await user.save()
             sent += 1
 
@@ -305,6 +341,10 @@ async def process_agentic_chat_drip(settings: Settings | None = None) -> int:
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping agentic-chat drip")
+        return 0
+
     now = datetime.datetime.now(datetime.timezone.utc)
     sent = 0
 
@@ -319,6 +359,8 @@ async def process_agentic_chat_drip(settings: Settings | None = None) -> int:
         prefs = user.email_preferences or {}
         if not prefs.get("onboarding", True):
             continue
+        if _marketing_capped(user, now):
+            continue
 
         step = user.agentic_drip_step  # 0-indexed; next step to send
         subject, html = agentic_chat_drip_email(
@@ -332,6 +374,7 @@ async def process_agentic_chat_drip(settings: Settings | None = None) -> int:
         )
         if success:
             sent += 1
+            user.last_marketing_email_at = now
 
         user.agentic_drip_step = step + 1
         if step + 1 < _AGENTIC_DRIP_TOTAL_STEPS:
@@ -409,6 +452,10 @@ async def send_certification_complete_email_for(
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping cert-complete email")
+        return False
+
     subject, html = certification_complete_email(
         name=user.name or user.user_id,
         frontend_url=settings.frontend_url,
@@ -417,7 +464,9 @@ async def send_certification_complete_email_for(
         user.email, subject, html, settings, email_type="certification_complete",
     )
     if success:
-        user.certification_complete_sent_at = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        user.certification_complete_sent_at = now
+        user.last_marketing_email_at = now
         await user.save()
     return success
 
@@ -456,6 +505,10 @@ async def process_powerup_milestones(settings: Settings | None = None) -> int:
     if settings is None:
         settings = Settings()
 
+    if not settings.promotional_emails_enabled:
+        logger.info("Promotional email disabled — skipping power-user milestones")
+        return 0
+
     users = await User.find(
         User.chat_workflow_count >= POWERUP_MILESTONE_THRESHOLD,
         User.powerup_milestone_sent_at == None,  # noqa: E711
@@ -469,6 +522,8 @@ async def process_powerup_milestones(settings: Settings | None = None) -> int:
         prefs = user.email_preferences or {}
         if prefs.get("announcements") is False:
             continue
+        if _marketing_capped(user, now):
+            continue
         subject, html = powerup_milestone_email(
             name=user.name or user.user_id,
             workflow_count=user.chat_workflow_count,
@@ -479,6 +534,7 @@ async def process_powerup_milestones(settings: Settings | None = None) -> int:
         )
         if success:
             user.powerup_milestone_sent_at = now
+            user.last_marketing_email_at = now
             await user.save()
             sent += 1
 

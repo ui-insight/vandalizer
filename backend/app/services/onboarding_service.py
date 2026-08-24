@@ -10,15 +10,20 @@ from pathlib import Path
 from typing import Optional
 
 from app.models.document import SmartDocument
+from app.models.extraction_test_case import ExtractionTestCase
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
-from app.models.search_set import SearchSet
+from app.models.search_set import SearchSet, SearchSetItem
 from app.models.user import User
 from app.models.validation_run import ValidationRun
 
 logger = logging.getLogger(__name__)
 
 SEEDS_DIR = Path(__file__).resolve().parent.parent.parent / "seeds"
-NSF_SEED_FILE = SEEDS_DIR / "search_sets" / "nsf_proposal_extraction.json"
+# Bundled under seeds/onboarding/, NOT seeds/search_sets/: the catalog seeder
+# globs search_sets/ and its prune pass retires items dropped from the catalog
+# manifest — which is exactly how v1.1.0 silently deleted this file and broke
+# the scripted demo. The onboarding assets are owned by this service alone.
+NSF_SEED_FILE = SEEDS_DIR / "onboarding" / "nsf_proposal_extraction.json"
 
 
 @dataclass
@@ -201,15 +206,23 @@ async def provision_onboarding_sample(user: User) -> Optional[OnboardingContext]
                 sample_doc.uuid, user.user_id,
             )
 
-        # Look up verified NSF extraction set
+        # Look up a verified NSF extraction set. Prefix match, not exact:
+        # auxiliary seeders title it "NSF Grant Proposal (Verified Template)"
+        # and an exact-string miss used to silently kill the demo.
         extraction_set = await SearchSet.find_one(
-            SearchSet.title == "NSF Grant Proposal",
-            SearchSet.verified == True,  # noqa: E712
+            {"title": {"$regex": r"^NSF Grant Proposal"}, "verified": True},
         )
 
-        # If no extraction set is seeded, the demo can't run
+        # If the catalog didn't seed one, self-provision from the bundled seed
+        # (same pattern as the inline PAPPG KB below) so the demo never
+        # depends on catalog contents.
         if not extraction_set:
-            logger.info("No verified NSF extraction set found — skipping agentic onboarding")
+            extraction_set = await _provision_nsf_extraction_set()
+        if not extraction_set:
+            logger.warning(
+                "No NSF extraction set found and self-provisioning failed — "
+                "the scripted demo cannot run"
+            )
             return None
 
         # Ensure a ValidationRun exists so quality signals appear during the demo.
@@ -286,6 +299,72 @@ async def provision_onboarding_sample(user: User) -> Optional[OnboardingContext]
 
     except Exception as e:
         logger.error("Failed to provision onboarding sample: %s", e)
+        return None
+
+
+async def _provision_nsf_extraction_set() -> Optional[SearchSet]:
+    """Self-provision the demo extraction set from the bundled seed.
+
+    Mirrors seed_catalog's insertion shape (SearchSetItem rows + ``item_order``
+    of item ids) so the set runs identically to a catalog-seeded one.
+    """
+    if not NSF_SEED_FILE.exists():
+        logger.warning("Onboarding NSF seed missing at %s", NSF_SEED_FILE)
+        return None
+    try:
+        seed_data = json.loads(NSF_SEED_FILE.read_text())
+        item = (seed_data.get("items") or [{}])[0]
+        fields = item.get("items") or []
+        if not fields:
+            logger.warning("Onboarding NSF seed has no fields")
+            return None
+
+        ss = SearchSet(
+            title="NSF Grant Proposal",
+            uuid=str(uuid_mod.uuid4()),
+            status="active",
+            set_type=item.get("set_type", "extraction"),
+            user_id="system",
+            created_by_user_id="system",
+            verified=True,
+            domain="nsf",
+            extraction_config=item.get("extraction_config", {}) or {},
+        )
+        await ss.insert()
+
+        item_order: list[str] = []
+        for field in fields:
+            ssi = SearchSetItem(
+                searchphrase=field["searchphrase"],
+                searchset=ss.uuid,
+                searchtype=field.get("searchtype", "extraction"),
+                title=field.get("title", field["searchphrase"]),
+                user_id="system",
+                is_optional=field.get("is_optional", False),
+                enum_values=field.get("enum_values", []),
+            )
+            await ssi.insert()
+            item_order.append(str(ssi.id))
+        ss.item_order = item_order
+        await ss.save()
+
+        for tc_data in item.get("test_cases", []):
+            await ExtractionTestCase(
+                search_set_uuid=ss.uuid,
+                label=tc_data.get("label", "Demo test case"),
+                source_type="text",
+                source_text=tc_data.get("source_text", ""),
+                expected_values=tc_data.get("expected_values", {}),
+                user_id="system",
+            ).insert()
+
+        logger.info(
+            "Provisioned demo extraction set %s (%d fields, %d test cases)",
+            ss.uuid, len(fields), len(item.get("test_cases", [])),
+        )
+        return ss
+    except Exception:
+        logger.exception("Failed to self-provision the demo extraction set")
         return None
 
 

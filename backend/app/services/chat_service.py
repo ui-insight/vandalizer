@@ -158,23 +158,9 @@ def annotate_pages(text: str, markers: list[dict] | None) -> str:
     if not text or not markers:
         return text
 
-    positions: list[tuple[int, int, bool]] = []
-    for m in markers:
-        if not isinstance(m, dict) or m.get("kind") != "page":
-            continue  # XLSX markers describe sheets, not pages
-        page = m.get("value")
-        offset = m.get("char_offset")
-        if not isinstance(page, int) or not isinstance(offset, bool | int):
-            continue
-        if isinstance(offset, bool) or not 0 <= offset <= len(text):
-            # raw_text can be re-saved shorter than when markers were computed.
-            continue
-        positions.append((offset, page, bool(m.get("approximate"))))
-
+    positions = _page_positions(markers, len(text))
     if not positions:
         return text
-
-    positions.sort()
     out: list[str] = []
     cursor = 0
     for offset, page, approximate in positions:
@@ -185,6 +171,86 @@ def annotate_pages(text: str, markers: list[dict] | None) -> str:
         cursor = offset
     out.append(text[cursor:])
     return "".join(out)
+
+
+def _page_positions(markers: list[dict] | None, text_len: int) -> list[tuple[int, int, bool]]:
+    """Sorted ``(char_offset, page, approximate)`` for usable page markers."""
+    positions: list[tuple[int, int, bool]] = []
+    for m in markers or []:
+        if not isinstance(m, dict) or m.get("kind") != "page":
+            continue  # XLSX markers describe sheets, not pages
+        page = m.get("value")
+        offset = m.get("char_offset")
+        if not isinstance(page, int) or not isinstance(offset, bool | int):
+            continue
+        if isinstance(offset, bool) or not 0 <= offset <= text_len:
+            # raw_text can be re-saved shorter than when markers were computed.
+            continue
+        positions.append((offset, page, bool(m.get("approximate"))))
+    positions.sort()
+    return positions
+
+
+_PAGE_REF_RE = re.compile(r"\bp(?:p|age|g)?\.?\s*~?\s*(\d{1,4})\b", re.IGNORECASE)
+_MAX_DERIVED_CITATIONS = 6
+
+
+def derive_document_citations(text: str, documents: list) -> list[dict]:
+    """Citation chips for an attached-document answer, from the pages it cites.
+
+    Attached-document answers had no citation chips at all: the model was told
+    to write "p. 3" inline and that string is inert text, so the promise that
+    sources are always inspectable held only on the KB and web paths. Here the
+    page references the model actually wrote are turned into the same chip the
+    KB path emits, anchored on that page's opening text so clicking lands on
+    the passage.
+
+    Attribution has to be unambiguous to be honest, so this only fires when
+    exactly one attached document carries page markers — with two, "p. 3" does
+    not say whose page 3, and a chip pointing at the wrong document is worse
+    than no chip. Pages outside the document are ignored, and an interpolated
+    page keeps its ``page_approximate`` hedge through to the viewer.
+    """
+    if not text or not documents:
+        return []
+
+    candidates = []
+    for doc in documents:
+        raw = getattr(doc, "raw_text", None) or ""
+        positions = _page_positions(getattr(doc, "text_markers", None), len(raw))
+        if positions:
+            candidates.append((doc, raw, positions))
+    if len(candidates) != 1:
+        return []
+
+    doc, raw, positions = candidates[0]
+    by_page = {page: (offset, approx) for offset, page, approx in positions}
+
+    citations: list[dict] = []
+    seen: set[int] = set()
+    for match in _PAGE_REF_RE.finditer(text):
+        try:
+            page = int(match.group(1))
+        except ValueError:
+            continue
+        if page in seen or page not in by_page:
+            continue
+        seen.add(page)
+        offset, approximate = by_page[page]
+        preview = " ".join(raw[offset:offset + 400].split())
+        if not preview:
+            continue
+        citations.append({
+            "document_uuid": doc.uuid,
+            "document_title": doc.title,
+            "page": page,
+            "page_approximate": approximate,
+            "content_preview": preview[:240],
+            "source_reference": None,
+        })
+        if len(citations) >= _MAX_DERIVED_CITATIONS:
+            break
+    return citations
 
 
 def page_note_for(markers: list[dict] | None, *, annotated: bool) -> str:
@@ -1043,6 +1109,29 @@ async def chat_stream(
             sys_config_doc=sys_config_doc,
         ):
             yield _brand_org_json_chunk(chunk, _demo_org)
+        return
+
+    if run_demo:
+        # The home card previews a scripted, quality-badged demo. If
+        # provisioning failed, falling through to an improvised LLM answer
+        # would silently under-deliver on that promise — say what happened
+        # and hand the user a real path to the same value instead.
+        logger.error(
+            "Demo requested but onboarding provisioning failed for user %s — "
+            "sending honest fallback instead of improvising",
+            user_id,
+        )
+        fallback = (
+            "I couldn't set up the sample demo — the demo document and its "
+            "extraction template aren't available on this deployment right "
+            "now. Your administrator can check the server logs for details.\n\n"
+            "You don't need the demo to see how this works, though: upload one "
+            "of your own documents and ask me to extract deadlines, budget "
+            "details, or compliance requirements, and you'll get the same "
+            "source-linked results on real work."
+        )
+        yield json.dumps({"kind": "text", "content": fallback}) + "\n"
+        await _finalize(conversation, fallback, [], None, activity_id, user_id)
         return
 
     # Load documents
@@ -1956,6 +2045,21 @@ async def chat_stream(
                             cleaned_segments.append({"kind": "text", "content": cleaned})
                     else:
                         cleaned_segments.append(seg)
+
+                # Attached-document answers carry no tool-emitted citations, so
+                # turn the pages the model cited into real chips. Skipped when
+                # the answer already has sources: those came from a KB or web
+                # lookup, and an inline "p. 3" may belong to one of those
+                # passages rather than to the attached file.
+                if not streamed_citations:
+                    derived = derive_document_citations(assistant_message, documents)
+                    if derived:
+                        streamed_citations.extend(derived)
+                        yield json.dumps({
+                            "kind": "sources",
+                            "content": "",
+                            "sources": derived,
+                        }) + "\n"
 
                 await _finalize(
                     conversation, assistant_message, documents,

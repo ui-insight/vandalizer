@@ -664,6 +664,7 @@ async def get_workflow_status(
         "error_payload": result.error_payload,
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
+        "workflow_id": str(result.workflow) if result.workflow else None,
         "document_title": result.document_title,
     }
 
