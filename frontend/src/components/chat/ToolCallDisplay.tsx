@@ -685,6 +685,12 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
   const fields = (content.fields as string[]) || Object.keys(entities[0])
   if (fields.length === 0) return null
   const sources = content.sources as Array<Record<string, FieldSource>> | undefined
+  // Absent `sources` means the run captured no source data at all — a result
+  // persisted before source tracking existed, replayed from history. That is
+  // not the same as "this field had no quote", and marking every field
+  // "no source" on such a run is a false alarm on all of them. Chips only
+  // render for a run that actually tried.
+  const hasSourceData = Array.isArray(content.sources)
 
   const copyText = toolResultToText('run_extraction', content)
   const csv = extractionToCSV(content)
@@ -716,7 +722,9 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
                     : String(entity[f])}
                 </span>
               )}
-              {!empty && <FieldSourceChip src={entitySources[f]} actions={actions} />}
+              {!empty && hasSourceData && (
+                <FieldSourceChip src={entitySources[f]} actions={actions} />
+              )}
             </div>
           )
         })}
@@ -785,7 +793,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
                   const empty = entity[f] == null
                   const src = rowSources[f]
                   const traced = Boolean(src?.verified)
-                  const cellTitle = empty
+                  const cellTitle = empty || !hasSourceData
                     ? undefined
                     : traced && src ? sourceTooltip(src) : NO_SOURCE_TOOLTIP
                   return (
