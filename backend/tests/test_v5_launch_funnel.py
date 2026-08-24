@@ -192,6 +192,7 @@ class TestAnnouncementIdempotency:
         user.user_id = "u1"
         user.email_preferences = {}
         user.v5_announcement_sent_at = None
+        user.last_marketing_email_at = None
         user.save = AsyncMock()
 
         qc = MagicMock()
