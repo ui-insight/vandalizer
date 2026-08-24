@@ -558,6 +558,17 @@ async def list_examiners(
     return {"examiners": examiners}
 
 
+@router.get("/examiners/search")
+async def search_users_for_examiner(
+    q: str = Query(..., min_length=1),
+    user: User = Depends(get_current_user),
+):
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    users = await svc.search_users(q)
+    return {"users": users}
+
+
 @router.post("/examiners")
 async def set_examiner(
     req: SetExaminerRequest,

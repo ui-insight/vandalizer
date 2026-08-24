@@ -75,3 +75,6 @@ backend/data/
 backend/coverage.json
 demo-data/
 demo-containers/
+
+# Benchmark harness output (benchmarks/corpus/*/tools/run_benchmark_http.py)
+benchmark-runs/

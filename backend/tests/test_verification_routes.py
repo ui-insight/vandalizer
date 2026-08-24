@@ -312,3 +312,75 @@ class TestCatalogRoutes:
             resp = await client.get("/api/verification/catalog/export", cookies=cookies, headers=headers)
 
         assert resp.status_code == 403
+
+
+class TestExaminerSearch:
+    """GET /api/verification/examiners/search — the route #692 reported missing."""
+
+    @pytest.mark.asyncio
+    async def test_search_returns_users_for_admin(self, client):
+        user = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        found = [
+            {"user_id": "u1", "name": "Alice", "email": "alice@example.com", "is_examiner": False}
+        ]
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.verification.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.search_users = AsyncMock(return_value=found)
+            resp = await client.get(
+                "/api/verification/examiners/search",
+                params={"q": "ali"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"users": found}
+        mock_svc.search_users.assert_awaited_once_with("ali")
+
+    @pytest.mark.asyncio
+    async def test_search_requires_admin(self, client):
+        user = _make_user("examiner", is_examiner=True)
+        cookies, headers = _auth("examiner")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "examiner", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.verification.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get(
+                "/api/verification/examiners/search",
+                params={"q": "ali"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        mock_svc.search_users.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_search_rejects_empty_query(self, client):
+        user = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.verification.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get(
+                "/api/verification/examiners/search",
+                params={"q": ""},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 422
+        mock_svc.search_users.assert_not_called()

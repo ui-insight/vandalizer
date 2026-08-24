@@ -285,7 +285,18 @@ def perform_document_validation(
             else os.path.join(Settings().upload_dir, rel_or_abs)
         )
         ext = os.path.splitext(file_path)[1].lstrip(".")
-        text = extract_text_from_file(file_path, ext)
+        try:
+            text = extract_text_from_file(file_path, ext)
+        except Exception as e:
+            # The extraction task owns reporting read failures (it marks the
+            # document errored and notifies). For compliance validation a
+            # failed read just means nothing to validate: empty text produces
+            # zero chunks and the chord callback still runs, so the
+            # "validating" flag clears instead of stalling forever.
+            logger.warning(
+                "Validation text read failed for %s: %s", document_uuid, e,
+            )
+            text = ""
 
     compliance = settings["rules"]
     effective_chunk_size = chunk_size or settings["chunk_size"]

@@ -13,6 +13,17 @@ from markitdown import MarkItDown
 
 logger = logging.getLogger(__name__)
 
+
+class DocumentReadError(RuntimeError):
+    """Text extraction failed for a document.
+
+    Raised instead of returning an error-message string as if it were the
+    document's text — a returned placeholder is indistinguishable from real
+    content downstream (it gets token-counted, chunked, and embedded), so a
+    crashed reader must fail the document visibly instead.
+    """
+
+
 MIN_PDF_TEXT_LENGTH = 100
 MAX_XLSX_COMMENT_LEN = 500
 
@@ -958,5 +969,13 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
         return ""
 
     except Exception as e:
+        # Raise instead of returning an error string: a returned
+        # "[Error extracting content: …]" is non-empty, so it sailed past the
+        # empty-text guard, was token-counted, chunked, and embedded into
+        # ChromaDB as the document's entire content — the document showed as
+        # processed and chat answered confidently from a one-line error
+        # message. A reader crash must fail the document visibly.
         logger.error("Error extracting text from %s: %s", file_path, e)
-        return f"[Error extracting content: {e!s}]"
+        raise DocumentReadError(
+            f"Could not read this {file_extension or 'file'}: {e!s}"
+        ) from e

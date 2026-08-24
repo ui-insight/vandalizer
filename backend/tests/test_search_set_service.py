@@ -242,14 +242,16 @@ class TestCloneSearchSet:
             patch("app.services.search_set_service.get_search_set", new_callable=AsyncMock, return_value=original),
             patch("app.services.search_set_service.SearchSet") as MockSS,
             patch("app.services.search_set_service.SearchSetItem") as MockItem,
-            patch("app.models.user.User") as MockUser,
             patch("app.services.name_conflicts.search_set_title_taken", new_callable=AsyncMock, return_value=False),
+            patch(
+                "app.services.library_service.ensure_bookmark", new_callable=AsyncMock
+            ) as mock_bookmark,
         ):
             MockSS.return_value = clone_ss
             mock_item = _make_item()
             MockItem.return_value = mock_item
-            MockUser.find_one = AsyncMock(return_value=None)
 
+            from app.models.library import LibraryItemKind
             from app.services.search_set_service import clone_search_set
 
             result = await clone_search_set("orig", "user2")
@@ -257,6 +259,14 @@ class TestCloneSearchSet:
         assert result is clone_ss
         clone_ss.insert.assert_awaited_once()
         mock_item.insert.assert_awaited_once()
+        # The bookmark follows the clone's scope: it keeps the original's
+        # team_id, so a team set's copy must land in the team library (#673).
+        mock_bookmark.assert_awaited_once_with(
+            clone_ss.id,
+            LibraryItemKind.SEARCH_SET,
+            "user2",
+            team_id=original.team_id,
+        )
 
     @pytest.mark.asyncio
     async def test_clone_returns_none_when_not_found(self):

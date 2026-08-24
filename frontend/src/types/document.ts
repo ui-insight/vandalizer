@@ -21,6 +21,7 @@ export interface Document {
   chromadb_ready?: boolean
   chunk_count?: number
   ingest_error?: string | null
+  error_message?: string | null
   extraction_low_quality?: boolean
 }
 

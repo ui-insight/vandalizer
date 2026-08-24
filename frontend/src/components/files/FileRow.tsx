@@ -90,6 +90,23 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             >
               <AlertTriangle className="h-4 w-4 text-red-500" />
             </span>
+          ) : doc.task_status === 'error' ? (
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label={
+                doc.error_message
+                  ? `Text extraction failed: ${doc.error_message}`
+                  : 'Text extraction failed for this document — chat and extraction cannot read it. Try Retry extraction or re-upload it.'
+              }
+              title={
+                doc.error_message
+                  ? `Text extraction failed: ${doc.error_message}`
+                  : 'Text extraction failed for this document — chat and extraction cannot read it. Try Retry extraction or re-upload it.'
+              }
+            >
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
           ) : doc.ingest_error ? (
             <span
               className="shrink-0 mr-2.5 inline-flex items-center"

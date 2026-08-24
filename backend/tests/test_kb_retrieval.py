@@ -7,6 +7,7 @@ the validation harness and streaming chat must route retrieval through the
 same pipeline.
 """
 
+import re
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -532,19 +533,165 @@ async def test_build_kb_segment_condenses_anaphoric_followups():
 
 
 # ---------------------------------------------------------------------------
-# Section-number (identifier) lexical lookup — bare "§ 200.1" style queries
+# Lexical pinning — literal strings the embedding barely represents: "§ 200.1",
+# "CSU-PI-001", a quoted or questioned phrase
 # ---------------------------------------------------------------------------
 
 
-def test_extract_section_refs_variants():
-    assert chat_service._extract_section_refs("What does § 200.1 say?") == ["200.1"]
-    assert chat_service._extract_section_refs("explain section 200.512") == ["200.512"]
-    assert chat_service._extract_section_refs("compare 200.1 and 200.400") == ["200.1", "200.400"]
+def test_extract_pin_terms_section_variants():
+    assert chat_service._extract_pin_terms("What does § 200.1 say?") == ["200.1"]
+    assert chat_service._extract_pin_terms("explain section 200.512") == ["200.512"]
+    # A prefix pair on purpose: "200.1" is a text prefix of "200.10", and both
+    # are separate lookups the user asked for. The retrieval-side post-filter
+    # keeps them apart; extraction must not conflate them in the first place.
+    assert chat_service._extract_pin_terms("compare 200.1 and 200.10") == ["200.1", "200.10"]
+    assert chat_service._extract_pin_terms(
+        "Compare section 200.1 with 200.512 and 200.1a."
+    ) == ["200.1", "200.512", "200.1a"]
     # Dedup, order-preserving.
-    assert chat_service._extract_section_refs("§ 200.1 vs 200.1") == ["200.1"]
+    assert chat_service._extract_pin_terms("§ 200.1 vs 200.1") == ["200.1"]
     # Bare integers / years must not trip it (no dotted part.section token).
-    assert chat_service._extract_section_refs("what happened in 2024?") == []
-    assert chat_service._extract_section_refs("the $200 cap") == []
+    assert chat_service._extract_pin_terms("what happened in 2024?") == []
+    assert chat_service._extract_pin_terms("the $200 cap") == []
+
+
+def test_extract_pin_terms_identifier_shapes():
+    """Role, award and form identifiers are what near-duplicate documents
+    differ by, and they carry almost no weight in a mean-pooled bi-encoder."""
+    assert chat_service._extract_pin_terms(
+        "Where did CSU-PI-001 earn the Ph.D. credential, and in what field?"
+    ) == ["CSU-PI-001"]
+    assert chat_service._extract_pin_terms(
+        "Award NSF-2024-117 and form OMB-3145-0279"
+    ) == ["NSF-2024-117", "OMB-3145-0279"]
+    # Identifier counterpart of the section prefix pair: one identifier being a
+    # text prefix of another must not suppress the longer one.
+    assert chat_service._extract_pin_terms(
+        "Is CSU-PI-001 the same as CSU-PI-0012?"
+    ) == ["CSU-PI-001", "CSU-PI-0012"]
+    assert chat_service._extract_pin_terms("Do AA-1 and AA-11 both apply?") == [
+        "AA-1", "AA-11",
+    ]
+    # Hyphen *and* a digit are both required, so capitalised words and
+    # hyphenated prose stay out of the lane.
+    for prose in (
+        "Tell me about cost-sharing and NSF-funded work with the Co-PI.",
+        "What did the CHIPS and Science Act require?",
+        "Send an e-mail to the PI about the well-known issue.",
+        # Hyphenated and upper-case, but carrying no digit — the digit is what
+        # separates an identifier from a shouted phrase.
+        "Compare the ABC-DEF and GHI-JKL sections.",
+        # Lower-case is deliberately out of scope: matching it would mean
+        # pinning ordinary hyphenated prose, and `$contains` is case-sensitive
+        # anyway, so a lower-cased identifier would not match the stored text.
+        "where did csu-pi-001 study?",
+    ):
+        assert chat_service._extract_pin_terms(prose) == [], prose
+
+
+def test_extract_pin_terms_quoted_and_questioned_phrases():
+    # An explicitly quoted string is a "find me this" instruction.
+    assert chat_service._extract_pin_terms(
+        'Find "Data Management Plan" for me'
+    ) == ["Data Management Plan"]
+    # The noun phrase a definitional question asks about, minus the count.
+    assert chat_service._extract_pin_terms(
+        "What are the three field sites?"
+    ) == ["field sites"]
+    assert chat_service._extract_pin_terms("What is the total budget?") == ["total budget"]
+
+
+def test_questioned_phrase_stops_at_the_first_function_word():
+    """"the name of the vendor" is not asking for the string "name of the".
+
+    A phrase allowed to run through "of"/"for"/"between" is a fragment of
+    English, not a string worth looking for — and on a small knowledge base,
+    where the hit cut-off can never fire, pinning one fills the lane with every
+    chunk that happens to contain it and displaces genuinely relevant chunks.
+    """
+    for prose in (
+        "What is the name of the vendor?",
+        "What is the status of the review?",
+        "What is the deadline for the submission?",
+        "What was the outcome of the audit?",
+        "What is the address of the office?",
+        "What is the main goal of this project?",
+        "What is the difference between direct and indirect costs?",
+        "What are my options here?",
+    ):
+        assert chat_service._extract_pin_terms(prose) == [], prose
+    # A genuine noun phrase still survives, truncated at the function word that
+    # ends it rather than dropped.
+    assert chat_service._extract_pin_terms(
+        "What is the effective date of the agreement?"
+    ) == ["effective date"]
+    assert chat_service._extract_pin_terms(
+        "Which is the correct form to use?"
+    ) == ["correct form"]
+
+
+def test_extract_pin_terms_drops_a_phrase_wrapping_a_pinned_term():
+    """One concept must not spend two of the four slots — and four extra
+    case-variant lookups — just because the question names it twice."""
+    assert chat_service._extract_pin_terms(
+        "What is CSU-COI-001's nine-month institutional base salary?"
+    ) == ["CSU-COI-001"]
+    assert chat_service._extract_pin_terms("What is the CO-PI-1 role?") == ["CO-PI-1"]
+    # The questioned phrase here would carry literal quote characters, which
+    # could never match stored text.
+    assert chat_service._extract_pin_terms(
+        'What is the "force majeure" clause?'
+    ) == ["force majeure"]
+
+
+def test_extract_pin_terms_ignores_plain_prose():
+    """Ordinary requests must pin nothing — the lane costs half the top-k."""
+    for prose in (
+        "Summarize this document for me.",
+        "Can you give me an overview of the project and its goals?",
+        "What are you?",
+        "What is this about?",
+        "I don't know what isn't covered here",
+        "Please compare the two budgets and explain the difference.",
+        "",
+    ):
+        assert chat_service._extract_pin_terms(prose) == [], prose
+
+
+def test_extract_pin_terms_capped_per_turn():
+    msg = "Compare AAA-001, BBB-002, CCC-003, DDD-004 and EEE-005."
+    assert chat_service._extract_pin_terms(msg) == [
+        "AAA-001", "BBB-002", "CCC-003", "DDD-004",
+    ]
+
+
+def test_extract_pin_terms_does_not_cap_cited_sections():
+    """The cap is on *inferred* terms. Five sections cited by hand are five
+    deliberate lookups, and dropping the fifth would regress the CFR feature
+    this lane originally shipped for."""
+    assert chat_service._extract_pin_terms(
+        "Compare 200.1, 200.2, 200.3, 200.4 and 200.5"
+    ) == ["200.1", "200.2", "200.3", "200.4", "200.5"]
+
+
+def test_rank_pinned_chunks_orders_by_mentions_then_position():
+    """``get_kb_chunks_containing`` returns ChromaDB storage order, which is
+    arbitrary. With more hits than pin slots, ordering decides whether the
+    chunk the user asked about reaches the context at all."""
+    chunks = [
+        {"chunk_id": "passing", "content": "x" * 400 + " CSU-PI-001 was consulted."},
+        {"chunk_id": "about", "content": "Biographical Sketch - CSU-PI-001\nNAME: CSU-PI-001"},
+        {"chunk_id": "late-single", "content": "y" * 800 + " CSU-PI-001"},
+        {"chunk_id": "early-single", "content": "CSU-PI-001 leads the work. " + "z" * 500},
+    ]
+    ranked = chat_service._rank_pinned_chunks(chunks, re.compile("CSU-PI-001"))
+
+    assert [c["chunk_id"] for c in ranked] == [
+        "about",          # two mentions, first at offset 0
+        "early-single",   # one mention, offset 0
+        "passing",        # one mention, offset 400
+        "late-single",    # one mention, offset 800
+    ]
 
 
 def test_get_kb_chunks_containing_uses_where_document():
@@ -570,7 +717,7 @@ def test_get_kb_chunks_containing_uses_where_document():
 
 
 @pytest.mark.asyncio
-async def test_retrieve_section_chunks_filters_substring_false_positives():
+async def test_retrieve_pinned_chunks_filters_substring_false_positives():
     """A "$contains: 200.1" candidate pool would also match "200.10"; the
     word-boundary post-filter must keep only exact section hits."""
     candidates = [
@@ -584,10 +731,54 @@ async def test_retrieve_section_chunks_filters_substring_false_positives():
 
     with patch("app.services.document_manager.get_document_manager",
                return_value=fake_dm):
-        out = await chat_service._retrieve_section_chunks("kb-1", ["200.1"])
+        out = await chat_service._retrieve_pinned_chunks("kb-1", ["200.1"])
 
     ids = [r["chunk_id"] for r in out]
     assert ids == ["c1"], "200.10 must not be returned for a 200.1 lookup"
+
+
+@pytest.mark.asyncio
+async def test_retrieve_pinned_chunks_tries_phrase_capitalisations():
+    """ChromaDB's ``$contains`` is case-sensitive, so a phrase lifted from
+    lower-case prose has to be looked up the way a heading would write it."""
+    hits = {
+        "Field sites": [{"content": "## 5.4 Field sites and reference sampling",
+                         "chunk_id": "c32", "metadata": {"source_name": "desc.pdf"},
+                         "score": None, "similarity": None}],
+    }
+    fake_dm = MagicMock()
+    fake_dm.get_kb_chunks_containing = MagicMock(
+        side_effect=lambda kb, sub, limit: hits.get(sub, []))
+
+    with patch("app.services.document_manager.get_document_manager",
+               return_value=fake_dm):
+        out = await chat_service._retrieve_pinned_chunks("kb-1", ["field sites"])
+
+    tried = [c.args[1] for c in fake_dm.get_kb_chunks_containing.call_args_list]
+    assert "field sites" in tried and "Field sites" in tried
+    assert [r["chunk_id"] for r in out] == ["c32"]
+
+
+@pytest.mark.asyncio
+async def test_retrieve_pinned_chunks_skips_boilerplate_identifier():
+    """A project number stamped in every running header points nowhere; pinning
+    an arbitrary handful of its hits would just cost the semantic pool slots.
+    A section number the user cited explicitly stays exempt."""
+    many = [
+        {"content": f"CSU-NSF-001 header {i} — § 200.1 applies.", "chunk_id": f"c{i}",
+         "metadata": {"source_name": "doc.pdf"}, "score": None, "similarity": None}
+        for i in range(chat_service._MAX_PIN_TERM_HITS + 1)
+    ]
+    fake_dm = MagicMock()
+    fake_dm.get_kb_chunks_containing = MagicMock(return_value=many)
+
+    with patch("app.services.document_manager.get_document_manager",
+               return_value=fake_dm):
+        boilerplate = await chat_service._retrieve_pinned_chunks("kb-1", ["CSU-NSF-001"])
+        cited = await chat_service._retrieve_pinned_chunks("kb-1", ["200.1"])
+
+    assert boilerplate == []
+    assert len(cited) == 6, "an explicitly cited section still pins"
 
 
 @pytest.mark.asyncio
@@ -602,7 +793,7 @@ async def test_build_kb_segment_answers_section_only_query_when_semantic_empty()
                       new=AsyncMock()), \
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(return_value=([], cfg, 0))), \
-         patch.object(chat_service, "_retrieve_section_chunks",
+         patch.object(chat_service, "_retrieve_pinned_chunks",
                       new=AsyncMock(return_value=[section_hit])):
         segment, sources = await chat_service._build_kb_segment(
             "kb-1", "What does § 200.1 say?", "test-model",
@@ -611,6 +802,65 @@ async def test_build_kb_segment_answers_section_only_query_when_semantic_empty()
     assert segment is not None
     assert len(sources) == 1
     assert sources[0]["document_title"] == "2 CFR 200"
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_pins_identifier_chunk_the_vector_pool_missed():
+    """The regression this lane exists for: two near-identical documents that
+    differ only by a role identifier. The bi-encoder ranks the wrong one first
+    and the right one nowhere near the top-k, so the chunk that literally names
+    the identifier has to be pinned in."""
+    cfg = RAGConfig(k=8)
+    pool = [_chunk(i, source="11_Biographical_Sketch_CoPI.pdf") for i in range(8)]
+    answer = _chunk(0, source="10_Biographical_Sketch_PI.pdf")
+
+    async def fake_pin(kb_uuid, terms, **kwargs):
+        assert terms == ["CSU-PI-001"]
+        return [answer]
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(return_value=(pool, cfg, 0))), \
+         patch.object(chat_service, "_retrieve_pinned_chunks",
+                      new=AsyncMock(side_effect=fake_pin)):
+        segment, sources = await chat_service._build_kb_segment(
+            "kb-1",
+            "Where did CSU-PI-001 earn the Ph.D. credential, and in what field?",
+            "test-model",
+        )
+
+    assert segment is not None
+    assert sources[0]["document_title"] == "10_Biographical_Sketch_PI.pdf", (
+        "the pinned chunk takes the first slot"
+    )
+    assert len(sources) == cfg.k, "the top-k is still filled to k"
+    # The pin costs exactly one slot: the vector pool keeps the other seven,
+    # in its own order, minus the one it lost.
+    assert [s["chunk_id"] for s in sources[1:]] == [
+        c["chunk_id"] for c in pool[: cfg.k - 1]
+    ]
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_leaves_prose_turns_on_the_vector_path():
+    """No-regression: a turn with nothing pin-shaped in it must not touch the
+    lexical lane, and its context must be exactly the vector top-k."""
+    cfg = RAGConfig(k=4)
+    pool = [_chunk(i) for i in range(4)]
+    pin = AsyncMock(return_value=[])
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(return_value=(pool, cfg, 0))), \
+         patch.object(chat_service, "_retrieve_pinned_chunks", new=pin):
+        _, sources = await chat_service._build_kb_segment(
+            "kb-1", "Summarize this project for me.", "test-model",
+        )
+
+    pin.assert_not_awaited()
+    assert [s["chunk_id"] for s in sources] == [c["chunk_id"] for c in pool]
 
 
 # ---------------------------------------------------------------------------
@@ -662,7 +912,7 @@ async def test_build_kb_segment_fans_out_per_question():
                       new=AsyncMock()), \
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(side_effect=fake_retrieve)), \
-         patch.object(chat_service, "_retrieve_section_chunks",
+         patch.object(chat_service, "_retrieve_pinned_chunks",
                       new=AsyncMock(return_value=[])):
         segment, sources = await chat_service._build_kb_segment(
             "kb-1", msg, "test-model",

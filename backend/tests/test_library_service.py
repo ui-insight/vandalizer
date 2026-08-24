@@ -439,6 +439,87 @@ class TestEnsureBookmark:
             lib.save.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_team_scoped_object_lands_in_the_team_library(self):
+        # A team workflow bookmarked into the duplicator's personal library is
+        # invisible to the teammates who can actually access it (#673).
+        from app.models.library import LibraryItemKind
+
+        team_lib = _make_library()
+        new_item = _make_library_item()
+        wf_id = PydanticObjectId()
+
+        with (
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch(
+                "app.services.library_service.get_or_create_team_library",
+                new_callable=AsyncMock,
+                return_value=team_lib,
+            ) as mock_team,
+            patch(
+                "app.services.library_service.get_or_create_personal_library",
+                new_callable=AsyncMock,
+            ) as mock_personal,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockItem.return_value = new_item
+            MockLib.find_one = AsyncMock(return_value=None)
+
+            from app.services.library_service import ensure_bookmark
+
+            result = await ensure_bookmark(
+                wf_id, LibraryItemKind.WORKFLOW, "user1", team_id="team-1"
+            )
+
+            assert result is new_item
+            mock_team.assert_awaited_once_with("user1", "team-1")
+            mock_personal.assert_not_called()
+            assert team_lib.items == [new_item.id]
+            team_lib.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_unresolvable_team_falls_back_to_the_personal_library(self):
+        # Landing in the wrong library is recoverable; not landing anywhere is
+        # the stranding defect this function exists to prevent.
+        from app.models.library import LibraryItemKind
+
+        personal_lib = _make_library()
+        new_item = _make_library_item()
+        wf_id = PydanticObjectId()
+
+        with (
+            patch("app.services.library_service.Library") as MockLib,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch(
+                "app.services.library_service.get_or_create_team_library",
+                new_callable=AsyncMock,
+                side_effect=ValueError("Team not found: gone"),
+            ),
+            patch(
+                "app.services.library_service.get_or_create_personal_library",
+                new_callable=AsyncMock,
+                return_value=personal_lib,
+            ) as mock_personal,
+        ):
+            mock_find = MagicMock()
+            mock_find.to_list = AsyncMock(return_value=[])
+            MockItem.find = MagicMock(return_value=mock_find)
+            MockItem.return_value = new_item
+            MockLib.find_one = AsyncMock(return_value=None)
+
+            from app.services.library_service import ensure_bookmark
+
+            result = await ensure_bookmark(
+                wf_id, LibraryItemKind.WORKFLOW, "user1", team_id="gone"
+            )
+
+            assert result is new_item
+            mock_personal.assert_awaited_once_with("user1")
+            assert personal_lib.items == [new_item.id]
+
+    @pytest.mark.asyncio
     async def test_is_a_noop_when_a_live_bookmark_exists(self):
         from app.models.library import LibraryItemKind
 

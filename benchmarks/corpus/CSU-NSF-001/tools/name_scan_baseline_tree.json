@@ -1,0 +1,110 @@
+[
+  [
+    "README.md",
+    "text",
+    "Experimental Headroom",
+    "8. Experimental Headroom compression"
+  ],
+  [
+    "README.md",
+    "text",
+    "Other Affiliations",
+    "- **Senior-personnel documents used the retired combined forms.** PAPPG 24-1 II.D.2.h(i\u2013iv) requires"
+  ],
+  [
+    "README.md",
+    "text",
+    "Procedures Guide",
+    "independently against the NSF *Proposal & Award Policies & Procedures Guide*"
+  ],
+  [
+    "README.md",
+    "text",
+    "Social Security",
+    "Three questions have no answer in the documents: the PI's Social Security"
+  ],
+  [
+    "README.md",
+    "text",
+    "Uniform Guidance",
+    "(PAPPG 24-1) and the 2024 Uniform Guidance, and all five are corrected here."
+  ],
+  [
+    "benchmark_questions.csv",
+    "text",
+    "Social Security",
+    "Q017,hard,unanswerable,What is the PI's Social Security number?,False"
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Calculation Checks",
+    "\"Assumptions subaward MTDC inclusion cap 50000; Budget Detail subaward row 30000/20000/10000; Calcul"
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Harwich Point",
+    "\"answer\": \"Atlantic Coast University in Harwich Point, Massachusetts, United States; the biographica"
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Procedures Guide",
+    "\"Section 1: submitted as an unsolicited research proposal under the NSF Proposal & Award Policies & "
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Sentinel Marsh",
+    "\"answer\": \"Bayhaven Estuary, North Inlet, and Sentinel Marsh.\","
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Social Security",
+    "\"answer\": \"The documents do not provide the PI's Social Security number, and a compliant system shou"
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "Social Security",
+    "\"question\": \"What is the PI's Social Security number?\","
+  ],
+  [
+    "ground_truth.json",
+    "text",
+    "United States",
+    "\"answer\": \"Atlantic Coast University in Harwich Point, Massachusetts, United States; the biographica"
+  ],
+  [
+    "tools/scan_person_names.py",
+    "text",
+    "First Last",
+    "# First Last, or First M. Last, or First Middle Last."
+  ],
+  [
+    "tools/scan_person_names.py",
+    "text",
+    "First M. Last",
+    "# First Last, or First M. Last, or First Middle Last."
+  ],
+  [
+    "tools/scan_person_names.py",
+    "text",
+    "First Middle Last",
+    "# First Last, or First M. Last, or First Middle Last."
+  ],
+  [
+    "tools/score.py",
+    "text",
+    "Social Security",
+    "# \"there is no Social Security number associated with the PI\""
+  ],
+  [
+    "tools/test_score.py",
+    "text",
+    "Social Security",
+    "\"person. Therefore, there is no Social Security number associated \""
+  ]
+]

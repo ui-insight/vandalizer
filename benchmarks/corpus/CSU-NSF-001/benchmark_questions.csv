@@ -1,0 +1,31 @@
+id,difficulty,type,question,answerable
+Q001,easy,exact_extraction,What is the total amount requested from NSF?,True
+Q002,easy,exact_extraction,What F&A rate applies to this project?,True
+Q003,medium,calculation,What is the project MTDC base?,True
+Q004,medium,classification,"Is the $62,000 imaging flow cytometer included in the MTDC base?",True
+Q005,hard,cross_document_calculation,"How much of the $60,000 subaward is included in MTDC, and how much is excluded?",True
+Q006,medium,exact_extraction,How many participants are supported by the summer training institute?,True
+Q007,hard,distractor,Is the NSF amount requested $1.25 million?,True
+Q008,hard,distractor,"Does the earlier $20,000 seed award count toward the NSF project budget?",True
+Q009,medium,calculation,What are total direct costs?,True
+Q010,medium,calculation,What are total F&A costs?,True
+Q011,hard,calculation,What are the total MTDC exclusions?,True
+Q012,hard,policy_reasoning,Does field sampling automatically require the 26% off-campus rate?,True
+Q013,medium,classification,Are research vessel service-center charges excluded from MTDC?,True
+Q014,medium,exact_extraction,What is total graduate tuition remission?,True
+Q015,hard,cross_document_reasoning,Can a CSU employee receive participant support from this project?,True
+Q016,easy,date_extraction,What is the project period?,True
+Q017,hard,unanswerable,What is the PI's Social Security number?,False
+Q018,hard,unanswerable,Which specific model of imaging flow cytometer will be purchased?,False
+Q019,hard,negative_evidence,Does the proposal include committed cost sharing?,True
+Q020,hard,multi_step_calculation,Show how the total request is calculated from direct costs and F&A.,True
+Q021,medium,cross_document_reasoning,"Which early-career researchers must the proposal's mentoring plan cover, and does the plan comply?",True
+Q022,easy,exact_extraction,What research vessel supports station installation and servicing?,True
+Q023,medium,exact_extraction,"Where did CSU-PI-001 earn the synthetic Ph.D. credential, and in what field?",True
+Q024,hard,cross_document_reasoning,"Does either investigator currently hold NSF support, and does any listed support overlap this proposal?",True
+Q025,medium,exact_extraction,How many summer months does the PI request in Year 1?,True
+Q026,hard,unanswerable,What is the name of the postdoctoral researcher who will be hired?,False
+Q027,easy,exact_extraction,What are the three field sites?,True
+Q028,hard,distractor,Is the $2.4 million genomics core facility part of the budget requested in this proposal?,True
+Q029,medium,calculation,What is the average participant support cost per participant for the training institute?,True
+Q030,medium,exact_extraction,What is CSU-COI-001's nine-month institutional base salary?,True

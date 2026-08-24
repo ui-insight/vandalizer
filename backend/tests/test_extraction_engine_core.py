@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from app.services.extraction_engine import ExtractionEngine
+from app.services.extraction_engine import ExtractionEngine, ExtractionError
 
 
 def _make_mock_agent_result(output, request_tokens=10, response_tokens=5):
@@ -401,22 +401,24 @@ class TestFallbackExtraction:
         assert result[0]["Name"] == "Alice"
 
     @patch("app.services.extraction_engine.create_chat_agent")
-    def test_fallback_handles_invalid_json(self, mock_create_agent):
+    def test_fallback_raises_on_invalid_json(self, mock_create_agent):
+        """Unparseable model output raises — it must never read as "nothing found"."""
         mock_agent = MagicMock()
         mock_agent.run_sync.return_value = _make_mock_agent_result("not json at all")
         mock_create_agent.return_value = mock_agent
 
         engine = ExtractionEngine(system_config_doc={})
-        result = engine._extract_fallback_json("text", ["Name"], "gpt-4o")
-        assert result == []
+        with pytest.raises(ExtractionError):
+            engine._extract_fallback_json("text", ["Name"], "gpt-4o")
 
     @patch("app.services.extraction_engine.create_chat_agent")
-    def test_fallback_handles_exception(self, mock_create_agent):
+    def test_fallback_raises_on_exception(self, mock_create_agent):
+        """A dead LLM call raises so callers mark the run FAILED, not completed."""
         mock_create_agent.side_effect = RuntimeError("LLM down")
 
         engine = ExtractionEngine(system_config_doc={})
-        result = engine._extract_fallback_json("text", ["Name"], "gpt-4o")
-        assert result == []
+        with pytest.raises(ExtractionError):
+            engine._extract_fallback_json("text", ["Name"], "gpt-4o")
 
     @patch("app.services.extraction_engine.create_chat_agent")
     def test_fallback_list_response(self, mock_create_agent):
@@ -457,16 +459,17 @@ class TestStructuredExtractionErrors:
 
     @patch("app.services.extraction_engine.Agent")
     @patch("app.services.extraction_engine.get_agent_model")
-    def test_non_validation_error_returns_empty(self, mock_get_model, mock_agent_cls):
-        """Non-validation errors return empty list."""
+    def test_non_validation_error_raises(self, mock_get_model, mock_agent_cls):
+        """Provider/network errors raise so the run is marked FAILED — an
+        empty result must mean "nothing found", never "the call died"."""
         mock_get_model.return_value = MagicMock()
         mock_agent = MagicMock()
         mock_agent.run_sync.side_effect = ConnectionError("network error")
         mock_agent_cls.return_value = mock_agent
 
         engine = ExtractionEngine(system_config_doc={})
-        result = engine._extract_structured("text", ["Name"], "gpt-4o")
-        assert result == []
+        with pytest.raises(ExtractionError, match="network error"):
+            engine._extract_structured("text", ["Name"], "gpt-4o")
 
     @patch("app.services.extraction_engine.Agent")
     @patch("app.services.extraction_engine.get_agent_model")
@@ -489,15 +492,75 @@ class TestStructuredExtractionErrors:
     @patch("app.services.extraction_engine.Agent")
     @patch("app.services.extraction_engine.get_agent_model")
     def test_fallback_disabled(self, mock_get_model, mock_agent_cls):
-        """When allow_fallback=False, validation errors return empty."""
+        """When allow_fallback=False, validation errors raise instead of
+        silently shipping an empty result."""
         mock_get_model.return_value = MagicMock()
         mock_agent = MagicMock()
         mock_agent.run_sync.side_effect = Exception("output validation failed")
         mock_agent_cls.return_value = mock_agent
 
         engine = ExtractionEngine(system_config_doc={})
-        result = engine._extract_structured("text", ["Name"], "gpt-4o", allow_fallback=False)
-        assert result == []
+        with pytest.raises(ExtractionError):
+            engine._extract_structured("text", ["Name"], "gpt-4o", allow_fallback=False)
+
+
+# ---------------------------------------------------------------------------
+# Failure-degradation semantics
+# ---------------------------------------------------------------------------
+
+class TestFailureDegradation:
+    def test_two_pass_falls_back_to_draft_when_pass2_fails(self):
+        """A pass-2 refinement failure ships the pass-1 draft, not a crash."""
+        engine = ExtractionEngine(system_config_doc={})
+        draft = [{"Name": "Alice"}]
+
+        def fake_extract(content, keys, model, **kwargs):
+            if kwargs.get("allow_fallback") is False:  # pass 2
+                raise ExtractionError("pass 2 died")
+            return deepcopy(draft)
+
+        with patch.object(engine, "_extract_structured", side_effect=fake_extract):
+            result = engine._execute_two_pass(
+                "text", ["Name"], "gpt-4o",
+                pass_1_cfg={"structured": True},
+                pass_2_cfg={"structured": True},
+            )
+        assert result == draft
+
+    def test_two_pass_raises_when_pass1_fails(self):
+        """No draft, no dishonest empty result — pass-1 failure propagates."""
+        engine = ExtractionEngine(system_config_doc={})
+        with patch.object(
+            engine, "_extract_structured", side_effect=ExtractionError("pass 1 died"),
+        ):
+            with pytest.raises(ExtractionError):
+                engine._execute_two_pass(
+                    "text", ["Name"], "gpt-4o",
+                    pass_1_cfg={"structured": True},
+                    pass_2_cfg={"structured": True},
+                )
+
+    def test_consensus_raises_when_all_replicates_fail(self):
+        engine = ExtractionEngine(system_config_doc={})
+        with patch.object(
+            engine, "_dispatch_extraction", side_effect=ExtractionError("down"),
+        ):
+            with pytest.raises(ExtractionError):
+                engine._extract_with_consensus("text", ["Name"], "gpt-4o", {})
+
+    def test_consensus_survives_one_failed_replicate(self):
+        engine = ExtractionEngine(system_config_doc={})
+        calls = {"n": 0}
+
+        def fake_dispatch(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise ExtractionError("replicate 1 died")
+            return [{"Name": "Alice"}]
+
+        with patch.object(engine, "_dispatch_extraction", side_effect=fake_dispatch):
+            result = engine._extract_with_consensus("text", ["Name"], "gpt-4o", {})
+        assert result and result[0]["Name"] == "Alice"
 
 
 # ---------------------------------------------------------------------------

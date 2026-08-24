@@ -339,6 +339,7 @@ async def ensure_bookmark(
     owner_user_id: str,
     *,
     verified: bool = False,
+    team_id: str | None = None,
 ) -> LibraryItem | None:
     """Guarantee a newly created workflow / extraction is reachable somewhere.
 
@@ -350,11 +351,24 @@ async def ensure_bookmark(
     (duplicate, import, catalog import) call this instead, so a dropped or
     failed second request can no longer strand the object.
 
+    The bookmark follows where the object lives: a team-scoped object
+    (``team_id`` set) lands in the team library so teammates who can access it
+    see it, not in the creator's personal library where they cannot. A team_id
+    that cannot be resolved falls back to the personal library — an object
+    bookmarked in the wrong place is recoverable, an unbookmarked one is not.
+
     Idempotent: returns ``None`` when the object is already bookmarked.
     """
     if await has_bookmark(item_id, kind):
         return None
-    lib = await get_or_create_personal_library(owner_user_id)
+    lib: Library | None = None
+    if team_id:
+        try:
+            lib = await get_or_create_team_library(owner_user_id, team_id)
+        except ValueError:
+            lib = None
+    if lib is None:
+        lib = await get_or_create_personal_library(owner_user_id)
     now = datetime.datetime.now(datetime.timezone.utc)
     li = LibraryItem(
         item_id=item_id,
