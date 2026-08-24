@@ -593,13 +593,98 @@ function CSVDownloadButton({ csv, filename }: { csv: string; filename: string })
 // Auto-shown rich content
 // ---------------------------------------------------------------------------
 
+/** Per-field source sidecar entry from run_extraction (index-aligned with entities). */
+interface FieldSource {
+  quote?: string
+  page?: number | null
+  page_approximate?: boolean
+  document_uuid?: string | null
+  document_title?: string | null
+  verified?: boolean
+}
+
+function isEmptyValue(v: unknown): boolean {
+  return v == null || String(v).trim() === '' || String(v) === '--'
+}
+
+function sourceTooltip(src: FieldSource): string {
+  const page = src.page != null ? ` (p. ${src.page_approximate ? '~' : ''}${src.page})` : ''
+  return `\u201C${(src.quote || '').slice(0, 160)}\u201D \u2014 ${src.document_title || 'document'}${page}`
+}
+
+const NO_SOURCE_TOOLTIP =
+  "This value couldn't be traced back to the document \u2014 double-check it before relying on it"
+
+/** "p. 4" chip for a traced value; amber "no source" for an untraced one. */
+function FieldSourceChip({ src, actions }: { src?: FieldSource; actions?: KBSourceActions }) {
+  const verified = Boolean(src?.verified)
+  const clickable = verified && Boolean(src?.document_uuid) && Boolean(actions)
+  const label = verified
+    ? (src?.page != null ? `p. ${src.page_approximate ? '~' : ''}${src.page}` : 'source')
+    : 'no source'
+  const tooltip = verified && src
+    ? `${sourceTooltip(src)}${clickable ? ' \u2014 click to open' : ''}`
+    : NO_SOURCE_TOOLTIP
+
+  const handleOpen = () => {
+    if (!clickable || !actions || !src?.document_uuid) return
+    // Same contract as citation chips: the passage text is the primary
+    // anchor and an approximate page must keep its hedge in the viewer.
+    actions.setWorkspaceMode('files')
+    actions.viewDocument(src.document_uuid, src.document_title || 'Document', {
+      terms: src.quote ? [pickHighlightPhrase(src.quote)] : [],
+      page: src.page ?? null,
+      pageApproximate: src.page_approximate ?? false,
+    })
+  }
+
+  return (
+    <span
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={clickable ? handleOpen : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter') handleOpen() } : undefined}
+      title={tooltip}
+      style={{
+        flexShrink: 0, fontSize: 10, lineHeight: '14px', padding: '0 5px',
+        borderRadius: 7, whiteSpace: 'nowrap',
+        cursor: clickable ? 'pointer' : 'help',
+        color: verified ? '#1d4ed8' : '#b45309',
+        background: verified ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.12)',
+        border: `1px solid ${verified ? 'rgba(59,130,246,0.25)' : 'rgba(245,158,11,0.3)'}`,
+      }}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** "N of M values traced" summary under extraction results. */
+function SourceCoverageLine({ content }: { content: Record<string, unknown> }) {
+  const cov = content.source_coverage as
+    | { fields_with_verified_source?: number; fields_without_verified_source?: number }
+    | undefined
+  if (!cov) return null
+  const traced = cov.fields_with_verified_source ?? 0
+  const untraced = cov.fields_without_verified_source ?? 0
+  const total = traced + untraced
+  if (total === 0) return null
+  return (
+    <span style={{ fontSize: 10, color: untraced > 0 ? '#b45309' : '#6b7280' }}>
+      {traced} of {total} values traced to a source passage
+      {untraced > 0 && ' \u2014 double-check the untraced ones'}
+    </span>
+  )
+}
+
 /** Key-value pairs for single-entity extractions, compact table for multi. */
-function ExtractionContent({ content }: { content: Record<string, unknown> }) {
+function ExtractionContent({ content, actions }: { content: Record<string, unknown>; actions?: KBSourceActions }) {
   const [showAll, setShowAll] = useState(false)
   const entities = content.entities as Array<Record<string, unknown>> | undefined
   if (!entities || entities.length === 0) return null
   const fields = (content.fields as string[]) || Object.keys(entities[0])
   if (fields.length === 0) return null
+  const sources = content.sources as Array<Record<string, FieldSource>> | undefined
 
   const copyText = toolResultToText('run_extraction', content)
   const csv = extractionToCSV(content)
@@ -608,25 +693,34 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
   // Single entity: key-value pairs
   if (entities.length === 1) {
     const entity = entities[0]
-    const entries = fields
-      .filter((f) => entity[f] != null && String(entity[f]).trim() !== '' && String(entity[f]) !== '--')
-    const visibleLimit = showAll ? entries.length : 8
-    const shown = entries.slice(0, visibleLimit)
-    const remaining = entries.length - shown.length
+    const entitySources = sources?.[0] || {}
+    // Every field renders, including empty ones: "the model found nothing"
+    // is an answer the user must see, not a row to hide.
+    const visibleLimit = showAll ? fields.length : 8
+    const shown = fields.slice(0, visibleLimit)
+    const remaining = fields.length - shown.length
 
     return (
       <div style={{ marginTop: 4, marginLeft: 20, fontSize: 12, lineHeight: 1.7 }}>
-        {shown.map((f) => (
-          <div key={f} style={{ display: 'flex', gap: 8 }}>
-            <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{f}</span>
-            <span style={{ color: '#374151' }}>
-              {String(entity[f]).length > 80
-                ? String(entity[f]).slice(0, 77) + '...'
-                : String(entity[f])}
-            </span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+        {shown.map((f) => {
+          const empty = isEmptyValue(entity[f])
+          return (
+            <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+              <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{f}</span>
+              {empty ? (
+                <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>not found</span>
+              ) : (
+                <span style={{ color: '#374151' }}>
+                  {String(entity[f]).length > 80
+                    ? String(entity[f]).slice(0, 77) + '...'
+                    : String(entity[f])}
+                </span>
+              )}
+              {!empty && <FieldSourceChip src={entitySources[f]} actions={actions} />}
+            </div>
+          )
+        })}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
           {remaining > 0 && (
             <button
               onClick={() => setShowAll(true)}
@@ -638,7 +732,7 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
               +{remaining} more fields
             </button>
           )}
-          {showAll && entries.length > 8 && (
+          {showAll && fields.length > 8 && (
             <button
               onClick={() => setShowAll(false)}
               style={{
@@ -649,6 +743,7 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
               Show less
             </button>
           )}
+          <SourceCoverageLine content={content} />
           <span style={{ flex: 1 }} />
           <CopyButton text={copyText} label="Copy extraction data" />
           {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
@@ -682,18 +777,34 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
           </tr>
         </thead>
         <tbody>
-          {entities.slice(0, maxRows).map((entity, i) => (
-            <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-              {visibleFields.map((f) => (
-                <td key={f} style={{
-                  padding: '3px 8px', color: '#4b5563', maxWidth: 200,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {entity[f] != null ? String(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {entities.slice(0, maxRows).map((entity, i) => {
+            const rowSources = sources?.[i] || {}
+            return (
+              <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                {visibleFields.map((f) => {
+                  const empty = entity[f] == null
+                  const src = rowSources[f]
+                  const traced = Boolean(src?.verified)
+                  const cellTitle = empty
+                    ? undefined
+                    : traced && src ? sourceTooltip(src) : NO_SOURCE_TOOLTIP
+                  return (
+                    <td key={f} title={cellTitle} style={{
+                      padding: '3px 8px', color: '#4b5563', maxWidth: 200,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      // A dotted underline marks values with a verified source
+                      // passage; hover shows the quote. Untraced values warn on
+                      // hover and count in the footer line.
+                      textDecoration: traced && !empty ? 'underline dotted rgba(59,130,246,0.45)' : undefined,
+                      textUnderlineOffset: traced && !empty ? 3 : undefined,
+                    }}>
+                      {entity[f] != null ? String(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
         </tbody>
       </table>
       <div style={{ color: '#c4c9d1', fontSize: 10, marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -719,6 +830,7 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
             Show less
           </button>
         )}
+        <SourceCoverageLine content={content} />
         <span style={{ flex: 1 }} />
         <CopyButton text={copyText} label="Copy extraction data" />
         {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
@@ -737,7 +849,11 @@ export function pickHighlightPhrase(content: string): string {
 }
 
 interface KBSourceActions {
-  viewDocument: (uuid: string, title: string) => void
+  viewDocument: (
+    uuid: string,
+    title: string,
+    highlight?: { terms?: string[]; page?: number | null; pageApproximate?: boolean },
+  ) => void
   setHighlightTerms: (terms: string[]) => void
   setWorkspaceMode: (mode: WorkspaceMode) => void
 }
@@ -1191,7 +1307,7 @@ export function ToolStatusLine({
 
       {/* Auto-shown rich content (copy/export buttons are inside each block) */}
       {result && name === 'run_extraction' && obj?.entities != null && (
-        <ExtractionContent content={obj} />
+        <ExtractionContent content={obj} actions={kbActions} />
       )}
       {result && name === 'search_knowledge_base' && (
         <KBPassages content={result.content} actions={kbActions} />
