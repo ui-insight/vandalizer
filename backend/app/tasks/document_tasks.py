@@ -388,6 +388,13 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 "Document %s produced empty extracted text (ext=%s) — marking as error",
                 document_uuid, extension,
             )
+            message = (
+                "We couldn't extract any text from this document. "
+                "It may be blank, image-only, or encrypted, or our "
+                "OCR service may be temporarily unavailable. Try "
+                "retrying — if it keeps failing, re-upload or "
+                "contact support."
+            )
             db.smart_document.update_one(
                 {"uuid": document_uuid},
                 {
@@ -401,16 +408,14 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         # a previously-good document is reprocessed.
                         "num_pages": 0,
                         "task_status": "error",
-                        "error_message": (
-                            "We couldn't extract any text from this document. "
-                            "It may be blank, image-only, or encrypted, or our "
-                            "OCR service may be temporarily unavailable. Try "
-                            "retrying — if it keeps failing, re-upload or "
-                            "contact support."
-                        ),
+                        "error_message": message,
                     }
                 },
             )
+            # Every other terminal-error branch notifies; this one silently
+            # relied on the user noticing the row state — which the file list
+            # didn't render either. Same coalesced bell as the rest.
+            _notify_document_processing_failed(db, document_uuid, message)
             return ""
 
         update_fields: dict = {

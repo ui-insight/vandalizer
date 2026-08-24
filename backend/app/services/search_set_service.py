@@ -54,7 +54,7 @@ async def create_search_set(
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        ss.id, LibraryItemKind.SEARCH_SET, user_id,
+        ss.id, LibraryItemKind.SEARCH_SET, user_id, team_id=team_id,
     )
     return ss
 
@@ -203,13 +203,15 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
         )
         await new_item.insert()
 
-    # Add clone to user's personal library
-    from app.models.user import User as UserModel
-    user = await UserModel.find_one(UserModel.user_id == user_id)
-    if user:
-        from app.services.library_service import get_or_create_personal_library, add_item
-        lib = await get_or_create_personal_library(user_id)
-        await add_item(str(lib.id), user, str(clone.id), "search_set")
+    # Bookmark the clone where it lives: the clone keeps the original's
+    # team_id, so a copy of a team extraction set belongs in the team library,
+    # not the copier's personal one (#673).
+    from app.models.library import LibraryItemKind
+    from app.services import library_service
+
+    await library_service.ensure_bookmark(
+        clone.id, LibraryItemKind.SEARCH_SET, user_id, team_id=original.team_id,
+    )
 
     return clone
 

@@ -117,6 +117,7 @@ async def list_contents(
                 "chromadb_ready": d.chromadb_ready,
                 "chunk_count": d.chunk_count,
                 "ingest_error": d.ingest_error,
+                "error_message": d.error_message,
                 "extraction_low_quality": is_extraction_low_quality(d),
             }
             for d in documents

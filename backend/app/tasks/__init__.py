@@ -15,11 +15,49 @@ logger = logging.getLogger(__name__)
 
 # Transient exceptions that are safe to retry with backoff.
 # Permanent errors (ValueError, KeyError, TypeError, etc.) should NOT be retried.
-TRANSIENT_EXCEPTIONS = (
-    ConnectionError,
-    TimeoutError,
-    OSError,
-)
+#
+# The builtins alone are not enough: the failures that actually occur in
+# production raise library exception types that do NOT inherit from them —
+# httpx timeouts/transport errors (httpx.HTTPError → Exception), pymongo
+# AutoReconnect (PyMongoError → Exception), redis connection errors
+# (RedisError → Exception) — so ``autoretry_for=TRANSIENT_EXCEPTIONS``
+# silently never fired for the most common blips. Each library is added
+# under an import guard so a missing optional dependency can't break task
+# module import.
+#
+# LLM-call errors are deliberately NOT here: pydantic-ai's ``ModelAPIError``
+# is transient but its subclass ``ModelHTTPError`` (an HTTP *status* error —
+# a 4xx won't improve on retry) is not, and an ``except autoretry_for``
+# clause cannot express that exclusion. Tasks that make LLM calls handle it
+# per-task with the catch/re-raise pattern in
+# ``kb_validation_tasks.generate_test_queries_task``.
+def _transient_exceptions() -> tuple[type[BaseException], ...]:
+    excs: list[type[BaseException]] = [ConnectionError, TimeoutError, OSError]
+    try:
+        import httpx
+
+        # TransportError covers ConnectError, ReadTimeout, WriteError, etc.
+        # HTTPStatusError is intentionally excluded (4xx/5xx responses).
+        excs.append(httpx.TransportError)
+    except ImportError:  # pragma: no cover
+        pass
+    try:
+        from pymongo.errors import AutoReconnect
+
+        excs.append(AutoReconnect)
+    except ImportError:  # pragma: no cover
+        pass
+    try:
+        from redis.exceptions import ConnectionError as RedisConnectionError
+        from redis.exceptions import TimeoutError as RedisTimeoutError
+
+        excs.extend([RedisConnectionError, RedisTimeoutError])
+    except ImportError:  # pragma: no cover
+        pass
+    return tuple(excs)
+
+
+TRANSIENT_EXCEPTIONS = _transient_exceptions()
 
 
 def run_task_async(coro: "Coroutine[Any, Any, Any]") -> Any:

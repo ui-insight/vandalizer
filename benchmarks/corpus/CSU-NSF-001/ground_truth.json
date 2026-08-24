@@ -1,0 +1,791 @@
+{
+  "case_id": "CSU-NSF-001",
+  "title": "Forecasting Harmful Algal Bloom Risk with Autonomous Environmental DNA Sensors",
+  "version": "0.5.0",
+  "synthetic": true,
+  "authoritative_budget_total": 1184398.51428,
+  "display_budget_total": 1184398.51,
+  "questions": [
+    {
+      "id": "Q001",
+      "difficulty": "easy",
+      "type": "exact_extraction",
+      "question": "What is the total amount requested from NSF?",
+      "answer": "$1,184,398.51",
+      "answerable": true,
+      "sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Title metadata and Overview"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table"
+        ],
+        [
+          "04_Project_Description.pdf",
+          2,
+          "Section 1, Project Overview"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget Reconciliation: authoritative total amount requested"
+        ],
+        [
+          "12_Current_Pending_PI.pdf",
+          1,
+          "CSU-PI-001 Pending entry (this proposal), total anticipated project amount"
+        ],
+        [
+          "13_Current_Pending_CoPI.pdf",
+          2,
+          "CSU-COI-001 Pending entry (this proposal), total anticipated project amount"
+        ],
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail TOTAL row and NSF Summary line J (full precision)"
+        ]
+      ]
+    },
+    {
+      "id": "Q002",
+      "difficulty": "easy",
+      "type": "exact_extraction",
+      "question": "What F&A rate applies to this project?",
+      "answer": "58.0% of MTDC (predetermined on-campus organized research rate)",
+      "answerable": true,
+      "sources": [
+        [
+          "01_CSU_Synthetic_FA_Rate_Agreement.pdf",
+          1,
+          "Section I rate table"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Section I, Facilities and Administrative Costs"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Assumptions F&A research rate 0.58 of MTDC; NSF Summary rate note"
+        ]
+      ]
+    },
+    {
+      "id": "Q003",
+      "difficulty": "medium",
+      "type": "calculation",
+      "question": "What is the project MTDC base?",
+      "answer": "$649,849.57",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Section I and Budget Reconciliation"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail CALCULATION row, MTDC base"
+        ]
+      ]
+    },
+    {
+      "id": "Q004",
+      "difficulty": "medium",
+      "type": "classification",
+      "question": "Is the $62,000 imaging flow cytometer included in the MTDC base?",
+      "answer": "No. It is equipment (per-unit cost above the $5,000 threshold, useful life over one year) and is excluded from MTDC.",
+      "answerable": true,
+      "sources": [
+        [
+          "01_CSU_Synthetic_FA_Rate_Agreement.pdf",
+          1,
+          "Section II.A, Distribution base"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section D, Equipment"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "02_CSU_Synthetic_Budget_Policy.pdf",
+          1,
+          "Section 4, Equipment definition and MTDC exclusion"
+        ],
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Equipment threshold assumption; cytometer row marked Excluded: equipment"
+        ]
+      ]
+    },
+    {
+      "id": "Q005",
+      "difficulty": "hard",
+      "type": "cross_document_calculation",
+      "question": "How much of the $60,000 subaward is included in MTDC, and how much is excluded?",
+      "answer": "Of the $60,000 subaward, the first $50,000 is included in MTDC as incurred \u2014 $30,000 in Year 1 and $20,000 in Year 2 \u2014 and the remaining $10,000 (Year 3) is excluded.",
+      "answerable": true,
+      "sources": [
+        [
+          "01_CSU_Synthetic_FA_Rate_Agreement.pdf",
+          1,
+          "Section II.B, Subaward treatment (worked illustration for CSU-NSF-001)"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Section H, Subaward (continuation): first $50,000 included as incurred, $10,000 excluded"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "02_CSU_Synthetic_Budget_Policy.pdf",
+          2,
+          "Section 7, up to the first $50,000 of each subaward included regardless of the period of performance"
+        ],
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Assumptions subaward MTDC inclusion cap 50000; Budget Detail subaward row 30000/20000/10000; Calculation Checks subaward inclusion equals $50,000"
+        ]
+      ]
+    },
+    {
+      "id": "Q006",
+      "difficulty": "medium",
+      "type": "exact_extraction",
+      "question": "How many participants are supported by the summer training institute?",
+      "answer": "20 participants",
+      "answerable": true,
+      "sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Broader Impacts"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section F, Participant Support Costs"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "04_Project_Description.pdf",
+          12,
+          "Section 7, Broader Impacts: seven-day summer institute in Year 2 will serve 20 participants"
+        ]
+      ]
+    },
+    {
+      "id": "Q007",
+      "difficulty": "hard",
+      "type": "distractor",
+      "question": "Is the NSF amount requested $1.25 million?",
+      "answer": "No. $1.25 million is the cited economic loss from a single regional closure, a contextual figure. The NSF amount requested is $1,184,398.51.",
+      "answerable": true,
+      "sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Overview"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "04_Project_Description.pdf",
+          2,
+          "Section 1 restates the total NSF request"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table, total amount requested"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget Reconciliation: authoritative total amount requested"
+        ],
+        [
+          "12_Current_Pending_PI.pdf",
+          1,
+          "CSU-PI-001 Pending entry (this proposal), total anticipated project amount"
+        ],
+        [
+          "13_Current_Pending_CoPI.pdf",
+          2,
+          "CSU-COI-001 Pending entry (this proposal), total anticipated project amount"
+        ],
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail TOTAL row and NSF Summary line J"
+        ]
+      ]
+    },
+    {
+      "id": "Q008",
+      "difficulty": "hard",
+      "type": "distractor",
+      "question": "Does the earlier $20,000 seed award count toward the NSF project budget?",
+      "answer": "No. The $20,000 CSU Ocean Futures internal seed award (07/01/2025\u201306/30/2026) funded feasibility work only and is not part of the NSF amount requested.",
+      "answerable": true,
+      "sources": [
+        [
+          "04_Project_Description.pdf",
+          4,
+          "Section 3, Preliminary Studies: internal seed-award clause"
+        ],
+        [
+          "16_CSU_Research_Infrastructure_Summary.pdf",
+          1,
+          "Section 2, CSU Ocean Futures FY2026 seed-award table: CSU-PI-001 row"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q009",
+      "difficulty": "medium",
+      "type": "calculation",
+      "question": "What are total direct costs?",
+      "answer": "$807,485.77",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget period table"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail total direct costs; NSF Summary line H"
+        ]
+      ]
+    },
+    {
+      "id": "Q010",
+      "difficulty": "medium",
+      "type": "calculation",
+      "question": "What are total F&A costs?",
+      "answer": "$376,912.75",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget period table"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail F&A at 58% MTDC row; NSF Summary line I"
+        ]
+      ]
+    },
+    {
+      "id": "Q011",
+      "difficulty": "hard",
+      "type": "calculation",
+      "question": "What are the total MTDC exclusions?",
+      "answer": "$157,636.20 (equipment $62,000.00 + participant support $30,000.00 + tuition remission $55,636.20 + subaward above the first $50,000 = $10,000.00)",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget Reconciliation"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail CALCULATION row, MTDC exclusions total, with per-item exclusion labels"
+        ]
+      ]
+    },
+    {
+      "id": "Q012",
+      "difficulty": "hard",
+      "type": "policy_reasoning",
+      "question": "Does field sampling automatically require the 26% off-campus rate?",
+      "answer": "No. The off-campus rate applies only when more than 50% of total project effort for an entire budget period is performed in non-CSU facilities with rent not charged to the project; field sampling alone does not trigger it. This project applies the on-campus rate.",
+      "answerable": true,
+      "sources": [
+        [
+          "01_CSU_Synthetic_FA_Rate_Agreement.pdf",
+          1,
+          "Section II.C, Off-campus definition"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Section I, Facilities and Administrative Costs"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q013",
+      "difficulty": "medium",
+      "type": "classification",
+      "question": "Are research vessel service-center charges excluded from MTDC?",
+      "answer": "No. Internal service-center charges are included in MTDC; the project's $34,000 in research vessel service-center charges ($10,000 / $12,000 / $12,000 by year) is included.",
+      "answerable": true,
+      "sources": [
+        [
+          "02_CSU_Synthetic_Budget_Policy.pdf",
+          2,
+          "Section 9, Internal service centers"
+        ],
+        [
+          "04_Project_Description.pdf",
+          7,
+          "Section 5.4, Field sites and reference sampling"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section G, Other Direct Costs"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail research vessel service center row, by year, marked Included"
+        ]
+      ]
+    },
+    {
+      "id": "Q014",
+      "difficulty": "medium",
+      "type": "exact_extraction",
+      "question": "What is total graduate tuition remission?",
+      "answer": "$55,636.20 ($18,000.00 in Year 1, $18,540.00 in Year 2, $19,096.20 in Year 3)",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section G, Graduate tuition remission"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget Reconciliation"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail graduate tuition remission row, total and by year"
+        ]
+      ]
+    },
+    {
+      "id": "Q015",
+      "difficulty": "hard",
+      "type": "cross_document_reasoning",
+      "question": "Can a CSU employee receive participant support from this project?",
+      "answer": "No. University employees are not participants under policy CSU-RSP-204 and are not eligible for participant support; the budget justification restates that CSU employees are not eligible for these funds.",
+      "answerable": true,
+      "sources": [
+        [
+          "02_CSU_Synthetic_Budget_Policy.pdf",
+          2,
+          "Section 5, Participant support costs"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section F, Participant Support Costs"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q016",
+      "difficulty": "easy",
+      "type": "date_extraction",
+      "question": "What is the project period?",
+      "answer": "September 1, 2027 through August 31, 2030",
+      "answerable": true,
+      "sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Title metadata"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "04_Project_Description.pdf",
+          2,
+          "Section 1 states September 1, 2027 through August 31, 2030"
+        ],
+        [
+          "12_Current_Pending_PI.pdf",
+          1,
+          "CSU-PI-001 Pending entry (this proposal), project start and end dates"
+        ],
+        [
+          "13_Current_Pending_CoPI.pdf",
+          2,
+          "CSU-COI-001 Pending entry (this proposal), project end date and person-months table"
+        ],
+        [
+          "16_CSU_Research_Infrastructure_Summary.pdf",
+          1,
+          "Section 2: the proposed CSU-NSF-001 project period of 09/01/2027 through 08/31/2030"
+        ]
+      ]
+    },
+    {
+      "id": "Q017",
+      "difficulty": "hard",
+      "type": "unanswerable",
+      "question": "What is the PI's Social Security number?",
+      "answer": "The documents do not provide the PI's Social Security number, and a compliant system should refuse to speculate.",
+      "answerable": false,
+      "sources": [],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q018",
+      "difficulty": "hard",
+      "type": "unanswerable",
+      "question": "Which specific model of imaging flow cytometer will be purchased?",
+      "answer": "The documents identify the equipment type and cost but do not specify a manufacturer or model.",
+      "answerable": false,
+      "sources": [],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q019",
+      "difficulty": "hard",
+      "type": "negative_evidence",
+      "question": "Does the proposal include committed cost sharing?",
+      "answer": "No. The proposal includes no voluntary committed cost sharing, and because the proposal is unsolicited, no program solicitation imposes mandatory cost sharing.",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Cost Sharing"
+        ],
+        [
+          "02_CSU_Synthetic_Budget_Policy.pdf",
+          2,
+          "Section 8, Cost sharing"
+        ],
+        [
+          "04_Project_Description.pdf",
+          2,
+          "Section 1: submitted as an unsolicited research proposal under the NSF Proposal & Award Policies & Procedures Guide (PAPPG 24-1); no program solicitation modifies the standard proposal requirements"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "16_CSU_Research_Infrastructure_Summary.pdf",
+          2,
+          "Section 3: records no cost sharing committed to CSU-NSF-001, and none is offered"
+        ]
+      ]
+    },
+    {
+      "id": "Q020",
+      "difficulty": "hard",
+      "type": "multi_step_calculation",
+      "question": "Show how the total request is calculated from direct costs and F&A.",
+      "answer": "Total direct costs $807,485.77 + F&A $376,912.75 (= 58.0% of the $649,849.57 MTDC base, where MTDC = direct costs minus $157,636.20 in exclusions) = $1,184,398.51 total requested. Displayed components are rounded to cents; the workbook retains full precision.",
+      "answerable": true,
+      "sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Budget Detail and NSF Summary sheets"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          3,
+          "Budget Reconciliation and budget period table"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Header table: total direct costs plus F&A equals total amount requested"
+        ]
+      ]
+    },
+    {
+      "id": "Q021",
+      "difficulty": "medium",
+      "type": "cross_document_reasoning",
+      "question": "Which early-career researchers must the proposal's mentoring plan cover, and does the plan comply?",
+      "answer": "Both the postdoctoral scholar and the graduate research assistant. Under PAPPG 24-1 Chapter II.D.2.i(i) a single mentoring plan of no more than one page must cover every postdoctoral scholar and graduate student supported by the project. The proposal complies: one one-page Mentoring Plan covers both mentees, with a shared mentoring core and components enacted separately for each category.",
+      "answerable": true,
+      "sources": [
+        [
+          "09_Mentoring_Plan.pdf",
+          1,
+          "Entire document: one plan covering both mentees per PAPPG 24-1 II.D.2.i(i)"
+        ],
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Section B, Other Personnel: postdoctoral researcher and graduate research assistant"
+        ],
+        [
+          "04_Project_Description.pdf",
+          11,
+          "Section 6: postdoctoral and graduate researcher responsibilities"
+        ],
+        [
+          "04_Project_Description.pdf",
+          12,
+          "Sections 6.1 and 7: trainee cross-training and development outcomes"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Broader Impacts: one postdoctoral researcher and one graduate student trained under a structured mentoring plan"
+        ]
+      ]
+    },
+    {
+      "id": "Q022",
+      "difficulty": "easy",
+      "type": "exact_extraction",
+      "question": "What research vessel supports station installation and servicing?",
+      "answer": "The R/V Cormorant, an 11-meter coastal research vessel operated by the CSU research vessel service center (supported by two 6-meter skiffs for weekly reference sampling).",
+      "answerable": true,
+      "sources": [
+        [
+          "08_Facilities_Equipment_Resources.pdf",
+          1,
+          "Research vessels and field infrastructure"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q023",
+      "difficulty": "medium",
+      "type": "exact_extraction",
+      "question": "Where did CSU-PI-001 earn the synthetic Ph.D. credential, and in what field?",
+      "answer": "Atlantic Coast University in Harwich Point, Massachusetts, United States; the biographical sketch lists the degree as PHD, the receipt date as 09/2005 - 05/2011 and the field of study as Biological Oceanography.",
+      "answerable": true,
+      "sources": [
+        [
+          "10_Biographical_Sketch_PI.pdf",
+          1,
+          "CSU-PI-001, Professional Preparation table"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q024",
+      "difficulty": "hard",
+      "type": "cross_document_reasoning",
+      "question": "Does either investigator currently hold NSF support, and does any listed support overlap this proposal?",
+      "answer": "No. Neither investigator holds current or pending NSF support other than this proposal, and every listed current and pending project states its potential overlap as \"None.\" The project description also states that neither investigator has received NSF support during the preceding five years.",
+      "answerable": true,
+      "sources": [
+        [
+          "12_Current_Pending_PI.pdf",
+          1,
+          "No-NSF-support statement and CSU-PI-001 pending entries"
+        ],
+        [
+          "12_Current_Pending_PI.pdf",
+          2,
+          "CSU-PI-001 second pending entry, statement of potential overlap"
+        ],
+        [
+          "13_Current_Pending_CoPI.pdf",
+          1,
+          "No-NSF-support statement and CSU-COI-001 current entry"
+        ],
+        [
+          "13_Current_Pending_CoPI.pdf",
+          2,
+          "CSU-COI-001 pending entry, statement of potential overlap"
+        ],
+        [
+          "04_Project_Description.pdf",
+          4,
+          "Section 3, Preliminary Studies: no NSF support in the preceding five years"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q025",
+      "difficulty": "medium",
+      "type": "exact_extraction",
+      "question": "How many summer months does the PI request in Year 1?",
+      "answer": "1.5 summer months (1.2 summer months in each of Years 2 and 3).",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Section A, Senior Personnel"
+        ],
+        [
+          "12_Current_Pending_PI.pdf",
+          1,
+          "CSU-PI-001 Pending entry (this proposal), person months per budget period"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q026",
+      "difficulty": "hard",
+      "type": "unanswerable",
+      "question": "What is the name of the postdoctoral researcher who will be hired?",
+      "answer": "The documents do not name the postdoctoral researcher; the position will be recruited nationally in the first quarter of the project.",
+      "answerable": false,
+      "sources": [],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q027",
+      "difficulty": "easy",
+      "type": "exact_extraction",
+      "question": "What are the three field sites?",
+      "answer": "Bayhaven Estuary, North Inlet, and Sentinel Marsh.",
+      "answerable": true,
+      "sources": [
+        [
+          "04_Project_Description.pdf",
+          7,
+          "Section 5.4 and field-site table"
+        ],
+        [
+          "08_Facilities_Equipment_Resources.pdf",
+          1,
+          "Research vessels and field infrastructure"
+        ]
+      ],
+      "corroborating_sources": []
+    },
+    {
+      "id": "Q028",
+      "difficulty": "hard",
+      "type": "distractor",
+      "question": "Is the $2.4 million genomics core facility part of the budget requested in this proposal?",
+      "answer": "No. The $2.4 million was an institutional investment made in 2024 to construct the CSU Genomics Core; it predates the proposal and is not part of the support requested from NSF. Core services used by the project are budgeted under materials and supplies.",
+      "answerable": true,
+      "sources": [
+        [
+          "16_CSU_Research_Infrastructure_Summary.pdf",
+          1,
+          "Section 1, capital investment table: CSU Genomics Core, 2024, $2,400,000"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "08_Facilities_Equipment_Resources.pdf",
+          1,
+          "Genomics core facility: institutional funds, predates the proposal, not part of the NSF request; core services budgeted under materials and supplies (no dollar figure)"
+        ]
+      ]
+    },
+    {
+      "id": "Q029",
+      "difficulty": "medium",
+      "type": "calculation",
+      "question": "What is the average participant support cost per participant for the training institute?",
+      "answer": "$1,500 per participant ($30,000 for 20 participants).",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          2,
+          "Section F, Participant Support Costs"
+        ],
+        [
+          "04_Project_Description.pdf",
+          12,
+          "Section 7, Broader Impacts"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "03_Project_Summary.pdf",
+          1,
+          "Broader Impacts: $30,000 participant support for 20 participants"
+        ]
+      ]
+    },
+    {
+      "id": "Q030",
+      "difficulty": "medium",
+      "type": "exact_extraction",
+      "question": "What is CSU-COI-001's nine-month institutional base salary?",
+      "answer": "$105,000 (escalated 3.0% annually for salary computation).",
+      "answerable": true,
+      "sources": [
+        [
+          "05_Budget_Justification.pdf",
+          1,
+          "Section A, Senior Personnel"
+        ]
+      ],
+      "corroborating_sources": [
+        [
+          "CSU_NSF_001_Budget.xlsx",
+          null,
+          "Assumptions personnel table, Co-PI nine-month base salary and 3.0% escalation"
+        ]
+      ]
+    }
+  ]
+}

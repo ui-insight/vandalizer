@@ -804,6 +804,7 @@ async def _run_scripted_demo(
                 )
                 return results
 
+            extract_failed = False
             try:
                 entities = await asyncio.wait_for(
                     asyncio.to_thread(_extract), timeout=120,
@@ -811,6 +812,14 @@ async def _run_scripted_demo(
             except asyncio.TimeoutError:
                 logger.warning("Scripted demo extraction timed out")
                 entities = []
+                extract_failed = True
+            except Exception as e:
+                # The engine raises on provider/parse failure (ExtractionError)
+                # instead of returning empties — a failed demo extraction must
+                # show as a failure, not as "0 fields found".
+                logger.warning("Scripted demo extraction failed: %s", e)
+                entities = []
+                extract_failed = True
 
             # Same shape as the live run_extraction tool: pop the per-field
             # source sidecar out of each entity into an index-aligned list.
@@ -822,14 +831,15 @@ async def _run_scripted_demo(
                 sidecar = entity.pop(SOURCE_KEY, None) if isinstance(entity, dict) else None
                 demo_sources.append(sidecar if isinstance(sidecar, dict) else {})
 
-            extraction_result = {
-                "extraction_set": template_name,
-                "fields": keys,
-                "documents": [doc_title],
-                "entities": entities,
-                "entity_count": entity_count_total,
-                "sources": demo_sources,
-            }
+            if not extract_failed:
+                extraction_result = {
+                    "extraction_set": template_name,
+                    "fields": keys,
+                    "documents": [doc_title],
+                    "entities": entities,
+                    "entity_count": entity_count_total,
+                    "sources": demo_sources,
+                }
 
             if latest_run and latest_run.score is not None:
                 score = latest_run.score
@@ -851,7 +861,14 @@ async def _run_scripted_demo(
         entity_count = extraction_result.get("entity_count", 0)
         field_count = len(keys) if keys else 0
 
-        if latest_run and latest_run.accuracy is not None:
+        if extraction_result.get("error"):
+            yield _text(
+                "The extraction hit a model error just now — that happens, and "
+                "when it does Vandalizer reports a **failed run** rather than "
+                "quietly showing empty fields. In your workspace you'd see the "
+                "failure in the activity rail and could simply re-run it.\n\n"
+            )
+        elif latest_run and latest_run.accuracy is not None:
             acc_pct = round(latest_run.accuracy * 100)
             yield _text(
                 f"That pulled out **{field_count} structured fields** in seconds. "
@@ -2378,47 +2395,209 @@ _SECTION_REF_RE = re.compile(
     re.IGNORECASE,
 )
 
+# An identifier-shaped token: an upper-case alphanumeric run joined by hyphens
+# and carrying at least one digit — role and award identifiers ("CSU-PI-001",
+# "NSF-2024-117"), OMB numbers, contract numbers. Both the hyphen and the digit
+# are required so ordinary capitalised words ("NSF", "CHIPS") and hyphenated
+# prose ("cost-sharing", "NSF-funded") never pin.
+_IDENTIFIER_REF_RE = re.compile(r"\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b")
 
-def _extract_section_refs(message: str) -> list[str]:
-    """Pull CFR-style section numbers (e.g. "200.1") out of the message.
+# A phrase the user put in double quotes — an explicit "find me this string".
+# Apostrophes are deliberately excluded so ordinary contractions can't pair up
+# into a bogus quoted span.
+_QUOTED_PHRASE_RE = re.compile("[\"“]([^\"“”\n]{3,60})[\"”]")
 
-    Only matches a dotted ``part.section`` token, optionally preceded by a
-    §/"section"/"sec." lead-in — enough to catch "§ 200.1", "section 200.1",
-    and a bare "200.1" while ignoring plain integers. Deduped, order-preserving.
+# The noun phrase a definitional question is asking about: the words directly
+# after a "what/which is/are" frame. "What are the three field sites?" -> "field
+# sites". Only this frame fires, and only when two content words survive the
+# lead-in strip, so ordinary prose and open-ended requests pin nothing.
+_ASKED_PHRASE_RE = re.compile(
+    r"\bwh(?:at|ich)\s+(?:is|are|was|were)\b([^?.,;:!\n]{0,60})",
+    re.IGNORECASE,
+)
+
+# Articles, demonstratives, possessives and counts that lead a questioned noun
+# phrase without narrowing it — stripped so "the three field sites" pins on
+# "field sites".
+_PHRASE_LEAD_WORDS = frozenset({
+    "a", "an", "the", "this", "that", "these", "those", "its", "their", "our",
+    "my", "your", "his", "her", "all", "any", "some", "each", "every", "both",
+    "other", "main", "key",
+    "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    "ten",
+})
+
+# Function words a noun phrase does not run through. "the name of the vendor"
+# is not asking for the string "name of the" — it is asking about the vendor —
+# so the phrase ends at the first of these. Without this the channel pins
+# prepositional fragments, which on a small knowledge base are common enough to
+# fill the lane with every chunk that happens to say "name of the".
+_PHRASE_STOP_WORDS = frozenset({
+    "of", "in", "on", "for", "to", "from", "with", "by", "at", "as", "and",
+    "or", "but", "between", "about", "into", "over", "under", "per", "via",
+    "that", "which", "who", "whom", "whose", "if", "when", "than", "then",
+    "there", "here", "it", "we", "you", "i", "they", "he", "she",
+})
+
+# At most this many *inferred* terms pin per turn: the lane only has ceil(k/2)
+# slots, so fanning out further just costs lexical lookups nothing can use.
+# Section numbers don't count against it — "compare 200.1, 200.2, 200.3, 200.4
+# and 200.5" is five deliberate citations, and dropping the fifth would regress
+# a feature that predates this lane.
+_MAX_PIN_TERMS = 4
+
+# A term found in more chunks than this isn't pointing anywhere in particular —
+# it's boilerplate, like the project number stamped in every running header —
+# and pinning an arbitrary handful of its hits would spend slots the semantic
+# pool needs. Section numbers the user cited explicitly are exempt: those are a
+# deliberate lookup, however often the corpus repeats them.
+#
+# Note what this does *not* protect: a flat count can only fire on a collection
+# big enough to reach it, so on a small knowledge base every term survives it.
+# That is why the phrase channel above has to be narrow on its own terms rather
+# than leaning on this.
+_MAX_PIN_TERM_HITS = 24
+
+
+def _extract_pin_terms(message: str) -> list[str]:
+    """Pull the literal strings worth a lexical lookup out of the message.
+
+    Three shapes, in priority order:
+
+    * CFR-style section numbers — "§ 200.1", "section 200.1", a bare "200.1";
+    * identifier-shaped tokens — "CSU-PI-001", "NSF-2024-117";
+    * a short phrase the user quoted, or the noun phrase a "what is/are …"
+      question asks about.
+
+    All three name something the embedding barely represents: a bi-encoder
+    scores an identifier or a rare bigram as near-noise, so the chunk that
+    literally contains it can rank far below chunks that merely echo the
+    question's vocabulary. Deduped, order-preserving, and capped at
+    ``_MAX_PIN_TERMS`` for everything but section citations.
+
+    A *phrase* that merely wraps a term already collected is dropped: "what is
+    the CSU-PI-001 role?" yields the identifier, not the identifier plus
+    "CSU-PI-001 role", which would spend two of the four slots and four lexical
+    lookups on one concept. Single tokens are exempt from that check — one
+    citation is routinely a text prefix of another ("200.1" of "200.10",
+    "AA-1" of "AA-11"), and both are separate lookups the user asked for.
     """
     seen: set = set()
-    refs: list[str] = []
-    for m in _SECTION_REF_RE.finditer(message or ""):
-        ref = m.group(1)
-        if ref not in seen:
-            seen.add(ref)
-            refs.append(ref)
-    return refs
+    terms: list[str] = []
+
+    def add(term: str, *, cited: bool = False) -> None:
+        if not term or term in seen:
+            return
+        if " " in term and any(t in term for t in terms):
+            return
+        if not cited and sum(1 for t in terms if not _is_section(t)) >= _MAX_PIN_TERMS:
+            return
+        seen.add(term)
+        terms.append(term)
+
+    message = message or ""
+    for m in _SECTION_REF_RE.finditer(message):
+        add(m.group(1), cited=True)
+    for m in _IDENTIFIER_REF_RE.finditer(message):
+        token = m.group(0)
+        if any(c.isdigit() for c in token):
+            add(token)
+    for m in _QUOTED_PHRASE_RE.finditer(message):
+        add(" ".join(m.group(1).split()))
+    for m in _ASKED_PHRASE_RE.finditer(message):
+        add(_questioned_phrase(m.group(1)))
+    return terms
 
 
-async def _retrieve_section_chunks(
-    kb_uuid: str, refs: list[str], limit_per_ref: int = 6,
+def _is_section(term: str) -> bool:
+    """True for a dotted ``part.section`` citation the user typed verbatim."""
+    return bool(_SECTION_REF_RE.fullmatch(term))
+
+
+def _questioned_phrase(tail: str) -> str:
+    """Reduce the tail of a "what is/are …" question to its noun phrase.
+
+    Strips leading articles, possessives and counts, then keeps words up to the
+    first function word — a noun phrase that runs through "of" or "for" is not
+    one, and "name of the" is a fragment of English rather than a string worth
+    looking for. Returns "" unless at least two words with some substance
+    survive, so "what are you?" and "what is this about?" pin nothing.
+    """
+    words = tail.split()
+    while words and words[0].lower().strip("'’") in _PHRASE_LEAD_WORDS:
+        words.pop(0)
+    kept: list[str] = []
+    for word in words[:3]:
+        if word.lower().strip(".,;:'’") in _PHRASE_STOP_WORDS:
+            break
+        kept.append(word)
+    if len(kept) < 2 or not any(len(w) >= 4 for w in kept):
+        return ""
+    return " ".join(kept)
+
+
+def _rank_pinned_chunks(chunks: list[dict], pattern: re.Pattern) -> list[dict]:
+    """Order lexical hits by how central the pinned term is to each chunk.
+
+    ``get_kb_chunks_containing`` returns ChromaDB storage order, which is
+    arbitrary. When a term hits more chunks than the pin lane has slots, that
+    ordering decides whether the chunk the user actually asked about reaches
+    the context at all — so rank by how many times the chunk names the term,
+    then by how early the first mention falls. A chunk that names it in its
+    heading is about it; one that names it once on the last line only mentions
+    it. Ties keep storage order (``sorted`` is stable).
+    """
+    def key(item: dict) -> tuple:
+        starts = [m.start() for m in pattern.finditer(item.get("content") or "")]
+        return (-len(starts), starts[0] if starts else len(item.get("content") or ""))
+
+    return sorted(chunks, key=key)
+
+
+async def _retrieve_pinned_chunks(
+    kb_uuid: str, terms: list[str], limit_per_ref: int = 6,
 ) -> list[dict]:
-    """Lexically fetch chunks that literally contain each section number.
+    """Lexically fetch chunks that literally contain each pin term.
 
     A candidate pool comes from ChromaDB's substring filter (which would also
     match "200.10" for "200.1"), then a word-boundary regex keeps only exact
-    section matches so "§ 200.1" doesn't drag in "§ 200.10". Runs off the
-    embedding index entirely — the point is to rescue identifier lookups that
+    matches so "§ 200.1" doesn't drag in "§ 200.10". Runs off the embedding
+    index entirely — the point is to rescue identifier and phrase lookups that
     vector search can't see.
+
+    ``$contains`` is case-sensitive, so a multi-word phrase is also looked up
+    in the capitalisations a heading or a title would actually use.
     """
     from app.services.document_manager import get_document_manager
 
     dm = get_document_manager()
     out: list[dict] = []
     seen: set = set()
-    for ref in refs:
-        exact = re.compile(rf"(?<!\d){re.escape(ref)}(?!\d)")
-        candidates = await asyncio.to_thread(
-            dm.get_kb_chunks_containing, kb_uuid, ref, limit_per_ref * 4,
-        )
+    for term in terms:
+        is_section = _is_section(term)
+        is_phrase = " " in term
+        flags = re.IGNORECASE if is_phrase else 0
+        exact = re.compile(rf"(?<!\d){re.escape(term)}(?!\d)", flags)
+        variants = [term]
+        if is_phrase:
+            variants += [term.lower(), term.lower().capitalize(), term.title()]
+        candidates: list[dict] = []
+        pooled: set = set()
+        for variant in dict.fromkeys(variants):
+            for r in await asyncio.to_thread(
+                dm.get_kb_chunks_containing, kb_uuid, variant,
+                _MAX_PIN_TERM_HITS + 1,
+            ):
+                cid = r.get("chunk_id")
+                if cid is not None and cid in pooled:
+                    continue
+                if cid is not None:
+                    pooled.add(cid)
+                candidates.append(r)
+        if not is_section and len(candidates) > _MAX_PIN_TERM_HITS:
+            continue
         kept = 0
-        for r in candidates:
+        for r in _rank_pinned_chunks(candidates, exact):
             if kept >= limit_per_ref:
                 break
             if not exact.search(r.get("content") or ""):
@@ -2538,13 +2717,16 @@ async def _build_kb_segment(
             retrieval_query=retrieval_query,
         )
 
-    # Section-number targeting: a bare identifier like "§ 200.1" carries almost
-    # no semantic signal, so vector search misses the very chunk that contains
-    # it. Fetch those chunks lexically and pin them into the final slots.
-    section_results: list[dict] = []
-    section_refs = _extract_section_refs(message)
-    if section_refs:
-        section_results = await _retrieve_section_chunks(kb_uuid, section_refs)
+    # Literal-string targeting: a bare identifier like "§ 200.1" or
+    # "CSU-PI-001", and a rare phrase like "field sites", carry almost no
+    # semantic signal, so vector search misses the very chunk that contains
+    # them — and near-identical documents that differ only by an identifier are
+    # not separable at all. Fetch those chunks lexically and pin them into the
+    # final slots.
+    pinned_results: list[dict] = []
+    pin_terms = _extract_pin_terms(message)
+    if pin_terms:
+        pinned_results = await _retrieve_pinned_chunks(kb_uuid, pin_terms)
 
     # Named-document targeting: when the message mentions a project file by
     # name, run a second search restricted to that source and guarantee it a
@@ -2562,7 +2744,7 @@ async def _build_kb_segment(
         )
 
     kb_results = _compose_kb_results(
-        kb_results, named_results, rag_cfg.k, pinned=section_results,
+        kb_results, named_results, rag_cfg.k, pinned=pinned_results,
     )
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)

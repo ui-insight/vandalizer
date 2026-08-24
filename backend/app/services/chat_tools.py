@@ -1394,12 +1394,26 @@ async def _execute_extraction(
         )
         return results, engine.tokens_in, engine.tokens_out
 
+    from app.services.extraction_engine import ExtractionError
+
     try:
         results, tokens_in, tokens_out = await asyncio.wait_for(
             asyncio.to_thread(_run), timeout=120,
         )
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out after 2 minutes. Try with fewer documents or a smaller extraction set."}
+    except ExtractionError as e:
+        # The engine raises on provider/parse failure (never returns silent
+        # empties); translate to the tool-error envelope so the agent loop
+        # survives and the model reports a FAILED run — not an empty one.
+        return _err(
+            f"Extraction FAILED — the model call did not complete: {e}",
+            hint=(
+                "This was an infrastructure/model failure, not an empty "
+                "document. Tell the user the run failed and suggest retrying; "
+                "do not describe any field as 'not found'."
+            ),
+        )
 
     # Record behavioral memory — best-effort, never blocks the tool.
     from app.services import user_memory_service
@@ -2519,10 +2533,20 @@ async def propose_test_case(
             doc_metadata=doc_metadata,
         )
 
+    from app.services.extraction_engine import ExtractionError
+
     try:
         results = await asyncio.wait_for(asyncio.to_thread(_run), timeout=120)
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out. Try a smaller extraction set."}
+    except ExtractionError as e:
+        return _err(
+            f"Extraction FAILED — the model call did not complete: {e}",
+            hint=(
+                "Do not open a verification session from a failed run. Tell "
+                "the user the extraction failed and suggest retrying."
+            ),
+        )
 
     from app.services.extraction_sources import SOURCE_KEY
 

@@ -76,7 +76,7 @@ async def create_workflow(name: str, user_id: str, description: str | None = Non
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        wf.id, LibraryItemKind.WORKFLOW, user_id,
+        wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
     )
     return wf
 
@@ -376,7 +376,7 @@ async def duplicate_workflow(
     from app.services import library_service
 
     await library_service.ensure_bookmark(
-        new_wf.id, LibraryItemKind.WORKFLOW, user_id,
+        new_wf.id, LibraryItemKind.WORKFLOW, user_id, team_id=team_id,
     )
 
     return await get_workflow(str(new_wf.id))
