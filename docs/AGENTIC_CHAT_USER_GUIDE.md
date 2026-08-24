@@ -10,7 +10,7 @@ This guide walks through everything the chat can do for you. If you've used Chat
 
 Vandalizer's agentic chat is built on the same conversational interface you already know, with three things generic AI chat can't give you:
 
-1. **Validated answers.** Every extraction and workflow the chat runs comes with a quality score, accuracy %, and the number of test cases behind it. The agent can't see that number, so it can't talk it up — the badge comes straight from your stored validation runs.
+1. **Validated answers.** Extractions and workflows that have validation runs carry a quality score, accuracy %, and the number of test cases behind it — and anything unvalidated is labeled **Unscored** rather than dressed up. The agent can't see the number, so it can't talk it up; the badge comes straight from your stored validation runs.
 2. **Cited sources.** Knowledge-base answers show the exact passages used. Click any passage to jump to the source document.
 3. **Confirmation on writes.** Creating knowledge bases, running workflows, building automations, or promoting results into validated templates always previews first, then waits for your approval.
 

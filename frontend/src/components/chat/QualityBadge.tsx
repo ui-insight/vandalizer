@@ -2,11 +2,14 @@ import { useState, useRef, useEffect } from 'react'
 import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react'
 import type { QualityMeta } from '../../types/chat'
 
+// Labels and colors match QUALITY_SIGNALS_EXPLAINED.md. "Verified" is
+// deliberately NOT a tier label here — it means examiner verification, a
+// different and stronger claim than a validation score.
 const TIER_CONFIG: Record<string, { bg: string; border: string; text: string; icon: typeof Shield; label: string }> = {
-  excellent: { bg: 'rgba(34,197,94,0.10)', border: '#22c55e', text: '#15803d', icon: ShieldCheck, label: 'Verified' },
-  good:      { bg: 'rgba(234,179,8,0.10)', border: '#eab308', text: '#a16207', icon: ShieldCheck, label: 'Good' },
-  fair:      { bg: 'rgba(148,163,184,0.10)', border: '#94a3b8', text: '#475569', icon: Shield, label: 'Fair' },
-  poor:      { bg: 'rgba(239,68,68,0.08)', border: '#ef4444', text: '#dc2626', icon: ShieldAlert, label: 'Low' },
+  excellent: { bg: 'rgba(34,197,94,0.10)', border: '#22c55e', text: '#15803d', icon: ShieldCheck, label: 'Excellent' },
+  good:      { bg: 'rgba(59,130,246,0.10)', border: '#3b82f6', text: '#1d4ed8', icon: ShieldCheck, label: 'Good' },
+  fair:      { bg: 'rgba(234,179,8,0.10)', border: '#eab308', text: '#a16207', icon: Shield, label: 'Fair' },
+  poor:      { bg: 'rgba(239,68,68,0.08)', border: '#ef4444', text: '#dc2626', icon: ShieldAlert, label: 'Poor' },
 }
 
 const DEFAULT_CONFIG = { bg: 'rgba(148,163,184,0.06)', border: '#cbd5e1', text: '#64748b', icon: Shield, label: 'Unscored' }
@@ -32,6 +35,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
   const config = TIER_CONFIG[tier] || DEFAULT_CONFIG
   const IconComponent = config.icon
   const hasAlerts = (quality.active_alerts?.length ?? 0) > 0
+  const hasCriticalAlert = (quality.active_alerts ?? []).some(a => a.severity === 'critical')
 
   // Close tooltip on outside click
   useEffect(() => {
@@ -84,7 +88,9 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
         )}
         <span>{config.label}</span>
         {hasAlerts && (
-          <AlertTriangle size={10} style={{ color: '#f59e0b', marginLeft: -2 }} />
+          // Red = critical (accuracy floor breached / run errored); amber =
+          // warning (consistency drift, stale validation).
+          <AlertTriangle size={10} style={{ color: hasCriticalAlert ? '#dc2626' : '#f59e0b', marginLeft: -2 }} />
         )}
       </button>
 
@@ -146,6 +152,12 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
                   <span style={{ fontWeight: 500, textAlign: 'right' }}>{quality.num_runs}</span>
                 </>
               )}
+              {quality.grade != null && (
+                <>
+                  <span style={{ color: '#6b7280' }}>Grade</span>
+                  <span style={{ fontWeight: 500, textAlign: 'right' }}>{quality.grade}</span>
+                </>
+              )}
             </div>
           )}
 
@@ -153,6 +165,15 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           <div style={{ color: '#9ca3af', fontSize: 11 }}>
             Last validated: {formatDate(quality.last_validated_at)}
           </div>
+
+          {/* A high tier on a tiny test set is provisional, not proven — the
+              docs' own FAQ says so; the badge should too. */}
+          {quality.num_test_cases != null && quality.num_test_cases < 5 && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', fontSize: 11, color: '#d97706' }}>
+              Scored on only {quality.num_test_cases} test case{quality.num_test_cases === 1 ? '' : 's'} —
+              treat as provisional and add more before relying on it for high-stakes work.
+            </div>
+          )}
 
           {/* Stale validation plan (workflows) */}
           {quality.plan_stale && (

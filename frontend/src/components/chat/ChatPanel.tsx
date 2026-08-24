@@ -1325,13 +1325,29 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Notices are keyed by `action` so a "document still processing"
-            warning never wears the "Context was compacted" label. */}
+        {/* Notices are keyed by `action` so a trust warning never wears the
+            "Context was compacted" label. Unknown actions fall into a neutral
+            bucket rather than borrowing the compaction heading. */}
         {(() => {
           const notReady = contextNotices.filter(n => n.action === 'documents_not_ready')
           const failed = contextNotices.filter(n => n.action === 'documents_extraction_failed')
-          const compacted = contextNotices.filter(
-            n => n.action !== 'documents_not_ready' && n.action !== 'documents_extraction_failed',
+          const lowQuality = contextNotices.filter(n => n.action === 'documents_low_quality')
+          const kbFailed = contextNotices.filter(n => n.action === 'kb_retrieval_failed')
+          const routing = contextNotices.filter(
+            n => n.action === 'model_routed' || n.action === 'model_not_routed',
+          )
+          const COMPACTION_ACTIONS = new Set([
+            'auto_compacted', 'autocompact_unavailable', 'attachments_trimmed',
+            'documents_trimmed', 'history_trimmed', 'over_budget',
+          ])
+          const HANDLED = new Set([
+            'documents_not_ready', 'documents_extraction_failed',
+            'documents_low_quality', 'kb_retrieval_failed',
+            'model_routed', 'model_not_routed',
+          ])
+          const compacted = contextNotices.filter(n => COMPACTION_ACTIONS.has(n.action))
+          const other = contextNotices.filter(
+            n => !HANDLED.has(n.action) && !COMPACTION_ACTIONS.has(n.action),
           )
           return (
             <>
@@ -1365,11 +1381,43 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   </div>
                 </div>
               )}
+              {lowQuality.length > 0 && (
+                <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">Answers about these documents may be unreliable</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {lowQuality.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {kbFailed.length > 0 && (
+                <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">This answer is not grounded in your documents</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {kbFailed.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {routing.length > 0 && (
+                <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+                  <div className="font-medium mb-1">Model note</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {routing.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
               {compacted.length > 0 && (
                 <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
                   <div className="font-medium mb-1">Context was compacted to fit the model:</div>
                   <ul className="list-disc pl-4 space-y-0.5">
                     {compacted.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {other.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Notices</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {other.map((n, i) => <li key={i}>{n.detail}</li>)}
                   </ul>
                 </div>
               )}

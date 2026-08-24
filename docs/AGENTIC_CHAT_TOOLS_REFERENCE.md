@@ -155,6 +155,8 @@ Knowledge bases available to the user — personal, team-shared, and verified. N
 |---|---|---|---|
 | `search` | `str?` | `None` | Filter templates by title |
 
+Each entry carries `quality_tier`/`quality_score` from the set's latest validation run when one exists, and scored sets sort first (best score leading) so the most trusted templates surface first. Listing-level tier is deliberately model-visible — like `get_quality_info`, it helps the agent recommend trusted templates; the anti-inflation strip applies to per-result badges, not listings.
+
 ### `list_workflows`
 
 | Param | Type | Default | Notes |
@@ -227,6 +229,8 @@ Full text of one document. Parallel-safe, compactable.
 | Param | Type | Default | Notes |
 |---|---|---|---|
 | `document_uuid` | `str` | required | |
+
+Text comes back page-annotated (`[p. N]` boundaries from the document's stored page markers, `[p. ~N]` when interpolated) with a `page_citation_note` telling the model how to cite — the same contract as attached-document chat, approximate-page hedge included. Reads truncated at 30K chars carry a note instructing the model to present the read as partial, never as whole-document coverage.
 
 ### `analyze_documents`
 
@@ -319,7 +323,7 @@ A workflow runs on documents, on typed text, or on nothing, depending on its inp
 |---|---|---|---|
 | `session_id` | `str` | required | Returned by `run_workflow` |
 
-Returns current step, completion, any pending `approval_request_id`, and final output. Parallel-safe but deliberately **not** compactable — it anchors an in-flight process.
+Returns current step, completion, any pending `approval_request_id`, and final output. A completed run also carries the workflow's quality sidecar (score/tier/grade/alerts from its own latest `ValidationRun`, plus the stale-plan flag) — stripped from the model's view like every quality sidecar. Parallel-safe but deliberately **not** compactable — it anchors an in-flight process.
 
 ### `approve_workflow_step` / `reject_workflow_step`
 

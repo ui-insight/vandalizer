@@ -29,9 +29,9 @@ const STEPS: TourStep[] = [
   {
     icon: BadgeCheck,
     accent: 'text-green-400',
-    title: 'Every answer is validated',
+    title: 'Quality is measured, not claimed',
     body:
-      'Results from validated templates carry a quality badge with accuracy, consistency, and test-case count. Hover the badge for the full breakdown.',
+      'Results from validated templates carry a quality badge with accuracy, consistency, and test-case count — click the badge for the full breakdown. Templates without validation runs show Unscored until you validate them.',
   },
   {
     icon: Award,
