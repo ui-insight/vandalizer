@@ -860,7 +860,7 @@ interface KBSourceActions {
   viewDocument: (
     uuid: string,
     title: string,
-    highlight?: { terms?: string[]; page?: number | null; pageApproximate?: boolean },
+    highlight?: { terms: string[]; page: number | null; pageApproximate?: boolean },
   ) => void
   setHighlightTerms: (terms: string[]) => void
   setWorkspaceMode: (mode: WorkspaceMode) => void

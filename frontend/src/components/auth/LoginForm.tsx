@@ -75,7 +75,7 @@ export function LoginForm() {
         Need an account?{' '}
         <Link
           to="/landing"
-          search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }}
+          search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }}
           className="font-bold text-white hover:text-[#f1b300]"
         >
           Create one

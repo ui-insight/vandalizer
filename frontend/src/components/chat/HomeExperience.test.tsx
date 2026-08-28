@@ -35,7 +35,6 @@ function certProgress(completedModules: string[]): CertificationProgress {
     level: 'apprentice',
     certified: false,
     certified_at: null,
-    streak_days: 1,
     last_activity_date: null,
   }
 }
