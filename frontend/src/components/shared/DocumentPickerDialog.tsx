@@ -7,10 +7,13 @@ export function DocumentPickerDialog({
   onSelect,
   onClose,
   excludeUuids,
+  title = 'Add Documents',
 }: {
   onSelect: (docs: { uuid: string; title: string }[]) => void
   onClose: () => void
   excludeUuids: string[]
+  /** Dialog heading — say where the documents come from when it isn't obvious. */
+  title?: string
 }) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ uuid: string; title: string }[]>([])
@@ -63,12 +66,12 @@ export function DocumentPickerDialog({
       justifyContent: 'center', zIndex: 1000,
     }}>
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label="Add documents" style={{
+      <div role="dialog" aria-modal="true" aria-label={title} style={{
         backgroundColor: '#fff', borderRadius: 12, width: 480, maxHeight: '70vh',
         display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>Add Documents</span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>{title}</span>
           <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>

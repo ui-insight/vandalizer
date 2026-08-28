@@ -523,8 +523,8 @@ def test_find_context_overflow_corrects_stored_tiktoken_counts():
     from app.services.context_budget import find_context_overflow
 
     # The input budget for a 65,536-token window is 56,320 once the response
-    # reserve and overhead are taken out. 50,000 raw fits it; at the 1.20
-    # default the same package is 60,000, which does not.
+    # reserve and overhead are taken out. 50,000 raw fits it; at the 1.5
+    # default the same package is 75,000, which does not.
     docs = [
         {"uuid": "a", "title": "Narrative.pdf", "token_count": 25_000},
         {"uuid": "b", "title": "Budget_Justification.xlsx", "token_count": 25_000},
@@ -543,7 +543,7 @@ def test_find_context_overflow_corrects_stored_tiktoken_counts():
     )
     assert overflow is not None
     assert overflow.kind == "combined"
-    assert overflow.total_tokens == 60_000
+    assert overflow.total_tokens == 75_000
 
 
 def test_find_context_overflow_does_not_inflate_for_openai_models():

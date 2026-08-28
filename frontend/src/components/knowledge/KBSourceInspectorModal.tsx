@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { describeSourceCurrency, formatCurrencyDateTime } from './sourceCurrency'
 import { FocusTrap } from 'focus-trap-react'
 import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
 import { getKBSource, setKBSourceReference } from '../../api/knowledge'
@@ -340,12 +341,40 @@ function SourceContentInspector({
             <div style={{ fontFamily: 'monospace', fontSize: 11 }}>{detail.parent_source_uuid}</div>
           </>
         )}
-        {detail.processed_at && (
+        {detail.processed_at && !detail.currency && (
           <>
             <div style={{ color: '#888' }}>Processed</div>
             <div>{new Date(detail.processed_at).toLocaleString()}</div>
           </>
         )}
+        {detail.currency && (() => {
+          // Source currency, field by field — what an evaluator needs to
+          // verify the source without re-fetching the original.
+          const c = detail.currency
+          const desc = describeSourceCurrency(c)
+          const row = (label: string, value: string | null | undefined, opts?: { mono?: boolean; color?: string }) => value ? (
+            <>
+              <div style={{ color: '#888' }}>{label}</div>
+              <div style={{ fontFamily: opts?.mono ? 'monospace' : undefined, fontSize: opts?.mono ? 11 : undefined, wordBreak: 'break-all', color: opts?.color }}>{value}</div>
+            </>
+          ) : null
+          const toneColor = desc?.tone === 'warn' ? '#fbbf24' : desc?.tone === 'error' ? '#f87171' : undefined
+          return (
+            <>
+              {row('Currency', desc ? `${desc.label} — ${desc.summary}` : null, { color: toneColor })}
+              {row('Last refresh attempted', formatCurrencyDateTime(c.last_refresh_attempted_at))}
+              {row('Last retrieved', formatCurrencyDateTime(c.last_retrieved_at))}
+              {row('Last indexed', formatCurrencyDateTime(c.last_ingested_at))}
+              {row('Serving text retrieved', formatCurrencyDateTime(c.content_retrieved_at))}
+              {row('Last refresh error', c.last_refresh_error, { color: '#f87171' })}
+              {row(
+                `Content hash (${c.content_hash_algorithm})`,
+                c.content_hash ? `${c.content_hash}${c.content_hash_recorded ? '' : ' (from stored snapshot)'}` : null,
+                { mono: true },
+              )}
+            </>
+          )
+        })()}
       </div>
 
       {/* Crawled children list */}

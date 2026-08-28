@@ -25,6 +25,8 @@ make backend-install frontend-install
 make release-check
 ```
 
+`make release-check` includes `make security-gate`, which needs [Trivy](https://trivy.dev) on the PATH (`brew install trivy`). The `Release` GitHub workflow installs it itself.
+
 Optional but recommended while the backend analysis backlog is still being cleaned up:
 
 ```bash

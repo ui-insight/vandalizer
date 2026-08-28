@@ -14,6 +14,7 @@ Usage:
     python -m scripts.seed_catalog --reset                      # wipe catalog metadata, then re-seed
     python -m scripts.seed_catalog --prune                      # seed, then retire items dropped from the catalog
     python -m scripts.seed_catalog --prune --dry-run            # preview what --prune would retire (no changes)
+    python -m scripts.seed_catalog --only kbs --refresh-urls    # re-fetch live-URL KB sources from their current pages
 
 The --reset flag clears the catalog "metadata layer" (VerifiedCollection,
 VerifiedItemMetadata, verified LibraryItem records, and the verified Library
@@ -54,6 +55,26 @@ from app.models.verification import VerifiedCollection, VerifiedItemMetadata
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 
 logger = logging.getLogger(__name__)
+
+
+def _reinstate_verified(doc) -> bool:
+    """Restore ``verified=True`` on an existing catalog row the seed is re-attaching.
+
+    A prune (``_retire_item``) or the admin retire toggle flips the row to
+    ``verified=False`` and keeps it so the change is reversible. When a later
+    catalog version reinstates that seed, the row is found by ``seed_id``, its
+    content refreshed and its library item + metadata re-created — but the flag
+    stayed False. The catalog then advertised a knowledge base or extraction set
+    that ``can_view_*`` refuses to everyone but its owner, which surfaced as
+    "Knowledge base not found or not accessible" on Adopt (prod, 2026-08-26).
+
+    Returns True when the flag was changed so the caller saves the row.
+    """
+    if getattr(doc, "verified", True):
+        return False
+    doc.verified = True
+    print("    (reinstated: verified flag restored)")
+    return True
 
 SEEDS_DIR = pathlib.Path(__file__).resolve().parent.parent / "seeds"
 VERSION_FILE = SEEDS_DIR / "VERSION"
@@ -324,7 +345,7 @@ async def seed_workflow(
         if patched:
             print(f"    (patched {patched} extraction task(s))")
 
-        changed = False
+        changed = _reinstate_verified(existing)
         new_name = item["name"]
         if existing.name != new_name:
             existing.name = new_name
@@ -493,7 +514,7 @@ async def _refresh_search_set(
     """Apply updates to an existing SearchSet: refresh top-level fields, add any
     missing items from the seed (matched by searchphrase), add missing test cases,
     and refresh metadata/library/collections."""
-    changed = False
+    changed = _reinstate_verified(ss)
     if ss.title != item["title"]:
         ss.title = item["title"]
         changed = True
@@ -673,8 +694,14 @@ def _load_seed_source_text(src_data: dict) -> str | None:
 
 async def seed_knowledge_base(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
+    refresh_urls: bool = False,
 ) -> SeedResult:
-    """Seed a single knowledge base. Returns "created", "updated", or "skipped"."""
+    """Seed a single knowledge base. Returns "created", "updated", or "skipped".
+
+    ``refresh_urls`` re-fetches every existing live-URL source of an already
+    seeded KB (sources with bundled ``content_file`` text are never refetched —
+    the bundle is authoritative). A failed fetch keeps the previous text.
+    """
     seed_id = meta["seed_id"]
     item = data["items"][0]
 
@@ -694,7 +721,7 @@ async def seed_knowledge_base(
         )
         from app.utils.bot_challenge import looks_like_bot_challenge
 
-        changed = False
+        changed = _reinstate_verified(existing)
         if existing.resource_config.get("seed_id") != seed_id:
             existing.resource_config = {**existing.resource_config, "seed_id": seed_id}
             changed = True
@@ -763,7 +790,30 @@ async def seed_knowledge_base(
                 repaired += 1
         if repaired:
             print(f"    ~ repaired {repaired} poisoned source(s) from bundled text")
-        if new_sources_ingested or repaired:
+
+        # Optional refresh pass: existing live-URL sources are otherwise left
+        # alone forever, so a catalog KB built from institutional web pages
+        # silently drifts from the pages it cites (support ticket: APM policy
+        # text from 2018 served months after the pages were revised).
+        refreshed = 0
+        kept = 0
+        if refresh_urls:
+            from app.services.knowledge_service import refresh_url_source
+
+            for src in current_sources:
+                if src.source_type != "url" or not src.url:
+                    continue
+                if src.url in bundled_by_url:
+                    continue
+                reason = await refresh_url_source(src, existing)
+                if reason:
+                    kept += 1
+                    print(f"    ! kept previous text for {src.url}: {reason}")
+                else:
+                    refreshed += 1
+            print(f"    ~ refreshed {refreshed} URL source(s) from their live pages ({kept} kept previous text)")
+
+        if new_sources_ingested or repaired or refreshed or kept:
             await _recalc_kb_stats(existing)
 
         await ensure_library_item(verified_lib, existing.id, LibraryItemKind.KNOWLEDGE_BASE)
@@ -1173,13 +1223,15 @@ async def compute_catalog_diff(types: set[str] | None = None) -> dict:
 # Main
 # ---------------------------------------------------------------------------
 
-async def seed_catalog(types: set[str] | None = None):
+async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False):
     """Seed the verified catalog. Expects Beanie to be already initialized.
 
     Args:
         types: Subset of {"workflows", "extractions", "knowledge_bases"} controlling
                which resource types to seed. ``None`` (default) seeds all three.
                Collections are always ensured because the other types reference them.
+        refresh_urls: Re-fetch existing live-URL sources of already seeded KBs
+               (see ``seed_knowledge_base``).
     """
     selected = set(types) if types else set(ALL_TYPES)
     unknown = selected - ALL_TYPES
@@ -1267,7 +1319,9 @@ async def seed_catalog(types: set[str] | None = None):
                 if not meta.get("seed_id"):
                     print(f"  SKIP {kb_file.name}: missing _seed_meta.seed_id")
                     continue
-                result = await seed_knowledge_base(data, meta, verified_lib, slug_to_collection)
+                result = await seed_knowledge_base(
+                    data, meta, verified_lib, slug_to_collection, refresh_urls=refresh_urls,
+                )
                 _tally(kb_counts, result, "knowledge base", meta.get("display_name", kb_file.stem))
         summary.append(
             f"Knowledge bases: {kb_counts.get('created', 0)} created, "
@@ -1350,6 +1404,16 @@ async def main():
         ),
     )
     parser.add_argument(
+        "--refresh-urls",
+        action="store_true",
+        help=(
+            "Re-fetch every live-URL source of already seeded knowledge bases "
+            "from its current web page (bundled-text sources are left alone; a "
+            "failed fetch keeps the previous text). Use when cited pages have "
+            "been revised since the KB was built."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help=(
@@ -1378,7 +1442,7 @@ async def main():
             f"{deleted['library_items']} verified library item(s), "
             f"{deleted['libraries']} verified library container(s)."
         )
-    await seed_catalog(types=types)
+    await seed_catalog(types=types, refresh_urls=args.refresh_urls)
 
     if args.prune:
         retired = await prune_stale_seeded_items(types, dry_run=False)

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { describeFileSummary, summarizeFilePayload } from './outputFilePayload'
 import { FocusTrap } from 'focus-trap-react'
 import { X, Folder } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
@@ -82,6 +83,9 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
   const previewText = useMemo(() => {
     if (outputPreview === null || outputPreview === undefined) return ''
     if (typeof outputPreview === 'string') return outputPreview
+    // A file-producing step's payload: name the file rather than print its base64.
+    const file = summarizeFilePayload(outputPreview)
+    if (file) return file.text !== null ? `${describeFileSummary(file)}\n\n${file.text}` : describeFileSummary(file)
     try {
       return JSON.stringify(outputPreview, null, 2)
     } catch {

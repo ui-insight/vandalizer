@@ -1,4 +1,15 @@
-"""Demo waitlist service — manages applications, activation, expiry, and feedback."""
+"""Demo/trial service — a token-metered free tier.
+
+The trial is a *budget*, not a clock: an account is included up to
+``TRIAL_TOKEN_BUDGET`` LLM tokens (enforced live at the metering chokepoint in
+``trial_budget.py``), tops up in ``TRIAL_TOPUP_TOKENS`` increments priced in
+feedback, and never expires on a date. Running out is soft — the workspace
+stays browsable and only LLM spend is gated — so there is no lockout and
+nothing to rescue the user from.
+
+This module owns application records, activation, the budget lifecycle sweep
+(warning → exhausted → top-up), and the feedback loop around them.
+"""
 
 import datetime
 import logging
@@ -17,31 +28,32 @@ from app.models.workflow import Workflow, WorkflowResult
 from app.services.email_service import (
     send_email,
     test_email,
-    waitlist_confirmation_email,
     activation_email,
-    expiry_warning_email,
-    trial_expired_email,
-    trial_extended_email,
+    budget_warning_email,
+    trial_exhausted_email,
+    trial_topup_email,
+    verify_email_email,
     recapture_email,
 )
+from app.services import trial_budget
 from app.utils.security import hash_password
 import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
-MAX_ACTIVE_DEMOS = 50
-MAX_PER_ORGANIZATION = 5
-TRIAL_DAYS = 14
+# Fraction of the budget that triggers the one-time "running low" email.
+BUDGET_WARNING_THRESHOLD = 0.8
 
-# Self-serve renewal from the end-of-trial screen
+# Self-serve top-ups from the trial-end screen are unlimited; the counter is
+# analytics only (kept under its historical name for stored records).
 MAX_SELF_EXTENSIONS = 2
 # A trial user who logged in but produced fewer than this many meaningful
 # artifacts (documents + workflow runs + chats) "didn't really get a chance to
-# try it" — the end screen offers them a frictionless one-click extension.
+# try it" — the end screen offers them a frictionless one-click top-up.
 LOW_ENGAGEMENT_MAX_ARTIFACTS = 3
 
 # Magic sign-in links double as the primary credential for trial users, so they
-# need to outlive a vacation, not expire in 48h. Match the trial length.
+# need to outlive a vacation, not expire in 48h.
 MAGIC_LINK_TTL_SECONDS = 14 * 24 * 60 * 60
 
 # Excludes look-alikes (I, O, i, l, o, 0, 1) so copied/typed passwords don't fail silently.
@@ -61,7 +73,7 @@ def _generate_demo_password() -> str:
 
 
 async def _create_magic_login_token(user_id: str, settings: Settings) -> str:
-    """Create a one-time magic login URL (48h TTL) for the given user."""
+    """Create a one-time magic login URL (TTL = MAGIC_LINK_TTL_SECONDS)."""
     token = secrets.token_urlsafe(32)
     r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
     try:
@@ -71,114 +83,110 @@ async def _create_magic_login_token(user_id: str, settings: Settings) -> str:
     return f"{settings.frontend_url}/api/auth/magic-login?token={token}"
 
 
-async def submit_application(
-    name: str,
-    email: str,
-    organization: str,
-    questionnaire_responses: dict,
-    title: str = "",
-    settings: Settings | None = None,
+def _email_domain(email: str) -> str:
+    """Bucket signups by email domain, so per-institution uptake is visible."""
+    domain = (email or "").rsplit("@", 1)[-1].strip().lower()
+    return domain or "self-registered"
+
+
+async def begin_self_serve_trial(
+    user: User, settings: Settings | None = None
 ) -> DemoApplication:
-    """Create a new demo application and send confirmation email."""
+    """Start the token-metered trial for a user who registered directly.
+
+    Marks the User as a trial account with the deployment's default token
+    budget and mints — or adopts, for a *pending* application an admin created
+    but never sent — an active DemoApplication. The application record is
+    what the rest of the lifecycle keys on (the budget sweep, the trial-end
+    screen, engagement scoring, the admin dashboard).
+
+    Only a pending application is adopted. An exhausted or completed one
+    belongs to a finished run: reviving it would silently hand a fresh budget
+    to someone who already used theirs, so those keep their record and get a
+    new one.
+    """
     if settings is None:
         settings = Settings()
 
-    email = email.strip().lower()
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    user.is_demo_user = True
+    user.demo_status = "active"
+    # Token-metered: no clock. The legacy field stays None for new trials.
+    user.demo_expires_at = None
+    user.trial_token_budget = settings.trial_token_budget
+    await user.save()
+
+    email = (user.email or user.user_id or "").strip().lower()
     existing = await DemoApplication.find_one(DemoApplication.email == email)
-    if existing:
-        raise ValueError("An application with this email already exists")
-
-    existing_user = await User.find_one(User.email == email)
-    if existing_user:
-        raise ValueError("An account with this email already exists")
-
-    # Calculate waitlist position
-    pending_count = await DemoApplication.find(
-        DemoApplication.status == "pending"
-    ).count()
-    position = pending_count + 1
+    if existing is not None and existing.status == "pending":
+        existing.status = "active"
+        existing.user_id = user.user_id
+        existing.activated_at = now
+        existing.expires_at = None
+        existing.budget_warning_sent = False
+        await existing.save()
+        # Same gate as a fresh signup: adopting a pending record is still a
+        # first sign-in, and without this the account is unverified with no
+        # link ever sent — AI gated with nothing to click.
+        await send_verification_email(user, existing, settings)
+        return existing
 
     app = DemoApplication(
         uuid=secrets.token_urlsafe(16),
-        name=name,
-        title=title,
+        name=user.name or email,
         email=email,
-        organization=organization.strip(),
-        questionnaire_responses=questionnaire_responses,
-        status="pending",
-        waitlist_position=position,
-        created_at=datetime.datetime.now(datetime.timezone.utc),
+        organization=_email_domain(email),
+        status="active",
+        user_id=user.user_id,
+        activated_at=now,
+        created_at=now,
     )
     await app.insert()
-
-    # Send confirmation email
-    subject, html = waitlist_confirmation_email(
-        name, position, settings.frontend_url, app.uuid
-    )
-    await send_email(email, subject, html, settings, email_type="waitlist_confirmation")
-
+    await send_verification_email(user, app, settings)
     return app
 
 
-async def get_waitlist_status(uuid: str) -> Optional[DemoApplication]:
-    """Return current application status."""
-    app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
-    if not app:
-        return None
+async def send_verification_email(
+    user: User, app: DemoApplication, settings: Settings | None = None
+) -> bool:
+    """Email a new signup the link that confirms their address.
 
-    # Recalculate position for pending apps
-    if app.status == "pending":
-        ahead = await DemoApplication.find(
-            DemoApplication.status == "pending",
-            DemoApplication.created_at < app.created_at,
-        ).count()
-        app.waitlist_position = ahead + 1
-
-    return app
-
-
-async def process_waitlist(settings: Settings | None = None) -> int:
-    """Activate eligible waitlisted applications. Returns count activated."""
+    Self-registration hands out a session immediately, so this is the only
+    thing standing between "anyone can type an address" and unmetered spend on
+    the deployment's keys — clicking the link both verifies the address and
+    signs them in. SSO users never see this (the IdP asserts the address), and
+    neither does anyone on a deployment with the trial system off.
+    """
     if settings is None:
         settings = Settings()
+    if user.email_verified:
+        return True
 
-    active_count = await DemoApplication.find(
-        DemoApplication.status == "active"
-    ).count()
-
-    activated = 0
-    while active_count < MAX_ACTIVE_DEMOS:
-        # Find next eligible pending application (FIFO)
-        pending = await DemoApplication.find(
-            DemoApplication.status == "pending"
-        ).sort("+created_at").to_list()
-
-        candidate = None
-        for p in pending:
-            org_active = await DemoApplication.find(
-                DemoApplication.organization == p.organization,
-                DemoApplication.status == "active",
-            ).count()
-            if org_active < MAX_PER_ORGANIZATION:
-                candidate = p
-                break
-
-        if not candidate:
-            break
-
-        await _activate_application(candidate, settings)
-        active_count += 1
-        activated += 1
-
-    if activated:
-        logger.info("Activated %d demo accounts", activated)
-    return activated
+    magic_link = await _create_magic_login_token(user.user_id, settings)
+    subject, html = verify_email_email(
+        user.name or app.name,
+        magic_link,
+        budget_tokens=settings.trial_token_budget,
+    )
+    sent = await send_email(
+        app.email, subject, html, settings, email_type="verify_email"
+    )
+    if not sent:
+        logger.error(
+            "Verification email FAILED to send for trial user %s — they cannot "
+            "use AI features until it is resent",
+            app.email,
+        )
+    if app.activation_email_failed != (not sent):
+        app.activation_email_failed = not sent
+        await app.save()
+    return sent
 
 
 async def _activate_application(app: DemoApplication, settings: Settings) -> None:
     """Create user account + team and mark application as active."""
     now = datetime.datetime.now(datetime.timezone.utc)
-    expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
     password = _generate_demo_password()
 
     # Create user. Normalize the identity to lowercase to match register()'s
@@ -191,8 +199,8 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
         name=app.name,
         password_hash=hash_password(password),
         is_demo_user=True,
-        demo_expires_at=expires_at,
         demo_status="active",
+        trial_token_budget=settings.trial_token_budget,
     )
     await user.insert()
 
@@ -206,7 +214,9 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
             if d not in ("Other", "I'm not in research administration"):
                 department = d
                 break
-    team = await _find_or_create_org_team(app.organization, user.user_id, department)
+    team = await _find_or_create_org_team(
+        app.organization, user.user_id, department, applicant_email=app.email
+    )
 
     # Add membership
     existing_membership = await TeamMembership.find_one(
@@ -230,7 +240,7 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     app.user_id = user.user_id
     app.team_id = team.id
     app.activated_at = now
-    app.expires_at = expires_at
+    app.budget_warning_sent = False
     await app.save()
 
     # Seed recapture drip — first email 24h after activation
@@ -243,10 +253,10 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     # send failures loudly: a silent failure leaves an active account whose owner
     # never got a way in.
     magic_link = await _create_magic_login_token(user_id, settings)
-    expires_str = expires_at.strftime("%B %d, %Y")
     subject, html = activation_email(
-        app.name, user_id, expires_str, settings.frontend_url,
+        app.name, user_id, settings.frontend_url,
         magic_link=magic_link,
+        budget_tokens=settings.trial_token_budget,
     )
     sent = await send_email(
         app.email, subject, html, settings, email_type="demo_activation"
@@ -257,22 +267,69 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
             "but they have no way in — needs a resend)",
             app.email,
         )
+    # Persisted so the public status page can tell the applicant the email
+    # didn't go out and offer the resend button, instead of showing "active"
+    # with no way in. Cleared by a successful resend.
+    app.activation_email_failed = not sent
+    await app.save()
+
+
+def _login_domain(identity: str) -> str:
+    """The email domain of a login identity, lowercased ('' when not an email)."""
+    identity = (identity or "").strip().lower()
+    return identity.rsplit("@", 1)[-1] if "@" in identity else ""
+
+
+async def _can_join_demo_team(team: Team, applicant_email: str) -> bool:
+    """Whether a demo applicant may be added to an existing team.
+
+    Two gates, both required. The team must be demo-created — the org name on
+    an application is self-asserted free text, and matching it against *any*
+    team let an applicant type a real team's name and read its shared
+    documents. And the applicant's email domain must match the team owner's:
+    the domain is the one piece of the org claim the applicant actually
+    demonstrated control of (they hold the magic-link inbox), so it, not the
+    typed string, is what earns cohort membership.
+    """
+    if not team.is_demo_team:
+        return False
+    applicant_domain = _login_domain(applicant_email)
+    if not applicant_domain:
+        return False
+    owner = await User.find_one(User.user_id == team.owner_user_id)
+    owner_identity = (owner.email if owner and owner.email else team.owner_user_id)
+    return _login_domain(owner_identity) == applicant_domain
 
 
 async def _find_or_create_org_team(
-    org_name: str, owner_user_id: str, department: str | None = None
+    org_name: str,
+    owner_user_id: str,
+    department: str | None = None,
+    applicant_email: str | None = None,
 ) -> Team:
-    """Find existing team for org+department or create a new one."""
+    """Find a joinable demo cohort team for org+department, or create one.
+
+    Only demo-created teams whose owner shares the applicant's email domain are
+    ever joined (see _can_join_demo_team); anything else gets a fresh team,
+    with a suffixed name if the plain one is already taken by a team the
+    applicant may not join.
+    """
     team_name = f"{org_name} - {department}" if department else org_name
     team = await Team.find_one(Team.name == team_name)
-    if team:
+    if team and await _can_join_demo_team(team, applicant_email or owner_user_id):
         return team
+    if team:
+        # The name belongs to a team this applicant may not join — a real
+        # (non-demo) team, or another domain's cohort. Keep names distinct so
+        # members can tell the two workspaces apart.
+        team_name = f"{team_name} ({secrets.token_hex(3)})"
 
     now = datetime.datetime.now(datetime.timezone.utc)
     team = Team(
         uuid=secrets.token_urlsafe(12),
         name=team_name,
         owner_user_id=owner_user_id,
+        is_demo_team=True,
         created_at=now,
     )
     await team.insert()
@@ -288,75 +345,181 @@ async def _find_or_create_org_team(
     return team
 
 
-async def check_expirations(settings: Settings | None = None) -> int:
-    """Lock expired demo accounts and send feedback emails. Returns count expired."""
-    if settings is None:
-        settings = Settings()
+async def _adopt_clock_era_trial_users(now: datetime.datetime) -> int:
+    """Migrate trial users from the 14-day-clock era onto token budgets.
 
-    now = datetime.datetime.now(datetime.timezone.utc)
-    expired_apps = await DemoApplication.find(
-        DemoApplication.status == "active",
-        DemoApplication.expires_at <= now,
+    Two populations, both handled in place so no manual migration is needed:
+
+    * users with no DemoApplication at all (registration once set only the User
+      flags) get one minted;
+    * users still carrying ``demo_expires_at`` get it cleared and a budget set,
+      so a clock that already lapsed can never lock them.
+
+    Already-``locked`` accounts are deliberately left locked: their unlock path
+    is the trial-end screen, which now grants tokens.
+    """
+    users = await User.find(
+        User.is_demo_user == True,  # noqa: E712 — Beanie query expression
+        User.demo_status == "active",
     ).to_list()
+    if not users:
+        return 0
 
-    count = 0
-    for app in expired_apps:
-        # Update application
-        app.status = "expired"
-        app.expired_at = now
-        app.post_questionnaire_token = secrets.token_urlsafe(16)
-        await app.save()
+    settings_budget = trial_budget._budget()
+    linked_user_ids = {
+        app.user_id
+        for app in await DemoApplication.find(
+            DemoApplication.user_id != None  # noqa: E711 — Beanie query expression
+        ).to_list()
+    }
 
-        # Lock user account
-        if app.user_id:
-            user = await User.find_one(User.user_id == app.user_id)
-            if user:
-                user.demo_status = "locked"
-                await user.save()
+    migrated = 0
+    for user in users:
+        touched = False
 
-        # Send the friendly end-of-trial email pointing at the renew/feedback screen
-        trial_end_url = f"{settings.frontend_url}/demo/trial-end?token={app.post_questionnaire_token}"
-        subject, html = trial_expired_email(app.name, trial_end_url)
-        await send_email(app.email, subject, html, settings, email_type="trial_expired")
-        count += 1
-
-    if count:
-        logger.info("Expired %d demo accounts", count)
-    return count
-
-
-async def send_expiry_warnings(settings: Settings | None = None) -> int:
-    """Send warning emails to demos expiring in the next 2 days."""
-    if settings is None:
-        settings = Settings()
-
-    now = datetime.datetime.now(datetime.timezone.utc)
-    two_days = now + datetime.timedelta(days=2)
-
-    apps = await DemoApplication.find(
-        DemoApplication.status == "active",
-        DemoApplication.expires_at <= two_days,
-        DemoApplication.expires_at > now,
-    ).to_list()
-
-    count = 0
-    for app in apps:
-        if not app.expires_at:
-            continue
-        # MongoDB returns datetimes as offset-naive; normalize to UTC-aware
-        # before arithmetic against ``now`` (also offset-aware).
-        expires_at = app.expires_at
-        if expires_at.tzinfo is None:
-            expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
-        days_left = max(1, (expires_at - now).days)
-        expires_str = expires_at.strftime("%B %d, %Y")
-        subject, html = expiry_warning_email(
-            app.name, days_left, expires_str, settings.frontend_url
+        # Who predates the token model, decided before anything is rewritten:
+        # a clock-era account still carries an expiry, or never got a
+        # DemoApplication at all. A signup made under the token model has
+        # neither property — begin_self_serve_trial leaves demo_expires_at
+        # None and always mints a linked application.
+        clock_era = (
+            user.demo_expires_at is not None or user.user_id not in linked_user_ids
         )
-        await send_email(app.email, subject, html, settings, email_type="expiry_warning")
-        count += 1
 
-    return count
+        # Retire the clock; give anyone without one the deployment default.
+        if user.demo_expires_at is not None:
+            user.demo_expires_at = None
+            touched = True
+        if user.trial_token_budget is None and settings_budget:
+            user.trial_token_budget = settings_budget
+            touched = True
+        # Grandfather clock-era trials past the new verification gate. They
+        # signed up before it existed — most reached the product through an
+        # emailed magic link anyway — and retroactively cutting off AI for
+        # people mid-trial would be a far worse failure than the narrow abuse
+        # the gate exists to stop.
+        #
+        # It must not reach anyone else. This sweep runs hourly, not once at
+        # deploy, so an unbounded version verifies every new signup at the
+        # next tick — the gate would disarm itself within the hour and the
+        # feature would be decorative.
+        if clock_era and not user.email_verified:
+            user.email_verified = True
+            touched = True
+        if touched:
+            await user.save()
+
+        if user.user_id not in linked_user_ids:
+            email = (user.email or user.user_id or "").strip().lower()
+            app = await DemoApplication.find_one(DemoApplication.email == email)
+            if app is None:
+                await DemoApplication(
+                    uuid=secrets.token_urlsafe(16),
+                    name=user.name or email,
+                    email=email,
+                    organization=_email_domain(email),
+                    status="active",
+                    user_id=user.user_id,
+                    activated_at=now,
+                    created_at=now,
+                ).insert()
+            else:
+                app.status = "active"
+                app.user_id = user.user_id
+                app.activated_at = app.activated_at or now
+                app.expires_at = None
+                await app.save()
+            touched = True
+
+        if touched:
+            migrated += 1
+
+    if migrated:
+        logger.info("Migrated %d clock-era trial users to token budgets", migrated)
+    return migrated
+
+
+async def sweep_trial_budgets(settings: Settings | None = None) -> dict:
+    """Walk active trial accounts and advance the token lifecycle.
+
+    Two transitions, both driven by the ``llm_usage`` ledger:
+
+    * crossing ``BUDGET_WARNING_THRESHOLD`` sends the one-time "running low"
+      email (``budget_warning_sent`` keeps it one-time per budget window);
+    * reaching the budget marks the application ``exhausted`` and emails the
+      trial-end/top-up link.
+
+    Exhaustion is deliberately *soft*: ``demo_status`` becomes ``exhausted``,
+    not ``locked``. The user keeps full read access to everything they built —
+    only LLM spend is gated, and that gate is already enforced live at the
+    metering chokepoint. Returns {"warned": n, "exhausted": n}.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    await _adopt_clock_era_trial_users(now)
+    # Recompute the fleet-wide monthly ceiling; the hot path reads the cached
+    # flag this writes (per-account budgets stay exact in between).
+    await trial_budget.refresh_fleet_pause(settings)
+
+    apps = await DemoApplication.find(DemoApplication.status == "active").to_list()
+    warned = 0
+    exhausted = 0
+
+    for app in apps:
+        if not app.user_id:
+            continue
+        user = await User.find_one(User.user_id == app.user_id)
+        if not user or not user.is_demo_user:
+            continue
+
+        usage = await trial_budget.get_trial_usage(user)
+        if not usage["enabled"]:
+            continue
+
+        if usage["remaining"] <= 0:
+            app.status = "exhausted"
+            app.expired_at = now
+            app.post_questionnaire_token = (
+                app.post_questionnaire_token or secrets.token_urlsafe(16)
+            )
+            await app.save()
+
+            user.demo_status = "exhausted"
+            await user.save()
+
+            trial_end_url = (
+                f"{settings.frontend_url}/demo/trial-end"
+                f"?token={app.post_questionnaire_token}"
+            )
+            subject, html = trial_exhausted_email(app.name, trial_end_url)
+            await send_email(
+                app.email, subject, html, settings, email_type="trial_exhausted"
+            )
+            exhausted += 1
+            continue
+
+        if (
+            not app.budget_warning_sent
+            and usage["used"] >= usage["budget"] * BUDGET_WARNING_THRESHOLD
+        ):
+            subject, html = budget_warning_email(
+                app.name, usage["used"], usage["budget"], settings.frontend_url
+            )
+            sent = await send_email(
+                app.email, subject, html, settings, email_type="budget_warning"
+            )
+            if sent:
+                app.budget_warning_sent = True
+                await app.save()
+                warned += 1
+
+    if warned or exhausted:
+        logger.info(
+            "Trial budget sweep: %d warned, %d exhausted", warned, exhausted
+        )
+    return {"warned": warned, "exhausted": exhausted}
 
 
 async def submit_post_questionnaire(token: str, responses: dict) -> bool:
@@ -399,8 +562,8 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> dic
     Status values:
       - "sent"        active trial → a new sign-in link was emailed
       - "send_failed" active trial but the email failed to send
-      - "pending"     still on the waitlist; no credentials exist yet
-      - "expired"     trial ended → caller should route to the renewal screen
+      - "pending"     not yet activated; no credentials exist yet
+      - "exhausted"   tokens used up → caller should route to the top-up screen
                       (feedback_token included)
       - "not_found"   no such application
     """
@@ -415,34 +578,41 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> dic
     if app.status == "pending" or not app.user_id:
         return {"status": "pending"}
 
-    # Trial is over → a sign-in link won't help; send them to renewal instead.
-    if app.status in ("expired", "completed"):
-        return {"status": "expired", "feedback_token": app.post_questionnaire_token}
+    # Out of tokens → point at the top-up screen rather than a sign-in link
+    # (they can still sign in, but the thing they want is more tokens).
+    # "expired" is the legacy clock-era status; treat it the same.
+    if app.status in ("exhausted", "expired", "completed"):
+        return {"status": "exhausted", "feedback_token": app.post_questionnaire_token}
 
     user = await User.find_one(User.user_id == app.user_id)
     if not user:
         return {"status": "not_found"}
 
-    # Active → mint a fresh magic sign-in link (no password rotation).
+    # Active → mint a fresh magic sign-in link (no password rotation). No token
+    # figure here: this is a "here's your way back in" email, and quoting the
+    # original allowance to someone mid-trial would misstate what's left.
     magic_link = await _create_magic_login_token(user.user_id, settings)
-    expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
     subject, html = activation_email(
-        app.name, user.user_id, expires_str, settings.frontend_url,
-        magic_link=magic_link,
+        app.name, user.user_id, settings.frontend_url, magic_link=magic_link
     )
     sent = await send_email(
         app.email, subject, html, settings, email_type="credentials_resend"
     )
     if not sent:
         logger.error("Resend sign-in link FAILED to send for demo user %s", app.email)
+        app.activation_email_failed = True
+        await app.save()
         return {"status": "send_failed", "email": app.email}
 
     logger.info("Resent sign-in link for demo user %s", app.email)
+    if app.activation_email_failed:
+        app.activation_email_failed = False
+        await app.save()
     return {"status": "sent", "email": app.email}
 
 
 async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
-    """Generate a one-time magic login link for a demo user (48h TTL)."""
+    """Generate a one-time magic login link (TTL = MAGIC_LINK_TTL_SECONDS)."""
     app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
     if not app or app.status != "active" or not app.user_id:
         return None
@@ -457,7 +627,12 @@ async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
 
 
 async def admin_release_user(demo_uuid: str) -> bool:
-    """Admin: release an expired demo user so they can log in again."""
+    """Admin: release a finished trial user so they can use AI again.
+
+    Clears the per-account budget cap (``trial_token_budget = 0``) rather than
+    granting a fixed number of tokens — an admin release is "stop metering this
+    person", not "give them one more helping".
+    """
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
     if not app:
         return False
@@ -470,6 +645,8 @@ async def admin_release_user(demo_uuid: str) -> bool:
         user = await User.find_one(User.user_id == app.user_id)
         if user:
             user.demo_status = "active"
+            user.demo_expires_at = None
+            user.trial_token_budget = 0
             await user.save()
 
     return True
@@ -499,35 +676,54 @@ async def admin_promote_user(demo_uuid: str) -> bool:
             user.is_demo_user = False
             user.demo_expires_at = None
             user.demo_status = None
+            # Not a trial account any more — the budget must not follow them.
+            user.trial_token_budget = None
             await user.save()
 
     return True
 
 
+async def grant_tokens(user: User, amount: int) -> int:
+    """Give a trial user `amount` more usable tokens; returns the new budget.
+
+    Ledger usage is lifetime and never resets, so a grant raises the *budget*.
+    Anchoring on ``max(budget, used)`` means the grant is worth exactly
+    ``amount`` even when the last operation overshot the previous ceiling.
+    """
+    used = await trial_budget.tokens_used_async(user.user_id)
+    current = user.trial_token_budget
+    if current is None:
+        current = trial_budget._budget()
+    user.trial_token_budget = max(current, used) + amount
+    user.demo_status = "active"
+    user.demo_expires_at = None
+    await user.save()
+    return user.trial_token_budget
+
+
 async def admin_restart_trial(demo_uuid: str) -> bool:
-    """Admin: restart the trial for an expired demo user (reset to 14 days)."""
+    """Admin: give a finished trial user a fresh full allowance of tokens."""
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
-    if not app or app.status not in ("active", "expired", "completed"):
+    if not app or app.status not in ("active", "exhausted", "expired", "completed"):
         return False
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
 
     app.status = "active"
-    app.expires_at = new_expires
+    app.expires_at = None
     app.expired_at = None
+    app.budget_warning_sent = False
     app.recapture_step = 0
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
-    # Admin restart restores a fresh self-serve renewal runway.
+    # A restart is a clean slate, including the self-serve top-up counter.
     app.trial_extensions_used = 0
     await app.save()
 
     if app.user_id:
         user = await User.find_one(User.user_id == app.user_id)
         if user:
-            user.demo_status = "active"
-            user.demo_expires_at = new_expires
-            await user.save()
+            settings = Settings()
+            await grant_tokens(user, settings.trial_token_budget)
 
     return True
 
@@ -565,7 +761,7 @@ async def compute_trial_engagement(user_id: str | None) -> str:
 
 
 async def get_trial_end_info(token: str) -> Optional[dict]:
-    """Validate an end-of-trial token and return the data the screen needs."""
+    """Validate a trial-end token and return the data the top-up screen needs."""
     app = await DemoApplication.find_one(
         DemoApplication.post_questionnaire_token == token
     )
@@ -573,30 +769,39 @@ async def get_trial_end_info(token: str) -> Optional[dict]:
         return None
 
     engagement = await compute_trial_engagement(app.user_id)
+    usage = {"enabled": False, "budget": 0, "used": 0, "remaining": 0, "percent": 0}
+    if app.user_id:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user:
+            usage = await trial_budget.get_trial_usage(user)
+
+    settings = Settings()
     return {
         "name": app.name,
         "organization": app.organization,
         "engagement": engagement,
         "extensions_used": app.trial_extensions_used,
         "max_extensions": MAX_SELF_EXTENSIONS,
-        # Renewals are unlimited — trial users can always keep going (engaged
-        # users in exchange for a few notes). We still track extensions_used for
-        # analytics, but it no longer gates access.
+        # Top-ups are unlimited — trial users can always keep going (engaged
+        # users in exchange for a few notes). extensions_used is analytics only.
         "can_self_extend": True,
         "already_extended": app.trial_extensions_used > 0,
+        "tokens_used": usage["used"],
+        "tokens_budget": usage["budget"],
+        "topup_tokens": settings.trial_topup_tokens,
     }
 
 
-async def self_extend_trial(
+async def self_topup_trial(
     token: str, notes: dict | None = None, settings: Settings | None = None
 ) -> dict:
-    """Self-serve trial renewal from the end-of-trial screen.
+    """Self-serve token top-up from the trial-end screen.
 
-    Extends the trial by TRIAL_DAYS and unlocks the account. Renewals are
-    unlimited — low-engagement users renew with one click, engaged users in
-    exchange for a few notes. ``trial_extensions_used`` is still incremented for
-    analytics but no longer caps access. Optional post-trial notes are persisted
-    as a PostExperienceResponse. Returns {"ok": bool, ...}.
+    Grants ``TRIAL_TOPUP_TOKENS`` more usable tokens and returns the account to
+    active. Top-ups are unlimited — low-engagement users take one with a click,
+    engaged users in exchange for a few notes — and ``trial_extensions_used``
+    is incremented for analytics only. Optional notes are persisted as a
+    PostExperienceResponse. Returns {"ok": bool, ...}.
     """
     if settings is None:
         settings = Settings()
@@ -607,7 +812,7 @@ async def self_extend_trial(
     if not app:
         return {"ok": False, "reason": "invalid"}
 
-    # Persist any post-trial notes the user left (reuses the feedback model).
+    # Persist any notes the user left (reuses the feedback model).
     if notes:
         await PostExperienceResponse(
             uuid=secrets.token_urlsafe(12),
@@ -617,34 +822,65 @@ async def self_extend_trial(
         ).insert()
 
     now = datetime.datetime.now(datetime.timezone.utc)
-    new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
 
     app.status = "active"
-    app.expires_at = new_expires
+    app.expires_at = None
     app.expired_at = None
     app.trial_extensions_used += 1
+    # Burn the link. This endpoint is unauthenticated by design — the token in
+    # the out-of-tokens email *is* the credential — so a token that survived
+    # its own use could be replayed to mint another grant on every call, which
+    # is an unbounded spend budget wearing a top-up button. Rotating rather
+    # than clearing keeps the field populated for the exhausted-user paths
+    # that hand it back out; the next out-of-tokens email carries the new one,
+    # and this run's own email gets the user back in by magic link anyway.
+    app.post_questionnaire_token = secrets.token_urlsafe(16)
+    # A fresh budget window gets a fresh "running low" warning, and a working
+    # account shouldn't keep a stale delivery-failure flag.
+    app.budget_warning_sent = False
+    app.activation_email_failed = False
     app.recapture_step = 0
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
     await app.save()
 
+    new_budget = None
     if app.user_id:
         user = await User.find_one(User.user_id == app.user_id)
         if user:
-            user.demo_status = "active"
-            user.demo_expires_at = new_expires
-            await user.save()
+            new_budget = await grant_tokens(user, settings.trial_topup_tokens)
+
+    # Trial accounts have a random password the user never saw — a magic link
+    # is their way back in, so the confirmation email and the screen's "Enter"
+    # button both carry one instead of pointing at /login. Two separate tokens:
+    # magic-login is one-time, and either path must survive the other being
+    # used first.
+    email_link = None
+    screen_link = None
+    if app.user_id:
+        email_link = await _create_magic_login_token(app.user_id, settings)
+        screen_link = await _create_magic_login_token(app.user_id, settings)
 
     # Confirmation email
-    expires_str = new_expires.strftime("%B %d, %Y")
-    subject, html = trial_extended_email(app.name, expires_str, settings.frontend_url)
-    await send_email(app.email, subject, html, settings, email_type="trial_extended")
+    subject, html = trial_topup_email(
+        app.name,
+        new_budget or settings.trial_topup_tokens,
+        settings.frontend_url,
+        magic_link=email_link,
+    )
+    await send_email(app.email, subject, html, settings, email_type="trial_topup")
 
     logger.info(
-        "Self-serve trial extension for %s (#%d)",
+        "Self-serve token top-up for %s (#%d, new budget %s)",
         app.email,
         app.trial_extensions_used,
+        new_budget,
     )
-    return {"ok": True, "expires_at": new_expires.isoformat()}
+    return {
+        "ok": True,
+        "tokens_granted": settings.trial_topup_tokens,
+        "tokens_budget": new_budget,
+        "login_url": screen_link,
+    }
 
 
 async def admin_add_demo_user(
@@ -653,7 +889,7 @@ async def admin_add_demo_user(
     email: str,
     settings: Settings | None = None,
 ) -> DemoApplication:
-    """Admin: create a demo user directly, skipping the application/waitlist flow."""
+    """Admin: create a trial user directly and send them a sign-in link."""
     if settings is None:
         settings = Settings()
 
@@ -683,7 +919,7 @@ async def admin_add_demo_user(
 
 
 async def admin_activate_user(demo_uuid: str, settings: Settings | None = None) -> bool:
-    """Admin: manually activate a waitlisted user (skip queue)."""
+    """Admin: activate an application an admin created but never sent."""
     if settings is None:
         settings = Settings()
 
@@ -700,7 +936,11 @@ async def admin_get_stats() -> dict:
     total = await DemoApplication.find().count()
     active = await DemoApplication.find(DemoApplication.status == "active").count()
     pending = await DemoApplication.find(DemoApplication.status == "pending").count()
-    expired = await DemoApplication.find(DemoApplication.status == "expired").count()
+    # "expired" is the legacy clock-era status; count it alongside "exhausted"
+    # so the dashboard total stays continuous across the migration.
+    exhausted = await DemoApplication.find(
+        {"status": {"$in": ["exhausted", "expired"]}}
+    ).count()
     completed = await DemoApplication.find(DemoApplication.status == "completed").count()
 
     # Per-organization breakdown
@@ -715,7 +955,7 @@ async def admin_get_stats() -> dict:
         "total_applications": total,
         "active_count": active,
         "waitlist_count": pending,
-        "expired_count": expired,
+        "expired_count": exhausted,
         "completed_count": completed,
         "by_organization": by_org,
     }
@@ -745,12 +985,27 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
     user_ids = [a.user_id for a in apps if a.user_id]
     last_login_by_user: dict[str, datetime.datetime] = {}
     is_demo_by_user: dict[str, bool] = {}
+    budget_by_user: dict[str, int] = {}
+    tokens_by_user: dict[str, int] = {}
     if user_ids:
         users = await User.find({"user_id": {"$in": user_ids}}).to_list()
         last_login_by_user = {
             u.user_id: u.last_login_at for u in users if u.last_login_at
         }
         is_demo_by_user = {u.user_id: u.is_demo_user for u in users}
+        budget_by_user = {
+            u.user_id: trial_budget.effective_budget(u.trial_token_budget)
+            for u in users
+        }
+        # One grouped pass over the ledger rather than a query per row.
+        from app.models.llm_usage import LlmUsageRecord
+
+        usage_rows = await LlmUsageRecord.find(
+            {"user_id": {"$in": user_ids}}
+        ).aggregate(
+            [{"$group": {"_id": "$user_id", "total": {"$sum": "$total_tokens"}}}]
+        ).to_list()
+        tokens_by_user = {r["_id"]: int(r["total"]) for r in usage_rows}
 
     emails = [a.email for a in apps if a.email]
     creds_sent_by_email: dict[str, datetime.datetime] = {}
@@ -777,6 +1032,8 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
             "waitlist_position": a.waitlist_position,
             "activated_at": a.activated_at.isoformat() if a.activated_at else None,
             "expires_at": a.expires_at.isoformat() if a.expires_at else None,
+            "tokens_used": tokens_by_user.get(a.user_id or "", 0),
+            "tokens_budget": budget_by_user.get(a.user_id or "", 0),
             "post_questionnaire_completed": a.post_questionnaire_completed,
             "admin_released": a.admin_released,
             "created_at": a.created_at.isoformat(),
@@ -942,8 +1199,8 @@ async def send_test_email(to: str, settings: Settings | None = None) -> bool:
 
 
 async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
-    """Reset passwords and resend activation emails for all active demo users
-    who have never logged in. Returns counts of successes and failures."""
+    """Resend fresh magic sign-in links to all active demo users who have
+    never logged in (no password rotation). Returns success/failure counts."""
     if settings is None:
         settings = Settings()
 
@@ -965,28 +1222,30 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
             skipped += 1
             continue
 
-        # Reset trial expiration to 14 days from now
+        # These users never got in, so their budget is untouched — there is
+        # nothing to top up. Just restart the recapture drip so they get
+        # reminder emails alongside the fresh sign-in link.
         now = datetime.datetime.now(datetime.timezone.utc)
-        new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
-        app.expires_at = new_expires
-        # Restart recapture drip so they get reminder emails
         app.recapture_step = 0
         app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
         await app.save()
 
-        # Extend the runway but do NOT rotate the password — rotating here was
-        # invalidating the sign-in details users already had. A fresh magic link
-        # is all they need.
-        user.demo_expires_at = new_expires
-        await user.save()
-
+        # Do NOT rotate the password — rotating here was invalidating the
+        # sign-in details users already had. A fresh magic link is all they need.
         magic_link = await _create_magic_login_token(user.user_id, settings)
-        expires_str = new_expires.strftime("%B %d, %Y")
+        usage = await trial_budget.get_trial_usage(user)
         subject, html = activation_email(
-            app.name, user.user_id, expires_str, settings.frontend_url,
+            app.name, user.user_id, settings.frontend_url,
             magic_link=magic_link,
+            budget_tokens=usage["remaining"] if usage["enabled"] else None,
         )
         success = await send_email(app.email, subject, html, settings, email_type="bulk_credentials_resend")
+        # Same contract as the public resend: the status page shows the
+        # delivery-failed alert while this flag is set, so a bulk resend after
+        # fixing deliverability must clear it (and a failed one must set it).
+        if app.activation_email_failed != (not success):
+            app.activation_email_failed = not success
+            await app.save()
         if success:
             sent += 1
         else:

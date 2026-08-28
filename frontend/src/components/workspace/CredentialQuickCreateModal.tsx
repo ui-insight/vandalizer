@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
-import { createCredential } from '../../api/credentials'
+import { createCredential, testCredentialDraft } from '../../api/credentials'
+import { CredentialTestPanel } from '../credentials/CredentialTestPanel'
 import type { Credential, CredentialType } from '../../types/credential'
 
 interface Props {
@@ -73,6 +74,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
   const [form, setForm] = useState<FormState>(() => emptyForm(initialType))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [testUrl, setTestUrl] = useState('')
 
   useEffect(() => {
     if (open) {
@@ -106,7 +108,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
         name: form.name.trim(),
         type: form.type,
         description: form.description.trim() || undefined,
-        payload: buildPayload(form),
+        payload: { ...buildPayload(form), ...(testUrl ? { test_url: testUrl } : {}) },
       })
       onCreated(cred)
     } catch (err) {
@@ -317,6 +319,15 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           </div>
         </div>
 
+          <div style={{ border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', borderRadius: 6, padding: 10, marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Test before saving</div>
+            <CredentialTestPanel
+              testUrl={testUrl}
+              onTestUrlChange={setTestUrl}
+              disabled={!valid}
+              run={url => testCredentialDraft({ type: form.type, payload: { ...buildPayload(form), ...(url ? { test_url: url } : {}) }, test_url: url || undefined })}
+            />
+          </div>
         <div style={{
           padding: '12px 20px', borderTop: '1px solid #e5e7eb',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,

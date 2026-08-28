@@ -535,6 +535,7 @@ async def generate_improvement_suggestions(
     item_kind: str,
     item_id: str,
     result: dict,
+    user_id: str | None = None,
 ) -> str:
     """Use the LLM to suggest improvements when validation results fall below an A grade.
 
@@ -582,7 +583,7 @@ async def generate_improvement_suggestions(
             system_config_doc=sys_config_doc,
         )
         from app.services.metering import metered_async
-        async with metered_async("quality_suggestion"):
+        async with metered_async("quality_suggestion", user_id=user_id):
             res = await agent.run(prompt)
         return res.output
     except Exception as exc:

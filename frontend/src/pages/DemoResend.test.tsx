@@ -42,9 +42,9 @@ describe('DemoResend', () => {
     expect(await screen.findByText(/on the waitlist/i)).toBeInTheDocument()
   })
 
-  it('expired: redirects to the renewal screen with the token', async () => {
+  it('exhausted: redirects to the top-up screen with the token', async () => {
     mockResend.mockResolvedValueOnce(
-      result({ status: 'expired', ok: false, feedback_token: 'renew_tok' }),
+      result({ status: 'exhausted', ok: false, feedback_token: 'renew_tok' }),
     )
     render(<DemoResend />)
     await screen.findByRole('navigation')

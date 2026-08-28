@@ -135,10 +135,10 @@ def _make_vr():
     )
 
 
-def _build():
+def _build(vr=None):
     return build_kb_validation_results_export(
         kb=_make_kb(),
-        vr=_make_vr(),
+        vr=vr or _make_vr(),
         test_queries=_make_queries(),
         catalog_version="1.3.1",
         exported_by_user_id="user-1",
@@ -330,3 +330,82 @@ def test_an_older_run_still_falls_back_to_the_live_test_set():
 
     assert rows[0]["expected_answer"] == "From the live set"
     assert rows[0]["external_id"] == "OLD-1"
+
+
+# ---------------------------------------------------------------------------
+# The overall score is a composite; the export must say what it is made of so
+# nobody reads it as the judge's answer accuracy.
+# ---------------------------------------------------------------------------
+
+
+def test_run_meta_explains_the_overall_score_for_an_older_run():
+    # The fixture snapshot predates score_components — derive from its ratios.
+    _, run_meta, _ = _build()
+    assert "composite" in run_meta["run_score_meaning"]
+    assert "Answer accuracy" in run_meta["avg_judge_score_meaning"]
+    assert run_meta["score_formula"].startswith("overall = 40% × answer accuracy (judge)")
+    comps = {c["key"]: c for c in run_meta["score_components"]}
+    assert comps["judge"] == {
+        "key": "judge", "label": "answer accuracy (judge)", "weight": 0.40, "value": 85.0,
+    }
+    assert comps["retrieval_precision"]["value"] == 75.0
+    assert comps["source_health"]["value"] == 100.0
+    assert comps["chunk_coverage"]["value"] == 90.0
+
+
+def test_run_meta_prefers_the_components_the_run_persisted():
+    vr = _make_vr()
+    vr.result_snapshot["score_formula"] = "overall = persisted"
+    vr.result_snapshot["score_components"] = [
+        {"key": "judge", "label": "answer accuracy (judge)", "weight": 0.4, "value": 12.0},
+    ]
+    _, run_meta, _ = _build(vr=vr)
+    assert run_meta["score_formula"] == "overall = persisted"
+    assert run_meta["score_components"][0]["value"] == 12.0
+
+
+def test_csv_carries_formula_and_answer_accuracy_beside_the_overall_score():
+    _, run_meta, rows = _build()
+    parsed = list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))
+    first = dict(zip(parsed[0], parsed[1]))
+    assert first["run_score"] == "82.5"
+    assert first["avg_judge_score"] == "0.85"
+    assert first["score_formula"].startswith("overall = 40% × answer accuracy (judge)")
+
+
+def test_xlsx_summary_renders_components_readably():
+    from openpyxl import load_workbook
+
+    _, run_meta, rows = _build()
+    wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows)))
+    summary = {r[0].value: r[1].value for r in wb["Summary"].iter_rows(min_row=2)}
+    assert summary["score_components"] == (
+        "40% × answer accuracy (judge) = 85.0; 25% × retrieval precision = 75.0; "
+        "20% × source health = 100.0; 15% × chunk coverage = 90.0"
+    )
+    assert summary["run_score_meaning"].startswith("Overall quality score")
+
+
+def test_rows_carry_truncation_flags_and_default_false_for_older_runs():
+    """Rows written before the flags existed export False (not missing), and
+    rows that recorded a cut export it under both the storage and the
+    generation flag, independently for the baseline."""
+    vr = _make_vr()
+    details = vr.result_snapshot["retrieval_precision"]["details"]
+    details[0]["actual_answer_truncated"] = True
+    details[0]["generation_truncated"] = False
+    details[0]["baseline_generation_truncated"] = True
+    _, _, rows = build_kb_validation_results_export(
+        kb=_make_kb(), vr=vr, test_queries=_make_queries(), catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-08-26T00:00:00Z",
+    )
+    first = rows[0]
+    assert first["actual_answer_truncated"] is True
+    assert first["generation_truncated"] is False
+    assert first["baseline_answer_truncated"] is False
+    assert first["baseline_generation_truncated"] is True
+    older = rows[1]
+    for key in ("actual_answer_truncated", "generation_truncated",
+                "baseline_answer_truncated", "baseline_generation_truncated"):
+        assert key in RESULT_COLUMNS
+        assert older[key] is False

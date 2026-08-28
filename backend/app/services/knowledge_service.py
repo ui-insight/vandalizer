@@ -29,6 +29,7 @@ from app.models.knowledge import (
 from app.models.user import User
 from app.services import access_control, audit_service, name_conflicts
 from app.services.document_manager import get_document_manager
+from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_fetch_error
 from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
 
@@ -804,6 +805,34 @@ def _normalize_url(url: str) -> str:
     return url
 
 
+async def partition_new_urls(
+    kb: KnowledgeBase, urls: list[str],
+) -> tuple[list[str], list[str]]:
+    """Split ``urls`` into (new, already_in_kb), normalized and de-duplicated.
+
+    ``add_urls`` silently skips a URL the KB already holds, so a caller that
+    reports "Added N" from the raw request length lies whenever a user
+    re-submits an existing page hoping to refresh it (support ticket: a
+    catalog KB kept serving 2018 policy text after two such "re-adds"). The
+    router uses this to tell the user which URLs were skipped and to point
+    them at the per-source refresh instead.
+    """
+    new: list[str] = []
+    present: list[str] = []
+    seen: set[str] = set()
+    for raw in urls:
+        url = _normalize_url(raw or "")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        existing = await KnowledgeBaseSource.find_one(
+            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+            KnowledgeBaseSource.url == url,
+        )
+        (present if existing else new).append(url)
+    return new, present
+
+
 async def add_urls(
     kb: KnowledgeBase, urls: list[str],
     crawl_enabled: bool = False,
@@ -1006,7 +1035,12 @@ async def clone_knowledge_base(
                 )
                 new_src.chunk_count = chunk_count
                 new_src.status = "ready"
-                new_src.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+                # Cloned from the original's snapshot, not re-fetched: the
+                # text is exactly as old as it was there.
+                currency.stamp_ingested(
+                    new_src, src.content, retrieved=False,
+                    retrieved_at=getattr(src, "content_retrieved_at", None) or src.processed_at,
+                )
                 await new_src.save()
             except Exception as e:
                 logger.error(f"Error cloning URL source {new_src.uuid}: {e}")
@@ -1111,6 +1145,17 @@ async def adopt_knowledge_base(
         user_org_ancestry=user_org_ancestry,
     )
     if not source_kb:
+        # One message to the client (a uuid probe must not learn whether a KB
+        # exists), but the log says which it was — "exists but verified=False"
+        # took an afternoon to find from the outside.
+        raw = await KnowledgeBase.find_one(KnowledgeBase.uuid == source_kb_uuid)
+        logger.warning(
+            "adopt refused for kb %s by user %s: %s",
+            source_kb_uuid, user.user_id,
+            "no such knowledge base" if raw is None else
+            f"exists (verified={raw.verified}, shared_with_team={raw.shared_with_team}, "
+            f"team_id={raw.team_id}, organization_ids={raw.organization_ids})",
+        )
         raise ValueError("Knowledge base not found or not accessible")
     # Only allow referencing verified or team-shared KBs (not your own private ones — those are already "yours")
     if source_kb.user_id == user.user_id and not source_kb.verified and not source_kb.shared_with_team:
@@ -1392,6 +1437,9 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
             "max_crawl_pages": s.max_crawl_pages,
             "parent_source_uuid": s.parent_source_uuid,
             "crawled_urls": s.crawled_urls,
+            # Read-only provenance for whoever evaluates the export. The
+            # importer ignores these (it re-ingests and re-stamps).
+            **currency.export_provenance(s),
         })
     return {
         "format_version": 1,
@@ -1477,7 +1525,7 @@ async def import_knowledge_base(
                 )
                 new_src.chunk_count = chunk_count
                 new_src.status = "ready"
-                new_src.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+                currency.stamp_ingested(new_src, content)
                 await new_src.save()
             except Exception as e:
                 logger.error(f"Error ingesting imported source {new_src.uuid}: {e}")
@@ -1537,13 +1585,137 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         )
         source.chunk_count = chunk_count
         source.status = "ready"
-        source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        currency.stamp_ingested(source, doc.raw_text)
         await source.save()
     except Exception as e:
         logger.error(f"Error ingesting document source {source.uuid}: {e}")
         source.status = "error"
         source.error_message = str(e)[:2000]
         await source.save()
+
+
+def _reject_fetched_page(result: WebFetchResult) -> str | None:
+    """Why a fetched page must not be embedded, or None if it's real content.
+
+    Shared by first ingest and refresh so both apply the same gates: an empty
+    body, a bot-verification interstitial, or a JavaScript-rendered page that
+    only returned site chrome. Embedding any of those poisons retrieval.
+    """
+    from app.utils.bot_challenge import (
+        looks_like_bot_challenge,
+        looks_like_boilerplate_only,
+    )
+    from app.utils.fetch_errors import describe_empty_fetch
+
+    raw_text = result.text
+    if not raw_text.strip():
+        return describe_empty_fetch(result.status_code)
+    if looks_like_bot_challenge(raw_text):
+        return "Blocked by the site's bot protection (verification page returned instead of content)"
+    if looks_like_boilerplate_only(raw_text):
+        return "Page returned only site navigation/boilerplate — content is JavaScript-rendered and did not load"
+    return None
+
+
+async def refresh_url_source(
+    source: KnowledgeBaseSource, kb: KnowledgeBase,
+) -> str | None:
+    """Re-fetch a URL source's page and replace its stored text and chunks.
+
+    The only way to pick up a revised web page used to be remove-then-re-add
+    (re-adding an existing URL is a dedupe no-op, and ``/reingest`` re-embeds
+    the stored snapshot without fetching). This re-fetches in place, keeping
+    the source's uuid, label and provenance.
+
+    Unlike first ingest, a fetch that fails or is rejected by the content
+    gates leaves the existing text and chunks untouched — a page that is
+    temporarily down must not blank out a working source. Returns None on
+    success, otherwise the reason (also recorded on ``error_message`` so the
+    source list can show it).
+
+    Every attempt is recorded on the source's currency fields
+    (``last_refresh_attempted_at``, ``last_refresh_outcome``, …) so an
+    evaluator can tell "never retried" from "retried and failed", and see
+    which text is actually retained. A page whose text is byte-identical to
+    what is indexed is reported ``unchanged`` and not re-embedded.
+    """
+    if source.source_type != "url" or not source.url:
+        return "Only URL sources can be refreshed"
+
+    previous_status = source.status
+    source.last_refresh_attempted_at = currency.utcnow()
+    source.status = "processing"
+    await source.save()
+
+    reason: str | None
+    result: WebFetchResult | None = None
+    try:
+        from app.services.web_fetcher import fetch_url
+
+        result = await fetch_url(source.url)
+        reason = _reject_fetched_page(result)
+    except Exception as e:
+        logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
+        reason = describe_fetch_error(e)[:1800]
+
+    if reason or result is None:
+        reason = reason or "Fetch returned no result"
+        source.last_refresh_outcome = currency.OUTCOME_RETRIEVAL_FAILED
+        source.last_refresh_error = reason[:2000]
+        if previous_status == "ready":
+            source.status = "ready"
+            source.error_message = f"Refresh failed — previous content kept: {reason}"[:2000]
+        else:
+            source.status = "error"
+            source.error_message = reason[:2000]
+        await source.save()
+        return reason
+
+    raw_text = result.text
+    source.last_retrieved_at = currency.utcnow()
+    new_hash = currency.content_fingerprint(raw_text)
+    if (
+        previous_status == "ready"
+        and source.chunk_count
+        and getattr(source, "content_hash", None) == new_hash
+    ):
+        # Same text as what is indexed: nothing to re-embed. Still a
+        # successful currency check, so it clears an earlier failure.
+        source.url_title = result.title or source.url_title
+        source.status = "ready"
+        source.error_message = None
+        source.last_refresh_outcome = currency.OUTCOME_UNCHANGED
+        source.last_refresh_error = None
+        await source.save()
+        return None
+
+    name = source.custom_name or result.title or source.url_title or source.url
+    try:
+        dm = _get_dm()
+        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        chunk_count = await asyncio.to_thread(
+            dm.add_to_kb, kb.uuid, source.uuid, name, raw_text,
+        )
+    except Exception as e:
+        logger.error(f"Error re-embedding refreshed KB source {source.uuid}: {e}")
+        source.status = "error"
+        source.error_message = f"Refresh failed while re-indexing: {e}"[:2000]
+        source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
+        source.last_refresh_error = source.error_message
+        await source.save()
+        return source.error_message
+
+    source.content = raw_text[:500000]
+    source.url_title = result.title or source.url_title
+    source.truncated = bool(result.truncated)
+    source.chunk_count = chunk_count
+    source.status = "ready"
+    source.error_message = None
+    source.last_refresh_outcome = currency.OUTCOME_REFRESHED
+    source.last_refresh_error = None
+    currency.stamp_ingested(source, raw_text)
+    await source.save()
+    return None
 
 
 async def _ingest_url_source(
@@ -1562,35 +1734,14 @@ async def _ingest_url_source(
     await source.save()
     try:
         from app.services.web_fetcher import fetch_url
-        from app.utils.bot_challenge import (
-            looks_like_bot_challenge,
-            looks_like_boilerplate_only,
-        )
-        from app.utils.fetch_errors import describe_empty_fetch
 
         result = await fetch_url(source.url)
         raw_text = result.text
 
-        if not raw_text.strip():
+        reject_reason = _reject_fetched_page(result)
+        if reject_reason:
             source.status = "error"
-            source.error_message = describe_empty_fetch(result.status_code)
-            await source.save()
-            return None
-
-        if looks_like_bot_challenge(raw_text):
-            # The site served a bot-verification interstitial instead of the
-            # page. Embedding it would poison retrieval with junk text.
-            source.status = "error"
-            source.error_message = "Blocked by the site's bot protection (verification page returned instead of content)"
-            await source.save()
-            return None
-
-        if looks_like_boilerplate_only(raw_text):
-            # A JavaScript-rendered page answered with HTTP 200 but only site
-            # chrome (.gov banner, nav, session dialog). Embedding it teaches
-            # the KB padlock trivia instead of the document.
-            source.status = "error"
-            source.error_message = "Page returned only site navigation/boilerplate — content is JavaScript-rendered and did not load"
+            source.error_message = reject_reason
             await source.save()
             return None
 
@@ -1615,7 +1766,7 @@ async def _ingest_url_source(
         )
         source.chunk_count = chunk_count
         source.status = "ready"
-        source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        currency.stamp_ingested(source, raw_text)
         await source.save()
         return result
     except httpx.HTTPStatusError as e:
@@ -1682,7 +1833,7 @@ async def ingest_text_into_source(
         source.truncated = False
         source.status = "ready"
         source.error_message = None
-        source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        currency.stamp_ingested(source, text)
         await source.save()
         return chunk_count
     except Exception as e:

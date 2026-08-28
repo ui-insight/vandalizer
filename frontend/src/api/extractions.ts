@@ -103,6 +103,19 @@ export interface ExtractionFieldSource {
   document_uuid: string | null
   document_title: string | null
   verified: boolean
+  /**
+   * Whether the extracted value actually appears in `quote` — the stronger
+   * claim `verified` does not make. `null` when the check does not apply (no
+   * located quote, a "not found" value, or an enum field whose value is a
+   * mapping of the prose rather than a span of it); absent on results
+   * extracted before this was recorded.
+   *
+   * Recorded but not yet surfaced: the badge still keys off `verified` until
+   * the true/false distribution across real extractions is known.
+   */
+  value_supported?: boolean | null
+  /** How `value_supported` was decided, for measuring that distribution. */
+  value_support_method?: string
 }
 
 export type ExtractionSourceMap = Record<string, ExtractionFieldSource>
@@ -115,7 +128,9 @@ export function runExtractionSync(data: {
   combined_context?: boolean
 }, signal?: AbortSignal) {
   // `sources` is index-aligned with `results` (per-field source map per entity).
-  return apiFetch<{ results: unknown[]; sources?: ExtractionSourceMap[] }>('/api/extractions/run-sync', {
+  // `error` is set when the run produced no values: the backend records
+  // the run as failed with this reason rather than completed.
+  return apiFetch<{ results: unknown[]; sources?: ExtractionSourceMap[]; error?: string }>('/api/extractions/run-sync', {
     method: 'POST',
     body: JSON.stringify(data),
     signal,

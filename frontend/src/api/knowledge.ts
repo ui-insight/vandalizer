@@ -83,6 +83,15 @@ export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   })
 }
 
+export interface AddUrlsResult {
+  ok: boolean
+  /** URLs actually queued for fetching. */
+  added: number
+  /** URLs the KB already held — not re-fetched (use refreshKBSource for that). */
+  skipped?: number
+  skipped_urls?: string[]
+}
+
 export function addUrlsToKB(
   uuid: string,
   urls: string[],
@@ -90,7 +99,7 @@ export function addUrlsToKB(
   maxCrawlPages = 5,
   allowedDomains = '',
 ) {
-  return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_urls`, {
+  return apiFetch<AddUrlsResult>(`/api/knowledge/${uuid}/add_urls`, {
     method: 'POST',
     body: JSON.stringify({
       urls,
@@ -105,6 +114,14 @@ export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',
   })
+}
+
+/** Re-fetch a URL source from its page and rebuild its chunks in place (background). */
+export function refreshKBSource(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/refresh`,
+    { method: 'POST' },
+  )
 }
 
 export function getKBSource(uuid: string, sourceUuid: string) {
@@ -126,6 +143,8 @@ export interface KBSourceResponse {
   chunk_count: number
   truncated?: boolean
   created_at?: string | null
+  processed_at?: string | null
+  currency?: import('../types/knowledge').SourceCurrency | null
 }
 
 /** Set or clear the user-provided label for a KB source. Pass `""` to clear. */
@@ -208,7 +227,13 @@ export type KBValidationDetail = {
   expected_sources?: string[]
   answer_match?: boolean | null
   actual_answer?: string
+  /** Stored text is shorter than what the judge scored (storage cap). */
+  actual_answer_truncated?: boolean
+  /** The model stopped at its output cap — the judge scored an incomplete answer. */
+  generation_truncated?: boolean
   baseline_answer?: string | null
+  baseline_answer_truncated?: boolean
+  baseline_generation_truncated?: boolean
   judge?: KBJudgeVerdict | null
   baseline_judge?: KBJudgeVerdict | null
   lift?: number | null
@@ -250,6 +275,17 @@ export type KBValidationResult = {
     discrimination_summary?: { useful: number; redundant: number; failing: number; other: number }
     details: KBValidationDetail[]
   }
+  // How raw_score was assembled: the overall score is a weighted composite of
+  // answer accuracy, retrieval precision, source health, and chunk coverage —
+  // NOT the judge's answer accuracy (that is retrieval_precision.avg_judge_score).
+  // Absent on runs recorded before this was persisted; see kbScoreFormula.ts.
+  score_formula?: string | null
+  score_components?: {
+    key: 'judge' | 'retrieval_precision' | 'source_health' | 'chunk_coverage'
+    label: string
+    weight: number
+    value: number
+  }[] | null
   // Certified quality score (raw_score after the low-sample-size discount),
   // matching the persisted quality tile shown later.
   score?: number | null
@@ -870,6 +906,13 @@ export interface KBExportPayload {
     max_crawl_pages?: number
     parent_source_uuid?: string | null
     crawled_urls?: string[] | null
+    // Read-only provenance (ignored on import): status, size and currency.
+    source_reference?: string | null
+    status?: string
+    chunk_count?: number
+    truncated?: boolean
+    created_at?: string | null
+    currency?: import('../types/knowledge').SourceCurrency | null
   }[]
 }
 

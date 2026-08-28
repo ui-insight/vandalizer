@@ -114,6 +114,8 @@ const landingRoute = createRoute({
     invite_token: (search.invite_token as string) || undefined,
     admin: (search.admin as string) || undefined,
     next: (search.next as string) || undefined,
+    // `register=1` opens the auth block in register mode (trial CTA, /register).
+    register: search.register === '1' ? ('1' as const) : undefined,
   }),
   component: Landing,
 })
@@ -131,7 +133,7 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
-  component: () => <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }} />,
+  component: () => <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: '1' }} />,
 })
 
 const resetPasswordRoute = createRoute({

@@ -418,19 +418,19 @@ class TestAuthConfigRouteWithRealDB:
 
 class TestTrialExtensionWithRealDB:
     async def _make_locked_trial(self, suffix: str, *, extensions_used: int = 0):
-        """Create a locked demo application + user, return (app, user)."""
+        """Create an exhausted trial application + user, return (app, user)."""
         from app.models.demo import DemoApplication
         from app.models.user import User
 
         uid = f"trial_{suffix}@example.com"
-        past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+        now = datetime.datetime.now(datetime.timezone.utc)
         user = User(
             user_id=uid,
             email=uid,
             name=f"Trial {suffix}",
             is_demo_user=True,
-            demo_status="locked",
-            demo_expires_at=past,
+            demo_status="exhausted",
+            trial_token_budget=1000,
         )
         await user.insert()
         app = DemoApplication(
@@ -438,10 +438,9 @@ class TestTrialExtensionWithRealDB:
             name=f"Trial {suffix}",
             email=uid,
             organization="Test Org",
-            status="expired",
+            status="exhausted",
             user_id=uid,
-            expires_at=past,
-            expired_at=past,
+            expired_at=now,
             post_questionnaire_token=f"tok_{suffix}",
             trial_extensions_used=extensions_used,
         )
@@ -494,7 +493,7 @@ class TestTrialExtensionWithRealDB:
 
         app, _user = await self._make_locked_trial("extend")
         with patch.object(demo_service, "send_email", new_callable=AsyncMock):
-            result = await demo_service.self_extend_trial(
+            result = await demo_service.self_topup_trial(
                 "tok_extend", None, Settings()
             )
 
@@ -504,13 +503,15 @@ class TestTrialExtensionWithRealDB:
         assert refreshed_app.status == "active"
         assert refreshed_app.trial_extensions_used == 1
         assert refreshed_user.demo_status == "active"
-        now = datetime.datetime.now(datetime.timezone.utc)
-        # New expiry is ~14 days out
-        assert refreshed_app.expires_at.replace(tzinfo=datetime.timezone.utc) > now + datetime.timedelta(days=13)
+        # The top-up raised the budget rather than resetting lifetime usage,
+        # and the clock era is left behind entirely.
+        assert refreshed_user.trial_token_budget == 1000 + Settings().trial_topup_tokens
+        assert refreshed_user.demo_expires_at is None
+        assert refreshed_app.expires_at is None
 
     async def test_self_extend_is_unlimited(self, mongo_client):
-        # Renewals are unlimited — extending past the old 2-extension cap still
-        # unlocks the account and bumps the counter for analytics.
+        # Top-ups are unlimited — going past the old 2-extension cap still
+        # reactivates the account and bumps the counter for analytics.
         from app.config import Settings
         from app.models.demo import DemoApplication
         from app.models.user import User
@@ -518,7 +519,7 @@ class TestTrialExtensionWithRealDB:
 
         app, _user = await self._make_locked_trial("uncapped", extensions_used=5)
         with patch.object(demo_service, "send_email", new_callable=AsyncMock):
-            result = await demo_service.self_extend_trial(
+            result = await demo_service.self_topup_trial(
                 "tok_uncapped", None, Settings()
             )
 
@@ -536,7 +537,7 @@ class TestTrialExtensionWithRealDB:
 
         app, _user = await self._make_locked_trial("notes")
         with patch.object(demo_service, "send_email", new_callable=AsyncMock):
-            await demo_service.self_extend_trial(
+            await demo_service.self_topup_trial(
                 "tok_notes", {"using_for": "grants"}, Settings()
             )
 

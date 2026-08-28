@@ -965,6 +965,19 @@ runpy.run_path('bootstrap_install.py', run_name='__main__')
 # ---------------------------------------------------------------------------
 # Phase 4: Verification
 # ---------------------------------------------------------------------------
+
+# The web port the operator chose. In-memory WEB_PORT is only set during a
+# first install's prompts; verify/repair/finale on later runs must read it
+# back from the root .env docker compose uses, or they check port 80 and
+# report a healthy install on port 8080 as "not responding".
+web_port() {
+  local port="${WEB_PORT:-}"
+  if [[ -z "$port" && -f .env ]]; then
+    port=$(grep -E "^WEB_PORT=" .env 2>/dev/null | tail -1 | cut -d= -f2)
+  fi
+  echo "${port:-80}"
+}
+
 verify() {
   section "4" "System Verification"
 
@@ -1003,10 +1016,11 @@ verify() {
     fi
   done
 
-  # Frontend
-  if curl -sf "http://localhost/health" -o /dev/null 2>/dev/null; then
+  # Frontend — on the port the operator actually chose
+  local fe_base="http://localhost:$(web_port)"
+  if curl -sf "${fe_base}/health" -o /dev/null 2>/dev/null; then
     echo -e "  ${SYM_CHECK}  Frontend               ${GREEN}serving${RESET}"
-  elif curl -sf "http://localhost" -o /dev/null 2>/dev/null; then
+  elif curl -sf "${fe_base}" -o /dev/null 2>/dev/null; then
     echo -e "  ${SYM_CHECK}  Frontend               ${GREEN}serving${RESET}"
   else
     echo -e "  ${SYM_WARN}  Frontend               ${YELLOW}not yet responding (may still be starting)${RESET}"
@@ -1103,7 +1117,8 @@ finale() {
 
   echo -e "  ${MAGENTA}${BOLD}╠══════════════════════════════════════════════════════════════╣${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
-  local _wp="${WEB_PORT:-80}"
+  local _wp
+  _wp="$(web_port)"
   local _base_url="http://localhost"
   [[ "$_wp" != "80" ]] && _base_url="http://localhost:${_wp}"
   printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Frontend${RESET}     ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "${_base_url}"
@@ -1113,7 +1128,7 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Next steps:${RESET}                                                ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
-  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}1.${RESET} Open ${CYAN}http://localhost${RESET} and log in                    ${MAGENTA}${BOLD}║${RESET}"
+  printf "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}1.${RESET} Open ${CYAN}%-25s${RESET} and log in           ${MAGENTA}${BOLD}║${RESET}\n" "${_base_url}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}2.${RESET} Go to ${BOLD}Admin → System Config → Models${RESET}               ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}      Add an LLM provider (OpenAI, Anthropic, etc.)           ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}3.${RESET} Go to ${BOLD}Admin → System Config → Endpoints${RESET}            ${MAGENTA}${BOLD}║${RESET}"
@@ -1536,6 +1551,16 @@ upgrade() {
   local remote_url
   remote_url=$(git remote get-url origin 2>/dev/null || echo "")
 
+  # Scrub any credential an earlier version of this script embedded in the
+  # remote URL — it used to persist pasted tokens in .git/config in plaintext.
+  if [[ "$remote_url" =~ ^https://[^@/]+@github\.com/ ]]; then
+    local clean_url="https://github.com/${remote_url#*@github.com/}"
+    git remote set-url origin "$clean_url"
+    remote_url="$clean_url"
+    echo -e "  ${SYM_CHECK}  Removed embedded credential from the git remote ${DIM}(tokens are no longer stored on disk)${RESET}"
+    echo -e "     ${DIM}If scheduled auto-update relied on that token (private fork), switch the remote to SSH or configure a system git credential helper.${RESET}"
+  fi
+
   if [[ "$remote_url" == https://* ]]; then
     # Test if we can actually authenticate before wasting time
     echo -e "  ${SYM_PULSE}  ${DIM}Checking remote access...${RESET}"
@@ -1586,15 +1611,23 @@ upgrade() {
             echo -e "  ${SYM_CROSS}  ${RED}No token provided${RESET}"
             return 1
           fi
-          # Rewrite URL with token: https://TOKEN@github.com/org/repo.git
-          local token_url
-          token_url=$(echo "$remote_url" | sed -E "s|https://|https://${pat}@|")
-          git remote set-url origin "$token_url"
+          # Hold the token in this process's environment only and hand it to
+          # git through an ephemeral credential helper for the rest of this
+          # run. Never write it into .git/config — the old URL-rewrite
+          # persisted pasted tokens there in plaintext.
+          export VANDALIZER_GIT_TOKEN="$pat"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0="credential.helper"
+          export GIT_CONFIG_VALUE_0=""
+          export GIT_CONFIG_KEY_1="credential.helper"
+          # shellcheck disable=SC2016 — the helper must expand the var itself
+          export GIT_CONFIG_VALUE_1='!f() { echo "username=x-access-token"; echo "password=${VANDALIZER_GIT_TOKEN}"; }; f'
           if git ls-remote --heads origin >/dev/null 2>&1; then
-            echo -e "  ${SYM_CHECK}  Token authentication works"
+            echo -e "  ${SYM_CHECK}  Token authentication works ${DIM}(this run only — nothing stored)${RESET}"
           else
             echo -e "  ${SYM_CROSS}  ${RED}Token authentication failed — check the token scopes${RESET}"
-            git remote set-url origin "$remote_url"
+            unset VANDALIZER_GIT_TOKEN GIT_CONFIG_COUNT \
+              GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0 GIT_CONFIG_KEY_1 GIT_CONFIG_VALUE_1
             return 1
           fi
           ;;

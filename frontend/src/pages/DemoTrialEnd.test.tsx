@@ -35,6 +35,9 @@ function info(overrides: Partial<TrialEndInfo> = {}): TrialEndInfo {
     max_extensions: 2,
     can_self_extend: true,
     already_extended: false,
+    tokens_used: 1_800_000,
+    tokens_budget: 2_000_000,
+    topup_tokens: 2_000_000,
     ...overrides,
   }
 }
@@ -49,7 +52,9 @@ beforeEach(() => {
 describe('DemoTrialEnd', () => {
   it('low-engagement: shows one-click renewal and extends on click', async () => {
     mockGetTrialEndInfo.mockResolvedValueOnce(info({ engagement: 'low' }))
-    mockRequestTrialExtension.mockResolvedValueOnce({ ok: true, message: 'ok', expires_at: null })
+    mockRequestTrialExtension.mockResolvedValueOnce({
+      ok: true, message: 'ok', tokens_granted: 2_000_000, tokens_budget: 4_000_000,
+    })
 
     render(<DemoTrialEnd />)
 
@@ -69,12 +74,14 @@ describe('DemoTrialEnd', () => {
     expect(screen.queryByRole('button', { name: /keep my trial going/i })).not.toBeInTheDocument()
   })
 
-  it('renewals are unlimited: still offers to keep going after prior extensions', async () => {
-    // Previously this was a "cap reached" dead-end; renewals are now unlimited.
+  it('top-ups are unlimited: still offers to keep going after prior top-ups', async () => {
+    // Previously this was a "cap reached" dead-end; top-ups are now unlimited.
     mockGetTrialEndInfo.mockResolvedValueOnce(
       info({ engagement: 'low', extensions_used: 5, already_extended: true }),
     )
-    mockRequestTrialExtension.mockResolvedValueOnce({ ok: true, message: 'ok', expires_at: null })
+    mockRequestTrialExtension.mockResolvedValueOnce({
+      ok: true, message: 'ok', tokens_granted: 2_000_000, tokens_budget: 4_000_000,
+    })
 
     render(<DemoTrialEnd />)
 

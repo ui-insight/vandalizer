@@ -10,6 +10,7 @@ import {
   type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
+import { describeKBScoreWithValues, explainKBScore } from './kbScoreFormula'
 import { AutovalidateTab } from './AutovalidateTab'
 import { KBTestQueriesTab } from './KBTestQueriesTab'
 import { KBValidationRunTab } from './KBValidationRunTab'
@@ -70,6 +71,10 @@ const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
  * which addresses the audit's "no labeling, no reconciliation" gap. */
 type LatestQualitySummary = {
   score: number
+  // Overall-score composition + the judge's answer accuracy, so the chip's
+  // hover can say the score is a composite instead of reading as "judged N".
+  breakdown: string | null
+  answerAccuracy: number | null
   judgeModel: string | null
   numQueries: number | null
   mode: string | null
@@ -132,8 +137,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
 
   const applyLatestQuality = useCallback((history: KBHistoryItem[]) => {
     const last = history[0]
+    const snap = last?.result_snapshot ?? null
     setLatestQuality(last?.score != null ? {
       score: Number(last.score),
+      breakdown: snap ? describeKBScoreWithValues(explainKBScore(snap).components) : null,
+      answerAccuracy: snap?.retrieval_precision?.avg_judge_score ?? null,
       judgeModel: last.judge_model ?? null,
       numQueries: last.num_queries_judged ?? last.num_test_queries ?? null,
       mode: last.mode ?? null,
@@ -248,10 +256,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     : '#ef4444'
 
   // Build the "source of this score" tooltip — answers the audit's #11 directly.
+  // Leads with what the number IS (a composite) before who judged it, because
+  // "Score: 91 · judged by X" read as the judge's score, which it is not.
   const tooltip = useMemo(() => {
     if (!latestQuality) return undefined
     const parts: string[] = []
-    parts.push(`Score: ${latestQuality.score.toFixed(0)}`)
+    parts.push(`Overall quality ${latestQuality.score.toFixed(0)}`)
+    if (latestQuality.breakdown) parts.push(`= ${latestQuality.breakdown}`)
+    if (latestQuality.answerAccuracy != null) {
+      parts.push(`answer accuracy ${(latestQuality.answerAccuracy * 100).toFixed(0)}%`)
+    }
     if (latestQuality.judgeModel) parts.push(`judged by ${latestQuality.judgeModel}`)
     if (latestQuality.numQueries != null) parts.push(`on ${latestQuality.numQueries} queries`)
     if (latestQuality.mode) parts.push(`(${latestQuality.mode})`)

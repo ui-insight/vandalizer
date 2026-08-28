@@ -10,9 +10,21 @@ A passage that cannot be located in the document — even after unicode
 normalization — is marked ``verified: False``, which the frontend surfaces
 as "no source found": both a traceability gap and a hallucination signal.
 
+``verified`` answers only "does this passage exist in the document?". It says
+nothing about whether the passage supports the value shown beside it: a model
+that hallucinates an award amount and returns any real sentence from the
+budget section earns a located quote. ``value_supported`` answers the second,
+load-bearing question — is the extracted value actually present in the
+passage — and is recorded separately so the two claims never get conflated.
+
 Pure string/offset logic only; no DB or LLM access, safe to import anywhere.
+That purity is why the number/date parsing below is duplicated here in
+miniature rather than imported from ``extraction_validation_service``, which
+pulls in the engine, Beanie documents, and system config.
 """
 
+import re
+from datetime import date, datetime
 from typing import Optional
 
 # Reserved sidecar key on entity dicts: {field_name: source dict}. Every
@@ -125,18 +137,271 @@ def _doc_for_offset(offset: int, doc_spans: list[dict]) -> Optional[dict]:
     return None
 
 
-def resolve_entity_sources(entities: list, doc_text: str, doc_meta: dict) -> None:
+# ---------------------------------------------------------------------------
+# Value support: is the extracted value actually present in its quote?
+# ---------------------------------------------------------------------------
+
+# Kept in sync with extraction_validation_service._NOT_FOUND_VARIANTS. A
+# sentinel has no value to support, so it is never counted either way.
+_NOT_FOUND_VARIANTS = frozenset({
+    "", "n/a", "na", "n.a.", "not found", "not available",
+    "not applicable", "none", "null", "nil", "unknown", "-", "--", "---",
+    "nan", "no data", "no value", "not provided", "not specified",
+    "not present", "not stated", "not mentioned", "not given",
+    "no information", "no entry", "missing", "empty", "blank",
+})
+
+_CURRENCY_CHARS = "$€£¥"
+# Comma groups only in thousands position: `[\d,]*` swallowed "1,2,3" as one
+# token, which then parsed as 123 and "supported" a value of 123 with a quote
+# listing sections 1, 2 and 3.
+_NUMBER_IN_TEXT_RE = re.compile(
+    r"[-+]?\d{1,3}(?:,\d{3})+(?:\.\d+)?|[-+]?\d+(?:\.\d+)?"
+)
+
+# A quote is a passage, not a document. Past this the value question is not
+# worth asking, and asking it is not free: the date scan below backtracks
+# quadratically on long space-free text (OCR that lost its spaces, or a
+# degenerate model response), and the quote is model-controlled.
+_MAX_QUOTE_CHARS = 4000
+
+_MONTHS = "jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec"
+_DATE_IN_TEXT_RE = re.compile(
+    r"\d{4}-\d{1,2}-\d{1,2}"
+    r"|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+    rf"|(?:{_MONTHS})[a-z]*\.?\s+\d{{1,2}},?\s+\d{{4}}"
+    rf"|\d{{1,2}}\s+(?:{_MONTHS})[a-z]*\.?,?\s+\d{{4}}",
+    re.IGNORECASE,
+)
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y", "%m-%d-%Y", "%m-%d-%y",
+    "%B %d, %Y", "%B %d %Y", "%b %d, %Y", "%b %d %Y",
+    "%d %B %Y", "%d %b %Y", "%d %B, %Y", "%d %b, %Y",
+)
+
+
+def _is_not_found(value) -> bool:
+    if value is None:
+        return True
+    return str(value).strip().lower() in _NOT_FOUND_VARIANTS
+
+
+def _as_number(text: str) -> Optional[float]:
+    """Parse a whole string as a number, tolerating currency/percent/commas."""
+    cleaned = text.strip()
+    for ch in _CURRENCY_CHARS:
+        cleaned = cleaned.replace(ch, "")
+    cleaned = cleaned.replace(",", "").replace(" ", "")
+    if not cleaned:
+        return None
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def _number_with_pct(text: str) -> Optional[tuple[float, bool]]:
+    """Parse a whole string as (number, is_percent).
+
+    A percentage is not the same quantity as the bare number: "$50" must not
+    be certified by a quote that says "50% of MTDC", so the unit travels with
+    the value instead of being stripped away.
+    """
+    s = text.strip()
+    pct = s.endswith("%")
+    if pct:
+        s = s[:-1]
+    n = _as_number(s)
+    return None if n is None else (n, pct)
+
+
+def _numbers_in(text: str) -> set[tuple[float, bool]]:
+    out: set[tuple[float, bool]] = set()
+    for m in _NUMBER_IN_TEXT_RE.finditer(text):
+        n = _as_number(m.group())
+        if n is not None:
+            out.add((n, text[m.end():m.end() + 1] == "%"))
+    return out
+
+
+def _match_boundaries_ok(quote: str, start: int, end: int, *, numeric: bool) -> bool:
+    """Is the match at ``[start, end)`` a whole value rather than a fragment?
+
+    Without this the literal check is a bare substring test, so a quote saying
+    5000000 "supports" a value of 500000, $500,000.99 supports $500,000, and
+    "John Smithson" supports "John Smith" — over-claiming in exactly the
+    direction the value check exists to catch.
+    """
+    before = quote[start - 1] if start > 0 else ""
+    after = quote[end] if end < len(quote) else ""
+    if numeric:
+        # A digit or a group/decimal separator on either side means the match
+        # is a slice of a longer number. A trailing "." or "," only counts as
+        # part of the number when a digit follows it, so ordinary sentence
+        # punctuation still ends a value cleanly.
+        if before.isdigit() or before in ".,":
+            return False
+        if after.isdigit():
+            return False
+        if after in ".," and end + 1 < len(quote) and quote[end + 1].isdigit():
+            return False
+        return True
+    return not (before.isalnum() or after.isalnum())
+
+
+def _literal_match(norm_value: str, norm_quote: str, *, numeric: bool) -> bool:
+    """Whether *norm_value* occurs in *norm_quote* as a whole value.
+
+    Scans every occurrence: the first may be a fragment ("500,000" inside
+    "1,500,000") while a later one is genuine.
+    """
+    idx = norm_quote.find(norm_value)
+    while idx != -1:
+        if _match_boundaries_ok(norm_quote, idx, idx + len(norm_value), numeric=numeric):
+            return True
+        idx = norm_quote.find(norm_value, idx + 1)
+    return False
+
+
+def _as_date(text: str) -> Optional[date]:
+    s = text.strip().rstrip(".,").replace(".", "")
+    for fmt in _DATE_FORMATS:
+        try:
+            return datetime.strptime(s, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _dates_in(text: str) -> set[date]:
+    out: set[date] = set()
+    for m in _DATE_IN_TEXT_RE.finditer(text):
+        d = _as_date(m.group())
+        if d is not None:
+            out.add(d)
+    return out
+
+
+def same_value(a, b) -> bool:
+    """Whether two extracted values are the same value.
+
+    Formatting-tolerant in the same directions as the quote matcher: unicode
+    folding, then numeric and date equivalence. Used to decide whether a
+    quote captured for one pass's value may be carried onto another's.
+    """
+    a_nf, b_nf = _is_not_found(a), _is_not_found(b)
+    if a_nf or b_nf:
+        return a_nf and b_nf
+
+    a_str, b_str = str(a).strip(), str(b).strip()
+    norm_a, _ = normalize_with_map(a_str)
+    norm_b, _ = normalize_with_map(b_str)
+    if norm_a == norm_b:
+        return True
+
+    num_a, num_b = _number_with_pct(a_str), _number_with_pct(b_str)
+    if num_a is not None and num_b is not None:
+        return num_a == num_b
+
+    date_a, date_b = _as_date(a_str), _as_date(b_str)
+    if date_a is not None and date_b is not None:
+        return date_a == date_b
+
+    return False
+
+
+def value_supported_by_quote(
+    value, quote: Optional[str], *, enum_field: bool = False,
+) -> tuple[Optional[bool], str]:
+    """Is *value* actually supported by *quote*?
+
+    Returns ``(supported, method)``. ``supported`` is None when the question
+    does not apply — there is no quote, the value is a "not found" sentinel,
+    or the field is an enum whose allowed values are a mapping of the prose
+    rather than a span of it. ``method`` records how the answer was reached so
+    the distribution can be measured before any of this drives a badge.
+
+    Deliberately strict: only literal, numeric, and date equivalence count,
+    and a literal match must sit on value boundaries — a digit or separator
+    beside a number, or an alphanumeric beside a name, means the match is a
+    fragment of something else and does not count.
+    A multi-part value assembled from a sentence ("Jane Smith, Chemistry")
+    reads as unsupported. That is the conservative direction for a field that
+    is recorded but not yet surfaced — if measurement shows it dominates, a
+    partial-coverage rule can be added with evidence behind it.
+
+    Three known weaknesses to read the measured distribution against. Very
+    short values ("1", "A") match almost any passage by coincidence, so their
+    ``True`` carries little evidence. A value that is a judgment about the
+    passage rather than a span of it ("Yes" for "cost sharing is required")
+    reads as unsupported unless the field declares ``enum_values``. And the
+    check asks only whether the value appears *somewhere* in the passage, not
+    whether the passage assigns it to this field: a "Direct Costs" value is
+    supported by a quote that labels that same figure as indirect, and a year
+    (2024) by a dollar amount ($2,024). Reading a ``True`` as "the quote says
+    this field is this value" therefore over-reads it.
+    """
+    if not quote or not quote.strip():
+        return None, "no_quote"
+    if len(quote) > _MAX_QUOTE_CHARS:
+        return None, "quote_too_long"
+    if _is_not_found(value):
+        return None, "empty_value"
+    if enum_field:
+        return None, "enum_field"
+    if not isinstance(value, (str, int, float)) or isinstance(value, bool):
+        # Lists/dicts/bools have no verbatim form to look for. Counting them
+        # unsupported would load the measurement with a class that carries no
+        # hallucination signal.
+        return None, "non_scalar_value"
+
+    value_str = str(value).strip()
+    norm_value, _ = normalize_with_map(value_str)
+    norm_quote, _ = normalize_with_map(quote)
+    if not norm_value:
+        return None, "empty_value"
+
+    num = _number_with_pct(value_str)
+    if _literal_match(norm_value, norm_quote, numeric=num is not None):
+        return True, "literal"
+
+    if num is not None and num in _numbers_in(quote):
+        return True, "numeric"
+
+    dt = _as_date(value_str)
+    if dt is not None and dt in _dates_in(quote):
+        return True, "date"
+
+    return False, "no_match"
+
+
+def resolve_entity_sources(
+    entities: list,
+    doc_text: str,
+    doc_meta: dict,
+    field_meta: Optional[dict] = None,
+) -> None:
     """Verify and locate each entity's raw source quotes, in place.
 
     The engine attaches ``entity[SOURCE_KEY] = {field: {"quote": str}}``.
     This fills each entry out to::
 
-        {"quote", "page", "document_uuid", "document_title", "verified"}
+        {"quote", "page", "document_uuid", "document_title", "verified",
+         "value_supported", "value_support_method"}
+
+    ``verified`` is unchanged: the quote was located in the document.
+    ``value_supported`` is the separate, stronger claim that the value shown
+    to the user actually appears in that quote (None when the check does not
+    apply — see :func:`value_supported_by_quote`). Keeping them apart is
+    deliberate: today's UI treats a located quote as proof of the value, and
+    collapsing the two here would bake that error in permanently.
 
     *doc_meta* carries ``uuid``, ``title``, ``text_markers``, and (for
     combined-context runs over a merged text) optional ``doc_spans`` —
     ``[{"start", "end", "uuid", "title"}]`` — used to attribute an offset to
-    the document that contributed it.
+    the document that contributed it. *field_meta* is the engine's per-field
+    metadata map (``{key: {"enum_values", "is_optional"}}``), used to skip the
+    value check on enum fields.
     """
     markers = doc_meta.get("text_markers") or []
     doc_spans = doc_meta.get("doc_spans") or []
@@ -163,12 +428,32 @@ def resolve_entity_sources(entities: list, doc_text: str, doc_meta: dict) -> Non
             page_marker = (
                 page_marker_for_offset(offset, markers) if offset is not None else None
             )
+            # Only ask whether the value is supported once the quote is known
+            # to exist — a fabricated passage that happens to contain the
+            # value proves nothing, so an unlocated quote stays unassessed.
+            meta = (field_meta or {}).get(field) or {}
+            if offset is not None:
+                supported, method = value_supported_by_quote(
+                    entity.get(field), quote,
+                    enum_field=bool(meta.get("enum_values")),
+                )
+            elif isinstance(src, dict) and src.get("dropped_reason") == "value_changed":
+                # Pass 2 revised the value, so pass 1's quote was withheld
+                # rather than failing to locate. Kept as an entry (not dropped)
+                # so the UI renders "no source found" instead of nothing, and
+                # so these fields are counted rather than vanishing from the
+                # distribution.
+                supported, method = None, "value_changed_in_refinement"
+            else:
+                supported, method = None, "quote_not_located"
             sidecar[field] = {
                 "quote": quote,
                 "page": page_marker.get("value") if page_marker else None,
                 "document_uuid": doc_uuid,
                 "document_title": doc_title,
                 "verified": offset is not None,
+                "value_supported": supported,
+                "value_support_method": method,
             }
             # Set only when true, so sidecars for measured pages keep the shape
             # they have always had and existing results stay comparable.

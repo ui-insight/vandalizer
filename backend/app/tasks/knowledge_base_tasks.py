@@ -11,6 +11,7 @@ import httpx
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS
+from app.utils import kb_source_currency as currency
 from app.utils.fetch_errors import describe_empty_fetch, describe_fetch_error
 
 logger = logging.getLogger(__name__)
@@ -145,7 +146,7 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
-                    "processed_at": datetime.datetime.now(datetime.timezone.utc),
+                    **currency.ingestion_stamp(raw_text),
                 }
             },
         )
@@ -253,7 +254,14 @@ def kb_reingest(self, kb_uuid: str) -> None:
                         "chunk_count": chunk_count,
                         "status": "ready",
                         "error_message": None,
-                        "processed_at": datetime.datetime.now(datetime.timezone.utc),
+                        # Re-embeds the stored snapshot: the text is no newer
+                        # than it was, so only the ingestion date moves. A
+                        # row that never recorded a retrieval date keeps its
+                        # old processed_at as the best estimate of one.
+                        **currency.ingestion_stamp(
+                            raw_text, retrieved=False,
+                            retrieved_at=source.get("content_retrieved_at") or source.get("processed_at"),
+                        ),
                     }
                 },
             )
@@ -364,7 +372,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
-                    "processed_at": datetime.datetime.now(datetime.timezone.utc),
+                    **currency.ingestion_stamp(raw_text),
                 }
             },
         )

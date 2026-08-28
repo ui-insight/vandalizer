@@ -11,7 +11,7 @@ from typing import Any, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
-from app.services.page_locator import location_meta
+from app.services.page_locator import span_meta
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +334,7 @@ class DocumentManager:
                 "timestamp": datetime.now().isoformat(),
                 "user_id": user_id,
             }
-            meta.update(location_meta(_location_for_offset(offset, markers)))
+            meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
@@ -460,7 +460,7 @@ class DocumentManager:
                 "total_chunks": len(text_splits),
                 "timestamp": datetime.now().isoformat(),
             }
-            meta.update(location_meta(_location_for_offset(offset, markers)))
+            meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)

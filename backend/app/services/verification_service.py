@@ -526,6 +526,23 @@ async def check_auto_approve(request_uuid: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
+def catalog_row_is_openable(item, underlying) -> bool:
+    """Whether a verified-library row can actually be opened or adopted.
+
+    The library item and the underlying Workflow/SearchSet/KnowledgeBase each
+    carry a ``verified`` flag, and only the underlying one gates access
+    (``can_view_knowledge_base`` / ``can_view_search_set``). They drift when a
+    seed is retired and later reinstated — see
+    ``scripts.seed_catalog._reinstate_verified`` — and a row listed in that
+    state produces "not found or not accessible" on click. ``underlying`` is
+    None when the listing didn't load the document (workflows, whose access
+    doesn't key on the flag); such rows pass.
+    """
+    if underlying is None or not item.verified:
+        return True
+    return bool(getattr(underlying, "verified", True))
+
+
 async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
@@ -665,6 +682,20 @@ async def list_verified_items(
         # Quality tier filter
         item_tier = meta.quality_tier if meta else None
         if quality_tier and item_tier != quality_tier:
+            continue
+
+        # Don't advertise a row the access check will refuse.
+        underlying = None
+        if item.kind == LibraryItemKind.KNOWLEDGE_BASE:
+            underlying = kb_map.get(item_id_str)
+        elif item.kind == LibraryItemKind.SEARCH_SET:
+            underlying = ss_map.get(item_id_str)
+        if not catalog_row_is_openable(item, underlying):
+            logger.warning(
+                "verified catalog lists %s %s (%r) but its document has verified=False; "
+                "hiding it. Re-run the catalog seed to reinstate it.",
+                item.kind.value, item_id_str, name,
+            )
             continue
 
         submitter_id = submitter_user_map.get((item.kind.value, item_id_str))

@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
-import { KeyRound, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { KeyRound, Plus, Pencil, Trash2, RefreshCw , Plug } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useConfirm } from '../components/shared/useConfirm'
 import {
   createCredential,
   deleteCredential,
   invalidateCredentialCache,
+  testCredential,
+  testCredentialDraft,
   listCredentials,
   updateCredential,
 } from '../api/credentials'
+import { CredentialTestPanel } from '../components/credentials/CredentialTestPanel'
+import { useToast } from '../contexts/ToastContext'
 import type { Credential, CredentialType } from '../types/credential'
 
 const TYPE_LABELS: Record<CredentialType, string> = {
@@ -30,6 +34,7 @@ interface FormState {
   scope: string
   audience: string
   algorithm: string
+  test_url: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -44,11 +49,14 @@ const EMPTY_FORM: FormState = {
   scope: '',
   audience: '',
   algorithm: 'RS256',
+  test_url: '',
 }
 
 function buildPayload(form: FormState): Record<string, string> {
   if (form.type === 'static_header') {
-    return { header_name: form.header_name, header_value: form.header_value }
+    const p: Record<string, string> = { header_name: form.header_name, header_value: form.header_value }
+    if (form.test_url) p.test_url = form.test_url
+    return p
   }
   const payload: Record<string, string> = {
     client_id: form.client_id,
@@ -58,6 +66,7 @@ function buildPayload(form: FormState): Record<string, string> {
   if (form.scope) payload.scope = form.scope
   if (form.audience) payload.audience = form.audience
   if (form.algorithm && form.algorithm !== 'RS256') payload.algorithm = form.algorithm
+  if (form.test_url) payload.test_url = form.test_url
   return payload
 }
 
@@ -66,13 +75,14 @@ function buildPayload(form: FormState): Record<string, string> {
 // current one". The backend merges these over the stored payload.
 function buildUpdatePayload(form: FormState): Record<string, string> {
   if (form.type === 'static_header') {
-    const p: Record<string, string> = { header_name: form.header_name }
+    const p: Record<string, string> = { header_name: form.header_name, test_url: form.test_url }
     if (form.header_value) p.header_value = form.header_value
     return p
   }
   const p: Record<string, string> = {
     client_id: form.client_id,
     token_endpoint: form.token_endpoint,
+    test_url: form.test_url,
   }
   if (form.scope) p.scope = form.scope
   if (form.audience) p.audience = form.audience
@@ -86,6 +96,7 @@ function buildUpdatePayload(form: FormState): Record<string, string> {
 // cached bearer token).
 function nonSecretChanged(form: FormState, original: Credential): boolean {
   const p = original.payload || {}
+  if (form.test_url !== (p.test_url ?? '')) return true
   if (form.type === 'static_header') {
     return form.header_name !== (p.header_name ?? '')
   }
@@ -100,6 +111,7 @@ function nonSecretChanged(form: FormState, original: Credential): boolean {
 
 export default function Credentials() {
   const confirm = useConfirm()
+  const { toast } = useToast()
   const [creds, setCreds] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -155,6 +167,7 @@ export default function Credentials() {
       scope: p.scope ?? '',
       audience: p.audience ?? '',
       algorithm: p.algorithm || 'RS256',
+      test_url: p.test_url ?? '',
     })
     setEditingId(cred.id)
     setShowForm(true)
@@ -165,18 +178,25 @@ export default function Credentials() {
     setError(null)
     try {
       if (editingId) {
-        const original = creds.find(c => c.id === editingId)
         const secretEntered = form.type === 'static_header' ? !!form.header_value : !!form.private_key
-        const data: { name?: string; description?: string; payload?: Record<string, string> } = {
+        const data: { name?: string; description?: string; payload?: Record<string, string>; type?: CredentialType } = {
           name: form.name,
           description: form.description,
         }
-        // Only resend the payload when something in it actually changed, so a
-        // pure rename doesn't drop the cached OAuth token.
-        if (original && (secretEntered || nonSecretChanged(form, original))) {
+        if (typeChanged) {
+          // A type change is a fresh credential under the same id: send the
+          // new type and its complete payload.
+          data.type = form.type
+          data.payload = buildPayload(form)
+        } else if (original && (secretEntered || nonSecretChanged(form, original))) {
+          // Only resend the payload when something in it actually changed, so
+          // a pure rename doesn't drop the cached OAuth token.
           data.payload = buildUpdatePayload(form)
         }
-        await updateCredential(editingId, data)
+        const updated = await updateCredential(editingId, data)
+        if (typeChanged && updated.steps_updated) {
+          toast(`Credential type changed; ${updated.steps_updated} API step${updated.steps_updated === 1 ? '' : 's'} updated to match`, 'info')
+        }
       } else {
         await createCredential({
           name: form.name,
@@ -215,6 +235,9 @@ export default function Credentials() {
     }
   }
 
+  const [testingId, setTestingId] = useState<string | null>(null)
+  const [testUrls, setTestUrls] = useState<Record<string, string>>({})
+
   const handleInvalidate = async (id: string) => {
     try {
       await invalidateCredentialCache(id)
@@ -223,15 +246,21 @@ export default function Credentials() {
     }
   }
 
+  // Editing a credential into another type: the stored secrets belong to the
+  // old type, so the new type's fields — secret included — are all required,
+  // exactly as when creating.
+  const original = editingId ? creds.find(c => c.id === editingId) : undefined
+  const typeChanged = !!original && original.type !== form.type
   const formValid = useMemo(() => {
     if (!form.name.trim()) return false
-    // On edit, the secret may be left blank to keep the stored one.
-    const editing = editingId !== null
+    // On edit, the secret may be left blank to keep the stored one — unless
+    // the type changed, in which case there is nothing stored to keep.
+    const editing = editingId !== null && !typeChanged
     if (form.type === 'static_header') {
       return !!form.header_name && (editing || !!form.header_value)
     }
     return !!form.client_id && !!form.token_endpoint && (editing || !!form.private_key)
-  }, [form, editingId])
+  }, [form, editingId, typeChanged])
 
   return (
     <PageLayout>
@@ -281,15 +310,19 @@ export default function Credentials() {
                   id="cred-type"
                   value={form.type}
                   onChange={e => setForm({ ...form, type: e.target.value as CredentialType })}
-                  disabled={editingId !== null}
-                  title={editingId ? 'Type cannot be changed; delete and recreate to switch types' : undefined}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight disabled:bg-gray-100 disabled:text-gray-500"
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
                 >
                   <option value="static_header">{TYPE_LABELS.static_header}</option>
                   <option value="oauth_client_credentials">
                     {TYPE_LABELS.oauth_client_credentials}
                   </option>
                 </select>
+                {typeChanged && (
+                  <p role="note" className="mt-1 text-xs text-amber-700">
+                    Changing the type replaces the stored secrets — enter the {TYPE_LABELS[form.type]} details in full.
+                    API steps that use this credential will be switched to the new type when you save.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -331,7 +364,7 @@ export default function Credentials() {
                     value={form.header_value}
                     onChange={e => setForm({ ...form, header_value: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
-                    placeholder={editingId ? 'Leave blank to keep current' : 'secret'}
+                    placeholder={editingId && !typeChanged ? 'Leave blank to keep current' : 'secret'}
                   />
                 </div>
               </div>
@@ -420,6 +453,18 @@ export default function Credentials() {
               </>
             )}
 
+            <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+              <div className="mb-2 text-xs font-semibold text-gray-700">Test this credential</div>
+              <CredentialTestPanel
+                testUrl={form.test_url}
+                onTestUrlChange={url => setForm(f => ({ ...f, test_url: url }))}
+                disabled={!formValid}
+                run={testUrl => editingId && !typeChanged
+                  ? testCredential(editingId, { payload: buildUpdatePayload(form), test_url: testUrl || undefined })
+                  : testCredentialDraft({ type: form.type, payload: buildPayload(form), test_url: testUrl || undefined })}
+              />
+            </div>
+
             <div className="flex items-center gap-2 pt-2">
               <button
                 onClick={handleSave}
@@ -451,7 +496,8 @@ export default function Credentials() {
           ) : (
             <ul className="divide-y divide-gray-100">
               {creds.map(cred => (
-                <li key={cred.id} className="flex items-center justify-between px-4 py-3">
+                <li key={cred.id} className="px-4 py-3">
+                <div className="flex items-center justify-between">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-gray-900">{cred.name}</span>
@@ -468,6 +514,15 @@ export default function Credentials() {
                     <div className="mt-1 text-xs font-mono text-gray-500">{cred.id}</div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setTestingId(t => (t === cred.id ? null : cred.id))}
+                      title="Test this credential"
+                      aria-pressed={testingId === cred.id}
+                      className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                    >
+                      <Plug className="h-3 w-3" />
+                      Test
+                    </button>
                     {cred.type === 'oauth_client_credentials' && (
                       <button
                         onClick={() => handleInvalidate(cred.id)}
@@ -499,6 +554,16 @@ export default function Credentials() {
                       </button>
                     )}
                   </div>
+                </div>
+                {testingId === cred.id && (
+                  <div className="mt-3 rounded-md border border-gray-200 bg-gray-50 p-3">
+                    <CredentialTestPanel
+                      testUrl={testUrls[cred.id] ?? cred.payload?.test_url ?? ''}
+                      onTestUrlChange={url => setTestUrls(u => ({ ...u, [cred.id]: url }))}
+                      run={testUrl => testCredential(cred.id, { test_url: testUrl || undefined })}
+                    />
+                  </div>
+                )}
                 </li>
               ))}
             </ul>

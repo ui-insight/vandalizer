@@ -149,6 +149,11 @@ async def resolve_oauth_user(
         if user.sso_provider != "oauth":
             user.sso_provider = "oauth"
             changed = True
+        # The IdP asserts this address, so SSO users are verified by arrival
+        # and are never asked to confirm (see trial_budget.check_*).
+        if not user.email_verified:
+            user.email_verified = True
+            changed = True
         if changed:
             await user.save()
         # Silently backfill default-team membership for pre-existing users
@@ -166,6 +171,7 @@ async def resolve_oauth_user(
         password_hash=None,
         name=display_name or uid,
         sso_provider="oauth",
+        email_verified=True,
     )
     await user.insert()
 
@@ -223,6 +229,11 @@ async def resolve_saml_user(
         if user.sso_provider != "saml":
             user.sso_provider = "saml"
             changed = True
+        # The IdP asserts this address, so SSO users are verified by arrival
+        # and are never asked to confirm (see trial_budget.check_*).
+        if not user.email_verified:
+            user.email_verified = True
+            changed = True
         # Auto-map org from department if not already set
         if department and not user.organization_id:
             from app.models.organization import Organization
@@ -246,6 +257,7 @@ async def resolve_saml_user(
         password_hash=None,
         name=display_name or uid,
         sso_provider="saml",
+        email_verified=True,
     )
 
     # Auto-map organization from department

@@ -11,6 +11,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+import threading
 
 from app.services import workflow_optimizer
 from app.services.optimization_common import pick_winner_variance_aware
@@ -285,6 +286,42 @@ def test_build_candidates_generates_diverse_trials():
     # Trial labels are unique
     labels = [c["label"] for c in candidates]
     assert len(set(labels)) == len(labels)
+
+
+def _call_or_hang(fn, seconds: float = 5.0):
+    """Run ``fn`` on a thread; fail fast instead of hanging the suite if it spins."""
+    box: dict = {}
+    thread = threading.Thread(target=lambda: box.update(value=fn()), daemon=True)
+    thread.start()
+    thread.join(seconds)
+    assert not thread.is_alive(), "_build_candidates did not terminate"
+    return box["value"]
+
+
+def test_build_candidates_terminates_when_search_space_is_exhausted():
+    """Regression (VANDALIZER-BACKEND-2K): one Extraction step and two models
+    is a two-draw random space, one of them the baseline. The fill loop used to
+    spin forever because its brake counted distinct keys, which stop growing
+    the moment the space is exhausted."""
+    wf = _wf_data_with_steps(("extraction", ["Extraction"]))
+    available = [{"name": "openai/gpt-oss-120b"}, {"name": "qwen/qwen3.5-122b"}]
+
+    candidates = _call_or_hang(lambda: _build_candidates(
+        wf_data=wf,
+        available_models=available,
+        baseline_model="openai/gpt-oss-120b",
+        max_candidates=4,
+        rng_seed=None,  # unseeded, as the Celery task calls it
+    ))
+
+    assert 1 <= len(candidates) <= 4
+    labels = [c["label"] for c in candidates]
+    assert len(set(labels)) == len(labels)
+    # The baseline in disguise (baseline model + default prompt) is not a trial.
+    for c in candidates:
+        assert c["step_overrides"] != {
+            "extraction": {"model": "openai/gpt-oss-120b", "prompt_variant": "default"}
+        }
 
 
 def test_build_candidates_empty_when_no_llm_steps():

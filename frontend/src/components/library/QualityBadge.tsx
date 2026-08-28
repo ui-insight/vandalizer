@@ -6,13 +6,14 @@ const tierColors: Record<string, { bg: string; text: string; border: string }> =
 
 const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
 
-export function QualityBadge({ tier, score }: { tier: string | null; score: number | null }) {
+export function QualityBadge({ tier, score, title }: { tier: string | null; score: number | null; title?: string }) {
   const colors = tier ? tierColors[tier] || defaultColor : defaultColor
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
   const label = tierLabel ? `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}` : 'Unvalidated'
 
   return (
     <span
+      title={title}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

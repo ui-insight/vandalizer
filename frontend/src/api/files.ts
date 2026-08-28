@@ -74,3 +74,23 @@ export async function downloadFilesAsZip(docIds: string[]) {
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+/** Everything that references a document — see backend document_usage.py. */
+export interface DocumentUsage {
+  document: { uuid: string; title: string }
+  folder: { path: { uuid: string; title: string }[]; team_id: string | null }
+  knowledge_bases: { uuid: string; title: string; exists: boolean }[]
+  extractions: {
+    uuid: string; title: string; exists: boolean
+    test_cases: { uuid: string; label: string }[]
+  }[]
+  workflows: {
+    id: string; name: string
+    uses: { kind: 'fixed_document' | 'step_document'; step?: string; task?: string; role?: string }[]
+  }[]
+  total: number
+}
+
+export function fetchDocumentUsage(docUuid: string) {
+  return apiFetch<DocumentUsage>(`/api/files/${docUuid}/usage`)
+}

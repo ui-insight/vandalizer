@@ -326,3 +326,115 @@ def fetch_credential_sync(db: Any, credential_id: str) -> dict | None:
 def generate_random_jti() -> str:
     """Exposed for tests."""
     return secrets.token_hex(16)
+
+
+# ---------------------------------------------------------------------------
+# Connection test (the "Test" button)
+# ---------------------------------------------------------------------------
+#
+# Walks the same path APICallNode takes — validate, obtain the auth (a real
+# token exchange for OAuth), optionally send one GET with it — and reports each
+# step with the reason it failed, so a credential can be debugged where it is
+# entered instead of by running a workflow and reading a step error. Secret
+# values never appear in the report.
+
+_TEST_REQUEST_TIMEOUT = 15
+_TEST_BODY_PREVIEW = 300
+
+_STATUS_HINTS = {
+    401: "The server rejected the credential (401 Unauthorized). Check the key or token, and that it has not expired.",
+    403: "The server recognised the credential but refused the request (403 Forbidden). Check its permissions or scope.",
+    404: "The URL was not found (404). The credential may be fine — check the test URL.",
+    429: "The server is rate-limiting requests (429). The credential is being accepted; try again shortly.",
+}
+
+
+def _step(steps: list[dict], name: str, ok: bool, detail: str) -> None:
+    steps.append({"step": name, "ok": ok, "detail": detail})
+
+
+def run_connection_test(
+    cred_type: str,
+    payload: dict,
+    *,
+    test_url: str | None = None,
+) -> dict:
+    """Try a credential for real and report what happened, step by step.
+
+    *payload* is decrypted. Returns ``{"ok", "steps": [{"step", "ok",
+    "detail"}], "status_code", "elapsed_ms"}`` and never raises for a
+    failing credential — the failure is the report. Without *test_url* the
+    report stops after the auth step (for OAuth that is still a real token
+    exchange; for a static header there is nothing to try without a URL).
+    """
+    steps: list[dict] = []
+    headers: dict[str, str] = {}
+
+    try:
+        validate_payload(cred_type, payload)
+    except CredentialError as e:
+        _step(steps, "Configuration", False, str(e))
+        return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+    _step(steps, "Configuration", True, "All required fields are present.")
+
+    if cred_type == "static_header":
+        name = payload.get("header_name") or ""
+        value = payload.get("header_value") or ""
+        headers[name] = value
+        _step(
+            steps, "Header", True,
+            f"Will send header {name} ({len(value)} characters, value not shown).",
+        )
+    elif cred_type == "oauth_client_credentials":
+        started = time.monotonic()
+        try:
+            bearer, expires_in = _exchange_token(payload)
+        except CredentialError as e:
+            _step(steps, "Token exchange", False, str(e))
+            return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+        except Exception as e:  # e.g. an unusable private key
+            _step(steps, "Token exchange", False, f"Could not build the client assertion: {e}")
+            return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+        headers["Authorization"] = f"Bearer {bearer}"
+        _step(
+            steps, "Token exchange", True,
+            f"{payload.get('token_endpoint')} issued a bearer token in "
+            f"{int((time.monotonic() - started) * 1000)} ms (expires in {expires_in} s).",
+        )
+    else:
+        _step(steps, "Configuration", False, f"Unknown credential type: {cred_type!r}")
+        return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+
+    if not test_url:
+        _step(
+            steps, "Test request", True,
+            "No test URL given — add one to send a real request with this credential.",
+        )
+        return {"ok": True, "steps": steps, "status_code": None, "elapsed_ms": None}
+
+    try:
+        validate_outbound_url(test_url)
+    except ValueError as e:
+        _step(steps, "Test request", False, f"Test URL not allowed: {e}")
+        return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+
+    started = time.monotonic()
+    try:
+        with httpx.Client(timeout=_TEST_REQUEST_TIMEOUT, follow_redirects=False) as client:
+            resp = client.get(test_url, headers={**headers, "Accept": "application/json, */*"})
+    except httpx.RequestError as e:
+        _step(steps, "Test request", False, f"GET {test_url} failed before a response: {e}")
+        return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+
+    ok = 200 <= resp.status_code < 400
+    detail = f"GET {test_url} → {resp.status_code} {resp.reason_phrase} in {elapsed_ms} ms."
+    if not ok:
+        hint = _STATUS_HINTS.get(resp.status_code)
+        if hint:
+            detail += f" {hint}"
+        body = (resp.text or "")[:_TEST_BODY_PREVIEW]
+        if body:
+            detail += f" Response: {body}"
+    _step(steps, "Test request", ok, detail)
+    return {"ok": ok, "steps": steps, "status_code": resp.status_code, "elapsed_ms": elapsed_ms}

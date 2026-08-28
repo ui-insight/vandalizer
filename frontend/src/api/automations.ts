@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { Automation } from '../types/automation'
+import type { Automation, RunNowResponse, AutomationRunStatus } from '../types/automation'
 
 export function listAutomations() {
   return apiFetch<Automation[]>('/api/automations')
@@ -43,4 +43,16 @@ export function getActiveAutomations() {
     active_automation_ids: string[]
     recently_completed: CompletedAutomation[]
   }>('/api/automations/active')
+}
+
+/** Run an automation once, now, through its real pipeline (outputs fire). */
+export function runAutomationNow(id: string, documentUuids?: string[]) {
+  return apiFetch<RunNowResponse>(`/api/automations/${id}/run-now`, {
+    method: 'POST',
+    body: JSON.stringify(documentUuids && documentUuids.length ? { document_uuids: documentUuids } : {}),
+  })
+}
+
+export function getAutomationRun(id: string, triggerEventId: string) {
+  return apiFetch<AutomationRunStatus>(`/api/automations/${id}/runs/${triggerEventId}`)
 }

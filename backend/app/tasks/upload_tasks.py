@@ -69,6 +69,7 @@ def dispatch_upload_tasks(
             "document_uuid": document_uuid,
             "document_path": document_path,
             "background": True,
+            "user_id": user_id,
         },
         queue="uploads",
     )

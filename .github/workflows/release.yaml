@@ -33,6 +33,13 @@ jobs:
       - name: Install dependencies
         run: make backend-install frontend-install
 
+      # `make release-check` includes `security-gate`, which runs Trivy.
+      # Pin the same version ci.yaml uses so the two gates agree.
+      - name: Install Trivy
+        uses: aquasecurity/setup-trivy@v0.3.1
+        with:
+          version: v0.74.0
+
       - name: Run release validation
         run: make release-check
 

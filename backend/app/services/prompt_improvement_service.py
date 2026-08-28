@@ -56,8 +56,13 @@ async def improve_prompt(
     input_source: str | None = None,
     prev_step_name: str | None = None,
     sample_input: str | None = None,
+    user_id: str | None = None,
 ) -> dict:
-    """Return a rewritten prompt and a list of rationale bullets."""
+    """Return a rewritten prompt and a list of rationale bullets.
+
+    ``user_id`` attributes the spend to the requesting user so trial budgets
+    count (and can stop) it like every other user-triggered call.
+    """
     from app.services.config_service import get_default_model_name
     from app.services.llm_service import get_agent_model
 
@@ -80,7 +85,7 @@ async def improve_prompt(
     agent = Agent(model, system_prompt=_SYSTEM_PROMPT, output_type=PromptImprovement)
 
     from app.services.metering import metered_async
-    async with metered_async("prompt_improve"):
+    async with metered_async("prompt_improve", user_id=user_id):
         result = await agent.run("\n".join(parts))
     return {
         "improved_prompt": result.output.improved_prompt,

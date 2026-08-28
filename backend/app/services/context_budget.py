@@ -38,15 +38,23 @@ _CHAR_TO_TOKEN_RATIO = 4
 #   real budget justification        1.171
 #   synthetic dense currency table   1.455
 #
-# So no single constant is right. 1.20 covers ordinary prose and the real
-# documents measured here, and is *known to be insufficient* for heavily
-# numeric or tabular content — which is why exact tokenization, not a better
-# constant, is the actual fix. This value only governs models where exactness
-# is unavailable (hosted APIs), for which no measurements exist on this
-# deployment; a deployment that has measured its own should set
-# `token_safety_margin` on the model config. A configured value below 1.0 is
-# refused, since that re-creates the original bug by configuration.
-DEFAULT_TOKEN_SAFETY_MARGIN = 1.20
+# So no single constant is right, and the two ways of being wrong do not cost
+# the same. Guessing high routes a request early and wastes part of the window.
+# Guessing low hard-fails it and returns no answer at all. Given that asymmetry
+# this covers the worst case measured above rather than the typical one: 1.5
+# clears the 1.455 currency table, which is the digit-dense shape this product's
+# budget documents actually take.
+#
+# The cost is real and is accepted deliberately — a hosted model answering
+# flowing prose (1.000) now plans against a third less window than it has. A
+# deployment that knows its content skews prose should set `token_safety_margin`
+# on the model config and take that window back.
+#
+# This value only governs models where exactness is unavailable (hosted APIs).
+# Exact tokenization remains the actual fix, and applies wherever a local
+# vocabulary exists — see `resolve_exact_tokenizer`. A configured value below
+# 1.0 is refused, since that re-creates the original bug by configuration.
+DEFAULT_TOKEN_SAFETY_MARGIN = 1.5
 
 
 # Where a self-hosted server leaves the vocabulary for every model it serves.
@@ -101,7 +109,7 @@ def _settings_tokenizer_cache_root() -> str | None:
 # heavy turns where per-message wrappers accumulate. Tightening it buys
 # almost nothing and re-opens the direction that hard-fails.
 #
-# This is the piece the old 1.20 margin was incidentally covering. Making it
+# This is the piece the old margin was incidentally covering. Making it
 # explicit is what allows the margin to be dropped for models we can tokenize
 # exactly.
 REQUEST_SCAFFOLD_TOKENS = 512
@@ -118,8 +126,8 @@ def _warn_estimated_once(model_name: str) -> None:
 
     Silence here is the alias bug: a model registered as "Qwen-30b" rather
     than its full name resolves no vocabulary and drops to the default
-    margin, which measurement shows is wrong for numeric content. The guess
-    is a reasonable last resort; not saying so is not.
+    margin, silently planning against less window than the model has. The
+    guess is a reasonable last resort; not saying so is not.
     """
     if model_name in _ESTIMATED_MODELS_WARNED:
         return
@@ -127,7 +135,9 @@ def _warn_estimated_once(model_name: str) -> None:
     logger.warning(
         "token counts for %r are estimated, not exact: no local vocabulary "
         "and no stored calibration. Budgets use a default margin of %.2f, "
-        "which is known to under-count numeric and tabular content.",
+        "sized to cover the densest content measured (a currency table at "
+        "1.455) — so a prose-heavy deployment is giving up window it could "
+        "reclaim with token_safety_margin on the model config.",
         model_name, DEFAULT_TOKEN_SAFETY_MARGIN,
     )
 

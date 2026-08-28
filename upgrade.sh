@@ -6,7 +6,7 @@
 #   ./upgrade.sh v2026.04.1 --dry-run  # show what would happen, change nothing
 #   ./upgrade.sh --rollback            # restore the previous version from .last_version
 #
-# Requires: docker compose v2, a working .env in backend/ (created by deploy.sh),
+# Requires: docker compose v2, a working .env in backend/ (created by setup.sh),
 # and GHCR pull access (public images need no auth; private images need
 # `docker login ghcr.io` first).
 set -euo pipefail
@@ -52,7 +52,7 @@ command -v docker >/dev/null || die "docker not installed"
 docker compose version >/dev/null 2>&1 || die "docker compose v2 required"
 [[ -f compose.yaml ]]      || die "compose.yaml not found (run from repo root)"
 [[ -f compose.prod.yaml ]] || die "compose.prod.yaml not found"
-[[ -f backend/.env ]]      || die "backend/.env not found — run deploy.sh first"
+[[ -f backend/.env ]]      || die "backend/.env not found — run ./setup.sh first"
 
 # Verify the tag's images actually exist in GHCR before touching anything.
 for image in "ghcr.io/ui-insight/vandalizer-backend:${TAG}" \

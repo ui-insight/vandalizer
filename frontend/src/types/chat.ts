@@ -156,6 +156,9 @@ export interface Citation {
   document_uuid?: string | null
   document_title: string
   page?: number | null
+  /** Last page of a chunk that crosses page breaks, when the cited passage
+   *  could not be pinned to one page; rendered as "p. 2–3". */
+  page_end?: number | null
   /** Page was interpolated from OCR text, not measured. See #603. */
   page_approximate?: boolean
   sheet?: string | null

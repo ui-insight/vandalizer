@@ -17,7 +17,11 @@ from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic_ai import Agent, BinaryContent, NativeOutput
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
-from app.services.extraction_sources import SOURCE_KEY, resolve_entity_sources
+from app.services.extraction_sources import (
+    SOURCE_KEY,
+    resolve_entity_sources,
+    same_value as _same_value,
+)
 from app.services.llm_service import (
     build_thinking_model_settings,
     create_chat_agent,
@@ -202,7 +206,7 @@ class ExtractionEngine:
                     self._resolve_sources(
                         doc_results,
                         texts[idx] if idx < len(texts) else "",
-                        (doc_metadata or []), idx,
+                        (doc_metadata or []), idx, meta_map,
                     )
                 all_results.extend(doc_results)
             return all_results
@@ -222,15 +226,18 @@ class ExtractionEngine:
                 capture_sources=capture_sources,
             )
             if doc_results and capture_sources:
-                self._resolve_sources(doc_results, doc_text, (doc_metadata or []), idx)
+                self._resolve_sources(doc_results, doc_text, (doc_metadata or []), idx, meta_map)
             all_results.extend(doc_results)
 
         return all_results
 
     @staticmethod
-    def _resolve_sources(entities: list, doc_text: str, doc_metadata: list[dict], idx: int) -> None:
+    def _resolve_sources(
+        entities: list, doc_text: str, doc_metadata: list[dict], idx: int,
+        field_meta: dict[str, dict] | None = None,
+    ) -> None:
         meta = doc_metadata[idx] if idx < len(doc_metadata) else {}
-        resolve_entity_sources(entities, doc_text or "", meta or {})
+        resolve_entity_sources(entities, doc_text or "", meta or {}, field_meta)
 
     def build_from_documents(self, doc_texts: list[str], model: str) -> dict | None:
         """Generate extraction entities from document text using LLM."""
@@ -512,21 +519,39 @@ class ExtractionEngine:
 
     @staticmethod
     def _backfill_sources(final: list, draft: list) -> None:
-        """Fill final entities' missing per-field quotes from the draft pass."""
-        draft_sources: dict = {}
+        """Fill final entities' missing per-field quotes from the draft pass.
+
+        Only when pass 2 kept pass 1's value for that field. Pass 2 routinely
+        *changes* values, and the draft's quote supports the draft's value —
+        copying it onto a changed value attaches a passage that contradicts
+        what is displayed, then the quote verifies (it is real document text)
+        and the field earns a source badge pointing at evidence against
+        itself. Values are compared after the same normalization used for
+        source matching, so formatting-only differences still backfill.
+        """
+        draft_entries: dict = {}
         for entity in draft:
             if isinstance(entity, dict) and isinstance(entity.get(SOURCE_KEY), dict):
                 for field, src in entity[SOURCE_KEY].items():
-                    draft_sources.setdefault(field, src)
-        if not draft_sources:
+                    draft_entries.setdefault(field, (entity.get(field), src))
+        if not draft_entries:
             return
         for entity in final:
             if not isinstance(entity, dict):
                 continue
             sidecar = entity.setdefault(SOURCE_KEY, {})
-            for field, src in draft_sources.items():
-                if field in entity and field not in sidecar:
-                    sidecar[field] = src
+            for field, (draft_value, src) in draft_entries.items():
+                if field not in entity or field in sidecar:
+                    continue
+                if not _same_value(entity.get(field), draft_value):
+                    # Withhold the quote, but leave an entry behind. Dropping
+                    # the field entirely makes the UI render it unmarked —
+                    # the state that looks cleanest — so a revised value would
+                    # lose both its badge and its warning, and would vanish
+                    # from the value-support distribution instead of counting.
+                    sidecar[field] = {"quote": None, "dropped_reason": "value_changed"}
+                    continue
+                sidecar[field] = src
 
     @staticmethod
     def _format_draft_as_text(draft: dict, keys: list[str]) -> str:
@@ -1049,7 +1074,13 @@ class ExtractionEngine:
                 output = output.split("```")[1].split("```")[0].strip()
 
             try:
-                parsed = json.loads(output.strip())
+                # strict=False: accept raw control characters (literal
+                # newlines/tabs) inside string values. The prompt tells the
+                # model to copy each field's supporting passage character-
+                # for-character, and a passage that spans lines comes back
+                # with real newlines, which strict JSON rejects at the first
+                # one — turning a fully usable answer into a failed run.
+                parsed = json.loads(output.strip(), strict=False)
                 if isinstance(parsed, dict):
                     entity = {key: parsed.get(key) for key in keys}
                     if capture_sources and isinstance(parsed.get("_sources"), dict):

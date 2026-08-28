@@ -1,5 +1,27 @@
 export type KBScope = 'mine' | 'team' | 'verified' | 'reference'
 
+// What the "Optimized" chip means for a KB, from the v2 list / detail endpoint.
+//   applied   — tuned RAG settings are live in chat
+//   stale     — live, but sources or test questions changed materially since tuning
+//   available — a completed optimization has settings that were never applied
+export interface KBOptimizationStatus {
+  state: 'applied' | 'stale' | 'available'
+  applied_at?: string | null
+  applied_run_uuid?: string | null
+  last_run_at?: string | null
+  last_run_uuid?: string | null
+  tuned_keys?: string[]
+  stale: boolean
+  stale_reasons: string[]
+  sources_at_run?: number
+  sources_added?: number
+  sources_removed?: number
+  queries_at_run?: number
+  queries_added?: number
+  queries_removed?: number
+  queries_edited?: number
+}
+
 export interface KnowledgeBase {
   uuid: string
   title: string
@@ -32,6 +54,8 @@ export interface KnowledgeBase {
   // Set by KB Autovalidate's apply path
   has_optimized_config?: boolean
   optimized_config_set_at?: string | null
+  // Full story behind the chip (see KBOptimizationStatus); null when nothing to say.
+  optimization?: KBOptimizationStatus | null
   // AI-trust signals from the latest validation run. Scores are 0-1.
   last_validation_score?: number | null
   last_validation_baseline_score?: number | null
@@ -39,6 +63,28 @@ export interface KnowledgeBase {
   last_validated_at?: string | null
   // Per-requesting-user: when this user last chatted with the KB (ISO string).
   last_used_at?: string | null
+}
+
+/**
+ * Refresh / ingestion provenance for one source (backend
+ * app/utils/kb_source_currency.py). Lets an evaluator verify source currency
+ * without re-fetching the original.
+ */
+export interface SourceCurrency {
+  status: 'never_ingested' | 'ingested' | 'refreshed' | 'unchanged' | 'retained_previous' | 'retrieval_failed' | 'ingestion_failed'
+  last_refresh_attempted_at: string | null
+  last_retrieved_at: string | null
+  last_ingested_at: string | null
+  // When the text currently held and served was retrieved — a failed refresh
+  // leaves it alone, so this is the "retained content" date.
+  content_retrieved_at: string | null
+  content_hash: string | null
+  content_hash_algorithm: string
+  // false: computed from the retained snapshot because the source predates
+  // hash recording at ingest.
+  content_hash_recorded: boolean
+  last_refresh_outcome: 'refreshed' | 'unchanged' | 'retrieval_failed' | 'ingestion_failed' | null
+  last_refresh_error: string | null
 }
 
 export interface KnowledgeBaseSource {
@@ -57,6 +103,9 @@ export interface KnowledgeBaseSource {
   // "ready" but incomplete, so the UI warns instead of showing a clean check.
   truncated?: boolean
   created_at: string
+  // When the text was last fetched/ingested (null while pending).
+  processed_at?: string | null
+  currency?: SourceCurrency | null
 }
 
 export interface KnowledgeBaseSourceDetail extends KnowledgeBaseSource {
@@ -68,7 +117,6 @@ export interface KnowledgeBaseSourceDetail extends KnowledgeBaseSource {
   // Navigation pages the crawl followed for their links but did not embed.
   skipped_urls?: string[] | null
   child_sources: KnowledgeBaseSource[]
-  processed_at?: string | null
 }
 
 export interface KnowledgeBaseDetail extends KnowledgeBase {

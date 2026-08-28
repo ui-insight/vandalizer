@@ -26,7 +26,6 @@ const item: CertificationProgressItem = {
   modules_total: 5,
   certified: false,
   certified_at: null,
-  streak_days: 3,
   last_activity_date: '2026-01-01',
   unlocked: false,
   updated_at: null,

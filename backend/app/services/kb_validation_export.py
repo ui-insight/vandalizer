@@ -22,6 +22,39 @@ from typing import Any
 
 EXPORT_FORMAT_TAG = "vandalizer.kb-validation-results.v1"
 
+RUN_SCORE_MEANING = (
+    "Overall quality score (0-100): a weighted composite of answer accuracy, "
+    "retrieval precision, source health, and chunk coverage — see "
+    "score_formula and score_components. Not the answer accuracy on its own."
+)
+AVG_JUDGE_SCORE_MEANING = (
+    "Answer accuracy (0-1): mean judge score across judged questions. Use this "
+    "for 'how accurate are the answers'."
+)
+
+
+def _score_explanation(snap: dict, rp: dict) -> dict:
+    """Formula + weighted components behind the run's overall score.
+
+    Runs persist these since the composite was made explicit; older runs are
+    re-derived from the snapshot's ratios with the same weights.
+    """
+    components = snap.get("score_components")
+    formula = snap.get("score_formula")
+    if components and formula:
+        return {"formula": formula, "components": components}
+    from app.services.kb_validation_service import kb_score_components
+
+    derived = kb_score_components(
+        avg_judge_score=rp.get("avg_judge_score"),
+        num_queries_judged=rp.get("num_queries_judged"),
+        avg_precision=rp.get("avg_precision"),
+        source_health_ratio=(snap.get("source_health") or {}).get("ratio"),
+        chunk_coverage_ratio=(snap.get("chunk_coverage") or {}).get("ratio"),
+        num_test_queries=int(snap.get("num_test_queries") or 0),
+    )
+    return {"formula": derived["formula"], "components": derived["components"]}
+
 # Run-level metadata repeated on every CSV row so evaluators can concatenate
 # exports from several runs (or several KBs) into one comparison table.
 RUN_META_CSV_COLUMNS = [
@@ -32,6 +65,8 @@ RUN_META_CSV_COLUMNS = [
     "mode",
     "judge_model",
     "run_score",
+    "score_formula",
+    "avg_judge_score",
 ]
 
 # Per-query columns, in export order. List-valued cells ("; "-joined in
@@ -47,6 +82,8 @@ RESULT_COLUMNS = [
     "retrieval_precision",
     "answer_match",
     "actual_answer",
+    "actual_answer_truncated",
+    "generation_truncated",
     "judge_score",
     "judge_verdict",
     "judge_confidence",
@@ -54,6 +91,8 @@ RESULT_COLUMNS = [
     "missing_facts",
     "hallucinated_facts",
     "baseline_answer",
+    "baseline_answer_truncated",
+    "baseline_generation_truncated",
     "baseline_score",
     "baseline_verdict",
     "lift",
@@ -80,6 +119,7 @@ def build_kb_validation_results_export(
     snap = vr.result_snapshot or {}
     rp = snap.get("retrieval_precision") or {}
     details = rp.get("details") or []
+    scoring = _score_explanation(snap, rp)
 
     by_uuid = {q.uuid: q for q in test_queries}
     by_text = {q.query: q for q in test_queries}
@@ -108,6 +148,12 @@ def build_kb_validation_results_export(
             "retrieval_precision": det.get("precision"),
             "answer_match": det.get("answer_match"),
             "actual_answer": det.get("actual_answer") or "",
+            # Both flags are False for rows written before they existed: those
+            # runs stored at most 2,000 characters with no record of whether
+            # more was generated, so an older row of exactly 2,000 characters
+            # may be cut without saying so.
+            "actual_answer_truncated": bool(det.get("actual_answer_truncated")),
+            "generation_truncated": bool(det.get("generation_truncated")),
             "judge_score": judge.get("score"),
             "judge_verdict": judge.get("verdict") or "",
             "judge_confidence": judge.get("confidence"),
@@ -115,6 +161,8 @@ def build_kb_validation_results_export(
             "missing_facts": judge.get("missing_facts") or [],
             "hallucinated_facts": judge.get("hallucinated_facts") or [],
             "baseline_answer": det.get("baseline_answer") or "",
+            "baseline_answer_truncated": bool(det.get("baseline_answer_truncated")),
+            "baseline_generation_truncated": bool(det.get("baseline_generation_truncated")),
             "baseline_score": baseline.get("score"),
             "baseline_verdict": baseline.get("verdict") or "",
             "lift": det.get("lift"),
@@ -129,13 +177,22 @@ def build_kb_validation_results_export(
         "kb_title": kb.title,
         "mode": snap.get("mode"),
         "judge_model": snap.get("judge_model"),
+        # ``run_score`` is the OVERALL quality score: a weighted composite of
+        # answer accuracy, retrieval precision, source health, and chunk
+        # coverage (see ``score_formula`` / ``score_components``). It is not
+        # the answer accuracy — that is ``avg_judge_score`` below. The two were
+        # being read as the same number, hence the explicit formula here.
         "run_score": vr.score,
+        "run_score_meaning": RUN_SCORE_MEANING,
+        "score_formula": scoring["formula"],
+        "score_components": scoring["components"],
         "raw_score": snap.get("raw_score"),
         "score_breakdown": getattr(vr, "score_breakdown", None) or None,
         "num_test_queries": snap.get("num_test_queries"),
         "num_queries_judged": rp.get("num_queries_judged"),
         "num_queries_baselined": rp.get("num_queries_baselined"),
         "avg_judge_score": rp.get("avg_judge_score"),
+        "avg_judge_score_meaning": AVG_JUDGE_SCORE_MEANING,
         "avg_baseline_score": rp.get("avg_baseline_score"),
         "avg_lift": rp.get("avg_lift"),
         "judge_variance": rp.get("judge_variance"),
@@ -202,6 +259,13 @@ def render_results_xlsx(run_meta: dict, rows: list[dict]) -> bytes:
     from openpyxl.styles import Font
 
     def _cell(value: Any) -> Any:
+        if isinstance(value, list) and value and all(isinstance(x, dict) for x in value):
+            # score_components: render "40% × answer accuracy (judge) = 83.6"
+            # rather than a list of JSON blobs.
+            value = [
+                f"{round(float(x.get('weight', 0)) * 100)}% × {x.get('label')} = {x.get('value')}"
+                for x in value
+            ]
         v = _flatten_cell(value)
         if isinstance(v, dict):
             import json

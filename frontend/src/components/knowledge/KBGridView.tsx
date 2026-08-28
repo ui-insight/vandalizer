@@ -1,12 +1,13 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
-  ArrowUpDown, Loader2, BookOpen, ShieldCheck, Sparkles, Tag,
+  ArrowUpDown, Loader2, BookOpen, Tag,
   MessageSquare, Pencil, Trash2, Bookmark, BookmarkCheck, Pin, PinOff, Copy,
 } from 'lucide-react'
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
 import { AITrustChip } from './AITrustChip'
+import { OptimizedBadge, VerifiedBadge } from './KBTrustBadges'
 
 type SortOption = 'newest' | 'recent' | 'updated' | 'name' | 'sources' | 'chunks'
 
@@ -163,34 +164,8 @@ function KBGridCard({
             Team
           </span>
         )}
-        {kb.verified && (
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: 3,
-            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-            color: '#15803d', backgroundColor: '#dcfce7',
-          }}>
-            <ShieldCheck size={10} />
-            Verified
-          </span>
-        )}
-        {kb.has_optimized_config && (
-          <span
-            title={
-              kb.optimized_config_set_at
-                ? `Optimized settings applied ${new Date(kb.optimized_config_set_at).toLocaleDateString()}`
-                : 'Optimized settings applied'
-            }
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3,
-              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-              color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
-              border: '1px solid rgba(124, 58, 237, 0.3)',
-            }}
-          >
-            <Sparkles size={10} />
-            Optimized
-          </span>
-        )}
+        {kb.verified && <VerifiedBadge />}
+        <OptimizedBadge kb={kb} />
       </div>
 
       {/* Description */}

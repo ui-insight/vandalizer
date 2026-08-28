@@ -89,3 +89,25 @@ class TriggerEventStatusResponse(BaseModel):
     completed_at: Optional[str] = None
     output: Optional[Any] = None
     error: Optional[str] = None
+
+
+class RunNowRequest(BaseModel):
+    """Body for ``POST /automations/{id}/run-now``. ``document_uuids`` is
+    optional for folder-watch and schedule automations (the trigger's own
+    selection is used) and required for API / M365 ones."""
+
+    document_uuids: Optional[list[str]] = None
+
+
+class RunNowDocument(BaseModel):
+    uuid: str
+    title: str
+
+
+class RunNowResponse(BaseModel):
+    status: str  # queued
+    trigger_event_id: str
+    action_type: str
+    documents: list[RunNowDocument]
+    document_source: str  # chosen | folder | configured
+    documents_matched: int  # eligible before the folder cap

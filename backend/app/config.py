@@ -104,6 +104,20 @@ class Settings(BaseSettings):
 
     # Trial / demo system (disabled by default for self-hosters)
     enable_trial_system: bool = False
+    # The trial IS the budget: a token-metered free tier, not a timed trial.
+    # Lifetime LLM token budget (input + output) per trial account, enforced at
+    # the metering chokepoint (services/trial_budget.py). Only applies while
+    # the trial system is enabled; 0 disables the cap. Per-user overrides live
+    # on User.trial_token_budget (raised by feedback-priced top-ups).
+    trial_token_budget: int = 2_000_000
+    # Tokens granted per self-serve top-up from the trial-end screen.
+    trial_topup_tokens: int = 2_000_000
+    # Fleet-wide ceiling on trial spend per calendar month (UTC). The per-account
+    # budget bounds one signup; this bounds the bill when many sign up at once —
+    # the job the old 50-concurrent-trials cap was quietly doing. Recomputed by
+    # the hourly sweep and cached in Redis, so the hot path is one GET.
+    # 0 disables the fleet ceiling.
+    trial_global_monthly_tokens: int = 100_000_000
 
     # Upstream update check — hits api.github.com once per hour (cached in Redis)
     # to surface an "update available" banner to admins. Set to True to opt out

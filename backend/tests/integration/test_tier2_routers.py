@@ -308,75 +308,10 @@ class TestCertificationRouter:
 
 
 # ---------------------------------------------------------------------------
-# demo service (route is gated by enable_trial_system; test the service path)
+# trial service (routes are gated by enable_trial_system; test the service path)
 # ---------------------------------------------------------------------------
 
 class TestDemoService:
-    async def test_submit_application_creates_record(self, mongo_client):
-        from app.config import Settings
-        from app.models.demo import DemoApplication
-        from app.services import demo_service
-
-        settings = Settings(jwt_secret_key="test", environment="development")
-
-        with patch("app.services.demo_service.send_email", new_callable=AsyncMock):
-            app = await demo_service.submit_application(
-                name="Jane Doe",
-                email=f"jane-{uuid.uuid4().hex[:6]}@example.com",
-                organization="State U",
-                questionnaire_responses={"role": "ra"},
-                title="Director of Research",
-                settings=settings,
-            )
-
-        assert app.uuid is not None
-        assert app.status == "pending"
-        assert app.organization == "State U"
-
-        reloaded = await DemoApplication.find_one(DemoApplication.uuid == app.uuid)
-        assert reloaded is not None
-        assert reloaded.name == "Jane Doe"
-
-    async def test_submit_application_rejects_duplicate_email(self, mongo_client):
-        from app.config import Settings
-        from app.services import demo_service
-
-        settings = Settings(jwt_secret_key="test", environment="development")
-        email = f"dup-{uuid.uuid4().hex[:6]}@example.com"
-
-        with patch("app.services.demo_service.send_email", new_callable=AsyncMock):
-            await demo_service.submit_application(
-                name="A", email=email, organization="X",
-                questionnaire_responses={}, title="", settings=settings,
-            )
-            with pytest.raises(ValueError):
-                await demo_service.submit_application(
-                    name="B", email=email, organization="Y",
-                    questionnaire_responses={}, title="", settings=settings,
-                )
-
-    async def test_get_waitlist_status_for_existing(self, mongo_client):
-        from app.config import Settings
-        from app.services import demo_service
-
-        settings = Settings(jwt_secret_key="test", environment="development")
-
-        with patch("app.services.demo_service.send_email", new_callable=AsyncMock):
-            app = await demo_service.submit_application(
-                name="K", email=f"k-{uuid.uuid4().hex[:6]}@example.com",
-                organization="X", questionnaire_responses={}, title="", settings=settings,
-            )
-
-        result = await demo_service.get_waitlist_status(app.uuid)
-        assert result is not None
-        assert result.uuid == app.uuid
-
-    async def test_get_waitlist_status_for_missing(self, mongo_client):
-        from app.services import demo_service
-
-        result = await demo_service.get_waitlist_status("nonexistent-uuid")
-        assert result is None
-
     async def test_admin_promote_user_clears_demo_flags(self, mongo_client):
         import datetime
         from app.models.demo import DemoApplication

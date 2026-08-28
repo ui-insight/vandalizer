@@ -4,7 +4,7 @@
 Idempotent: if a team with this name already exists and is owned by the
 same admin, it will be reused rather than duplicated.
 
-Usage (via deploy.sh):
+Usage:
     docker compose exec -T api env TEAM_NAME="Research Administration" python setup_default_team.py
 
 Environment variables:

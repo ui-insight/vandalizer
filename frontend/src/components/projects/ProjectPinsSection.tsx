@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, Workflow, FileSearch, Zap, BookOpen, X } from 'lucide-react'
+import { Plus, Workflow, FileSearch, Zap, BookOpen, X, Search } from 'lucide-react'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useAutomations } from '../../hooks/useAutomations'
@@ -17,6 +17,9 @@ const TYPE_META: Record<string, { icon: ComponentType<{ size?: number; className
 
 const key = (p: { pin_type: string; target_id: string }) => `${p.pin_type}:${p.target_id}`
 
+/** Chips rendered per list before the picker asks you to narrow it. */
+const PICKER_CAP = 30
+
 /**
  * Pinned tools for a project — references (not copies) to workflows/extractions
  * you use for this grant, for quick access. Clicking one opens it inside the
@@ -24,7 +27,19 @@ const key = (p: { pin_type: string; target_id: string }) => `${p.pin_type}:${p.t
  */
 export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectUuid: string; onChange?: () => void; onOpen?: () => void }) {
   const navigate = useNavigate()
-  const { workflows } = useWorkflows()
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+  // Workflows are searched server-side: the list endpoint caps a page at 500,
+  // so a client-side filter over one page would hide anything past the cap —
+  // the same failure this picker used to have silently. The other three hooks
+  // return their whole set today and are narrowed here.
+  const { workflows, total: workflowTotal } = useWorkflows({ search: debouncedQuery || undefined })
+  const q = debouncedQuery.toLowerCase()
+  const matches = (name: string) => !q || name.toLowerCase().includes(q)
   const { searchSets } = useSearchSets()
   const { automations } = useAutomations()
   const { knowledgeBases } = useKnowledgeBases()
@@ -81,10 +96,24 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
 
       {adding && (
         <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
-          <PickerList title="Workflows" items={workflows.map(w => ({ id: w.id, name: w.name }))} pinType="workflow" pinnedSet={pinnedSet} onPin={pin} />
-          <PickerList title="Extractions" items={searchSets.map(s => ({ id: s.uuid, name: s.title }))} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
-          <PickerList title="Automations" items={automations.map(a => ({ id: a.id, name: a.name }))} pinType="automation" pinnedSet={pinnedSet} onPin={pin} />
-          <PickerList title="Knowledge bases" items={knowledgeBases.map(k => ({ id: k.uuid, name: k.title }))} pinType="knowledge_base" pinnedSet={pinnedSet} onPin={pin} />
+          <label className="mb-3 flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1.5 text-sm focus-within:border-highlight">
+            <Search size={14} className="shrink-0 text-gray-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search tools by name"
+              aria-label="Search tools to pin"
+              className="w-full bg-transparent text-gray-900 outline-none placeholder:text-gray-400"
+            />
+          </label>
+          <PickerList title="Workflows" items={workflows.map(w => ({ id: w.id, name: w.name }))} total={workflowTotal} query={debouncedQuery} pinType="workflow" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Extractions" items={searchSets.filter(s => matches(s.title)).map(s => ({ id: s.uuid, name: s.title }))} query={debouncedQuery} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Automations" items={automations.filter(a => matches(a.name)).map(a => ({ id: a.id, name: a.name }))} query={debouncedQuery} pinType="automation" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Knowledge bases" items={knowledgeBases.filter(k => matches(k.title)).map(k => ({ id: k.uuid, name: k.title }))} query={debouncedQuery} pinType="knowledge_base" pinnedSet={pinnedSet} onPin={pin} />
+          {debouncedQuery && workflows.length + searchSets.filter(s => matches(s.title)).length + automations.filter(a => matches(a.name)).length + knowledgeBases.filter(k => matches(k.title)).length === 0 && (
+            <div className="text-xs text-gray-500">Nothing matches “{debouncedQuery}”.</div>
+          )}
         </div>
       )}
 
@@ -116,15 +145,24 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   )
 }
 
-function PickerList({ title, items, pinType, pinnedSet, onPin }: {
+function PickerList({ title, items, total, query, pinType, pinnedSet, onPin }: {
   title: string
   items: { id: string; name: string }[]
+  /** Server-side match count when `items` is one page of a larger set. */
+  total?: number
+  query?: string
   pinType: string
   pinnedSet: Set<string>
   onPin: (pinType: string, targetId: string) => void
 }) {
   if (items.length === 0) return null
   const available = items.filter(i => !pinnedSet.has(`${pinType}:${i.id}`))
+  const shown = available.slice(0, PICKER_CAP)
+  // Two ways this list can be shorter than the truth: the page the server
+  // sent is not the whole set (`total`), or the chip cap trimmed it. Either
+  // way say so — a silent cut reads as "that workflow was deleted".
+  const known = Math.max(total ?? items.length, items.length)
+  const truncated = shown.length < available.length || items.length < known
   return (
     <div className="mb-2 last:mb-0">
       <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{title}</div>
@@ -132,7 +170,7 @@ function PickerList({ title, items, pinType, pinnedSet, onPin }: {
         <div className="text-xs text-gray-500">All pinned.</div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
-          {available.slice(0, 30).map(i => (
+          {shown.map(i => (
             <button
               key={i.id}
               onClick={() => onPin(pinType, i.id)}
@@ -141,6 +179,11 @@ function PickerList({ title, items, pinType, pinnedSet, onPin }: {
               + {i.name}
             </button>
           ))}
+        </div>
+      )}
+      {truncated && (
+        <div className="mt-1 text-xs text-gray-500">
+          Showing {shown.length} of {known}{query ? ' matching' : ''}. Search to narrow the list.
         </div>
       )}
     </div>

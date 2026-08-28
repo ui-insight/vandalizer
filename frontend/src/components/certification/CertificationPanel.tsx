@@ -6,7 +6,6 @@ import {
   Award,
   ChevronLeft,
   Cog,
-  Flame,
   GripHorizontal,
   Maximize2,
   PanelBottom,
@@ -416,13 +415,6 @@ export function CertificationPanel() {
               <span className="text-xs font-bold uppercase tracking-wider" style={{ color: levelConfig.color }}>
                 {levelConfig.label}
               </span>
-              {(progress?.streak_days || 0) > 0 && (
-                <div className="flex items-center gap-1 text-xs text-orange-600">
-                  <Flame size={11} className="text-orange-500" />
-                  <span className="font-semibold">{progress?.streak_days}</span>
-                  <span>day streak</span>
-                </div>
-              )}
             </div>
             <XPBar current={displayXp} nextThreshold={nextLevel.xp} prevThreshold={prevLevel.xp} nextLevel={nextLevel.name} />
             <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">

@@ -41,11 +41,25 @@ COPY --from=builder /app/.venv /app/.venv
 # the base image (87 -> 199), including two CRITICAL CVEs with no Debian fix
 # (libglib2.0-0t64 CVE-2026-58016, libxml2 CVE-2026-6653).
 #
-# Making the install itself optional is tracked separately; _render_with_browser
-# already degrades to the static fetch on ImportError, so a Playwright-less
-# build needs no code change.
-RUN playwright install --with-deps chromium && \
-    chmod -R a+rx /opt/ms-playwright
+# INSTALL_BROWSER=false skips the install and is the only way to not ship it.
+# Default true, so an existing build is byte-identical and opting out is
+# explicit.
+#
+# The same arg sets the runtime default immediately below, which is what keeps
+# the two in step: an image built without the browser must not attempt to launch
+# one. Note the Python ``playwright`` package is a plain runtime dependency
+# (pyproject.toml) and is installed by ``uv sync`` either way -- so a browserless
+# build does NOT take _render_with_browser's ImportError branch. It reaches
+# ``p.chromium.launch()``, which raises, is caught and logged, and returns None;
+# both call sites handle that (the blocked-URL path re-raises the original status
+# error, the thin-content path keeps its static text). Correct, but it costs a
+# failed launch and a warning per qualifying fetch -- hence the runtime default.
+ARG INSTALL_BROWSER=true
+ENV WEB_FETCHER_BROWSER_ENABLED=${INSTALL_BROWSER}
+RUN if [ "$INSTALL_BROWSER" = "true" ]; then \
+        playwright install --with-deps chromium && \
+        chmod -R a+rx /opt/ms-playwright; \
+    fi
 
 COPY app ./app
 COPY certification-data ./certification-data

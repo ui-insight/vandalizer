@@ -59,14 +59,13 @@ export function CertificationsTab() {
 
   const handleExport = () => {
     downloadCSV('certifications.csv',
-      ['User', 'Email', 'Level', 'Total XP', 'Modules Completed', 'Modules Total', 'Certified', 'Certified At', 'Streak', 'Last Activity', 'Unlocked'],
+      ['User', 'Email', 'Level', 'Total XP', 'Modules Completed', 'Modules Total', 'Certified', 'Certified At', 'Last Activity', 'Unlocked'],
       filtered.map(p => [
         p.name || p.user_id, p.email,
         p.level, p.total_xp,
         p.modules_completed, p.modules_total,
         p.certified ? 'yes' : 'no',
         p.certified_at,
-        p.streak_days,
         p.last_activity_date,
         p.unlocked ? 'yes' : 'no',
       ])

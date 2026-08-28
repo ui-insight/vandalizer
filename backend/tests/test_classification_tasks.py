@@ -139,3 +139,17 @@ class TestClassifyTaskErrorHandling:
                 classify_document_task("doc-uuid")
         mock_retry.assert_called_once()
         assert mock_retry.call_args.kwargs.get("exc") is err
+
+    def test_trial_gate_is_swallowed_without_retry(self):
+        """An unverified/exhausted trial account raises TrialSpendBlockedError
+        from metering-scope entry. It's not a model failure: don't retry, don't
+        propagate (Sentry VANDALIZER-BACKEND-2X), leave the doc unclassified."""
+        from app.exceptions import TrialUnverifiedError
+        from app.tasks.classification_tasks import classify_document_task
+
+        err = TrialUnverifiedError("confirm your email")
+        with patch("app.tasks.classification_tasks._classify", MagicMock()), \
+             patch("app.tasks.classification_tasks.run_task_async", side_effect=err), \
+             patch.object(classify_document_task, "retry") as mock_retry:
+            assert classify_document_task("doc-uuid") is None
+        mock_retry.assert_not_called()

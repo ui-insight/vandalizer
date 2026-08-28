@@ -575,3 +575,41 @@ class TestProcessScheduledAutomations:
         result = process_scheduled_automations()
 
         assert result["processed"] == 0
+
+
+class TestExecuteWorkflowPassiveMissingFixedDocument:
+    """An automation run has the same fixed-document check as a manual run:
+    a document deleted from Files fails the run and the trigger event by
+    name, before any step is built."""
+
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_fails_event_and_result_by_name(self, mock_get_db, mock_build):
+        from app.tasks.passive_tasks import execute_workflow_passive
+
+        event_id, wf_id, result_id = ObjectId(), ObjectId(), ObjectId()
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.workflow_trigger_event.find_one.return_value = {
+            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "folder_watch",
+        }
+        db.workflow.find_one.return_value = {
+            "_id": wf_id, "user_id": "u1", "steps": [],
+            "input_config": {"trigger_type": "folder_watch",
+                             "fixed_documents": [{"uuid": "gone", "title": "Award Terms.pdf"}]},
+        }
+        db.system_config.find_one.return_value = {}
+        db.smart_document.find.return_value = []
+        db.smart_document.find_one.return_value = None
+        db.workflow_result.insert_one.return_value.inserted_id = result_id
+
+        out = execute_workflow_passive(str(event_id))
+
+        assert "Award Terms.pdf" in out["error"]
+        mock_build.assert_not_called()
+        result_set = db.workflow_result.update_one.call_args[0][1]["$set"]
+        assert result_set["status"] == "error"
+        assert result_set["error_payload"]["code"] == "fixed_documents_missing"
+        event_set = db.workflow_trigger_event.update_one.call_args[0][1]["$set"]
+        assert event_set["status"] == "failed"
+        assert "deleted from Files" in event_set["error"]

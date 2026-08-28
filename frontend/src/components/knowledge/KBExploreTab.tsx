@@ -4,6 +4,7 @@ import {
   ArrowUpDown, ArrowLeft, Loader2, Tag, Sparkles, User as UserIcon, Mail,
 } from 'lucide-react'
 import { QualityBadge } from '../library/QualityBadge'
+import { KB_QUALITY_SCORE_HOVER } from './kbScoreFormula'
 import { ItemDetailModal } from '../library/ExploreTab'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
@@ -181,7 +182,7 @@ function KBCatalogCard({
           <BookOpen size={11} />
           Knowledge Base
         </span>
-        <QualityBadge tier={item.quality_tier} score={item.quality_score} />
+        <QualityBadge tier={item.quality_tier} score={item.quality_score} title={KB_QUALITY_SCORE_HOVER} />
         {item.validation_run_count > 0 && (
           <span style={{ fontSize: 10, color: C.textFaint }}>
             {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}

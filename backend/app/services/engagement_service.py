@@ -239,7 +239,16 @@ async def _get_new_catalog_items_since(
 
     items = []
     for req in approved:
-        name = await _get_item_name(req.item_kind, req.item_id)
+        # One unreadable item must not take down the whole nightly nudge run —
+        # every inactive user is skipped when this coroutine raises.
+        try:
+            name = await _get_item_name(req.item_kind, req.item_id)
+        except Exception:
+            logger.warning(
+                "Could not resolve name for %s %s; nudging with 'Untitled'",
+                req.item_kind, req.item_id, exc_info=True,
+            )
+            name = None
         items.append({
             "name": name or "Untitled",
             "kind": req.item_kind,
@@ -266,8 +275,9 @@ async def _get_item_name(item_kind: str, item_id) -> str | None:
         obj = await SearchSet.get(obj_id)
         return obj.title if obj else None
     elif item_kind == "knowledge_base":
+        # KnowledgeBase has ``title`` (Workflow is the one with ``name``).
         obj = await KnowledgeBase.get(obj_id)
-        return obj.name if obj else None
+        return obj.title if obj else None
     return None
 
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle, Play } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
@@ -9,6 +9,7 @@ import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
+import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
@@ -58,6 +59,7 @@ export function AutomationEditorPanel() {
   }, [editingTitle])
 
   const canManage = automation?.can_manage ?? true
+  const [runNowOpen, setRunNowOpen] = useState(false)
 
   const save = useCallback(async (updates: Parameters<typeof updateAutomation>[1]) => {
     if (!openAutomationId) return
@@ -192,6 +194,28 @@ export function AutomationEditorPanel() {
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {/* Run now — a real one-off run through the automation's pipeline */}
+            <button
+              onClick={() => setRunNowOpen(o => !o)}
+              disabled={!canManage || !automation.action_id}
+              aria-pressed={runNowOpen}
+              title={!automation.action_id
+                ? 'Choose an action first'
+                : canManage ? 'Run this automation once, now, with its configured outputs'
+                : 'Only the creator or a team owner/admin can run this'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
+                fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+                color: 'var(--highlight-text-color, #000)',
+                backgroundColor: 'var(--highlight-color, #eab308)',
+                border: '1px solid transparent',
+                borderRadius: 16, cursor: canManage && automation.action_id ? 'pointer' : 'not-allowed',
+                opacity: canManage && automation.action_id ? 1 : 0.6,
+              }}
+            >
+              <Play style={{ width: 12, height: 12 }} />
+              Run now
+            </button>
             {/* Enabled toggle */}
             <button
               onClick={handleToggleEnabled}
@@ -283,6 +307,12 @@ export function AutomationEditorPanel() {
           onFocus={e => (e.currentTarget.style.borderBottomColor = '#d1d5db')}
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
         />
+
+        {runNowOpen && (
+
+          <AutomationRunNowPanel automation={automation} canManage={canManage} onClose={() => setRunNowOpen(false)} />
+
+        )}
 
         {/* Section A — Trigger */}
         <SectionLabel>Trigger</SectionLabel>

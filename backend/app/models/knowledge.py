@@ -38,7 +38,21 @@ class KnowledgeBaseSource(Document):
     # rather than content, so they were never embedded (on parent).
     skipped_urls: Optional[list[str]] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    # Last time the source's chunks were written (kept in step with
+    # last_ingested_at for readers that predate the split below).
     processed_at: Optional[datetime.datetime] = None
+    # --- Currency: refresh / ingestion provenance, per source ---
+    # Written by app.utils.kb_source_currency at every ingest and refresh site;
+    # None on rows from before they existed (readers fall back to processed_at).
+    last_refresh_attempted_at: Optional[datetime.datetime] = None  # a refresh started, whatever came of it
+    last_retrieved_at: Optional[datetime.datetime] = None  # text last successfully obtained (fetch passed the gates / document read)
+    last_ingested_at: Optional[datetime.datetime] = None  # chunks last written to the index
+    # When the text this source currently holds and serves was retrieved. A
+    # failed refresh leaves it alone — that is the "retained content" date.
+    content_retrieved_at: Optional[datetime.datetime] = None
+    content_hash: Optional[str] = None  # sha256 of the text handed to the indexer
+    last_refresh_outcome: Optional[str] = None  # refreshed | unchanged | retrieval_failed | ingestion_failed
+    last_refresh_error: Optional[str] = None
 
     class Settings:
         name = "knowledge_base_sources"

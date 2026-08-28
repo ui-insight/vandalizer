@@ -143,6 +143,8 @@ For OCR, self-hosted options include [Docling-Serve](https://github.com/docling-
 
 **Deployment topology:** The local LLM/OCR server does **not** need to be the same machine as Vandalizer. A common setup is two servers — one lightweight machine for Vandalizer (16 GB RAM, no GPU) and one GPU-equipped machine for inference — connected over the local network.
 
+**Exact token counting for self-hosted models:** the backend measures every prompt against the model's context window before sending it. For OpenAI models it uses the exact tokenizer; for everything else it reads the model's `tokenizer.json` from a HuggingFace cache when one is available, and otherwise falls back to an estimate plus a safety margin (and logs that it did, once per model). If you self-host models, set `HF_CACHE_PATH` in the root `.env` to your `HF_HOME` (the directory containing `hub/`); Compose mounts it read-only at `/hf-cache` in the api and celery containers. Only the vocabulary is read — no weights, no GPU, no downloads. Leaving it unset is safe; budgets are simply less precise, most noticeably on numeric and tabular documents.
+
 ### Database Name
 
 The MongoDB database is named `vandalizer` by default. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.

@@ -13,8 +13,34 @@ logger = logging.getLogger(__name__)
 SYSTEM_USER_ID = "__vandalizer_team__"
 SYSTEM_USER_NAME = "Vandalizer Team"
 
-# Trial duration matches demo_service.TRIAL_DAYS
+# Legacy clock-era trial length, used only to back out an activation date for
+# accounts that still carry demo_expires_at.
 TRIAL_DAYS = 14
+
+
+async def _trial_started_at(user: User) -> Optional[datetime.datetime]:
+    """When this trial user began, or None if they aren't a trial user.
+
+    Prompt scheduling is still expressed in trial *days* — "day 3, after you've
+    run something" is the right shape for a check-in regardless of how the trial
+    is metered. Token-metered accounts have no expiry to work backwards from, so
+    the activation timestamp on the application is the source of truth, with the
+    old expiry-minus-14-days fallback kept for clock-era accounts.
+    """
+    if not user.is_demo_user:
+        return None
+
+    from app.models.demo import DemoApplication
+
+    app = await DemoApplication.find_one(DemoApplication.user_id == user.user_id)
+    started = app.activated_at if app else None
+    if started is None and user.demo_expires_at is not None:
+        started = user.demo_expires_at - datetime.timedelta(days=TRIAL_DAYS)
+    if started is None:
+        return None
+    if started.tzinfo is None:
+        started = started.replace(tzinfo=datetime.timezone.utc)
+    return started
 
 
 # ------------------------------------------------------------------
@@ -26,13 +52,10 @@ async def evaluate_eligible_prompt(
     onboarding_status: dict,
 ) -> Optional[dict]:
     """Return the single highest-priority eligible prompt for this user, or None."""
-    if not user.is_demo_user or not user.demo_expires_at:
+    activation_date = await _trial_started_at(user)
+    if activation_date is None:
         return None
 
-    expires_at = user.demo_expires_at
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
-    activation_date = expires_at - datetime.timedelta(days=TRIAL_DAYS)
     now = datetime.datetime.now(datetime.timezone.utc)
     trial_day = max(0, (now - activation_date).days)
 

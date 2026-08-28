@@ -3704,7 +3704,7 @@ requires-dist = [
     { name = "motor", specifier = ">=3.6,<4" },
     { name = "msal", specifier = ">=1.28,<2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10" },
-    { name = "pdf-inspector", specifier = ">=0.2,<1.15" },
+    { name = "pdf-inspector", specifier = ">=0.2,<1.18" },
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.9,<3" },
     { name = "playwright", specifier = ">=1.49,<2" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0,<9" },

@@ -64,10 +64,13 @@ vi.mock('../../hooks/useProjectPins', () => ({
   }),
 }))
 
+const refreshKBSource = vi.fn().mockResolvedValue({ ok: true, status: 'queued', source_uuid: 'src-1' })
+
 vi.mock('../../api/knowledge', () => ({
   getKnowledgeBase: (uuid: string) => getKnowledgeBase(uuid),
   getKBQuality: vi.fn().mockResolvedValue({}),
   getKBSourceHealth: vi.fn().mockResolvedValue({}),
+  refreshKBSource: (uuid: string, sourceUuid: string) => refreshKBSource(uuid, sourceUuid),
 }))
 
 vi.mock('../../api/organizations', () => ({
@@ -185,6 +188,7 @@ describe('KnowledgePanel add-source permissions', () => {
     expect(screen.queryByLabelText('Edit title')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Edit description')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Rename source')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Refresh source')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Remove source')).not.toBeInTheDocument()
     expect(screen.getByText('Share with Team').closest('button')).toBeDisabled()
     // Read-only actions stay available.
@@ -210,8 +214,50 @@ describe('KnowledgePanel add-source permissions', () => {
     expect(screen.getByLabelText('Edit title')).toBeInTheDocument()
     expect(screen.getByLabelText('Edit description')).toBeInTheDocument()
     expect(screen.getByLabelText('Rename source')).toBeInTheDocument()
+    expect(screen.getByLabelText('Refresh source')).toBeInTheDocument()
     expect(screen.getByLabelText('Remove source')).toBeInTheDocument()
     expect(screen.getByText('Share with Team').closest('button')).not.toBeDisabled()
+  }, 30000)
+
+  // Support ticket: a URL source's snapshot was years stale and re-adding the
+  // URL was a silent no-op. Refresh re-fetches the page in place.
+  it('re-fetches a URL source from the Refresh button', async () => {
+    detail.current = makeDetail({
+      can_manage: true,
+      sources: [{
+        uuid: 'src-1',
+        source_type: 'url',
+        url: 'https://example.gov/rule',
+        url_title: 'A Rule',
+        status: 'ready',
+        chunk_count: 4,
+        created_at: '2026-01-01T00:00:00Z',
+        processed_at: '2026-04-27T00:00:00Z',
+      }],
+    })
+    await openDetail()
+
+    fireEvent.click(screen.getByLabelText('Refresh source'))
+    await waitFor(() => expect(refreshKBSource).toHaveBeenCalledWith('kb-1', 'src-1'))
+  }, 30000)
+
+  it('offers no Refresh on document sources', async () => {
+    detail.current = makeDetail({
+      can_manage: true,
+      sources: [{
+        uuid: 'src-2',
+        source_type: 'document',
+        document_uuid: 'doc-1',
+        document_title: 'Uploaded policy.pdf',
+        status: 'ready',
+        chunk_count: 4,
+        created_at: '2026-01-01T00:00:00Z',
+      }],
+    })
+    await openDetail()
+
+    expect(screen.queryByLabelText('Refresh source')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Remove source')).toBeInTheDocument()
   }, 30000)
 })
 
@@ -257,5 +303,43 @@ describe('KnowledgePanel export on an empty KB', () => {
     await openDetail()
 
     expect(screen.getByText('Export').closest('button')).not.toBeDisabled()
+  }, 30000)
+
+  // Support ticket: evaluators needed refresh/ingestion provenance per source
+  // to verify currency without comparing every source to its original.
+  it('shows what is served when the last refresh failed, and the content hash', async () => {
+    detail.current = makeDetail({
+      can_manage: true,
+      sources: [{
+        uuid: 'src-1',
+        source_type: 'url',
+        url: 'https://example.gov/rule',
+        url_title: 'A Rule',
+        status: 'ready',
+        chunk_count: 4,
+        created_at: '2026-01-01T00:00:00Z',
+        processed_at: '2026-06-24T09:00:00Z',
+        error_message: 'Refresh failed — previous content kept: HTTP 503',
+        currency: {
+          status: 'retained_previous',
+          last_refresh_attempted_at: '2026-08-27T15:30:00Z',
+          last_retrieved_at: '2026-06-24T09:00:00Z',
+          last_ingested_at: '2026-06-24T09:00:00Z',
+          content_retrieved_at: '2026-06-24T09:00:00Z',
+          content_hash: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+          content_hash_algorithm: 'sha256',
+          content_hash_recorded: true,
+          last_refresh_outcome: 'retrieval_failed',
+          last_refresh_error: 'HTTP 503',
+        },
+      }],
+    })
+    await openDetail()
+
+    const line = screen.getByTestId('source-currency')
+    expect(line.textContent).toContain('4 chunks')
+    expect(line.textContent).toContain('Refresh failed')
+    expect(line.textContent).toContain('serving text from')
+    expect(line.textContent).toContain('abcdef012345')
   }, 30000)
 })

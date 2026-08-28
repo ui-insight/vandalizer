@@ -22,8 +22,12 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.services.extraction_engine import ExtractionEngine
+from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re-exported)
+    _FORM_FREEFORM_UNFILLED_RE,
+    form_value_is_missing,
+)
 from app.services.llm_service import create_chat_agent
-from app.services.page_locator import locator_for_meta
+from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 
 logger = logging.getLogger(__name__)
 
@@ -462,6 +466,8 @@ class MultiTaskNode(Node):
         warnings: list[str] = []
         errors: list[str] = []
         request_preview = None
+        fill_report: list[dict] = []
+        filled_values: dict = {}
         for result in results:
             if result.get("_approval_pause"):
                 return result
@@ -471,6 +477,13 @@ class MultiTaskNode(Node):
             sources = result.get("retrieved_sources")
             if isinstance(sources, list):
                 merged_sources.extend(sources)
+            # Form Filler's per-field check/source table and the values it
+            # wrote: persisted under steps_output and read by the run UI.
+            report = result.get("fill_report")
+            if isinstance(report, list):
+                fill_report.extend(report)
+            if isinstance(result.get("filled_values"), dict):
+                filled_values.update(result["filled_values"])
             warning = result.get("warning")
             if isinstance(warning, str) and warning:
                 warnings.append(warning)
@@ -502,6 +515,10 @@ class MultiTaskNode(Node):
             out["error"] = " | ".join(errors)
         if request_preview is not None:
             out["request"] = request_preview
+        if fill_report:
+            out["fill_report"] = fill_report
+        if filled_values:
+            out["filled_values"] = filled_values
         return out
 
 
@@ -588,9 +605,37 @@ class PromptNode(Node):
         self.data = data
         self.model = data.get("model")
 
+    # What a Prompt step with no instructions says instead of running. Also the
+    # message Test Step and the run's error banner show, so it names the fix.
+    EMPTY_PROMPT_ERROR = (
+        "Prompt step has no instructions. Enter a prompt (or link a saved "
+        "prompt from the Library) before running this step."
+    )
+
     def process(self, inputs):
-        prompt = self.data.get("prompt", "Enter prompt")
+        prompt = self.data.get("prompt")
+        prompt = prompt.strip() if isinstance(prompt, str) else ""
         prev_step_name = inputs.get("step_name")
+
+        # No instructions means there is nothing to ask. This used to fall
+        # through with the literal placeholder "Enter prompt" as the prompt,
+        # and the model would dutifully answer it — "The context does not
+        # contain a prompt to enter." — which then completed green as the
+        # run's deliverable. A missing prompt is a configuration error, not
+        # thin data, so it is a step failure (halts the run, no model call),
+        # not a warning. The editor blocks saving/testing an empty prompt;
+        # this is the backstop for steps created via the API or saved before
+        # that check existed, and for a linked saved prompt whose body is
+        # still empty (the resolver leaves the inline value untouched then).
+        if not prompt:
+            self.report_progress(self.EMPTY_PROMPT_ERROR)
+            return {
+                "output": self.EMPTY_PROMPT_ERROR,
+                "error": self.EMPTY_PROMPT_ERROR,
+                "input": "",
+                "step_name": self.name,
+            }
+
         self.report_progress(f"Prompt: {prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
@@ -630,9 +675,18 @@ class WebsiteNode(Node):
         self.data = data
 
     def process(self, inputs):
-        url = self.data.get("url", "")
+        url = (self.data.get("url") or "").strip()
         if not url:
-            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+            # A step with nothing to fetch used to return "" and let the run
+            # finish Completed — the only trace was the next step's output
+            # missing the page. It is a configuration error: the engine turns
+            # ``error`` into a failed run naming this step.
+            error = (
+                "Add Website is not configured: no URL. Open the step and enter "
+                "the address of the page to fetch."
+            )
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name,
+                    "error": error}
 
         from app.services.web_fetcher import fetch_url_sync
 
@@ -840,6 +894,25 @@ class CrawlerNode(Node):
         return {"output": output, "input": inputs.get("output"), "step_name": self.name}
 
 
+# Token the Deep Analysis pass-1 prompt asks the model to lead with when the
+# input has nothing relevant to the question. Checked after stripping any
+# markdown the model wraps it in (``**NO_RELEVANT_FINDINGS**``, a heading).
+RESEARCH_NO_FINDINGS = "NO_RELEVANT_FINDINGS"
+
+
+def _research_no_findings_reason(findings) -> str | None:
+    """Return the model's reason (possibly "") if pass 1 declared no findings,
+    else None. Only a leading token counts — the word appearing mid-analysis
+    is not a declaration."""
+    if not isinstance(findings, str):
+        return None
+    head = findings.strip().lstrip("#*_` \t")
+    if not head.startswith(RESEARCH_NO_FINDINGS):
+        return None
+    rest = head[len(RESEARCH_NO_FINDINGS):].lstrip("*_` \t:.-—\n").rstrip("*_` \t\n")
+    return " ".join(rest.split())
+
+
 class ResearchNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("ResearchNode")
@@ -853,11 +926,35 @@ class ResearchNode(Node):
         sources = _resolve_input_sources(self.data, prev_step_name)
         input_data = _build_combined_context(self.data, inputs, sources)
 
+        # No data means nothing to analyze — stop here, before any model call.
+        # Sent through anyway, the chat helper would drop into its standalone
+        # "draw on your own knowledge" framing and the two passes would
+        # produce a complete, confident, entirely invented report (different
+        # figures, deadlines and citations each run), marked Completed.
+        if _stringify_context(input_data).strip() == "":
+            labels = ", ".join(INPUT_SOURCE_LABELS.get(s, s) for s in sources)
+            warning = (
+                "Deep Analysis skipped: no input data to analyze. "
+                f"Its input source ({labels}) was empty, so no findings or report were generated. "
+                "Check that the preceding step produces output, or point this step at a document."
+            )
+            self.report_progress(warning)
+            return {
+                "output": f"({warning})",
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "warning": warning,
+            }
+
         self.report_progress("Pass 1: Analyzing data")
 
         analysis_prompt = (
             f"Analyze the following data and generate structured findings related to this question: {question}\n\n"
-            "Provide your analysis as a structured list of key findings, evidence, and observations."
+            "Provide your analysis as a structured list of key findings, evidence, and observations. "
+            "Every finding must be supported by the data; quote or reference the supporting passage.\n\n"
+            f"If the data contains nothing relevant to the question, reply with the exact token "
+            f"{RESEARCH_NO_FINDINGS} on the first line, followed by one sentence saying what the data "
+            "does contain. Do not produce findings from general knowledge."
         )
         findings = llm_chat_model(
             model=self.model, prompt=analysis_prompt, data=input_data,
@@ -865,11 +962,34 @@ class ResearchNode(Node):
             usage_acc=self._usage_acc,
         )
 
+        # Pass 1 said the data has nothing on the question. Stop before pass 2:
+        # asked to "create a comprehensive report" with those four section
+        # headings, the synthesis pass would fill them anyway.
+        no_findings_reason = _research_no_findings_reason(findings)
+        if no_findings_reason is not None:
+            warning = (
+                "Deep Analysis found nothing in its input relevant to the question "
+                f"{question!r}, so no report was generated."
+            )
+            if no_findings_reason:
+                warning += f" {no_findings_reason}"
+            self.report_progress(warning)
+            return {
+                "output": f"({warning})",
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "warning": warning,
+            }
+
         self.report_progress("Pass 2: Synthesizing report")
         synthesis_prompt = (
             f"Based on the following analysis findings, create a comprehensive research report about: {question}\n\n"
             "Structure the report with clear sections: Executive Summary, Key Findings, "
             "Detailed Analysis, and Conclusions.\n\n"
+            "Every statement, figure, date, deadline, citation, and regulation reference in the "
+            "report must come from the Findings below or the CONTEXT. Where the findings say the "
+            "data does not cover something, the report says so in that section — do not fill a "
+            "section from general knowledge or with examples of what similar cases typically show.\n\n"
             f"Findings:\n{findings}"
         )
         report = llm_chat_model(
@@ -994,8 +1114,16 @@ class APICallNode(Node):
         except templating.TemplateError as e:
             return self._error_result(str(e), inputs)
         body_raw = self.data.get("body", "")
-        if not url:
-            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+        # ``url`` may be None when the step was written through the API;
+        # ``render`` passes non-strings through unchanged.
+        if not (url or "").strip():
+            # Same defect as Add Website: an unconfigured step must not pass
+            # as a successful empty call.
+            return self._error_result(
+                "API Call is not configured: no URL. Open the step and enter the "
+                "endpoint to call.",
+                inputs,
+            )
 
         from app.utils.url_validation import validate_outbound_url
 
@@ -1147,22 +1275,198 @@ class DocumentRendererNode(Node):
         super().__init__("DocumentRenderer")
         self.data = data
 
+    # Formats the step advertises. PDF and Word go through the same renderers
+    # the run-export endpoint uses (markdown → styled document; dict / list of
+    # dicts → table), so a step output and an export of it look the same.
+    FORMATS = ("md", "txt", "pdf", "docx")
+
     def process(self, inputs):
-        fmt = self.data.get("format", "md")
-        filename = self.data.get("filename", "output")
+        fmt = (self.data.get("format") or "md").lower()
+        if fmt not in self.FORMATS:
+            fmt = "txt"
+        filename = (self.data.get("filename") or "").strip() or "output"
         input_data = inputs.get("output", "")
         self.report_progress(f"Rendering as {fmt}")
 
-        text = input_data if isinstance(input_data, str) else json.dumps(input_data, indent=2)
-        ext = "md" if fmt == "md" else "txt"
-        full_filename = f"{filename}.{ext}"
-        data_b64 = base64.b64encode(text.encode("utf-8")).decode("utf-8")
+        result = {"input": inputs.get("output"), "step_name": self.name}
+        if isinstance(input_data, dict) and input_data.get("type") == "file_download":
+            # Rendering a file's base64 into a document is never what anyone
+            # meant. Say so rather than shipping a .pdf full of base64.
+            result["output"] = ""
+            result["error"] = (
+                f"Document Renderer received a file ({input_data.get('filename') or 'output'}) "
+                "from the previous step, not text to render. Point this step at a step that "
+                "produces text, or remove it and download the file directly."
+            )
+            return result
 
-        return {
-            "output": {"type": "file_download", "data_b64": data_b64, "file_type": ext, "filename": full_filename},
-            "input": inputs.get("output"),
-            "step_name": self.name,
+        if fmt == "pdf":
+            from app.services.pdf_service import render_workflow_pdf
+
+            title = (self.data.get("title") or "").strip() or filename.replace("_", " ").replace("-", " ")
+            data = base64.b64encode(render_workflow_pdf(input_data, title=title, subtitle=""))
+        elif fmt == "docx":
+            from app.services.docx_service import data_to_docx_bytes
+
+            data = base64.b64encode(data_to_docx_bytes(input_data))
+        else:
+            text = input_data if isinstance(input_data, str) else json.dumps(input_data, indent=2)
+            data = base64.b64encode(text.encode("utf-8"))
+
+        result["output"] = {
+            "type": "file_download",
+            "data_b64": data.decode("ascii"),
+            "file_type": fmt,
+            "filename": f"{filename}.{fmt}",
         }
+        return result
+
+
+# ---------------------------------------------------------------------------
+# Form Filler
+# ---------------------------------------------------------------------------
+#
+# The form is rendered in Python, not by the model. The model is asked for one
+# JSON object of placeholder -> value (or null) and never sees the template, so
+# the layout is preserved by construction, a missing value is always the same
+# token, and there is no way for a note about missing fields to come back in
+# place of the form. Before this, the step went through llm_chat_model, whose
+# chat framing ("format as clean markdown", "say so explicitly if the context
+# lacks what the instruction needs") contradicted "return only the filled
+# template" — and with no temperature set, which reading won was a coin flip
+# per run. A support ticket counted four different output shapes in ten runs
+# of the same inputs.
+
+_PLACEHOLDER_RE = re.compile(r"\{\{\s*([^{}]+?)\s*\}\}")
+FORM_FILLER_MISSING = "[Not provided]"
+
+def form_missing_marker(name: str, missing_token: str | None = None) -> str:
+    """What goes in the form for a field with no value. The default names
+    the field — ``[Not provided: applicant_name]`` — so a gap is unmistakable
+    even to someone reading the form on its own; a per-step ``missing_value``
+    is used verbatim."""
+    return missing_token if missing_token else f"{FORM_FILLER_MISSING[:-1]}: {name}]"
+
+
+def count_unfilled_freeform(text: str, missing_token: str | None = None) -> int:
+    """Blanks a freehand fill left unfilled: the missing marker the
+    instructions ask for, plus the prose forms of "no value"."""
+    if not text:
+        return 0
+    token = missing_token or FORM_FILLER_MISSING
+    count = text.count(token)
+    rest = text.replace(token, "")
+    if token != FORM_FILLER_MISSING:
+        count += rest.count(FORM_FILLER_MISSING)
+        rest = rest.replace(FORM_FILLER_MISSING, "")
+    # Markers are removed before the prose scan so "[Not provided]" is not
+    # counted twice.
+    return count + len(_FORM_FREEFORM_UNFILLED_RE.findall(rest))
+
+FORM_FILLER_VALUES_INSTRUCTIONS = (
+    "You fill form templates for a document-processing workflow. You are given the "
+    "placeholder names from a template and a CONTEXT block. Return ONE JSON object "
+    "whose keys are exactly the placeholder names and whose values are strings copied "
+    "verbatim from the CONTEXT — the same digits, units, punctuation and capitalisation "
+    "as the source; never reformatted, rounded, expanded, abbreviated or summarised. "
+    "When the CONTEXT does not state a value for a placeholder, use JSON null — never "
+    "a sentence such as \"Not provided\" or \"The context does not mention this\". Do not "
+    "guess, do not use outside knowledge, do not add keys, and write nothing before or "
+    "after the JSON object."
+)
+
+FORM_FILLER_PDF_VALUES_INSTRUCTIONS = (
+    "You fill PDF forms for a document-processing workflow. You are given FIELDS — the "
+    "form's fields as JSON objects, each with its name, its type, the label printed "
+    "beside it on the form where one exists, its page, and for choice fields the "
+    "allowed options — and a CONTEXT block. Return ONE JSON object whose keys are "
+    "exactly the field names. For a text field the value is a string copied verbatim "
+    "from the CONTEXT — the same digits, units, punctuation and capitalisation as the "
+    "source; never reformatted, rounded, expanded, abbreviated or summarised. For a "
+    "checkbox the value is true or false, and only when the CONTEXT clearly settles it. "
+    "For a combobox, listbox or radiobutton the value is one of the listed options, "
+    "exactly as written. When the CONTEXT does not state a value for a field, use JSON "
+    "null — never a sentence such as \"Not provided\" or \"The context does not mention "
+    "this\". Do not guess, do not use outside knowledge, do not add keys, and write "
+    "nothing before or after the JSON object."
+)
+
+FORM_FILLER_FREEFORM_INSTRUCTIONS = (
+    "You fill form templates for a document-processing workflow. Return the TEMPLATE "
+    "with its blanks filled from the CONTEXT and every other character unchanged: same "
+    "lines, same order, same headings, same punctuation. Copy each value verbatim from "
+    "the CONTEXT. Where the CONTEXT does not state a value, write exactly "
+    f"{FORM_FILLER_MISSING} in that blank. Never restructure the template, never add "
+    "notes, lists or commentary, and never reply with a message instead of the "
+    "template. Output the filled template and nothing else."
+)
+
+
+def _context_block(input_data) -> str:
+    if input_data is None or input_data == "":
+        return ""
+    if isinstance(input_data, str):
+        return input_data
+    try:
+        return json.dumps(input_data, indent=2, default=str)
+    except (TypeError, ValueError):
+        return str(input_data)
+
+
+def _run_form_filler_model(
+    model: str, instructions: str, prompt: str, *,
+    system_config_doc: dict | None, usage_acc: UsageAccumulator | None,
+) -> str:
+    """One deterministic LLM call: dedicated instructions, temperature 0."""
+    from pydantic_ai import Agent
+
+    from app.services.llm_service import build_thinking_model_settings, get_agent_model
+
+    agent_model = get_agent_model(model, system_config_doc=system_config_doc)
+    settings = dict(build_thinking_model_settings(model, None, system_config_doc) or {})
+    settings["temperature"] = 0.0
+    agent = Agent(agent_model, instructions=instructions, model_settings=settings)
+    result = agent.run_sync(prompt)
+    if usage_acc:
+        usage_acc.record(result)
+    return result.output or ""
+
+
+def template_placeholders(template: str) -> list[str]:
+    """Placeholder names in first-appearance order, de-duplicated."""
+    return list(dict.fromkeys(_PLACEHOLDER_RE.findall(template or "")))
+
+
+def render_filled_template(
+    template: str, values: dict, missing_token: str | None = None,
+) -> tuple[str, list[str]]:
+    """Substitute placeholders; return (text, names that had no value).
+
+    A value that is null, blank, or prose meaning "no value" (see
+    ``form_value_is_missing``) is rendered as the missing marker — by default
+    ``[Not provided: <name>]`` — never as the prose.
+    """
+    missing: list[str] = []
+
+    def _sub(m: "re.Match[str]") -> str:
+        name = m.group(1)
+        value = values.get(name)
+        if form_value_is_missing(value):
+            if name not in missing:
+                missing.append(name)
+            return form_missing_marker(name, missing_token)
+        return value if isinstance(value, str) else json.dumps(value, default=str)
+
+    return _PLACEHOLDER_RE.sub(_sub, template or ""), missing
+
+
+def _parse_values_json(text: str, placeholders: list[str]) -> dict:
+    from app.services.workflow_validator import _extract_json
+
+    parsed = _extract_json(text)
+    if not isinstance(parsed, dict):
+        raise ValueError("expected a JSON object")
+    return {name: parsed.get(name) for name in placeholders}
 
 
 class FormFillerNode(Node):
@@ -1171,26 +1475,216 @@ class FormFillerNode(Node):
         self.data = data
         self.model = data.get("model")
 
+    # -- inputs ------------------------------------------------------------
+
+    def _attribution_sources(self, inputs, sources: list[str]) -> list[dict]:
+        """The inputs the model saw, in order, each with the metadata needed to
+        say which document and page a value came from (see form_fill)."""
+        out: list[dict] = []
+        for src in sources:
+            if src == "step_input":
+                text = _stringify_context(inputs.get("output"))
+                if text:
+                    out.append({"kind": src, "title": INPUT_SOURCE_LABELS[src], "text": text})
+            elif src == "select_document":
+                text = self.data.get("selected_doc_text") or ""
+                meta = self.data.get("selected_doc_meta") or {}
+                if text:
+                    out.append({
+                        "kind": src, "text": text,
+                        "title": meta.get("title") or INPUT_SOURCE_LABELS[src],
+                        "uuid": meta.get("uuid"),
+                        "text_markers": meta.get("text_markers") or [],
+                    })
+            elif src == "workflow_documents":
+                texts = self.data.get("doc_texts") or []
+                metas = self.data.get("doc_metas") or []
+                for i, text in enumerate(texts):
+                    if not text:
+                        continue
+                    meta = metas[i] if i < len(metas) and isinstance(metas[i], dict) else {}
+                    out.append({
+                        "kind": src, "text": text,
+                        "title": meta.get("title") or f"Document {i + 1}",
+                        "uuid": meta.get("uuid"),
+                        "text_markers": meta.get("text_markers") or [],
+                    })
+        return out
+
+    def _ask_values(self, instructions: str, prompt: str, names: list[str]) -> dict:
+        """One values call; one retry naming the failure; then a real error —
+        the step fails visibly rather than shipping a guess."""
+        raw = _run_form_filler_model(
+            self.model, instructions, prompt,
+            system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+        )
+        try:
+            return _parse_values_json(raw, names)
+        except ValueError:
+            raw = _run_form_filler_model(
+                self.model, instructions,
+                prompt + "\n\nYour previous reply was not a JSON object. Reply with "
+                "only the JSON object.",
+                system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+            )
+            try:
+                return _parse_values_json(raw, names)
+            except ValueError as e:
+                raise ValueError(
+                    f"Form Filler: the model did not return placeholder values as JSON ({e})"
+                ) from e
+
+    # -- fill --------------------------------------------------------------
+
     def process(self, inputs):
         template = self.data.get("template", "")
+        missing_token = (self.data.get("missing_value") or "").strip() or None
         prev_step_name = inputs.get("step_name")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
         input_data = _build_combined_context(self.data, inputs, sources)
+        context = _context_block(input_data)
+
+        result = {"input": inputs.get("output"), "step_name": self.name}
+
+        if (self.data.get("template_source") or "text").lower() == "pdf":
+            return self._fill_pdf_form(inputs, sources, context, result)
 
         self.report_progress("Filling template")
 
+        placeholders = template_placeholders(template)
+        if not placeholders:
+            # No {{name}} markers to substitute: the model has to fill the
+            # blanks itself. Still its own instructions and temperature 0.
+            # Nothing to check field-by-field either — there are no fields.
+            prompt = f"TEMPLATE:\n{template}\n\nCONTEXT:\n{context}"
+            result["output"] = _run_form_filler_model(
+                self.model, FORM_FILLER_FREEFORM_INSTRUCTIONS, prompt,
+                system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+            ).strip()
+            warnings = []
+            unfilled = count_unfilled_freeform(result["output"], missing_token)
+            if unfilled:
+                warnings.append(
+                    f"{unfilled} blank{'s' if unfilled != 1 else ''} could not be filled "
+                    "from the input — check the form before using it"
+                )
+            warnings.append(
+                "This template has no {{placeholder}} markers, so the model filled "
+                "its blanks freehand and the values could not be checked against the "
+                "input. Mark each blank as {{name}} to get the same layout, the same "
+                "missing-value marker, a list of the fields that were not found, and "
+                "a per-field source check on every run."
+            )
+            result["warning"] = " | ".join(warnings)
+            return result
+
+        from app.services.form_fill import describe_fill_report, resolve_fill
+
         prompt = (
-            f"Fill all {{{{placeholders}}}} in the following template using the provided data. "
-            f"Return only the filled template with no extra commentary.\n\n"
-            f"Template:\n{template}"
+            f"PLACEHOLDERS:\n{json.dumps(placeholders)}\n\n"
+            f"CONTEXT:\n{context}"
         )
-        filled = llm_chat_model(
-            model=self.model, prompt=prompt, data=input_data,
-            include_next_step=False, system_config_doc=self._sys_cfg,
-            usage_acc=self._usage_acc,
+        values = self._ask_values(FORM_FILLER_VALUES_INSTRUCTIONS, prompt, placeholders)
+
+        filled, _missing = render_filled_template(template, values, missing_token)
+        result["output"] = filled
+
+        # Check the fill: every value must appear in the input, and the report
+        # says where. An unfilled field or a value found nowhere is a warning
+        # on the step, never a silent pass.
+        report = resolve_fill(
+            values, self._attribution_sources(inputs, sources), field_order=placeholders,
         )
-        return {"output": filled, "input": inputs.get("output"), "step_name": self.name}
+        result["fill_report"] = report
+        warnings = describe_fill_report(
+            report, missing_token=missing_token or f"{FORM_FILLER_MISSING[:-1]}: <field>]",
+        )
+        if warnings:
+            result["warning"] = " | ".join(warnings)
+        return result
+
+    def _fill_pdf_form(self, inputs, sources: list[str], context: str, result: dict) -> dict:
+        """Write values into a real fillable PDF's form fields; output is the PDF."""
+        from app.services.form_fill import (
+            FILLABLE_PDF_FIELD_TYPES,
+            describe_fill_report,
+            fill_pdf_form,
+            filled_pdf_filename,
+            pdf_form_fields,
+            resolve_fill,
+        )
+
+        def _fail(message: str) -> dict:
+            result["output"] = ""
+            result["error"] = f"Form Filler: {message}"
+            return result
+
+        load_error = self.data.get("template_load_error")
+        if load_error:
+            return _fail(load_error)
+        pdf_b64 = self.data.get("template_pdf_b64")
+        if not pdf_b64:
+            return _fail(
+                "no template PDF was loaded for this step. Select a fillable PDF "
+                "document as the template."
+            )
+        title = self.data.get("template_document_title") or "form.pdf"
+        try:
+            pdf_bytes = base64.b64decode(pdf_b64)
+            fields = pdf_form_fields(pdf_bytes)
+        except Exception as e:
+            return _fail(f"could not read the PDF form '{title}': {e}")
+
+        fillable = [f for f in fields if f.get("type") in FILLABLE_PDF_FIELD_TYPES]
+        if not fillable:
+            return _fail(
+                f"'{title}' has no fillable form fields. Use a PDF with form fields, "
+                "or paste the form as a text template with {{placeholder}} markers."
+            )
+        names = [f["name"] for f in fillable]
+        self.report_progress(f"Filling {len(names)} form fields in {title}")
+
+        prompt = f"FIELDS:\n{json.dumps(fillable)}\n\nCONTEXT:\n{context}"
+        values = self._ask_values(FORM_FILLER_PDF_VALUES_INSTRUCTIONS, prompt, names)
+
+        try:
+            filled_bytes, applied, skipped = fill_pdf_form(pdf_bytes, values)
+        except Exception as e:
+            return _fail(f"could not write values into '{title}': {e}")
+
+        report = resolve_fill(values, self._attribution_sources(inputs, sources), field_order=names)
+        labels = {f["name"]: f.get("label") for f in fillable}
+        skipped_reasons = dict(skipped)
+        for entry in report:
+            label = labels.get(entry["name"])
+            if label:
+                entry["label"] = label
+            if entry["name"] in skipped_reasons:
+                entry["status"] = "not_written"
+                entry["reason"] = skipped_reasons[entry["name"]]
+
+        result["output"] = {
+            "type": "file_download",
+            "data_b64": base64.b64encode(filled_bytes).decode("ascii"),
+            "file_type": "pdf",
+            "filename": filled_pdf_filename(title),
+        }
+        result["filled_values"] = {
+            name: values.get(name) for name in applied if not form_value_is_missing(values.get(name))
+        }
+        result["fill_report"] = report
+
+        warnings = describe_fill_report(report, missing_token=None)
+        if skipped:
+            n = len(skipped)
+            warnings.append(
+                f"{n} form field{'s' if n != 1 else ''} could not be set: "
+                + "; ".join(f"{name} ({reason})" for name, reason in skipped)
+            )
+        if warnings:
+            result["warning"] = " | ".join(warnings)
+        return result
 
 
 class DataExportNode(Node):
@@ -1477,17 +1971,21 @@ class KnowledgeBaseQueryNode(Node):
         sources: list[dict] = []
         for i, r in enumerate(results, 1):
             meta = r.get("metadata") or {}
+            content = r.get("content") or ""
             source_name = meta.get("source_name", "Unknown source")
-            page = meta.get("page")
             sheet = meta.get("sheet")
-            approximate = bool(meta.get("page_approximate"))
-            locator = locator_for_meta(meta)
+            # Cite the page of the passage that matches the query, or the
+            # range, for a chunk that crosses a page break (see page_locator).
+            cited = cited_pages(meta, content, query)
+            page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
+            locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
             label = f"{source_name} · {locator}" if locator else source_name
-            parts.append(f"[{i}] {label}\n{r['content']}")
+            parts.append(f"[{i}] {label}\n{annotate_chunk_pages(content, meta)}")
             sources.append({
                 "document_id": meta.get("source_id"),
                 "document_title": source_name,
-                "page": page if isinstance(page, int) else None,
+                "page": page,
+                "page_end": page_end,
                 "page_approximate": approximate,
                 "sheet": sheet if isinstance(sheet, str) else None,
                 "chunk_id": r.get("chunk_id"),

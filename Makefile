@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
@@ -11,6 +11,7 @@ help:
 	@printf "  make backend-ci        Run the backend release-gating test suite\n"
 	@printf "  make backend-static    Run release-gating backend lint and security checks\n"
 	@printf "  make backend-backlog   Run backend typecheck and dependency audit backlog\n"
+	@printf "  make endpoint-map      Write the UI-to-endpoint map for reading\n"
 	@printf "  make frontend-install  Install frontend dependencies\n"
 	@printf "  make frontend-ci       Run frontend typecheck, lint, tests, and build\n"
 	@printf "  make ci                Run backend and frontend CI checks\n"
@@ -40,7 +41,17 @@ backend-security:
 backend-audit:
 	cd $(BACKEND_DIR) && uv run pip-audit
 
-backend-static: backend-lint backend-security
+# Writes scripts/ui_endpoint_map.md and .json for reading; regenerate on demand,
+# never commit (see .gitignore).
+endpoint-map:
+	cd $(BACKEND_DIR) && uv run python ../scripts/map_ui_endpoints.py
+
+# --stdout keeps the check read-only: plain --check still writes both timestamped
+# output files, which would dirty the tree on every CI run.
+endpoint-map-check:
+	cd $(BACKEND_DIR) && uv run python ../scripts/map_ui_endpoints.py --check --stdout >/dev/null
+
+backend-static: backend-lint backend-security endpoint-map-check
 
 backend-backlog: backend-typecheck backend-audit
 

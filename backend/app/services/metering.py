@@ -176,7 +176,16 @@ def metered(
     activity_id: Optional[str] = None,
     space: Optional[str] = None,
 ) -> Iterator[MeterScope]:
-    """Sync metering scope (Celery tasks, engine run_sync paths)."""
+    """Sync metering scope (Celery tasks, engine run_sync paths).
+
+    Raises TrialBudgetExceededError before yielding when `user_id` is a trial
+    account that has exhausted its token budget (see trial_budget.py) — the
+    scope entry is the one place every attributed spend path goes through.
+    """
+    if user_id:
+        from app.services.trial_budget import check_sync
+
+        check_sync(user_id)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,
@@ -198,7 +207,15 @@ async def metered_async(
     activity_id: Optional[str] = None,
     space: Optional[str] = None,
 ) -> AsyncIterator[MeterScope]:
-    """Async metering scope (FastAPI routes/services using `await agent.run`)."""
+    """Async metering scope (FastAPI routes/services using `await agent.run`).
+
+    Raises TrialBudgetExceededError before yielding when `user_id` is a trial
+    account that has exhausted its token budget (see trial_budget.py).
+    """
+    if user_id:
+        from app.services.trial_budget import check_async
+
+        await check_async(user_id)
     scope = MeterScope(
         feature=feature, user_id=user_id, team_id=team_id,
         activity_id=activity_id, space=space,

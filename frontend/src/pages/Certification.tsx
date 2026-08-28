@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Award,
   Cog,
-  Flame,
   ShieldCheck,
   Star,
   Target,
@@ -430,16 +429,6 @@ export default function Certification() {
                   <span className="font-semibold text-gray-900">{displayXp}</span>
                   <span className="text-gray-500">/ {TOTAL_XP} XP</span>
                 </div>
-                {(progress?.streak_days || 0) > 0 && (
-                  <div
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 text-sm"
-                    style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-                  >
-                    <Flame size={14} className="text-orange-500" />
-                    <span className="font-semibold text-orange-700">{progress?.streak_days}</span>
-                    <span className="text-orange-600">day streak</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>

@@ -55,7 +55,7 @@ def _sized_for(
 
     The caller measures the request once, with the model the user is on. That
     number carries *that* model's safety margin — 1.0 where the count is exact
-    (a local vocabulary, or OpenAI), 1.20 where it is an estimate. Comparing it
+    (a local vocabulary, or OpenAI), 1.5 where it is an estimate. Comparing it
     against another model's budget silently mixes rulers: a request measured
     exactly looks like it fits a model whose own count would come out 20%
     higher, the router switches, and that model rejects it. That is the

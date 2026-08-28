@@ -50,6 +50,29 @@ class AddUrlsRequest(BaseModel):
     allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
 
 
+class KBSourceCurrency(BaseModel):
+    """Refresh / ingestion provenance for one source (see
+    app.utils.kb_source_currency). Lets an evaluator verify source currency
+    from the UI or the export without re-fetching every original."""
+
+    # never_ingested | ingested | refreshed | unchanged | retained_previous
+    # | retrieval_failed | ingestion_failed
+    status: str
+    last_refresh_attempted_at: Optional[str] = None
+    last_retrieved_at: Optional[str] = None
+    last_ingested_at: Optional[str] = None
+    # When the text currently held and served was retrieved — unchanged by a
+    # failed refresh, so it is the "retained content" date.
+    content_retrieved_at: Optional[str] = None
+    content_hash: Optional[str] = None
+    content_hash_algorithm: str = "sha256"
+    # False when the hash was computed just now from the retained snapshot
+    # because the source predates hash recording at ingest.
+    content_hash_recorded: bool = False
+    last_refresh_outcome: Optional[str] = None
+    last_refresh_error: Optional[str] = None
+
+
 class KBSourceResponse(BaseModel):
     uuid: str
     source_type: str
@@ -66,6 +89,10 @@ class KBSourceResponse(BaseModel):
     # "ready" but incomplete, so the UI warns instead of showing a clean check.
     truncated: bool = False
     created_at: Optional[str] = None
+    # When the source's text was last fetched/ingested. Surfaced on the list
+    # so a user can tell how stale a URL snapshot is before refreshing it.
+    processed_at: Optional[str] = None
+    currency: Optional[KBSourceCurrency] = None
 
 
 class KBSourceDetailResponse(KBSourceResponse):
@@ -83,7 +110,6 @@ class KBSourceDetailResponse(KBSourceResponse):
     # Navigation pages the crawl followed for links but did not embed
     skipped_urls: Optional[list[str]] = None
     child_sources: list[KBSourceResponse] = []  # Crawled children (when this is a parent)
-    processed_at: Optional[str] = None
 
 
 class UpdateSourceRequest(BaseModel):
@@ -91,6 +117,31 @@ class UpdateSourceRequest(BaseModel):
     an empty string clears that field (reverts to the auto-derived value)."""
     custom_name: Optional[str] = None
     source_reference: Optional[str] = None
+
+
+class KBOptimizationStatusResponse(BaseModel):
+    """What the "Optimized" chip means for this KB, and whether it still holds.
+
+    ``applied``: tuned RAG settings are live. ``stale``: live, but the sources
+    or test questions have changed materially since they were tuned.
+    ``available``: a completed optimization has settings that were never
+    applied (or were reverted). See ``services/kb_optimization_status``.
+    """
+    state: str  # applied | stale | available
+    applied_at: Optional[str] = None
+    applied_run_uuid: Optional[str] = None
+    last_run_at: Optional[str] = None
+    last_run_uuid: Optional[str] = None
+    tuned_keys: list[str] = []
+    stale: bool = False
+    stale_reasons: list[str] = []
+    sources_at_run: int = 0
+    sources_added: int = 0
+    sources_removed: int = 0
+    queries_at_run: int = 0
+    queries_added: int = 0
+    queries_removed: int = 0
+    queries_edited: int = 0
 
 
 class KBResponse(BaseModel):
@@ -127,6 +178,10 @@ class KBResponse(BaseModel):
     # surfaces as a small "Optimized" chip.
     has_optimized_config: bool = False
     optimized_config_set_at: Optional[str] = None
+    # Full story behind the chip — applied / stale / available, when, from
+    # which run, and what changed since. None when there is nothing to say.
+    # Populated by the v2 list and the detail endpoint.
+    optimization: Optional[KBOptimizationStatusResponse] = None
     # AI-trust signals from the latest KB validation run.
     # Scores are 0-1; lift is also 0-1 (e.g., 0.28 == +28pts vs. baseline).
     last_validation_score: Optional[float] = None

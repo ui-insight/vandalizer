@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
 
-from app.services.extraction_engine import ExtractionEngine, ExtractionError
+from app.services.extraction_engine import SOURCE_KEY, ExtractionEngine, ExtractionError
 
 
 def _make_mock_agent_result(output, request_tokens=10, response_tokens=5):
@@ -410,6 +410,27 @@ class TestFallbackExtraction:
         engine = ExtractionEngine(system_config_doc={})
         with pytest.raises(ExtractionError):
             engine._extract_fallback_json("text", ["Name"], "gpt-4o")
+
+    @patch("app.services.extraction_engine.create_chat_agent")
+    def test_fallback_accepts_literal_newlines_in_strings(self, mock_create_agent):
+        """The prompt asks for supporting passages copied character-for-
+        character; a passage that spans lines comes back with a raw newline
+        inside the JSON string, which strict json.loads rejects ("Invalid
+        control character", Sentry VANDALIZER-BACKEND-2Y). That's a usable
+        answer, not a failed run."""
+        mock_agent = MagicMock()
+        mock_agent.run_sync.return_value = _make_mock_agent_result(
+            '{"Name": "Alice",\n "_sources": {"Name": "PI:\tAlice Smith\nDept of Biology"}}'
+        )
+        mock_create_agent.return_value = mock_agent
+
+        engine = ExtractionEngine(system_config_doc={})
+        result = engine._extract_fallback_json(
+            "text", ["Name"], "gpt-4o", capture_sources=True
+        )
+        assert len(result) == 1
+        assert result[0]["Name"] == "Alice"
+        assert result[0][SOURCE_KEY]["Name"]["quote"] == "PI:\tAlice Smith\nDept of Biology"
 
     @patch("app.services.extraction_engine.create_chat_agent")
     def test_fallback_raises_on_exception(self, mock_create_agent):

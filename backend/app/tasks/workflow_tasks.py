@@ -7,9 +7,18 @@ Task names use 'tasks.workflow_next.*' to coexist with Flask's 'tasks.workflow.*
 import logging
 
 from app.celery_app import celery_app
+from app.services.form_fill import document_meta
 from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
+
+
+def _preload_form_filler_template(db, task_data: dict) -> None:
+    """Attach a Form Filler task's fillable-PDF template bytes (see form_fill)."""
+    from app.config import Settings
+    from app.services.form_fill import load_form_filler_assets
+
+    load_form_filler_assets(db, task_data, upload_dir=Settings().upload_dir)
 
 
 def _wants_selected_document(task_data: dict) -> bool:
@@ -68,6 +77,8 @@ def _notify_approval_reviewers_sync(
 
     settings = Settings()
 
+    emails: list[tuple[str, str, str, str]] = []  # (user_id, to, subject, html)
+
     for user_id in assigned_user_ids:
         # In-app notification
         create_notification_sync(
@@ -79,11 +90,10 @@ def _notify_approval_reviewers_sync(
             link=f"/reviews/{approval_uuid}",
         )
 
-        # Email
+        # Email — rendered here, sent below on one loop for all reviewers.
         user_doc = db.user.find_one({"user_id": user_id})
         if user_doc and user_doc.get("email"):
-            from app.services.email_service import approval_request_email, send_email
-            import asyncio
+            from app.services.email_service import approval_request_email
 
             subject, html = approval_request_email(
                 reviewer_name=user_doc.get("name", user_id),
@@ -93,12 +103,38 @@ def _notify_approval_reviewers_sync(
                 approval_uuid=approval_uuid,
                 frontend_url=settings.frontend_url,
             )
+            emails.append((user_id, user_doc["email"], subject, html))
+
+    if not emails:
+        return
+
+    from app.tasks import run_task_async
+
+    async def _send_all() -> None:
+        # send_email reaches Beanie twice — SystemConfig for the deployment's
+        # branding, EmailLog for the audit row — and a Motor client is bound to
+        # the loop it was created on. This sync task holds only a pymongo
+        # handle, so the fresh loop needs its own Beanie init or both calls
+        # raise CollectionWasNotInitialized: the mail still went out, but
+        # unbranded and unlogged, with two Sentry errors per reviewer.
+        # One init per task, not per reviewer — every init_db builds a Motor
+        # client, and the other tasks in this package initialise once.
+        from app.database import init_db
+        from app.services.email_service import send_email
+
+        await init_db(settings, skip_indexes=True)
+        for user_id, to, subject, html in emails:
             try:
-                loop = asyncio.new_event_loop()
-                loop.run_until_complete(send_email(user_doc["email"], subject, html, settings, email_type="approval_request"))
-                loop.close()
+                await send_email(
+                    to, subject, html, settings, email_type="approval_request",
+                )
             except Exception:
                 logger.exception("Failed to send approval email to %s", user_id)
+
+    try:
+        run_task_async(_send_all())
+    except Exception:
+        logger.exception("Failed to send approval emails for %s", approval_uuid)
 
 
 def _bson_safe(value):
@@ -223,6 +259,7 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
 
             if doc_uuids:
                 doc_texts = []
+                doc_metas = []
                 for uuid in doc_uuids:
                     doc = db.smart_document.find_one({"uuid": uuid})
                     if doc and doc.get("origin_workflow_id") == workflow_id:
@@ -233,6 +270,7 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
                         continue
                     if doc and doc.get("raw_text"):
                         doc_texts.append(doc["raw_text"])
+                        doc_metas.append(document_meta(doc))
                     else:
                         logger.warning(
                             "Document %s has no raw_text — it may still be processing or text extraction failed",
@@ -244,12 +282,21 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
                         len(doc_uuids),
                     )
                 task_data["doc_texts"] = doc_texts
+                if task_doc.get("name") == "FormFiller":
+                    # Aligned 1:1 with doc_texts: the fill report attributes each
+                    # value to a document and page through these.
+                    task_data["doc_metas"] = doc_metas
 
             # Pre-load specific document text when select_document is selected
             if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
                 sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
                 if sel_doc and sel_doc.get("raw_text"):
                     task_data["selected_doc_text"] = sel_doc["raw_text"]
+                    if task_doc.get("name") == "FormFiller":
+                        task_data["selected_doc_meta"] = document_meta(sel_doc)
+
+            if task_doc.get("name") == "FormFiller":
+                _preload_form_filler_template(db, task_data)
 
             tasks.append({"name": task_doc.get("name", ""), "data": task_data})
 
@@ -603,6 +650,41 @@ def _resolve_input_doc_uuids(workflow_doc: dict, trigger_step_data: dict) -> lis
     return doc_uuids
 
 
+def _missing_fixed_documents(db, workflow_doc: dict) -> list[str]:
+    """Titles of fixed documents (Input tab) that no longer exist.
+
+    A fixed document is configuration, not a per-run input: if it has been
+    deleted from Files the workflow is misconfigured, and the run must say so
+    rather than quietly cover fewer documents than the author set up (support
+    ticket: output covered only the selected document, run marked Completed).
+    Soft-deleted (retention) documents count as gone. ``no_input`` mode never
+    loads fixed documents, so nothing is missing there.
+    """
+    input_cfg = workflow_doc.get("input_config") or {}
+    if input_cfg.get("trigger_type") == "no_input":
+        return []
+    missing: list[str] = []
+    for fd in input_cfg.get("fixed_documents") or []:
+        uuid = (fd.get("uuid") if isinstance(fd, dict) else str(fd)) or ""
+        if not uuid:
+            continue
+        doc = db.smart_document.find_one({"uuid": uuid}, {"title": 1, "soft_deleted": 1})
+        if not doc or doc.get("soft_deleted"):
+            title = (fd.get("title") if isinstance(fd, dict) else None) or (doc or {}).get("title") or uuid
+            missing.append(title)
+    return missing
+
+
+def fixed_documents_missing_message(titles: list[str]) -> str:
+    n = len(titles)
+    return (
+        f"{n} fixed document{'s' if n != 1 else ''} configured on this workflow's Input tab "
+        f"no longer exist{'s' if n == 1 else ''}: {', '.join(titles)}. "
+        f"{'It was' if n == 1 else 'They were'} deleted from Files. Remove "
+        f"{'it' if n == 1 else 'them'} from the Input tab or add a replacement, then run again."
+    )
+
+
 def _classify_input_documents(db, workflow_doc: dict, doc_uuids: list[str]):
     """Split a run's input documents by text-extraction readiness.
 
@@ -741,6 +823,23 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # the workflow would silently "complete" with no output. Rather than run on
     # nothing, wait for extraction (retry) when documents are still processing,
     # and fail with an actionable message when extraction has genuinely failed.
+    missing_fixed = _missing_fixed_documents(db, workflow_doc)
+    if missing_fixed:
+        # Configuration error, not a transient: no retry, no Sentry, a failed
+        # run with instructions — the same treatment as unreadable input.
+        logger.warning(
+            "Workflow %s aborted pre-flight: fixed document(s) no longer exist: %s",
+            workflow_id, missing_fixed,
+        )
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id, fixed_documents_missing_message(missing_fixed),
+            error_payload={
+                "code": "fixed_documents_missing",
+                "missing_documents": missing_fixed[:20],
+            },
+        )
+        return
+
     input_doc_uuids = _resolve_input_doc_uuids(workflow_doc, trigger_step_data)
     if input_doc_uuids:
         ready, processing, failed = _classify_input_documents(
@@ -779,7 +878,12 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                     "encrypted, or a temporary OCR outage). Open the document to retry "
                     "extraction, or re-upload it, then run the workflow again."
                 )
-            logger.error(
+            # Warning, not error: this is a handled, user-actionable outcome —
+            # the run is marked failed with instructions and the bell fires —
+            # not a fault in the worker. The oversize pre-flight below logs at
+            # the same level; paging Sentry for every run against an
+            # unextracted document is noise (VANDALIZER-BACKEND-1T).
+            logger.warning(
                 "Workflow %s aborted pre-flight: no input document has raw_text "
                 "(processing=%d, failed=%d)",
                 workflow_id, len(processing), len(failed),
@@ -1136,17 +1240,26 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
 
     # Pre-load doc texts
     doc_texts = []
+    doc_metas = []
     for uuid in doc_uuids:
         doc = db.smart_document.find_one({"uuid": uuid})
         if doc and doc.get("raw_text"):
             doc_texts.append(doc["raw_text"])
+            doc_metas.append(document_meta(doc))
     task_data["doc_texts"] = doc_texts
+    if task_name == "FormFiller":
+        task_data["doc_metas"] = doc_metas
 
     # Pre-load specific document text when select_document is selected
     if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
         sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
         if sel_doc and sel_doc.get("raw_text"):
             task_data["selected_doc_text"] = sel_doc["raw_text"]
+            if task_name == "FormFiller":
+                task_data["selected_doc_meta"] = document_meta(sel_doc)
+
+    if task_name == "FormFiller":
+        _preload_form_filler_template(db, task_data)
 
     # Resolve a linked saved Prompt/Formatter so Test Step uses the live body.
     _resolve_saved_prompt_formatter(db, task_name, task_data)
@@ -1204,7 +1317,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         engine.connect(nodes[i - 1], nodes[i])
 
     try:
-        final_output, _ = engine.execute()
+        final_output, steps = engine.execute()
     except WorkflowStepError as e:
         # Deterministic config/user error (blocked URL, HTTP failure, bad
         # headers…). Return a structured failure instead of raising: the task
@@ -1218,6 +1331,16 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
             "error": str(e),
             "output": e.step_output,
         }
+    # A step can complete with a warning (fields a Form Filler could not
+    # fill, an empty input, …). The run UI shows those on the step; Test
+    # Step used to drop them and show a clean "Test Completed" over output
+    # that needed checking. Wrap so the poll endpoint can hand it through.
+    warnings = [
+        s["warning"] for s in steps
+        if isinstance(s, dict) and isinstance(s.get("warning"), str) and s["warning"]
+    ]
+    if warnings:
+        return {"step_test_warning": " | ".join(warnings), "output": final_output}
     return final_output
 
 

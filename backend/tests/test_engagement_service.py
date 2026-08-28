@@ -22,6 +22,8 @@ from app.services import engagement_service
 from app.services.engagement_service import (
     NUDGE_COOLDOWN_DAYS,
     _as_aware_utc,
+    _get_item_name,
+    _get_new_catalog_items_since,
     process_inactivity_nudges,
 )
 from tests.conftest import fake_model
@@ -176,3 +178,48 @@ class TestInactivityNudges:
 
         assert sent == 0
         send.assert_not_awaited()
+
+
+class TestCatalogItemNames:
+    @pytest.mark.asyncio
+    async def test_knowledge_base_name_comes_from_title(self):
+        """Regression (VANDALIZER-BACKEND-1R): KnowledgeBase has ``title``, not
+        ``name``; reading ``.name`` raised AttributeError and killed the run."""
+        from app.models.knowledge import KnowledgeBase
+
+        kb = KnowledgeBase.model_construct(title="USDA General Terms & Conditions (2025)")
+        with patch.object(KnowledgeBase, "get", AsyncMock(return_value=kb)):
+            name = await _get_item_name("knowledge_base", "6a3ee628e1d889df955be302")
+
+        assert name == "USDA General Terms & Conditions (2025)"
+
+    @pytest.mark.asyncio
+    async def test_one_unresolvable_item_does_not_abort_the_run(self):
+        reqs = [
+            SimpleNamespace(item_kind="knowledge_base", item_id="6a3ee628e1d889df955be302"),
+            SimpleNamespace(item_kind="workflow", item_id="6a3ee628e1d889df955be303"),
+        ]
+        # The service imports VerificationRequest inside the function, so the
+        # stand-in has to go on the models module, not on engagement_service.
+        fake = fake_model(reqs)
+        query = fake.find.return_value
+        query.sort.return_value = query
+        query.limit.return_value = query
+
+        async def _name(kind, _id):
+            if kind == "knowledge_base":
+                raise AttributeError("'KnowledgeBase' object has no attribute 'name'")
+            return "NSF Extractor"
+
+        with (
+            patch("app.models.verification.VerificationRequest", fake),
+            patch.object(engagement_service, "_get_item_name", _name),
+        ):
+            items = await _get_new_catalog_items_since(
+                datetime.datetime(2026, 6, 30, tzinfo=datetime.timezone.utc)
+            )
+
+        assert items == [
+            {"name": "Untitled", "kind": "knowledge_base"},
+            {"name": "NSF Extractor", "kind": "workflow"},
+        ]

@@ -319,3 +319,38 @@ class TestPathTraversal:
         result = _safe_resolve(settings, "user1/doc.pdf")
         assert result is not None
         assert result.exists()
+
+
+class TestDocumentUsageRoute:
+    @pytest.mark.asyncio
+    async def test_usage_unauthenticated(self, client):
+        resp = await client.get("/api/files/doc-1/usage")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_usage_returns_service_payload_for_user(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        payload = {"document": {"uuid": "doc-1", "title": "A.pdf"}, "folder": {"path": [], "team_id": None},
+                   "knowledge_bases": [], "extractions": [], "workflows": [], "total": 0}
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.document_usage_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.document_usage = AsyncMock(return_value=payload)
+            resp = await client.get("/api/files/doc-1/usage", cookies=cookies, headers=headers)
+        assert resp.status_code == 200
+        assert resp.json() == payload
+        assert mock_svc.document_usage.call_args.kwargs.get("user") is user
+
+    @pytest.mark.asyncio
+    async def test_usage_404_when_not_visible(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.document_usage_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.document_usage = AsyncMock(return_value=None)
+            resp = await client.get("/api/files/doc-1/usage", cookies=cookies, headers=headers)
+        assert resp.status_code == 404

@@ -327,3 +327,65 @@ class TestOcrFailureLogging:
         assert result == ""
         mock_logger.error.assert_not_called()
         assert mock_logger.warning.called
+
+
+class TestPerformDocumentValidationOcrOutage:
+    """Regression (VANDALIZER-BACKEND-1F): an OCR outage while validation reads
+    the file itself must engage the task's retry, not be validated as empty
+    text on the first attempt."""
+
+    def _run(self, retries: int, mock_get_db, mock_settings_fn, MockSettings):
+        from app.services.ocr_client import OcrUnavailableError
+        from app.tasks.upload_validation_tasks import perform_document_validation
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {
+            "uuid": "doc-1", "path": "u@x.edu/ABC.pdf", "raw_text": "",
+        }
+        mock_settings_fn.return_value = {
+            "enabled": True, "rules": "no PII", "chunk_size": 8000, "chunk_overlap": 200,
+        }
+        cfg = MagicMock()
+        cfg.upload_dir = "/app/static/uploads"
+        MockSettings.return_value = cfg
+
+        perform_document_validation.push_request(retries=retries)
+        try:
+            with patch("app.services.document_readers.extract_text_from_file",
+                       side_effect=OcrUnavailableError("OCR down")):
+                return perform_document_validation.run(
+                    document_uuid="doc-1", document_path="u@x.edu/ABC.pdf", background=True,
+                )
+        finally:
+            perform_document_validation.pop_request()
+
+    @patch("app.tasks.upload_validation_tasks.chord")
+    @patch("app.config.Settings")
+    @patch("app.tasks.upload_validation_tasks._get_compliance_settings")
+    @patch("app.tasks.upload_validation_tasks._get_db")
+    def test_outage_is_reraised_while_retries_remain(
+        self, mock_get_db, mock_settings_fn, MockSettings, mock_chord,
+    ):
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._run(0, mock_get_db, mock_settings_fn, MockSettings)
+        # No chord dispatched — nothing was validated as empty.
+        mock_chord.assert_not_called()
+
+    @patch("app.tasks.upload_validation_tasks.chord")
+    @patch("app.config.Settings")
+    @patch("app.tasks.upload_validation_tasks._get_compliance_settings")
+    @patch("app.tasks.upload_validation_tasks._get_db")
+    def test_final_attempt_degrades_to_empty_text(
+        self, mock_get_db, mock_settings_fn, MockSettings, mock_chord,
+    ):
+        from app.tasks.upload_validation_tasks import perform_document_validation
+
+        self._run(
+            perform_document_validation.max_retries, mock_get_db, mock_settings_fn, MockSettings,
+        )
+        # Out of retries: the chord still runs (with zero chunks) so the
+        # "validating" flag clears instead of stalling forever.
+        mock_chord.assert_called_once()

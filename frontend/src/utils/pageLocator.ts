@@ -16,7 +16,15 @@
 export function formatPageLocator(
   page: unknown,
   approximate?: boolean,
+  pageEnd?: unknown,
 ): string | null {
   if (typeof page !== 'number' || !Number.isInteger(page)) return null
-  return approximate ? `p. ~${page}` : `p. ${page}`
+  const single = approximate ? `p. ~${page}` : `p. ${page}`
+  // A retrieved chunk that crosses a page break and whose matching passage
+  // could not be pinned to one page is cited as the range it covers, rather
+  // than the page it happens to start on.
+  if (typeof pageEnd === 'number' && Number.isInteger(pageEnd) && pageEnd > page) {
+    return `${single}–${pageEnd}`
+  }
+  return single
 }

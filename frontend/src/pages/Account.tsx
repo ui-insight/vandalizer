@@ -428,7 +428,8 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
           </div>
           <div className="p-4 space-y-4">
             <p className="text-sm text-gray-600">
-              Choose which emails we send you. We never share your address.
+              Choose which emails we send you. Failure alerts, review requests, and
+              security emails are always delivered.
             </p>
             {!emailPrefs ? (
               <p className="text-sm text-gray-400">Loading...</p>

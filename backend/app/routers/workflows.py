@@ -17,6 +17,7 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.dependencies import get_api_key_user, get_current_user
+from app.exceptions import TrialSpendBlockedError
 from app.models.user import User
 from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
@@ -428,7 +429,7 @@ def _render_workflow_output(status: dict, format: str, parse_structured: bool) -
     # its bytes back untouched under its own filename, ignoring the requested format.
     if isinstance(output_data, dict) and output_data.get("type") == "file_download":
         file_bytes = base64.b64decode(output_data["data_b64"])
-        media_type_map = {"pdf": "application/pdf", "csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "json": "application/json", "zip": "application/zip"}
+        media_type_map = {"pdf": "application/pdf", "csv": "text/csv", "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "json": "application/json", "zip": "application/zip"}
         file_type = output_data.get("file_type", "")
         media_type = media_type_map.get(file_type, "application/octet-stream")
         return file_bytes, media_type, file_type or "bin", output_data.get("filename", "output")
@@ -768,6 +769,11 @@ async def get_workflow(
     wf = await svc.get_workflow(workflow_id, user=user, share_token=share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    # The Input tab lists fixed documents by their saved title; tell it which
+    # ones have since been deleted from Files so it can say so.
+    input_cfg = await svc.annotate_missing_fixed_documents(wf.get("input_config"))
+    if input_cfg is not None:
+        wf = {**wf, "input_config": input_cfg}
     return await _workflow_response_from_dict(wf)
 
 
@@ -1220,7 +1226,9 @@ async def get_workflow_suggestions(
     if not latest:
         raise HTTPException(status_code=404, detail="No validation runs found for this workflow")
     result_snapshot = latest.get("result_snapshot", latest)
-    suggestions = await generate_improvement_suggestions("workflow", workflow_id, result_snapshot)
+    suggestions = await generate_improvement_suggestions(
+        "workflow", workflow_id, result_snapshot, user_id=user.user_id,
+    )
     return {"suggestions": suggestions}
 
 
@@ -1248,7 +1256,13 @@ async def improve_prompt_endpoint(
             input_source=body.input_source,
             prev_step_name=body.prev_step_name,
             sample_input=body.sample_input,
+            user_id=user.user_id,
         )
+    except TrialSpendBlockedError:
+        # Let the AppError handler answer with the gate's own status and
+        # message; wrapping it in a 502 would report a trial limit as a
+        # provider outage.
+        raise
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 

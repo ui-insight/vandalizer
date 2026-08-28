@@ -5,6 +5,8 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
 import { getWorkflowStatus, downloadResults } from '../../api/workflows'
+import { FileOutputCard } from './FileOutputCard'
+import { summarizeFilePayload } from './outputFilePayload'
 
 export interface HistoryRun {
   id: string
@@ -140,18 +142,23 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
     )
   }
 
+  const file = summarizeFilePayload(output)
   return (
     <div style={{ marginTop: 8 }}>
-      <div
-        className="chat-markdown"
-        style={{
-          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-          padding: 12, fontSize: 13, lineHeight: 1.6,
-          maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
-          color: '#374151', wordBreak: 'break-word',
-        }}
-        dangerouslySetInnerHTML={{ __html: renderMarkdownOutput(output) }}
-      />
+      {file ? (
+        <FileOutputCard summary={file} downloadHref={downloadResults(sessionId, 'text')} maxHeight="50vh" />
+      ) : (
+        <div
+          className="chat-markdown"
+          style={{
+            backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+            padding: 12, fontSize: 13, lineHeight: 1.6,
+            maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
+            color: '#374151', wordBreak: 'break-word',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdownOutput(output) }}
+        />
+      )}
       <div style={{ position: 'relative', display: 'inline-block', marginTop: 8 }}>
         <button
           onClick={() => setShowDownload(s => !s)}

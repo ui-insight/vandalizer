@@ -293,6 +293,73 @@ class TestDocumentRendererNode:
         decoded = base64.b64decode(result["output"]["data_b64"]).decode()
         assert json.loads(decoded) == {"k": "v"}
 
+    # The step advertised "DOCX, PDF, etc." and produced .md or .txt whatever
+    # the setting said (support ticket). It now renders the formats it names.
+
+    def test_pdf_render_produces_a_pdf_from_markdown(self):
+        node = DocumentRendererNode({"format": "pdf", "filename": "award_summary"})
+        result = node.process({"output": "# Award\n\n**PI:** Dr. Ada\n\n- one\n- two"})
+        out = result["output"]
+        assert out["file_type"] == "pdf" and out["filename"] == "award_summary.pdf"
+        pdf = base64.b64decode(out["data_b64"])
+        assert pdf.startswith(b"%PDF")
+        import fitz
+
+        text = "".join(page.get_text() for page in fitz.open(stream=pdf, filetype="pdf"))
+        assert "award summary" in text  # filename doubles as the document title
+        assert "Dr. Ada" in text and "one" in text
+        assert "**" not in text and "# Award" not in text  # markdown rendered, not pasted
+
+    def test_pdf_title_can_be_set(self):
+        node = DocumentRendererNode({"format": "pdf", "filename": "x", "title": "Quarterly Report"})
+        pdf = base64.b64decode(node.process({"output": "body"})["output"]["data_b64"])
+        import fitz
+
+        assert "Quarterly Report" in fitz.open(stream=pdf, filetype="pdf")[0].get_text()
+
+    def test_docx_render_produces_a_word_document(self):
+        node = DocumentRendererNode({"format": "docx", "filename": "letter"})
+        result = node.process({"output": "# Dear PI\n\nYour award is **approved**."})
+        out = result["output"]
+        assert out["file_type"] == "docx" and out["filename"] == "letter.docx"
+        raw = base64.b64decode(out["data_b64"])
+        assert raw[:2] == b"PK"
+        import io
+
+        from docx import Document
+
+        doc = Document(io.BytesIO(raw))
+        paragraphs = [p.text for p in doc.paragraphs]
+        assert "Dear PI" in paragraphs
+        assert any("approved" in p and "**" not in p for p in paragraphs)
+
+    def test_structured_input_renders_as_a_table_in_pdf_and_docx(self):
+        rows = [{"field": "rate", "value": "47.5%"}, {"field": "cap", "value": "n/a"}]
+        pdf = base64.b64decode(DocumentRendererNode({"format": "pdf"}).process({"output": rows})["output"]["data_b64"])
+        import fitz
+
+        assert "47.5%" in fitz.open(stream=pdf, filetype="pdf")[0].get_text()
+        import io
+
+        from docx import Document
+
+        raw = base64.b64decode(DocumentRendererNode({"format": "docx"}).process({"output": rows})["output"]["data_b64"])
+        assert Document(io.BytesIO(raw)).tables[0].rows[1].cells[1].text == "47.5%"
+
+    def test_unknown_format_falls_back_to_text(self):
+        result = DocumentRendererNode({"format": "rtf", "filename": "f"}).process({"output": "x"})
+        assert result["output"]["filename"] == "f.txt"
+
+    def test_blank_filename_defaults(self):
+        result = DocumentRendererNode({"format": "md", "filename": "  "}).process({"output": "x"})
+        assert result["output"]["filename"] == "output.md"
+
+    def test_file_input_is_a_configuration_error(self):
+        upstream = {"type": "file_download", "data_b64": "QUJD", "file_type": "pdf", "filename": "form-filled.pdf"}
+        result = DocumentRendererNode({"format": "pdf"}).process({"output": upstream})
+        assert "received a file (form-filled.pdf)" in result["error"]
+        assert result["output"] == ""
+
 
 class TestKnowledgeBaseQueryNodeApproximatePages:
     """A KB Query node in ``answer`` mode writes prose that flows into

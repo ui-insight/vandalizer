@@ -76,6 +76,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const u = await authApi.getMe()
       setUser(u)
+      // A successful /me means any earlier trial lockout is over (e.g. the
+      // user just renewed from the trial-end screen). Clear the expiry flags,
+      // or ProtectedRoute bounces the renewed user straight back to
+      // /demo/trial-end in a loop.
+      setDemoExpired(false)
+      setDemoFeedbackToken(null)
     } catch {
       // ignore
     }

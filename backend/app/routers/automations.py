@@ -19,6 +19,8 @@ from app.models.user import User
 from app.models.workflow import WorkflowResult
 from app.rate_limit import limiter
 from app.schemas.automations import (
+    RunNowRequest,
+    RunNowResponse,
     AutomationResponse,
     CreateAutomationRequest,
     TriggerEventStatusResponse,
@@ -27,6 +29,7 @@ from app.schemas.automations import (
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
+from app.services import automation_run_now
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -349,19 +352,11 @@ async def get_active_automations(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
-@router.get("/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
-@limiter.limit("60/minute")
-async def get_trigger_event_status(
-    request: Request,
-    trigger_event_id: str,
-    user: User = Depends(get_api_key_user),
-):
-    """Poll the status and output of a triggered automation run.
-
-    Works for both workflow and extraction trigger events.
-    Returns output data once the run has completed.
-    """
-    # Try WorkflowTriggerEvent first
+async def _trigger_event_status(trigger_event_id: str, *, may_view):
+    """Status + output of a trigger event, for the API-key route and the
+    editor's cookie-auth route alike. ``may_view(automation_id | None,
+    event_user_id | None)`` decides whether the caller may see the event;
+    a refusal is a 404 so ids cannot be probed."""
     try:
         oid = ObjectId(trigger_event_id)
     except Exception:
@@ -369,16 +364,9 @@ async def get_trigger_event_status(
 
     wf_event = await WorkflowTriggerEvent.find_one({"_id": oid})
     if wf_event:
-        # Verify ownership via automation
         ctx = wf_event.trigger_context or {}
-        auto_id = ctx.get("automation_id")
-        if auto_id:
-            try:
-                auto = await Automation.get(PydanticObjectId(auto_id))
-            except Exception:
-                auto = None
-            if not auto or auto.user_id != user.user_id:
-                raise HTTPException(status_code=404, detail="Trigger event not found")
+        if not await may_view(ctx.get("automation_id"), None):
+            raise HTTPException(status_code=404, detail="Trigger event not found")
         output = None
         if wf_event.status == "completed" and wf_event.workflow_result:
             result = await WorkflowResult.get(wf_event.workflow_result)
@@ -401,10 +389,9 @@ async def get_trigger_event_status(
             )
         return resp
 
-    # Try ExtractionTriggerEvent
     ext_event = await ExtractionTriggerEvent.find_one({"_id": oid})
     if ext_event:
-        if ext_event.user_id != user.user_id:
+        if not await may_view(ext_event.automation_id, ext_event.user_id):
             raise HTTPException(status_code=404, detail="Trigger event not found")
         resp = TriggerEventStatusResponse(
             trigger_event_id=trigger_event_id,
@@ -424,6 +411,32 @@ async def get_trigger_event_status(
         return resp
 
     raise HTTPException(status_code=404, detail="Trigger event not found")
+
+
+@router.get("/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
+@limiter.limit("60/minute")
+async def get_trigger_event_status(
+    request: Request,
+    trigger_event_id: str,
+    user: User = Depends(get_api_key_user),
+):
+    """Poll the status and output of a triggered automation run.
+
+    Works for both workflow and extraction trigger events.
+    Returns output data once the run has completed.
+    """
+    async def _owner_only(automation_id, event_user_id):
+        if event_user_id is not None:
+            return event_user_id == user.user_id
+        if not automation_id:
+            return True
+        try:
+            auto = await Automation.get(PydanticObjectId(automation_id))
+        except Exception:
+            auto = None
+        return bool(auto and auto.user_id == user.user_id)
+
+    return await _trigger_event_status(trigger_event_id, may_view=_owner_only)
 
 
 # ---------------------------------------------------------------------------
@@ -492,6 +505,77 @@ async def delete_automation(automation_id: str, user: User = Depends(get_current
 # ---------------------------------------------------------------------------
 # API trigger endpoint (x-api-key auth)
 # ---------------------------------------------------------------------------
+
+
+@router.post("/{automation_id}/run-now", response_model=RunNowResponse)
+@limiter.limit("10/minute")
+async def run_automation_now(
+    request: Request,
+    automation_id: str,
+    body: RunNowRequest | None = None,
+    user: User = Depends(get_current_user),
+):
+    """Run an automation once, immediately, the way its trigger would.
+
+    A real run: the documents go through the passive pipeline and every
+    configured output — saved results, notifications, webhooks — fires. That
+    is the point (those are the parts most likely to be set up wrong), and
+    the editor says so before the click. Works on a disabled automation, so
+    it can be tested before it is switched on. Manage rights required.
+    """
+    auto, _team_access = await _load_authorized_automation(automation_id, user, manage=True)
+    if not auto.action_id:
+        raise HTTPException(status_code=400, detail="This automation has no action target selected yet.")
+
+    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
+    if chosen:
+        chosen = await _authorize_existing_documents(chosen, user)
+    selection = await automation_run_now.select_run_now_documents(auto, chosen_uuids=chosen)
+    if not selection["documents"]:
+        raise HTTPException(status_code=400, detail=selection["reason"] or "No documents to run with.")
+
+    doc_uuids = [d["uuid"] for d in selection["documents"]]
+    result = await _dispatch_action(
+        auto, user, doc_uuids, None, False, 30, None,
+        trigger_type="manual",
+        extra_context={"manual_run": True, "run_by_user_id": user.user_id},
+    )
+    if isinstance(result, JSONResponse):  # pragma: no cover - wait=False never returns one
+        raise HTTPException(status_code=500, detail="Unexpected dispatch response")
+
+    await audit_service.log_event(
+        action="automation.run_now",
+        actor_user_id=user.user_id,
+        resource_type="automation",
+        resource_id=automation_id,
+        detail={"trigger_event_id": result["trigger_event_id"], "document_count": len(doc_uuids)},
+    )
+    return RunNowResponse(
+        status="queued",
+        trigger_event_id=result["trigger_event_id"],
+        action_type=auto.action_type,
+        documents=[{"uuid": d["uuid"], "title": d["title"]} for d in selection["documents"]],
+        document_source=selection["source"],
+        documents_matched=selection["matched"],
+    )
+
+
+@router.get("/{automation_id}/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
+@limiter.limit("120/minute")
+async def get_automation_run_status(
+    request: Request,
+    automation_id: str,
+    trigger_event_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Cookie-auth twin of ``GET /runs/{id}`` for the editor: anyone who can
+    see the automation can watch its run."""
+    auto, _team_access = await _load_authorized_automation(automation_id, user)
+
+    async def _same_automation(event_automation_id, _event_user_id):
+        return str(event_automation_id or "") == str(auto.id)
+
+    return await _trigger_event_status(trigger_event_id, may_view=_same_automation)
 
 
 @router.post("/{automation_id}/trigger")
@@ -621,7 +705,10 @@ async def trigger_automation(
         raise HTTPException(status_code=500, detail=f"Error dispatching action: {e}")
 
 
-async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None):
+async def _dispatch_action(
+    auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None,
+    *, trigger_type: str = "api", extra_context: dict | None = None,
+):
     if not auto.action_id:
         raise HTTPException(
             status_code=400,
@@ -649,6 +736,8 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
             document_oids=doc_oids,
             callback_url=callback_url,
             temp_doc_uuids=temp_doc_uuids or [],
+            trigger_type=trigger_type,
+            extra_context=extra_context,
         )
 
         # Dispatch to the passive execution pipeline
@@ -698,6 +787,10 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
             trigger_ctx["callback_url"] = callback_url
         if temp_doc_uuids:
             trigger_ctx["temp_doc_uuids"] = temp_doc_uuids
+        if extra_context:
+            trigger_ctx.update(extra_context)
+        if trigger_type != "api":
+            trigger_ctx["trigger_type"] = trigger_type
         ext_event = ExtractionTriggerEvent(
             automation_id=str(auto.id),
             search_set_uuid=auto.action_id,

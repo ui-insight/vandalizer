@@ -15,7 +15,7 @@ import { citationAnchor } from '../../utils/textMatch'
 
 const THINKING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
-  'Processing', 'Brewing', 'Crunching', 'Conjuring',
+  'Processing', 'Reading', 'Reviewing',
 ]
 
 function ThinkingLabel() {
@@ -534,7 +534,7 @@ export function ChatMessage({
                     Sources:
                   </span>
                   {message.citations.map((c, i) => {
-                    const locator = formatPageLocator(c.page, c.page_approximate) ?? (c.sheet || null)
+                    const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
                     const label = locator ? `${c.document_title} · ${locator}` : c.document_title
                     const preview = c.content_preview || ''
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
@@ -634,7 +634,7 @@ export function ChatMessage({
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
                       {open.document_title}
                       {(() => {
-                        const loc = formatPageLocator(open.page, open.page_approximate) ?? open.sheet
+                        const loc = formatPageLocator(open.page, open.page_approximate, open.page_end) ?? open.sheet
                         return loc ? ` · ${loc}` : ''
                       })()}
                     </div>

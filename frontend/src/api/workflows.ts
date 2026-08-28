@@ -277,7 +277,9 @@ export function testStep(data: { task_name: string; task_data: Record<string, un
 }
 
 export function getTestStepStatus(taskId: string) {
-  return apiFetch<{ status: string; result?: unknown; error?: string }>(`/api/workflows/steps/test/${taskId}`)
+  // `warning`: the step completed but flagged something (e.g. fields a Form
+  // Filler could not fill) — show it, the output needs checking.
+  return apiFetch<{ status: string; result?: unknown; error?: string; warning?: string }>(`/api/workflows/steps/test/${taskId}`)
 }
 
 export function downloadResults(

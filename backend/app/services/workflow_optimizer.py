@@ -730,24 +730,43 @@ def _build_candidates(
         overrides = {s["name"]: {"model": m, "prompt_variant": "default"} for s in llm_steps}
         _add(f"uniform-{_model_short(m)}", overrides)
 
-    # 4. Random samples (per-step independent draws) to fill quota
-    while len(candidates) < max_candidates:
+    # 4. Random samples (per-step independent draws) to fill quota.
+    #
+    # The search space can be tiny — one Extraction step (no prompt variants)
+    # and two models is exactly two distinct draws, one of which is the
+    # baseline — so the loop is bounded by *attempts*. A brake on the number
+    # of distinct keys cannot work: once the space is exhausted every draw is
+    # a duplicate that ``_add`` discards, so the count never moves. That
+    # brake spun a production optimize task in this loop for 90 minutes until
+    # Celery's soft time limit killed it (VANDALIZER-BACKEND-2K).
+    max_attempts = max(20, 5 * max_candidates)
+    for _ in range(max_attempts):
+        if len(candidates) >= max_candidates:
+            break
         overrides: dict[str, dict] = {}
         for step in llm_steps:
             m = rng.choice(model_names) if model_names else baseline_model
             variants_pool = PROMPT_VARIANTS if step["variant_eligible"] else ["default"]
             v = rng.choice(variants_pool)
             overrides[step["name"]] = {"model": m, "prompt_variant": v}
-        # Skip degenerate samples (all-default) that match the baseline.
-        if _overrides_key(overrides) == _overrides_key({}):
+        # Skip draws that are the baseline in disguise (every step on the
+        # baseline model with the default prompt) — that trial already runs.
+        if _is_baseline_shape(overrides, baseline_model):
             continue
         _add(f"random-{len(candidates) + 1}", overrides)
-        # Safety brake — if the per-step search space is tiny, we may have
-        # exhausted distinct candidates before hitting max_candidates.
-        if len(seen_keys) > 5 * max_candidates:
-            break
 
     return candidates[:max_candidates]
+
+
+def _is_baseline_shape(overrides: dict[str, dict], baseline_model: str) -> bool:
+    """True when ``overrides`` changes nothing relative to the baseline trial."""
+    return all(
+        ov.get("model") in (None, baseline_model)
+        and (ov.get("prompt_variant") or "default") == "default"
+        and not ov.get("prompt_rewrite")
+        and not ov.get("retry_on_empty")
+        for ov in overrides.values()
+    )
 
 
 async def _generate_prompt_rewrites(

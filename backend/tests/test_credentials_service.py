@@ -537,3 +537,100 @@ class TestMergeUpdatePayload:
             validate_payload("oauth_client_credentials", merged)
         re_encrypted = encrypt_payload("oauth_client_credentials", merged)
         assert decrypt_payload("oauth_client_credentials", re_encrypted)["private_key"] == "NEW-KEY"
+
+
+# ---------------------------------------------------------------------------
+# Connection test (the "Test" button)
+# ---------------------------------------------------------------------------
+
+from app.services.credentials_service import run_connection_test  # noqa: E402
+
+
+def _http_client(status=200, text="", reason="OK", raise_request=None):
+    resp = MagicMock()
+    resp.status_code = status
+    resp.text = text
+    resp.reason_phrase = reason
+    client = MagicMock()
+    client.__enter__ = MagicMock(return_value=client)
+    client.__exit__ = MagicMock(return_value=False)
+    if raise_request:
+        client.get.side_effect = raise_request
+    else:
+        client.get.return_value = resp
+    return client
+
+
+class TestTestCredential:
+    def test_missing_field_stops_at_configuration(self):
+        report = run_connection_test("static_header", {"header_name": "X-Api-Key"})
+        assert report["ok"] is False
+        assert [s["step"] for s in report["steps"]] == ["Configuration"]
+        assert "header_value" in report["steps"][0]["detail"]
+
+    def test_static_header_without_url_reports_the_header_but_never_the_secret(self):
+        report = run_connection_test("static_header", {"header_name": "X-Api-Key", "header_value": "s3cret-value"})
+        assert report["ok"] is True
+        assert [s["step"] for s in report["steps"]] == ["Configuration", "Header", "Test request"]
+        assert "X-Api-Key" in report["steps"][1]["detail"]
+        assert "s3cret" not in str(report)
+        assert "add one" in report["steps"][2]["detail"]
+
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service.httpx.Client")
+    def test_get_with_the_header_applied(self, mock_client_cls, _v):
+        client = _http_client(200)
+        mock_client_cls.return_value = client
+        report = run_connection_test("static_header", {"header_name": "X-Api-Key", "header_value": "k"},
+                                 test_url="https://api.example.com/ping")
+        assert report["ok"] is True and report["status_code"] == 200
+        assert report["steps"][-1]["detail"].startswith("GET https://api.example.com/ping → 200 OK")
+        sent_headers = client.get.call_args.kwargs["headers"]
+        assert sent_headers["X-Api-Key"] == "k"
+
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service.httpx.Client")
+    def test_401_fails_with_a_hint_and_body_preview(self, mock_client_cls, _v):
+        mock_client_cls.return_value = _http_client(401, text='{"error":"bad key"}', reason="Unauthorized")
+        report = run_connection_test("static_header", {"header_name": "X-Api-Key", "header_value": "k"},
+                                 test_url="https://api.example.com/ping")
+        assert report["ok"] is False and report["status_code"] == 401
+        last = report["steps"][-1]
+        assert last["ok"] is False
+        assert "rejected the credential" in last["detail"]
+        assert 'Response: {"error":"bad key"}' in last["detail"]
+
+    @patch("app.services.credentials_service.validate_outbound_url", side_effect=ValueError("private address"))
+    def test_blocked_test_url_fails_before_any_request(self, _v):
+        report = run_connection_test("static_header", {"header_name": "X", "header_value": "k"}, test_url="http://10.0.0.1/")
+        assert report["ok"] is False
+        assert "Test URL not allowed: private address" in report["steps"][-1]["detail"]
+
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service.httpx.Client")
+    def test_connection_failure_is_reported_not_raised(self, mock_client_cls, _v):
+        import httpx as _httpx
+        mock_client_cls.return_value = _http_client(raise_request=_httpx.ConnectError("dns failed"))
+        report = run_connection_test("static_header", {"header_name": "X", "header_value": "k"}, test_url="https://nope.example/")
+        assert report["ok"] is False
+        assert "failed before a response" in report["steps"][-1]["detail"]
+
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service._exchange_token", return_value=("tok-abc", 600))
+    def test_oauth_exchanges_a_real_token_and_never_shows_it(self, _ex, _v, rsa_private_pem):
+        report = run_connection_test("oauth_client_credentials", {
+            "client_id": "c", "token_endpoint": "https://issuer/token", "private_key": rsa_private_pem,
+        })
+        assert report["ok"] is True
+        assert report["steps"][1]["step"] == "Token exchange" and "expires in 600 s" in report["steps"][1]["detail"]
+        assert "tok-abc" not in str(report)
+
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service._exchange_token", side_effect=CredentialError("Token endpoint returned 400: invalid_client"))
+    def test_oauth_exchange_failure_is_the_report(self, _ex, _v, rsa_private_pem):
+        report = run_connection_test("oauth_client_credentials", {
+            "client_id": "c", "token_endpoint": "https://issuer/token", "private_key": rsa_private_pem,
+        }, test_url="https://api.example.com/")
+        assert report["ok"] is False
+        assert [s["step"] for s in report["steps"]] == ["Configuration", "Token exchange"]
+        assert "invalid_client" in report["steps"][1]["detail"]

@@ -97,9 +97,11 @@ export function useOnboarding(): OnboardingResult {
         setPills(firstSession ? [] : applyStatus(s))
       })
       .catch(() => {
-        // Default to first-session experience on API failure
-        setIsFirstSession(true)
-        setIsNewUser(true)
+        // On API failure, fall back to the ordinary returning-user experience:
+        // showing the first-session onboarding to an established user on a
+        // transient error is worse than showing no pills to a new one.
+        setIsFirstSession(false)
+        setIsNewUser(false)
         setPills([])
       })
       .finally(() => setLoading(false))

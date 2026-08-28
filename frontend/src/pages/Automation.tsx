@@ -8,6 +8,7 @@ import {
   Clock,
   Workflow,
   TrendingUp,
+  Search,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { getAutomationStats } from '../api/config'
@@ -32,17 +33,36 @@ function statusBadge(status: string) {
 export default function Automation() {
   const [stats, setStats] = useState<AutomationStats | null>(null)
   const [workflows, setWorkflows] = useState<WorkflowType[]>([])
+  // The server's full match count. The list endpoint caps a page at 500, so
+  // this is what tells a complete list from a truncated one.
+  const [total, setTotal] = useState(0)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getAutomationStats(), listWorkflows({ limit: 500 })])
-      .then(([s, page]) => {
-        setStats(s)
+    getAutomationStats().then(setStats).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  useEffect(() => {
+    let cancelled = false
+    // Searched server-side across every visible workflow, not filtered from
+    // the page in hand — anything past the cap is otherwise unreachable.
+    listWorkflows({ search: debouncedSearch || undefined, limit: 500 })
+      .then((page) => {
+        if (cancelled) return
         setWorkflows(page.items)
+        setTotal(page.total)
       })
       .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [debouncedSearch])
 
   if (loading) {
     return (
@@ -114,14 +134,30 @@ export default function Automation() {
 
         {/* Workflows with automation status */}
         <div className="rounded-lg border border-gray-200 bg-white">
-          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-4 py-3">
             <Workflow className="h-4 w-4 text-gray-400" />
             <h3 className="font-medium text-gray-900">Workflows</h3>
+            <span className="text-xs text-gray-500">
+              {workflows.length < total
+                ? `Showing ${workflows.length} of ${total}${debouncedSearch ? ' matching' : ''} — search to narrow`
+                : `${total}${debouncedSearch ? ' matching' : ''}`}
+            </span>
+            <label className="ml-auto flex items-center gap-2 rounded-md border border-gray-200 px-2 py-1 text-sm focus-within:border-highlight">
+              <Search className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search workflows"
+                aria-label="Search workflows"
+                className="w-44 bg-transparent text-gray-900 outline-none placeholder:text-gray-400"
+              />
+            </label>
           </div>
           <div className="divide-y divide-gray-100">
             {workflows.length === 0 ? (
               <div className="p-6 text-center text-sm text-gray-500">
-                No workflows found.
+                {debouncedSearch ? `No workflows match “${debouncedSearch}”.` : 'No workflows found.'}
               </div>
             ) : (
               workflows.map((wf) => {

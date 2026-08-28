@@ -15,7 +15,9 @@ import { MoveFolderDialog } from './MoveFolderDialog'
 import { MoveFileDialog } from './MoveFileDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
-import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DocumentUsage } from '../../api/files'
+import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
@@ -70,6 +72,22 @@ interface FileBrowserProps {
   // Override the team scope used to list/scope documents (project's team).
   teamScopeUuid?: string
 }
+
+// Usage for one or more documents, merged. `undefined` when any lookup fails,
+// so the confirmation can say the check did not happen rather than imply
+// "used nowhere".
+async function collectUsage(docUuids: string[]): Promise<UsageGroups | undefined> {
+  const settled = await Promise.allSettled(docUuids.map(u => fetchDocumentUsage(u)))
+  const ok: DocumentUsage[] = []
+  for (const r of settled) {
+    if (r.status !== 'fulfilled') return undefined
+    ok.push(r.value)
+  }
+  return mergeUsage(ok)
+}
+
+// The delete confirmation names what it deletes; past this many, "and N more".
+const DELETE_NAME_CAP = 8
 
 export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
@@ -270,11 +288,36 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     if (fileCount > 0) parts.push(`${fileCount} file${fileCount === 1 ? '' : 's'}`)
     if (folderCount > 0) parts.push(`${folderCount} folder${folderCount === 1 ? '' : 's'}`)
     const summary = parts.join(' and ')
+    // Name what is about to go, and say what depends on it. "Delete 1 file?"
+    // let a wrong selection through, and a file can be a knowledge-base
+    // source, an extraction test case, or a workflow's fixed document
+    // without anything here saying so.
+    const selectedFolderNames = folders.filter(f => selectedUuids.has(f.uuid)).map(f => f.title)
+    const selectedDocs = documents.filter(d => selectedUuids.has(d.uuid))
+    const docUuids = selectedDocs.map(d => d.uuid)
+    const names = [...selectedDocs.map(d => d.title), ...selectedFolderNames]
+    const shownNames = names.slice(0, DELETE_NAME_CAP)
+    const moreNames = names.length - shownNames.length
+    const usage = docUuids.length > 0 ? await collectUsage(docUuids) : null
+    const oneDoc = docUuids.length === 1
     const ok = await confirm({
       title: `Delete ${summary}?`,
-      message: folderCount > 0
-        ? `Are you sure you want to delete ${summary}? Folders will be removed along with everything inside them. This cannot be undone.`
-        : `Are you sure you want to delete ${summary}? This cannot be undone.`,
+      message: (
+        <>
+          Are you sure you want to delete <strong>{shownNames.length > 0 ? shownNames.join(', ') : summary}</strong>{moreNames > 0 ? ` and ${moreNames} more` : ''}?
+          {folderCount > 0 ? ' Folders will be removed along with everything inside them.' : ''} This cannot be undone.
+          {usage === undefined && <UsageCheckFailedNote many={!oneDoc} />}
+          {usage && usage.total > 0 && (
+            <div style={{ marginTop: 8 }}>
+              {oneDoc ? <><strong>{selectedDocs[0].title}</strong> is</> : 'These files are'} {summarizeUsage(usage)}.
+              {oneDoc
+                ? ' Deleting it removes it from each of these, and a workflow that pins it will fail until it is replaced.'
+                : ' Deleting them removes them from each of these, and a workflow that pins one will fail until it is replaced.'}
+              <UsageSummaryList usage={usage} />
+            </div>
+          )}
+        </>
+      ),
       confirmLabel: 'Delete',
       destructive: true,
     })
@@ -298,7 +341,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       refresh()
       setBulkDeleting(false)
     }
-  }, [selectedUuids, folders, refresh, confirm])
+  }, [selectedUuids, folders, documents, refresh, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
     try {
@@ -320,6 +363,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [selectedUuids, documents])
 
   // Context menu state
+  const [usageTarget, setUsageTarget] = useState<{ uuid: string; title: string } | null>(null)
+  const { openWorkflow, openExtraction, activateKB } = useWorkspace()
   const [contextMenu, setContextMenu] = useState<{
     x: number
     y: number
@@ -472,15 +517,26 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       const name = (item as { name?: string; title?: string } | undefined)?.name
         || (item as { title?: string } | undefined)?.title
         || (type === 'folder' ? 'this folder' : 'this file')
+      // Say what depends on a document before it goes: a knowledge base loses
+      // a source, an extraction its test case, a workflow its pinned input.
+      // `undefined` means the check failed; the dialog says so rather than
+      // passing it off as "used nowhere".
+      const usage: UsageGroups | null | undefined = type === 'doc' ? await collectUsage([uuid]) : null
       const ok = await confirm({
         title: type === 'folder' ? 'Delete folder?' : 'Delete file?',
         message: type === 'folder' ? (
           <>
             Are you sure you want to delete <strong>{name}</strong> and everything inside it? This cannot be undone.
           </>
+        ) : usage && usage.total > 0 ? (
+          <>
+            <strong>{name}</strong> is {summarizeUsage(usage)}. Deleting it removes it from each of these, and a workflow that pins it will fail until it is replaced. This cannot be undone.
+            <UsageSummaryList usage={usage} />
+          </>
         ) : (
           <>
             Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.
+            {usage === undefined && <UsageCheckFailedNote />}
           </>
         ),
         confirmLabel: 'Delete',
@@ -686,6 +742,17 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
         />
       </div>
 
+      {usageTarget && (
+        <DocumentUsageDialog
+          docUuid={usageTarget.uuid}
+          docTitle={usageTarget.title}
+          onClose={() => setUsageTarget(null)}
+          onOpenWorkflow={(id) => openWorkflow(id)}
+          onOpenExtraction={(uuid) => openExtraction(uuid)}
+          onOpenKnowledgeBase={(uuid, title) => activateKB(uuid, title)}
+        />
+      )}
+
       {contextMenu && (
         <ContextMenu
           x={contextMenu.x}
@@ -751,6 +818,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onCopyUuid={() => {
             navigator.clipboard.writeText(contextMenu.item.uuid)
           }}
+          onShowUsage={
+            contextMenu.type === 'doc'
+              ? () => setUsageTarget({ uuid: contextMenu.item.uuid, title: contextMenu.item.title })
+              : undefined
+          }
           onConvertToTeam={
             contextMenu.type === 'folder' && currentTeam && !(contextMenu.item as Folder).team_id
               ? async () => {

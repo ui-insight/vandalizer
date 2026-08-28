@@ -27,7 +27,7 @@ export function PresentShell({ children, activeAudience, showSidebar = true }: P
           <div className="flex items-center gap-6">
             <Link
               to="/landing"
-              search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }}
+              search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }}
               className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors"
             >
               Vandalizer

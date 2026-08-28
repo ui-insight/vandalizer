@@ -1,6 +1,9 @@
 """Tests for app.services.llm_service — protocol detection."""
 
 import asyncio
+import httpx
+import pytest
+from unittest.mock import AsyncMock, patch
 
 from app.services import llm_service
 from app.services.llm_service import (
@@ -309,6 +312,86 @@ class TestPerLoopHttpClient:
         del loop, client
         gc.collect()
         assert len(llm_service._loop_http_clients) == 0
+
+
+class TestRateLimitRetryTransport:
+    """A 429 from the gateway is a per-minute window, not a blip: wait for the
+    window to move (Retry-After if given, else exponential + jitter), and on
+    exhaustion return the real 429 so the SDK raises its own RateLimitError
+    (Sentry VANDALIZER-BACKEND-2T: three SDK retries inside 400ms, all 429)."""
+
+    @staticmethod
+    def _client(statuses, headers=None):
+        """Client whose transport answers with the given statuses in order."""
+        calls = []
+
+        def handler(request):
+            calls.append(request)
+            status = statuses[min(len(calls) - 1, len(statuses) - 1)]
+            return httpx.Response(
+                status, json={"detail": "x"},
+                headers=headers if status == 429 else None,
+            )
+
+        transport = llm_service.RateLimitRetryTransport(
+            httpx.MockTransport(handler), max_attempts=4, base_wait=2.0, max_wait=30.0,
+        )
+        return httpx.AsyncClient(transport=transport), calls
+
+    @pytest.mark.asyncio
+    async def test_retries_429_then_returns_success(self):
+        client, calls = self._client([429, 429, 200])
+        with patch.object(llm_service.asyncio, "sleep", new=AsyncMock()) as sleep, \
+             patch.object(llm_service.random, "uniform", return_value=0.0):
+            async with client:
+                r = await client.post("https://gw.example/v1/chat/completions", json={"a": 1})
+        assert r.status_code == 200
+        assert len(calls) == 3
+        # exponential fallback: 2s, then 4s
+        assert [c.args[0] for c in sleep.call_args_list] == [2.0, 4.0]
+
+    @pytest.mark.asyncio
+    async def test_honours_retry_after_header(self):
+        client, _ = self._client([429, 200], headers={"Retry-After": "7"})
+        with patch.object(llm_service.asyncio, "sleep", new=AsyncMock()) as sleep, \
+             patch.object(llm_service.random, "uniform", return_value=0.0):
+            async with client:
+                r = await client.post("https://gw.example/v1/chat/completions", json={})
+        assert r.status_code == 200
+        assert sleep.call_args_list[0].args[0] == 7.0
+
+    @pytest.mark.asyncio
+    async def test_exhaustion_returns_the_real_429(self):
+        """Not raised: an escaping exception would reach the OpenAI SDK as a
+        'Connection error' and hide that this was a rate limit."""
+        client, calls = self._client([429])
+        with patch.object(llm_service.asyncio, "sleep", new=AsyncMock()) as sleep:
+            async with client:
+                r = await client.post("https://gw.example/v1/chat/completions", json={})
+        assert r.status_code == 429
+        assert len(calls) == 4  # max_attempts
+        assert sleep.await_count == 3
+
+    @pytest.mark.asyncio
+    async def test_other_statuses_pass_through_untouched(self):
+        client, calls = self._client([500])
+        with patch.object(llm_service.asyncio, "sleep", new=AsyncMock()) as sleep:
+            async with client:
+                r = await client.post("https://gw.example/v1/chat/completions", json={})
+        assert r.status_code == 500
+        assert len(calls) == 1
+        sleep.assert_not_awaited()
+
+    def test_loop_client_is_built_on_the_retry_transport(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            client = llm_service._get_loop_http_client()
+            assert isinstance(client._transport, llm_service.RateLimitRetryTransport)
+        finally:
+            loop.run_until_complete(client.aclose())
+            loop.close()
+            asyncio.set_event_loop(None)
 
 
 class TestTruncationCapture:

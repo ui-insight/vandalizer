@@ -22,11 +22,26 @@ def classify_document_task(self, document_uuid: str):
     not stamp a guessed classification on failure — silently marking a
     possibly-sensitive document "unrestricted" is worse than leaving it
     unclassified for a later re-run or manual reclassification.
+
+    A trial gate (``TrialSpendBlockedError``: unconfirmed email, exhausted
+    budget, fleet pause) raised at metering-scope entry is "couldn't afford
+    to run it", not a failure: it fires on every upload by a brand-new trial
+    user who hasn't clicked their confirmation link yet. Skip quietly — the
+    user already sees the gate's message wherever they try to spend tokens
+    deliberately, and the document can be reclassified once they're through.
     """
     from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
 
+    from app.exceptions import TrialSpendBlockedError
+
     try:
         run_task_async(_classify(document_uuid))
+    except TrialSpendBlockedError as blocked:
+        logger.info(
+            "Auto-classification skipped for %s — trial spend blocked (%s); "
+            "leaving unclassified",
+            document_uuid, type(blocked).__name__,
+        )
     except ModelHTTPError as exc:
         logger.warning(
             "Auto-classification skipped for %s — model returned HTTP %s "

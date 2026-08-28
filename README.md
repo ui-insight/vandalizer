@@ -272,6 +272,7 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 - [External API Reference](docs/api.md)
 - [Management API Reference](docs/mgmt-api.md)
 - [Anonymous Telemetry](docs/telemetry.md)
+- [Long-Document Model Routing](docs/long-document-model-routing.md)
 - [Authorization Matrix](AUTHORIZATION_MATRIX.md)
 - [Deployment Guide](DEPLOY.md)
 - [Operations Guide](OPERATIONS.md)

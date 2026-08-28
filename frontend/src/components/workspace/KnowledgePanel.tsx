@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -24,6 +25,7 @@ import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { SharedKBDeleteDialog, type SharedKBDeleteChoice } from '../shared/SharedKBDeleteDialog'
+import { OptimizedBadge, VerifiedBadge } from '../knowledge/KBTrustBadges'
 
 type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
@@ -341,7 +343,23 @@ export function KnowledgePanel() {
     api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
       .then((result) => {
         const n = result?.added ?? urls.length
-        toast(`Added ${n} URL${n === 1 ? '' : 's'}, crawling in background`, 'success')
+        const skipped = result?.skipped ?? 0
+        const plural = (c: number) => (c === 1 ? '' : 's')
+        if (n === 0 && skipped > 0) {
+          // Nothing was fetched: re-adding an existing URL is a no-op. Say so —
+          // a silent "Added 2" here sent one user on a fruitless refresh loop.
+          toast(
+            `${skipped} URL${plural(skipped)} already in this KB — nothing was fetched. Use the ↻ button on a source to re-fetch its page.`,
+            'info',
+          )
+        } else if (skipped > 0) {
+          toast(
+            `Added ${n} URL${plural(n)} — crawling in background. ${skipped} already in this KB and not re-fetched.`,
+            'success',
+          )
+        } else {
+          toast(`Added ${n} URL${plural(n)} — crawling in background`, 'success')
+        }
         loadDetail(selectedKB.uuid)
         refresh()
       })
@@ -350,6 +368,25 @@ export function KnowledgePanel() {
         toast(err instanceof Error ? err.message : 'Failed to add URLs', 'error')
       })
       .finally(() => setAddingUrls(false))
+  }
+
+  const handleRefreshSource = async (source: KnowledgeBaseSource) => {
+    if (!selectedKB) return
+    try {
+      await api.refreshKBSource(selectedKB.uuid, source.uuid)
+      // Optimistically flip to building so the status poller starts.
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        status: 'building',
+        sources: prev.sources.map(s => s.uuid === source.uuid ? { ...s, status: 'pending' as const } : s),
+      } : prev)
+      toast('Re-fetching page in background — previous text is kept if the fetch fails', 'success')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to refresh source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to refresh source', 'error')
+    }
   }
 
   const handleRemoveSource = async (sourceUuid: string) => {
@@ -775,34 +812,8 @@ export function KnowledgePanel() {
               Team
             </span>
           )}
-          {selectedKB.verified && (
-            <span style={{
-              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-              color: '#15803d', backgroundColor: '#dcfce7',
-              display: 'flex', alignItems: 'center', gap: 3,
-            }}>
-              <ShieldCheck size={10} />
-              Verified
-            </span>
-          )}
-          {selectedKB.has_optimized_config && (
-            <span
-              title={
-                selectedKB.optimized_config_set_at
-                  ? `Optimized settings applied ${new Date(selectedKB.optimized_config_set_at).toLocaleString()}`
-                  : 'Optimized settings applied'
-              }
-              style={{
-                fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
-                border: '1px solid rgba(124, 58, 237, 0.3)',
-                display: 'flex', alignItems: 'center', gap: 3,
-              }}
-            >
-              <Sparkles size={10} />
-              Optimized
-            </span>
-          )}
+          {selectedKB.verified && <VerifiedBadge />}
+          <OptimizedBadge kb={selectedKB} withTime />
           <span
             style={{
               fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
@@ -1344,9 +1355,47 @@ export function KnowledgePanel() {
                         {!isRenaming && source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
                         )}
-                        {!isRenaming && source.status === 'ready' && (
-                          <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{source.chunk_count} chunks</div>
-                        )}
+                        {!isRenaming && source.status === 'ready' && (() => {
+                          // Currency beside the size: when the text was last
+                          // actually obtained / indexed, whether the last
+                          // refresh failed and what is being served instead,
+                          // and a fingerprint of the indexed text — so an
+                          // evaluator can check a source is current without
+                          // opening the original.
+                          const cur = describeSourceCurrency(source.currency)
+                          const hash = source.currency?.content_hash
+                          const toneColor = cur?.tone === 'warn' ? '#b45309' : cur?.tone === 'error' ? '#ef4444' : '#888'
+                          return (
+                            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }} data-testid="source-currency">
+                              {source.chunk_count} chunks
+                              {cur && (
+                                <>
+                                  {' · '}
+                                  <span style={{ color: toneColor }} title={[
+                                    source.currency?.last_refresh_attempted_at ? `Last refresh attempted: ${formatCurrencyDateTime(source.currency.last_refresh_attempted_at)}` : null,
+                                    source.currency?.last_retrieved_at ? `Last retrieved: ${formatCurrencyDateTime(source.currency.last_retrieved_at)}` : null,
+                                    source.currency?.last_ingested_at ? `Last indexed: ${formatCurrencyDateTime(source.currency.last_ingested_at)}` : null,
+                                    source.currency?.content_retrieved_at ? `Serving text retrieved: ${formatCurrencyDateTime(source.currency.content_retrieved_at)}` : null,
+                                    source.currency?.last_refresh_error ? `Last refresh error: ${source.currency.last_refresh_error}` : null,
+                                  ].filter(Boolean).join('\n')}>
+                                    {cur.summary}
+                                  </span>
+                                </>
+                              )}
+                              {hash && (
+                                <>
+                                  {' · '}
+                                  <span
+                                    style={{ fontFamily: 'monospace' }}
+                                    title={`${source.currency?.content_hash_algorithm ?? 'sha256'} of the indexed text: ${hash}${source.currency?.content_hash_recorded ? '' : ' (computed from the stored snapshot; recorded at the next refresh)'}`}
+                                  >
+                                    {shortHash(hash)}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )
+                        })()}
                         {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
                             {source.status === 'processing'
@@ -1406,6 +1455,22 @@ export function KnowledgePanel() {
                               >
                                 <Pencil size={12} style={{ color: '#888' }} />
                               </button>
+                              {source.source_type === 'url' && (
+                                <button
+                                  type="button"
+                                  aria-label="Refresh source"
+                                  onClick={(e) => { e.stopPropagation(); handleRefreshSource(source) }}
+                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  title={
+                                    source.processed_at
+                                      ? `Re-fetch this page (last fetched ${new Date(source.processed_at).toLocaleDateString()})`
+                                      : 'Re-fetch this page'
+                                  }
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                                >
+                                  <RefreshCw size={12} style={{ color: '#888' }} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 aria-label="Remove source"

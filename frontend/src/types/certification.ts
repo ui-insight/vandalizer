@@ -25,7 +25,6 @@ export interface CertificationProgress {
   level: string
   certified: boolean
   certified_at: string | null
-  streak_days: number
   last_activity_date: string | null
   unlocked?: boolean
 }

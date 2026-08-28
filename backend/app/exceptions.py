@@ -40,3 +40,28 @@ class ConflictError(AppError):
 
     def __init__(self, message: str = "Resource conflict"):
         super().__init__(message, status_code=409)
+
+
+class TrialSpendBlockedError(AppError):
+    """Base for every reason a trial account may not spend LLM tokens.
+
+    All of these raise from the same place — metering-scope entry — so callers
+    that degrade gracefully (skip the step, tell the user, keep the job
+    moving) must catch *this*, not one specific subclass. Catching a subclass
+    is how a new gate silently turns a handled degradation back into an
+    unhandled failure.
+    """
+
+
+class TrialBudgetExceededError(TrialSpendBlockedError):
+    """A trial account has used up its included LLM token budget."""
+
+    def __init__(self, message: str = "Trial AI usage limit reached"):
+        super().__init__(message, status_code=402)
+
+
+class TrialUnverifiedError(TrialSpendBlockedError):
+    """A trial account must confirm its email address before spending tokens."""
+
+    def __init__(self, message: str = "Confirm your email to use AI features"):
+        super().__init__(message, status_code=403)

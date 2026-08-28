@@ -13,65 +13,29 @@ Vandalizer is an AI-powered document intelligence platform for research administ
 Full Dockerized install + admin account + catalog seed (the supported deploy path, for users asking how to deploy on a server): `./setup.sh` from the project root. See `DEPLOY.md`. The commands below are the hot-reload dev loop.
 
 ```bash
-# Backend
-cd backend
-uv sync
-uvicorn app.main:app --reload --port 8001
+# Backend (port 8001)
+cd backend && uv sync && uvicorn app.main:app --reload --port 8001
 
 # Celery workers
-cd backend
-./run_celery.sh start
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+cd backend && ./run_celery.sh start
 
 # Reset database, uploads, and ChromaDB (development only)
 ./scripts/reset_db.sh          # interactive
 ./scripts/reset_db.sh --force  # skip confirmation
-
-# Production
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
-## CI / Testing (Makefile)
+## CI / Testing
 
-```bash
-make backend-ci        # Unit tests (50% coverage gate) + tier-1 integration tests
-make backend-static    # Ruff lint + Bandit security scan
-make backend-backlog   # Mypy typecheck + pip-audit (non-blocking)
-make frontend-ci       # Typecheck, lint, audit, Vitest (coverage gate over whole src/ tree, currently ~6% lines — see frontend/vitest.config.ts), build
-make ci                # backend-ci + frontend-ci
-make release-check     # ci + backend-static + security-gate + Docker builds
+`make help` lists the targets. What it doesn't tell you:
 
-# Vulnerability scanning (Trivy — brew install trivy)
-make security          # Full report: both lockfiles, runtime base images, secrets, Dockerfile config
-make security-gate     # Release gate: fails on a fixable CRITICAL or a leaked secret
-
-# Integration test tiers (run individually)
-make backend-test-integration-t1   # Engine tests (no external deps)
-make backend-test-integration-t2   # MongoDB integration (needs INTEGRATION_MONGODB=1)
-make backend-test-integration-t3   # LLM integration (needs INTEGRATION_LLM=1)
-```
+- `make backend-ci` enforces a 50% coverage gate.
+- `make frontend-ci`'s coverage gate spans the whole `src/` tree, currently ~6% lines — see `frontend/vitest.config.ts` before assuming a change broke it.
+- `make backend-test-integration-t2` needs `INTEGRATION_MONGODB=1`; `-t3` needs `INTEGRATION_LLM=1`. Neither runs otherwise.
+- The `security` targets need Trivy on PATH (`brew install trivy`).
 
 ## Architecture
 
-### Backend (`backend/`)
-
-**FastAPI application** with Beanie ODM (async MongoDB driver built on Motor).
-
-- **`app/main.py`** — FastAPI app creation, middleware, router registration, Beanie initialization
-- **`app/config.py`** — Pydantic `Settings` (reads `.env`)
-- **`app/database.py`** — MongoDB/Beanie connection setup
-- **`app/dependencies.py`** — FastAPI dependency injection (current user, DB sessions)
-
-### Routers (`backend/app/routers/`)
-`activity`, `admin`, `audit`, `auth`, `automations`, `browser_automation`, `certification`, `chat`, `config`, `credentials`, `demo`, `documents`, `extractions`, `feedback`, `feedback_admin`, `feedback_prompt`, `files`, `folders`, `graph_webhooks`, `knowledge`, `library`, `mgmt`, `notifications`, `office`, `optimizer_inbox`, `organizations`, `projects`, `reviews`, `spaces`, `support`, `teams`, `telemetry`, `verification`, `workflows`
-
-### Data Models (`backend/app/models/`)
-Beanie `Document` classes: `User`, `Team`/`TeamMembership`, `SmartDocument`, `SmartFolder`, `Space`, `Workflow`/`WorkflowStep`/`WorkflowResult`, `ChatConversation`, `Library`/`LibraryItem`, `SystemConfig`, `SearchSet`, `Group`, `QualityAlert`, `ValidationRun`, and more.
+FastAPI + Beanie ODM (async MongoDB, built on Motor) backend; React 19 + Vite frontend in `frontend/src/`.
 
 ### Services (`backend/app/services/`)
 Business logic layer. Key services:
@@ -85,24 +49,15 @@ Business logic layer. Key services:
 - **`extraction_sources.py`** — Resolves per-field supporting quotes to document pages for source tracking
 - **`failure_notifications.py`** — Coalesced failure notifications emitted from Celery failure paths
 
-### Celery Tasks (`backend/app/tasks/`)
-Task modules: `activity_tasks`, `approval_tasks`, `catalog_tasks`, `classification_tasks`, `demo_tasks`, `document_tasks`, `engagement_tasks`, `extraction_tasks`, `kb_validation_tasks`, `knowledge_base_tasks`, `m365_tasks`, `passive_tasks`, `project_tasks`, `quality_tasks`, `retention_tasks`, `telemetry_tasks`, `upload_tasks`, `upload_validation_tasks`, `workflow_optimization_tasks`, `workflow_tasks`
-
-### Frontend (`frontend/`)
-React 19, Vite, TypeScript, Tailwind CSS v4, TanStack Router. Source in `frontend/src/`.
-
 ### Multi-Tenancy
 Documents, workflows, and folders are scoped by `space` and `team_id`. Users have a `current_team` and `TeamMembership` records with role-based access (owner/admin/member).
 
 ## Key Environment Variables
 
-Copy `.env.example` to `.env`. Key variables: `redis_host`, `ENVIRONMENT` (development/staging/production), `CONFIG_ENCRYPTION_KEY` (Fernet, for encrypting LLM API keys in MongoDB), `GRAPH_TOKEN_KEY` / `GRAPH_NOTIFICATION_URL` / `GRAPH_CLIENT_STATE_SECRET` (M365 integration), `VANDALIZER_BASE_URL`. LLM API keys and endpoints are configured per-model via System Config in the admin UI.
+Copy `.env.example` to `.env`. Key variables: `redis_host`, `ENVIRONMENT` (development/staging/production), `CONFIG_ENCRYPTION_KEY` (Fernet, for encrypting LLM API keys in MongoDB), `GRAPH_TOKEN_KEY` / `GRAPH_NOTIFICATION_URL` / `GRAPH_CLIENT_STATE_SECRET` (M365 integration), `VANDALIZER_BASE_URL`. LLM API keys and endpoints are configured per-model via System Config in the admin UI — not via env.
 
 ## Conventions
 
-- Python >=3.11,<3.13 required
-- `uv` is the Python package manager; `npm` for frontend
-- Beanie ODM for MongoDB (async, Pydantic v2 models)
+- Python >=3.11,<3.13; `uv` is the Python package manager (never `pip`), `npm` for the frontend
 - Celery tasks use `bind=True` and `autoretry_for` patterns
-- MongoDB database name: `vandalizer` (configurable via `MONGO_DB`)
-- Docker builds via `docker build -t vandalizer-backend ./backend` and `docker build -t vandalizer-frontend ./frontend` (or `make docker-build`)
+- When you add, remove, or rename a route in `backend/app/routers/` or a call in `frontend/src/api/*.ts`, run `make endpoint-map` and read the two orphan lists in `scripts/ui_endpoint_map.md` — a frontend call matching no route is a live 404. `make backend-static` gates this in CI.

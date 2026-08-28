@@ -79,7 +79,11 @@ export interface Workflow {
   team_id?: string | null;
   num_executions: number;
   steps: WorkflowStep[];
-  input_config?: { trigger_type?: string };
+  input_config?: {
+    trigger_type?: string;
+    // Pre-assigned documents the run loader merges into every run (Input tab).
+    fixed_documents?: { uuid: string; title: string }[];
+  };
   output_config?: { storage?: SaveOutputConfig; [key: string]: unknown };
   can_manage?: boolean;
   created_by?: AuthorRef | null;
@@ -100,6 +104,9 @@ export interface WorkflowCitation {
   document_id?: string | null;
   document_title: string;
   page?: number | null;
+  /** Last page of a chunk that crosses page breaks, when the cited passage
+   *  could not be pinned to one page; rendered as "p. 2–3". */
+  page_end?: number | null;
   /** Page was interpolated from OCR text, not measured. See #603. */
   page_approximate?: boolean;
   sheet?: string | null;

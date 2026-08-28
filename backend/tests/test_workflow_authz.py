@@ -130,6 +130,7 @@ class TestWorkflowGetAuthz:
                 "id": "wf-1", "name": "Test Workflow", "description": "desc",
                 "user_id": "user1", "space": "default", "num_executions": 0,
             })
+            mock_svc.annotate_missing_fixed_documents = AsyncMock(side_effect=lambda cfg: cfg)
 
             resp = await client.get("/api/workflows/wf-1", cookies=cookies, headers=headers)
 
@@ -676,6 +677,7 @@ class TestWorkflowShareToken:
                 "user_id": "owner", "team_id": None, "num_executions": 0,
                 "can_manage": False,
             })
+            mock_svc.annotate_missing_fixed_documents = AsyncMock(side_effect=lambda cfg: cfg)
 
             resp = await client.get(
                 "/api/workflows/wf-1?share_token=tok-abc",

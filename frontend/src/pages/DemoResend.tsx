@@ -30,8 +30,8 @@ export default function DemoResend() {
       .finally(() => setLoading(false))
   }, [uuid])
 
-  // Trial's over → send them to the warm renewal screen.
-  if (result?.status === 'expired' && result.feedback_token) {
+  // Out of tokens → send them to the warm top-up screen.
+  if (result?.status === 'exhausted' && result.feedback_token) {
     return <Navigate to="/demo/trial-end" search={{ token: result.feedback_token }} />
   }
 
@@ -42,7 +42,7 @@ export default function DemoResend() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link
             to="/landing"
-            search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }}
+            search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }}
             className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -22,6 +22,13 @@ class DemoApplication(Document):
     post_questionnaire_completed: bool = False
     post_questionnaire_token: Optional[str] = None
     admin_released: bool = False
+    # The activation (or latest resend) email failed to send — surfaced on the
+    # public status page so the applicant knows to hit resend rather than
+    # seeing "active" with no way in. Cleared by a successful resend.
+    activation_email_failed: bool = False
+    # The ~80%-of-budget warning email was sent for the current budget window.
+    # Reset by a top-up so the next window warns again.
+    budget_warning_sent: bool = False
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     last_notified_position: Optional[int] = None
 

@@ -83,3 +83,25 @@ class TestUserDocumentChunkMetadata:
 
         assert collection.metadatas
         assert all(m["page_approximate"] is True for m in collection.metadatas)
+
+
+
+class TestSpanningChunkMetadata:
+    """A chunk that crosses a page break records the page it ends on and
+    where the break falls, so citation time can name the passage's page."""
+
+    def test_kb_chunk_spanning_pages_carries_end_and_breaks(self):
+        dm, collection = _manager(), _FakeCollection()
+        markers = [
+            {"char_offset": 0, "kind": "page", "value": 1},
+            {"char_offset": 150, "kind": "page", "value": 2},
+        ]
+        # chunk_size 100, overlap 0: chunk 1 covers 100..200 and crosses the break at 150.
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            dm.add_to_kb("kb1", "src1", "Doc.pdf", "x" * 300, markers)
+
+        first, second = collection.metadatas[0], collection.metadatas[1]
+        assert first["page"] == 1 and "page_end" not in first and "page_breaks" not in first
+        assert second["page"] == 1 and second["page_end"] == 2
+        assert second["page_breaks"] == "[[50, 2]]"
+        assert collection.metadatas[2]["page"] == 2 and "page_end" not in collection.metadatas[2]

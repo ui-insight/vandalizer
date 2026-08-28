@@ -104,11 +104,16 @@ def create_api_trigger(
     document_oids: list,
     callback_url: str | None = None,
     temp_doc_uuids: list[str] | None = None,
+    *,
+    trigger_type: str = "api",
+    extra_context: dict | None = None,
 ) -> dict:
-    """Create a trigger event for an API-initiated automation.
+    """Create a trigger event for a directly-dispatched automation run.
 
     Bypasses the pending→queued beat cycle and goes straight to queued
-    so the caller can dispatch execution immediately.
+    so the caller can dispatch execution immediately. ``trigger_type`` is
+    ``api`` for API calls and ``manual`` for "Run now" from the editor —
+    same pipeline, distinguishable in history.
     """
     db = get_sync_db()
     now = datetime.now(timezone.utc)
@@ -121,11 +126,13 @@ def create_api_trigger(
         trigger_context["callback_url"] = callback_url
     if temp_doc_uuids:
         trigger_context["temp_doc_uuids"] = temp_doc_uuids
+    if extra_context:
+        trigger_context.update(extra_context)
 
     event = {
         **_base_event(now),
         "workflow": ObjectId(workflow_id),
-        "trigger_type": "api",
+        "trigger_type": trigger_type,
         "status": "queued",
         "documents": document_oids,
         "document_count": len(document_oids),

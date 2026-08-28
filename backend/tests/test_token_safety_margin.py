@@ -130,11 +130,21 @@ class TestAgainstRecordedGroundTruth:
         assert margin > 1.1732, "margin does not cover the worst observation"
         assert margin <= 1.5, "margin is far beyond anything measured"
 
-    def test_headroom_over_the_worst_observation_is_real_but_modest(self):
+    def test_headroom_over_the_worst_observation_is_generous_by_design(self):
+        """The margin is sized for content worse than anything in this set.
+
+        These observations are real documents, worst 1.1732. The default is
+        sized instead for the synthetic dense currency table at 1.455, because
+        guessing low hard-fails and guessing high only wastes window. So the
+        headroom over *these* is deliberately large, and the upper bound is the
+        sizing target rather than a small multiple of the worst row here.
+        """
         worst_model, worst_raw, worst_actual = OBSERVED_UNDERCOUNTS[0]
         corrected = _corrected(worst_model, worst_raw)
-        # Covers it, and does not overshoot by more than a quarter again.
-        assert worst_actual <= corrected <= int(worst_actual * 1.25)
+        assert corrected >= worst_actual, "margin no longer covers the worst observation"
+        # Bounded by the content it *is* sized for, so a future edit cannot
+        # inflate this past anything ever measured without failing here.
+        assert corrected <= int(worst_raw * 1.5)
 
 
 class TestMarginSelection:
@@ -246,7 +256,7 @@ class TestMarginReachesTheCallers:
         )
         tuned_est = estimate_input_tokens(
             model_name="Qwen/Qwen3.5-9B",
-            model_config={"token_safety_margin": 1.45},
+            model_config={"token_safety_margin": 1.8},
             **kwargs,
         )
         assert tuned_est > default_est
@@ -375,7 +385,7 @@ class TestPreflightOversizeCheck:
         return [{"uuid": "u1", "title": "Proposal.pdf", "token_count": token_count}]
 
     def test_document_in_the_undercount_band_is_now_flagged(self):
-        """22,000 raw looks like it fits; at 1.20 it is really ~26,400 and does
+        """22,000 raw looks like it fits; at 1.5 it is really 33,000 and does
         not. This is precisely the case that used to run and then fail."""
         found = find_oversize_documents(
             documents=self._docs(22_000),
@@ -424,7 +434,7 @@ class TestLoudFallback:
     """A model that silently drops to a guessed margin is the alias bug.
 
     Verified before this existed: 'Qwen/Qwen3-VL-30B-A3B-Instruct ' (one
-    trailing space) resolved no vocabulary and fell to 1.2 with no signal
+    trailing space) resolved no vocabulary and fell to the default with no signal
     anywhere. The guess is acceptable; the silence is not.
     """
 

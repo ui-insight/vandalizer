@@ -50,7 +50,12 @@ import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { computeReorderedIds } from '../../utils/reorder'
 import { formatPageLocator } from '../../utils/pageLocator'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
+import { describeUnfinishedSteps, findUnfinishedSteps, promptTaskIsEmpty } from './workflowStepIssues'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
+import { CollapsibleSection } from '../shared/CollapsibleSection'
+import { DeletedDocumentBadge, FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
+import { FileOutputCard } from './FileOutputCard'
+import { summarizeFilePayload } from './outputFilePayload'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
@@ -111,7 +116,7 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
     description: 'Calls an external HTTP API and returns the parsed response for downstream steps to use.' },
   { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true,
-    description: 'Renders the step output into a downloadable file (DOCX, PDF, etc.) and saves it to the workflow result.' },
+    description: 'Renders the step output into a downloadable file — PDF, Word (DOCX), Markdown or plain text — and saves it to the workflow result.' },
   { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true,
     description: 'Maps the step output into the fields of a target form template and produces the filled form.' },
   { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true,
@@ -559,16 +564,34 @@ export function WorkflowEditorPanel() {
   // workflows never require input; text needs non-empty text; otherwise a doc
   // — unless a project is active, in which case the run falls back to all of
   // the project's files.
-  const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : (selectedDocUuids.length === 0 && !activeProjectUuid)
+  // Fixed documents (Input tab) are merged into every run by the loader, so
+  // they satisfy the selection on their own; a project does the same.
+  const fixedDocCount = workflow?.input_config?.fixed_documents?.length ?? 0
+  const runInput = describeRunInput({
+    triggerType: workflow?.input_config?.trigger_type as string | undefined,
+    selectedCount: selectedDocUuids.length,
+    fixedCount: fixedDocCount,
+    hasProject: !!activeProjectUuid,
+    textInput,
+  })
+  const missingInput = runInput.missing
   // A workflow with nothing to do still "runs": it completes in milliseconds
   // and hands back the input document's uuid as its output. The empty
   // "Document" step is the run's own input placeholder — the canvas hides it,
   // so a workflow carrying only that one reads as empty and is treated as
   // such here too.
   const hasSteps = (workflow?.steps ?? []).some(s => !(s.name === 'Document' && s.tasks.length === 0))
+  // A step that can't do anything (a Prompt task with no instructions) used
+  // to run anyway: the engine sent a placeholder to the model and the run
+  // completed green with "The context does not contain a prompt to enter."
+  // as its deliverable. The engine now fails such a step; block the run here
+  // so the user is pointed at the step instead of at a failed run.
+  const unfinishedSteps = findUnfinishedSteps(workflow?.steps ?? [])
+  const unfinishedStepsMessage = describeUnfinishedSteps(unfinishedSteps)
+  const runBlocked = runner.running || missingInput || !hasSteps || unfinishedSteps.length > 0
 
   const handleRun = async () => {
-    if (!openWorkflowId || !hasSteps) return
+    if (!openWorkflowId || !hasSteps || unfinishedSteps.length > 0) return
 
     try {
       if (isNoInput) {
@@ -586,13 +609,18 @@ export function WorkflowEditorPanel() {
         setActiveTab('design')
         await runner.start(openWorkflowId, allUuids, undefined, false)
       } else {
-        // Default to the whole project when nothing is explicitly selected.
+        // Default to the whole project when nothing is explicitly selected;
+        // failing that, the fixed documents alone (the run loader merges them
+        // in, so an empty explicit selection is a valid run).
         let uuids = selectedDocUuids
         if (uuids.length === 0) {
-          if (!activeProjectUuid) return
-          uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
-          if (uuids.length === 0) {
-            toast('No files in this project to run on yet', 'info')
+          if (activeProjectUuid) {
+            uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
+            if (uuids.length === 0) {
+              toast('No files in this project to run on yet', 'info')
+              return
+            }
+          } else if (fixedDocCount === 0) {
             return
           }
         }
@@ -970,7 +998,7 @@ export function WorkflowEditorPanel() {
           </>
         )}
 
-        {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
+        {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} canManage={canManage} onRefresh={refresh} />}
         {activeTab === 'validate' && (
           hasSteps ? (
             <ValidateTab
@@ -1094,16 +1122,22 @@ export function WorkflowEditorPanel() {
             Add a step below — there is nothing for this workflow to do yet
           </div>
         )}
-        {hasSteps && !isTextInput && !isNoInput && selectedDocUuids.length === 0 && (
+        {hasSteps && runInput.hint && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <FileText style={{ width: 12, height: 12 }} />
-            {activeProjectUuid ? 'Will run on all files in this project' : 'Select a document to run this workflow'}
+            {runInput.hint}
           </div>
         )}
         {isNoInput && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Play style={{ width: 12, height: 12 }} />
             No input required, runs directly
+          </div>
+        )}
+        {hasSteps && unfinishedStepsMessage && (
+          <div role="alert" style={{ fontSize: 12, color: '#92400e', marginBottom: 10, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+            <AlertTriangle style={{ width: 12, height: 12, flexShrink: 0, marginTop: 2 }} />
+            <span>{unfinishedStepsMessage}</span>
           </div>
         )}
         {runner.running && (runner.batchId || runner.sessionId) ? (
@@ -1138,15 +1172,17 @@ export function WorkflowEditorPanel() {
         ) : (
           <button
             onClick={handleRun}
-            disabled={runner.running || missingInput || !hasSteps}
-            title={!hasSteps ? 'Add at least one step before running this workflow' : undefined}
+            disabled={runBlocked}
+            title={!hasSteps
+              ? 'Add at least one step before running this workflow'
+              : unfinishedStepsMessage ?? undefined}
             style={{
               width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
               fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
               backgroundColor: 'var(--highlight-color, #eab308)',
               color: 'var(--highlight-text-color, #000)',
-              cursor: runner.running || missingInput || !hasSteps ? 'not-allowed' : 'pointer',
-              opacity: (missingInput || !hasSteps) && !runner.running ? 0.5 : 1,
+              cursor: runBlocked ? 'not-allowed' : 'pointer',
+              opacity: runBlocked && !runner.running ? 0.5 : 1,
               textTransform: 'uppercase', letterSpacing: '0.05em',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
             }}
@@ -1775,6 +1811,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
   // (mirror backend _step_output_value: formatted_output || output).
   const value = entry ? (entry.formatted_output ?? entry.output) : undefined
   const warning = entry && typeof entry.warning === 'string' ? (entry.warning as string) : null
+  const fillReport = entry && Array.isArray(entry.fill_report) ? (entry.fill_report as FillReportField[]) : null
   const hasValue = value !== undefined && value !== null && value !== ''
   const taskCount = step.tasks.length
 
@@ -1817,7 +1854,9 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
           )}
 
           {hasValue ? (
-            typeof value === 'string' ? (
+            isFileDownloadPayload(value) ? (
+              <FileOutputChip payload={value} />
+            ) : typeof value === 'string' ? (
               <div
                 style={{ fontSize: 13, color: '#202124', lineHeight: 1.6, wordBreak: 'break-word' }}
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }}
@@ -1838,6 +1877,7 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
                 : "This step hasn't produced output yet. Run the workflow to see its last output here."}
             </div>
           )}
+          {fillReport && fillReport.length > 0 && <FillReportTable fields={fillReport} />}
         </div>
       )}
     </div>
@@ -2005,7 +2045,23 @@ function EditStepOverlay({
                   <Icon style={{ width: 16, height: 16, color }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>{(task.data as Record<string, unknown>)?.name as string || task.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>{(task.data as Record<string, unknown>)?.name as string || task.name}</span>
+                    {promptTaskIsEmpty(task.name, task.data) && (
+                      <span
+                        title="This step has no prompt — open it and add instructions"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 3,
+                          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                          padding: '1px 6px', borderRadius: 4,
+                          color: '#92400e', backgroundColor: '#fef3c7',
+                        }}
+                      >
+                        <AlertTriangle style={{ width: 10, height: 10 }} />
+                        NO PROMPT
+                      </span>
+                    )}
+                  </div>
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
                     {task.name === 'Extraction' ? 'Extraction'
                       : task.name === 'Prompt' ? 'LLM prompt task'
@@ -2416,6 +2472,299 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
 // Task edit modal (with Design/Input/Output sub-tabs + test step)
 // ---------------------------------------------------------------------------
 
+/**
+ * Whether a run has the input it needs, and the hint to show when it doesn't.
+ *
+ * Fixed documents count as the selection in Manual mode: the run loader merges
+ * them into every run, so a workflow with a fixed document has something to
+ * run on even with nothing selected — pre-assigning was meant to avoid that
+ * selection, and the button used to demand it anyway (support ticket).
+ */
+export function describeRunInput(input: {
+  triggerType: string | undefined
+  selectedCount: number
+  fixedCount: number
+  hasProject: boolean
+  textInput: string
+}): { missing: boolean; hint: string | null } {
+  const { triggerType, selectedCount, fixedCount, hasProject, textInput } = input
+  if (triggerType === 'no_input') return { missing: false, hint: null }
+  if (triggerType === 'text_input') return { missing: !textInput.trim(), hint: null }
+  if (selectedCount > 0) return { missing: false, hint: null }
+  if (hasProject) return { missing: false, hint: 'Will run on all files in this project' }
+  if (fixedCount > 0) {
+    return {
+      missing: false,
+      hint: `Will run on its ${fixedCount} fixed document${fixedCount !== 1 ? 's' : ''} — select more to add to them`,
+    }
+  }
+  return { missing: true, hint: 'Select a document to run this workflow' }
+}
+
+// Explain a failed input/output-config save. The backend answers PATCH on a
+// workflow the viewer can see but not manage (shared or verified) with a 404,
+// so surfacing the raw "Workflow not found" would read as if the workflow
+// vanished — say what actually happened instead.
+function describeConfigSaveError(err: unknown, what: string): string {
+  if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+    return `Couldn't save ${what} — you don't have permission to edit this workflow. Save a copy to your library to make an editable version.`
+  }
+  return err instanceof Error && err.message ? err.message : `Couldn't save ${what}. Please try again.`
+}
+
+/**
+ * The message to show instead of saving when a step is missing a field it
+ * cannot run without, or null when it can be saved. A step saved blank used
+ * to run "successfully" and hand the next step nothing — the run finished
+ * Completed and the only trace was the missing content downstream. The
+ * backend now fails such a run, but refusing the save is where the author
+ * actually is when the mistake happens.
+ */
+export function requiredFieldMessage(taskName: string, data: Record<string, unknown>): string | null {
+  const text = (key: string) => (typeof data[key] === 'string' ? (data[key] as string) : '').trim()
+  if (taskName === 'AddWebsite' && !text('url')) {
+    return 'Enter the URL of the page to fetch before saving this step.'
+  }
+  if (taskName === 'APINode' && !text('url')) {
+    return 'Enter the endpoint URL before saving this step.'
+  }
+  if (taskName === 'FormFiller') {
+    const source = text('template_source') || 'text'
+    if (source === 'pdf' && !text('template_document_uuid')) {
+      return 'Choose the fillable PDF form to use as the template before saving this step.'
+    }
+    if (source === 'text' && !text('template')) {
+      return 'Enter the template text before saving this step.'
+    }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// Form Filler: fill report + file outputs
+// ---------------------------------------------------------------------------
+
+/** One row of a Form Filler step's `fill_report` (see backend form_fill.py). */
+export interface FillReportField {
+  name: string
+  value?: unknown
+  status: 'supported' | 'unsupported' | 'missing' | 'not_written'
+  method?: string
+  document_uuid?: string | null
+  document_title?: string | null
+  page?: number | null
+  page_approximate?: boolean
+  quote?: string
+  label?: string
+  reason?: string
+}
+
+export function isFileDownloadPayload(value: unknown): value is {
+  type: 'file_download'; filename?: string; file_type?: string; data_b64?: string
+} {
+  return !!value && typeof value === 'object' && (value as Record<string, unknown>).type === 'file_download'
+}
+
+/** "budget-filled.pdf (PDF, 41 KB)" — what to show instead of a base64 blob. */
+export function fileDownloadSummary(payload: { filename?: string; file_type?: string; data_b64?: string }): string {
+  const name = payload.filename || 'output'
+  const kind = (payload.file_type || name.split('.').pop() || 'file').toUpperCase()
+  const bytes = Math.round(((payload.data_b64 ?? '').length * 3) / 4)
+  const size = bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${name} (${kind}, ${size})`
+}
+
+export function fillReportSummary(fields: FillReportField[]): string {
+  const filled = fields.filter(f => f.status !== 'missing')
+  const supported = fields.filter(f => f.status === 'supported').length
+  const unsupported = fields.filter(f => f.status === 'unsupported').length
+  const notWritten = fields.filter(f => f.status === 'not_written').length
+  const missing = fields.length - filled.length
+  const parts = [`${supported} of ${filled.length} filled value${filled.length !== 1 ? 's' : ''} found in the input`]
+  if (unsupported) parts.push(`${unsupported} not in the input`)
+  if (notWritten) parts.push(`${notWritten} not written`)
+  if (missing) parts.push(`${missing} unfilled`)
+  return parts.join(' · ')
+}
+
+function fillValueText(value: unknown): string {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'string') return value
+  try { return JSON.stringify(value) } catch { return String(value) }
+}
+
+const FILL_STATUS_STYLE: Record<FillReportField['status'], { label: string; color: string; bg: string; border: string }> = {
+  supported: { label: 'Found in input', color: '#166534', bg: '#f0fdf4', border: '#bbf7d0' },
+  unsupported: { label: 'Not in input', color: '#991b1b', bg: '#fef2f2', border: '#fecaca' },
+  missing: { label: 'Not provided', color: '#4b5563', bg: '#f3f4f6', border: '#e5e7eb' },
+  not_written: { label: 'Not written', color: '#92400e', bg: '#fffbeb', border: '#fde68a' },
+}
+
+/**
+ * Per-field table for a Form Filler step: the value written, where it came
+ * from (document · page, with the surrounding passage on hover), and whether
+ * it was actually found in the input. A value the check could not find is
+ * the step's hallucination signal and is the row to look at first.
+ */
+function FillReportTable({ fields }: { fields: FillReportField[] }) {
+  if (!fields.length) return null
+  const hasSource = fields.some(f => f.document_title)
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 6 }}>{fillReportSummary(fields)}</div>
+      <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#fff' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Field</th>
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Value</th>
+              {hasSource && <th style={{ padding: '6px 10px', fontWeight: 600 }}>Source</th>}
+              <th style={{ padding: '6px 10px', fontWeight: 600 }}>Check</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fields.map(f => {
+              const style = FILL_STATUS_STYLE[f.status] ?? FILL_STATUS_STYLE.missing
+              const locator = formatPageLocator(f.page, f.page_approximate)
+              const source = f.document_title ? (locator ? `${f.document_title} · ${locator}` : f.document_title) : ''
+              const check = f.status === 'not_written' && f.reason ? `${style.label} — ${f.reason}` : style.label
+              return (
+                <tr key={f.name} style={{ borderTop: '1px solid #f3f4f6', verticalAlign: 'top' }}>
+                  <td style={{ padding: '6px 10px', color: '#111827', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', whiteSpace: 'nowrap' }}>
+                    {f.name}
+                    {f.label && <div style={{ fontFamily: 'inherit', fontSize: 11, color: '#6b7280', whiteSpace: 'normal' }}>{f.label}</div>}
+                  </td>
+                  <td style={{ padding: '6px 10px', color: '#374151', wordBreak: 'break-word', maxWidth: 320 }}>
+                    {f.status === 'missing' ? <span style={{ color: '#9ca3af' }}>—</span> : fillValueText(f.value)}
+                  </td>
+                  {hasSource && (
+                    <td style={{ padding: '6px 10px', color: '#374151', whiteSpace: 'nowrap' }} title={f.quote || undefined}>
+                      {source || <span style={{ color: '#9ca3af' }}>—</span>}
+                    </td>
+                  )}
+                  <td style={{ padding: '6px 10px' }}>
+                    <span style={{
+                      display: 'inline-block', padding: '1px 8px', borderRadius: 999, fontSize: 11, fontWeight: 600,
+                      color: style.color, backgroundColor: style.bg, border: `1px solid ${style.border}`,
+                    }}>
+                      {check}
+                    </span>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function FileOutputChip({ payload }: { payload: { filename?: string; file_type?: string; data_b64?: string } }) {
+  return (
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+      border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#fff', fontSize: 13, color: '#374151',
+    }}>
+      <FileText style={{ width: 16, height: 16, color: '#6b7280', flexShrink: 0 }} />
+      <span style={{ fontWeight: 600 }}>{fileDownloadSummary(payload)}</span>
+      <span style={{ color: '#6b7280', fontSize: 12 }}>— use Download to save it</span>
+    </div>
+  )
+}
+
+/** Library search narrowed to PDFs, for choosing a fillable form as a Form Filler template. */
+function PdfTemplatePicker({ value, onChange }: {
+  value: { uuid: string; title: string }
+  onChange: (doc: { uuid: string; title: string } | null) => void
+}) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<{ uuid: string; title: string }[]>([])
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const q = query.trim()
+    const t = setTimeout(async () => {
+      try {
+        const res = await searchDocuments(q, 20)
+        setResults(res.items
+          .filter(d => (d.extension || '').toLowerCase() === 'pdf')
+          .map(d => ({ uuid: d.uuid, title: d.title })))
+      } catch (err) {
+        console.error('Document search failed', err)
+        setResults([])
+      }
+    }, q ? 250 : 0)
+    return () => clearTimeout(t)
+  }, [query, open])
+
+  return (
+    <div>
+      {value.uuid ? (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+          backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 13, color: '#374151',
+        }}>
+          <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+            {value.title || value.uuid}
+          </span>
+          <button
+            type="button"
+            aria-label="Change template PDF"
+            onClick={() => { onChange(null); setOpen(true) }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#2563eb', fontFamily: 'inherit', padding: 0 }}
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <div style={{ position: 'relative' }}>
+          <input
+            aria-label="Template PDF"
+            aria-required="true"
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setTimeout(() => setOpen(false), 200)}
+            placeholder="Search your library for a fillable PDF form…"
+            style={{
+              width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          {open && (
+            <div role="listbox" aria-label="PDF documents" style={{
+              position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
+              backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, maxHeight: 200, overflowY: 'auto',
+            }}>
+              {results.length === 0 ? (
+                <div style={{ padding: '8px 12px', fontSize: 13, color: '#6b7280' }}>No PDF documents found</div>
+              ) : results.map(doc => (
+                <div
+                  key={doc.uuid}
+                  role="option"
+                  aria-selected={false}
+                  onMouseDown={() => { onChange(doc); setOpen(false); setQuery('') }}
+                  style={{ padding: '8px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+                >
+                  <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
   task: WorkflowTask
   selectedDocUuids: string[]
@@ -2427,6 +2776,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   canManage: boolean
 }) {
   const { user } = useAuth()
+  const { toast } = useToast()
   const { selectedDocNames } = useWorkspace()
   const [taskData, setTaskData] = useState<Record<string, unknown>>({ ...task.data })
   const [saving, setSaving] = useState(false)
@@ -2472,8 +2822,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
 
   // Fixed documents for workflow_documents input source
   const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
-  const [fixedDocs, setFixedDocs] = useState<{ uuid: string; title: string }[]>(
-    () => (((inputCfg?.fixed_documents) as { uuid: string; title: string }[]) || [])
+  const [fixedDocs, setFixedDocs] = useState<FixedDocument[]>(
+    () => (((inputCfg?.fixed_documents) as FixedDocument[]) || [])
   )
   const [fixedDocSearch, setFixedDocSearch] = useState('')
   const [fixedDocResults, setFixedDocResults] = useState<{ uuid: string; title: string }[]>([])
@@ -2516,23 +2866,28 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   }, [task.name, user?.current_team_uuid])
 
   // Save fixed documents to workflow input_config
-  const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
-    setFixedDocs(docs)
-    if (workflowId) {
+  const saveFixedDocs = async (docs: FixedDocument[]) => {
+    const previous = fixedDocs
+    setFixedDocs(docs)  // optimistic — refresh reconciles on success
+    if (!workflowId) return
+    try {
       await updateWorkflow(workflowId, {
-        input_config: { ...inputCfg, fixed_documents: docs },
+        input_config: { ...inputCfg, fixed_documents: docs.map(stripFixedDocumentFlags) },
       })
       onRefreshWorkflow()
+    } catch (err) {
+      setFixedDocs(previous)
+      toast(describeConfigSaveError(err, 'fixed documents'), 'error')
     }
   }
 
   const addFixedDoc = (doc: { uuid: string; title: string }) => {
     if (fixedDocs.some(d => d.uuid === doc.uuid)) return
-    saveFixedDocs([...fixedDocs, doc])
+    void saveFixedDocs([...fixedDocs, doc])
   }
 
   const removeFixedDoc = (uuid: string) => {
-    saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
+    void saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
   }
 
   const handleFileUpload = async (file: File) => {
@@ -2668,7 +3023,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [testProgress, setTestProgress] = useState(0)
   const [testMessage, setTestMessage] = useState('')
   const [testResult, setTestResult] = useState<unknown>(null)
+  const [testWarning, setTestWarning] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
+  // Set by handleUpdate when a required field is blank; cleared on the next save attempt.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const testMsgRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -2717,7 +3075,20 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     }
   }, [])
 
+  // The same condition that disables Improve. Update, Test Step and Run all
+  // used to ignore it, so an empty Prompt step saved without a word and then
+  // ran against a hidden placeholder, completing green with nonsense.
+  const promptMissing = promptTaskIsEmpty(task.name, taskData)
+  const PROMPT_MISSING_HINT = 'This step needs a prompt before it can be saved, tested, or run.'
+
   const handleUpdate = async () => {
+    if (promptMissing) return
+    setSaveError(null)
+    const missing = requiredFieldMessage(task.name, taskData)
+    if (missing) {
+      setSaveError(missing)
+      return
+    }
     setSaving(true)
     try {
       const finalData = {
@@ -2736,10 +3107,11 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   }
 
   const handleTestStep = async () => {
-    if (selectedDocUuids.length === 0) return
+    if (selectedDocUuids.length === 0 || promptMissing) return
     setTesting(true)
     setTestProgress(0)
     setTestResult(null)
+    setTestWarning(null)
     setTestError(null)
     setTestMessage(TEST_MESSAGES[0])
 
@@ -2768,6 +3140,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             setTestProgress(100)
             if (res.status === 'completed') {
               setTestResult(res.result)
+              setTestWarning(res.warning || null)
             } else {
               setTestError(res.error || 'Test failed. Please check your configuration.')
             }
@@ -3317,6 +3690,15 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       lineHeight: 1.5,
                     }}
                   />
+                  {promptMissing && (
+                    <div role="status" style={{
+                      marginTop: 8, display: 'flex', alignItems: 'center', gap: 6,
+                      fontSize: 12, color: '#92400e',
+                    }}>
+                      <AlertTriangle style={{ width: 12, height: 12, flexShrink: 0 }} />
+                      {PROMPT_MISSING_HINT}
+                    </div>
+                  )}
                   {improveError && (
                     <div role="alert" style={{
                       marginTop: 8, padding: '8px 12px', background: '#fef2f2',
@@ -3493,17 +3875,19 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             {task.name === 'AddWebsite' && (
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  URL
+                  URL <span style={{ color: '#dc2626' }} aria-hidden="true">*</span>
                 </label>
                 <input
                   aria-label="URL"
+                  aria-required="true"
+                  aria-invalid={saveError ? true : undefined}
                   type="text"
                   value={getTextValue('url')}
                   onChange={e => setTextValue('url', e.target.value)}
                   placeholder="https://example.com"
                   style={{
                     width: '100%', padding: '8px 12px', fontSize: 13,
-                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                    fontFamily: 'inherit', border: `1px solid ${saveError ? '#dc2626' : '#d1d5db'}`, borderRadius: 6,
                     outline: 'none', boxSizing: 'border-box',
                   }}
                 />
@@ -3998,6 +4382,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                         color: '#374151', appearance: 'none', paddingRight: 32,
                       }}
                     >
+                      <option value="pdf">PDF (.pdf)</option>
+                      <option value="docx">Word (.docx)</option>
                       <option value="md">Markdown (.md)</option>
                       <option value="txt">Plain Text (.txt)</option>
                     </select>
@@ -4006,7 +4392,30 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       width: 14, height: 14, color: '#6b7280', pointerEvents: 'none',
                     }} />
                   </div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                    PDF and Word render the previous step&apos;s markdown as a formatted document (headings, lists, tables);
+                    structured output becomes a table. Markdown and plain text save the text as-is.
+                  </div>
                 </div>
+                {(getTextValue('format') || 'md') === 'pdf' && (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                      Document title <span style={{ fontWeight: 400, color: '#6b7280' }}>(optional — defaults to the filename)</span>
+                    </label>
+                    <input
+                      aria-label="Document title"
+                      type="text"
+                      value={getTextValue('title')}
+                      onChange={e => setTextValue('title', e.target.value)}
+                      placeholder="Award Summary"
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13,
+                        fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                )}
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                     Filename
@@ -4032,22 +4441,66 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                   Template
                 </label>
-                <textarea
-                  aria-label="Template"
-                  value={getTextValue('template')}
-                  onChange={e => setTextValue('template', e.target.value)}
-                  placeholder={'Dear {{name}},\n\nThank you for your {{item}}.\n\nBest regards,\n{{sender}}'}
-                  rows={10}
-                  style={{
-                    width: '100%', padding: '10px 12px', fontSize: 14,
-                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                    outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
-                  }}
-                />
-                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
-                  Use <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>{'{{placeholder}}'}</code> syntax.
-                  AI will fill placeholders from the input data.
+                <div role="radiogroup" aria-label="Template source" style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+                  {([['text', 'Text template'], ['pdf', 'Fillable PDF form']] as const).map(([v, label]) => {
+                    const active = (getTextValue('template_source') || 'text') === v
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        role="radio"
+                        aria-checked={active}
+                        onClick={() => setTextValue('template_source', v)}
+                        style={{
+                          padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                          border: `1px solid ${active ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
+                          borderRadius: 6, cursor: 'pointer',
+                          backgroundColor: active ? '#fefce8' : '#fff', color: '#374151',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
+                {(getTextValue('template_source') || 'text') === 'pdf' ? (
+                  <div>
+                    <PdfTemplatePicker
+                      value={{ uuid: getTextValue('template_document_uuid'), title: getTextValue('template_document_title') }}
+                      onChange={doc => setTaskData(prev => ({
+                        ...prev,
+                        template_document_uuid: doc?.uuid ?? '',
+                        template_document_title: doc?.title ?? '',
+                      }))}
+                    />
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                      The form&apos;s own fields are filled and the step&apos;s output is the filled PDF.
+                      Values are copied verbatim from the input; a field the input doesn&apos;t answer is left blank.
+                      Every value is checked against the input and listed with its source document and page on the run result.
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <textarea
+                      aria-label="Template"
+                      value={getTextValue('template')}
+                      onChange={e => setTextValue('template', e.target.value)}
+                      placeholder={'Dear {{name}},\n\nThank you for your {{item}}.\n\nBest regards,\n{{sender}}'}
+                      rows={10}
+                      style={{
+                        width: '100%', padding: '10px 12px', fontSize: 14,
+                        fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                        outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                      Use <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>{'{{placeholder}}'}</code> syntax.
+                      Values are copied verbatim from the input and everything outside the placeholders is kept exactly as written.
+                      A placeholder the input doesn&apos;t answer is marked <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>[Not provided: name]</code> in the form and listed in the step&apos;s warning — a &quot;not provided&quot; sentence from the model is treated the same way, never written into the form.
+                      Every value is checked against the input and listed with its source document and page on the run result.
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -4311,10 +4764,12 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               <div style={{ marginTop: 16 }}>
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-                  fontSize: 13, color: '#16a34a', fontWeight: 600,
+                  fontSize: 13, color: testWarning ? '#b45309' : '#16a34a', fontWeight: 600,
                 }}>
-                  <CheckCircle style={{ width: 14, height: 14 }} />
-                  Test Completed
+                  {testWarning
+                    ? <AlertTriangle style={{ width: 14, height: 14 }} />
+                    : <CheckCircle style={{ width: 14, height: 14 }} />}
+                  {testWarning ? 'Test Completed with warnings' : 'Test Completed'}
                   <button
                     type="button"
                     onClick={handleDownloadTestResult}
@@ -4341,13 +4796,31 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     Download
                   </button>
                 </div>
-                <div style={{
-                  backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-                  padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
-                  maxHeight: 200, overflowY: 'auto', color: '#374151',
-                }}>
-                  {typeof testResult === 'string' ? testResult : JSON.stringify(testResult, null, 2)}
-                </div>
+                {testWarning && (
+                  <div role="status" style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8,
+                    border: '1px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 6,
+                    padding: '8px 12px', fontSize: 12, color: '#92400e',
+                  }}>
+                    <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+                    <div>{testWarning}</div>
+                  </div>
+                )}
+                {(() => {
+                  // A file-producing step's test result is the same payload a
+                  // run ends with; show the file, not its base64.
+                  const file = summarizeFilePayload(testResult)
+                  if (file) return <FileOutputCard summary={file} onDownload={handleDownloadTestResult} maxHeight={200} />
+                  return (
+                    <div style={{
+                      backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                      padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+                      maxHeight: 200, overflowY: 'auto', color: '#374151',
+                    }}>
+                      {typeof testResult === 'string' ? testResult : JSON.stringify(testResult, null, 2)}
+                    </div>
+                  )
+                })()}
               </div>
             )}
 
@@ -4565,15 +5038,22 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                           {fixedDocs.map(doc => (
                             <div key={doc.uuid} style={{
                               display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
-                              backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 12, marginBottom: 4,
+                              backgroundColor: doc.missing ? '#fef2f2' : '#f3f4f6',
+                              border: `1px solid ${doc.missing ? '#fecaca' : 'transparent'}`,
+                              borderRadius: 6, fontSize: 12, marginBottom: 4,
                             }}>
-                              <FileText style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} />
-                              <span style={{ color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <FileText style={{ width: 12, height: 12, color: doc.missing ? '#b91c1c' : '#6b7280', flexShrink: 0 }} />
+                              <span style={{
+                                color: doc.missing ? '#991b1b' : '#374151', flex: 1, overflow: 'hidden',
+                                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                textDecoration: doc.missing ? 'line-through' : 'none',
+                              }}>
                                 {doc.title}
                               </span>
+                              {doc.missing && <DeletedDocumentBadge />}
                               <button
                                 type="button"
-                                aria-label="Remove document"
+                                aria-label={doc.missing ? `Remove deleted document ${doc.title}` : 'Remove document'}
                                 onClick={() => removeFixedDoc(doc.uuid)}
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex' }}
                               >
@@ -4835,6 +5315,16 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         </div>
       )}
 
+      {saveError && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px',
+          borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#dc2626', fontWeight: 600,
+        }}>
+          <XCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
+          {saveError}
+        </div>
+      )}
+
       {/* Bottom toolbar */}
       <div style={{
         padding: '12px 20px', borderTop: '1px solid #e5e7eb', flexShrink: 0,
@@ -4843,14 +5333,14 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {TEST_STEP_SUPPORTED_TYPES.has(task.name) && (
           <button
             onClick={handleTestStep}
-            disabled={testing || selectedDocUuids.length === 0}
-            title={TEST_STEP_TOOLTIP}
+            disabled={testing || selectedDocUuids.length === 0 || promptMissing}
+            title={promptMissing ? PROMPT_MISSING_HINT : TEST_STEP_TOOLTIP}
             style={{
               flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
-              cursor: testing || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
+              cursor: testing || selectedDocUuids.length === 0 || promptMissing ? 'not-allowed' : 'pointer',
               color: '#374151',
-              opacity: testing || selectedDocUuids.length === 0 ? 0.5 : 1,
+              opacity: testing || selectedDocUuids.length === 0 || promptMissing ? 0.5 : 1,
             }}
           >
             {testing ? 'Testing...' : 'Test Step'}
@@ -4859,14 +5349,15 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {canManage ? (
           <button
             onClick={handleUpdate}
-            disabled={saving}
+            disabled={saving || promptMissing}
+            title={promptMissing ? PROMPT_MISSING_HINT : undefined}
             style={{
               flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               border: 'none', borderRadius: 6,
               backgroundColor: 'var(--highlight-color, #eab308)',
               color: 'var(--highlight-text-color, #000)',
-              cursor: saving ? 'not-allowed' : 'pointer',
-              opacity: saving ? 0.6 : 1,
+              cursor: saving || promptMissing ? 'not-allowed' : 'pointer',
+              opacity: saving || promptMissing ? 0.6 : 1,
             }}
           >
             {saving ? 'Updating...' : 'Update'}
@@ -4953,6 +5444,14 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 
   const finalOutput = status?.final_output as Record<string, unknown> | null
   const output = finalOutput?.output ?? finalOutput
+  // A file-producing final step (Document Renderer, Data Export, Package
+  // Builder) hands back {type: "file_download", data_b64, …}. Rendered through
+  // the generic path that is a JSON block of internal fields and base64 shown
+  // as the user's result. Show it as a file instead; the server download
+  // route already returns the file's own bytes for this payload whatever
+  // format is asked for, so one direct link replaces the format picker.
+  const fileSummary = summarizeFilePayload(output)
+  const fileDownloadHref = fileSummary && sessionId ? downloadResults(sessionId, 'text', { shareToken }) : undefined
 
   // API nodes attach a redacted snapshot of the request they sent under
   // steps_output[step].request. Surface it so authors can debug what actually
@@ -5004,6 +5503,30 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     </div>
   ) : null
 
+  // A Form Filler step attaches steps_output[step].fill_report: every value
+  // it wrote, where it came from, and whether it was found in the input.
+  const fillReports = Object.entries((status?.steps_output ?? {}) as Record<string, unknown>)
+    .map(([step, val]) => {
+      const report = val && typeof val === 'object' ? (val as Record<string, unknown>).fill_report : undefined
+      return Array.isArray(report) && report.length > 0 ? { step, fields: report as FillReportField[] } : null
+    })
+    .filter((x): x is { step: string; fields: FillReportField[] } => x !== null)
+
+  const fillReportPanel = fillReports.length > 0 ? (
+    <div style={{ marginTop: 12 }}>
+      {fillReports.map(({ step, fields }) => (
+        <details key={step} open style={{
+          border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', marginBottom: 8, backgroundColor: '#fff',
+        }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+            Filled values — {step}
+          </summary>
+          <FillReportTable fields={fields} />
+        </details>
+      ))}
+    </div>
+  ) : null
+
   const apiRequestPanel = apiRequests.length > 0 ? (
     <div style={{ marginTop: 12 }}>
       {apiRequests.map(({ step, req }) => (
@@ -5035,6 +5558,8 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     let md: string
     if (typeof data === 'string') {
       md = data
+    } else if (isFileDownloadPayload(data)) {
+      md = `**${fileDownloadSummary(data)}** — use Download to save it.`
     } else {
       try { md = '```json\n' + JSON.stringify(data, null, 2) + '\n```' } catch { md = String(data) }
     }
@@ -5186,26 +5711,56 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
       {/* Completed */}
       {isCompleted && (
         <div>
+          {/* A run that completed with step warnings (fields a Form Filler
+              could not fill, an empty input, …) is not a clean pass: say so
+              in the header, in amber, before the output and the Download /
+              Save buttons that offer it as a finished deliverable. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-            fontSize: 13, color: '#16a34a', fontWeight: 500,
+            fontSize: 13, color: stepWarnings.length > 0 ? '#b45309' : '#16a34a', fontWeight: 500,
           }}>
-            <CheckCircle style={{ width: 16, height: 16 }} />
-            Completed
+            {stepWarnings.length > 0
+              ? <AlertTriangle style={{ width: 16, height: 16 }} />
+              : <CheckCircle style={{ width: 16, height: 16 }} />}
+            {stepWarnings.length > 0
+              ? `Completed with ${stepWarnings.length} warning${stepWarnings.length === 1 ? '' : 's'} — check the output before using it`
+              : 'Completed'}
           </div>
-          <div
-            className="chat-markdown"
-            style={{
-              backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-              padding: 12, fontSize: 13, lineHeight: 1.6,
-              maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto',
-              color: '#374151', wordBreak: 'break-word',
-            }}
-            dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
-          />
+          {fileSummary ? (
+            <FileOutputCard summary={fileSummary} downloadHref={fileDownloadHref} />
+          ) : (
+            <div
+              className="chat-markdown"
+              style={{
+                backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                padding: 12, fontSize: 13, lineHeight: 1.6,
+                maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto',
+                color: '#374151', wordBreak: 'break-word',
+              }}
+              dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
+            />
+          )}
           {stepWarningsPanel}
+          {fillReportPanel}
           {apiRequestPanel}
           <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+          {fileSummary ? (
+            <a
+              href={fileDownloadHref}
+              download={fileSummary.filename}
+              aria-disabled={!fileDownloadHref}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit', textDecoration: 'none',
+                border: '1px solid #d1d5db', borderRadius: 6,
+                backgroundColor: '#fff', cursor: fileDownloadHref ? 'pointer' : 'not-allowed',
+                color: '#374151', opacity: fileDownloadHref ? 1 : 0.5,
+              }}
+            >
+              <Download style={{ width: 14, height: 14 }} />
+              Download {fileSummary.filename}
+            </a>
+          ) : (
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
               onClick={() => setShowDownloadPopup(!showDownloadPopup)}
@@ -5255,6 +5810,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               </div>
             )}
           </div>
+          )}
             <button
               onClick={() => setShowSaveToFolder(true)}
               disabled={!sessionId}
@@ -5331,7 +5887,7 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
       {expanded && (
         <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {sources.map((c, i) => {
-            const locator = formatPageLocator(c.page, c.page_approximate) ?? (c.sheet || null)
+            const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
             const label = locator ? `${c.document_title} · ${locator}` : c.document_title
             const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
             const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' - ')
@@ -5506,6 +6062,8 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
     let md: string
     if (typeof data === 'string') {
       md = data
+    } else if (isFileDownloadPayload(data)) {
+      md = `**${fileDownloadSummary(data)}** — use Download to save it.`
     } else {
       try { md = '```json\n' + JSON.stringify(data, null, 2) + '\n```' } catch { md = String(data) }
     }
@@ -5626,9 +6184,13 @@ function BatchOutputCard({ batchId, batchStatus, running, runElapsed }: {
                     color: '#374151', wordBreak: 'break-word',
                   }}
                 >
-                  <div dangerouslySetInnerHTML={{
-                    __html: renderOutput((item.final_output as Record<string, unknown>)?.output ?? item.final_output),
-                  }} />
+                  {(() => {
+                    const value = (item.final_output as Record<string, unknown>)?.output ?? item.final_output
+                    const file = summarizeFilePayload(value)
+                    return file
+                      ? <FileOutputCard summary={file} downloadHref={downloadResults(item.session_id, 'text', { shareToken })} maxHeight="40vh" />
+                      : <div dangerouslySetInnerHTML={{ __html: renderOutput(value) }} />
+                  })()}
                 </div>
               )}
             </div>
@@ -5921,17 +6483,20 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
 // ---------------------------------------------------------------------------
 
 
-function InputTab({ workflow, openWorkflowId, onRefresh }: {
+const VIEW_ONLY_HINT = 'This workflow is view-only. Save a copy to your library to change its input and output settings.'
+
+function InputTab({ workflow, openWorkflowId, canManage, onRefresh }: {
   workflow: Workflow
   openWorkflowId: string | null
+  canManage: boolean
   onRefresh: () => void
 }) {
   const { toast } = useToast()
   const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
   const [triggerType, setTriggerType] = useState((inputCfg?.trigger_type as string) || 'manual')
   const [saving, setSaving] = useState(false)
-  const [fixedDocs, setFixedDocs] = useState<{ uuid: string; title: string }[]>(
-    () => ((inputCfg?.fixed_documents as { uuid: string; title: string }[]) || [])
+  const [fixedDocs, setFixedDocs] = useState<FixedDocument[]>(
+    () => ((inputCfg?.fixed_documents as FixedDocument[]) || [])
   )
 
   // Keep local UI in sync with the persisted config when the workflow
@@ -5957,27 +6522,29 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
     try {
       await persistInputConfig({ trigger_type: value })
     } catch (err) {
-      // Roll the dropdown back so it reflects what's actually saved, and say
-      // why. The usual cause is editing a verified/shared workflow you don't
-      // have manage rights on — duplicate it first to get an editable copy.
+      // Roll the dropdown back so it reflects what's actually saved, and say why.
       setTriggerType(previous)
-      toast(
-        err instanceof Error && err.message
-          ? err.message
-          : "Couldn't change the input type. You may not have permission to edit this workflow. Duplicate it to make an editable copy.",
-        'error',
-      )
+      toast(describeConfigSaveError(err, 'the input type'), 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
-    setFixedDocs(docs)
-    await persistInputConfig({ fixed_documents: docs })
+  const saveFixedDocs = async (docs: FixedDocument[]) => {
+    const previous = fixedDocs
+    setFixedDocs(docs)  // optimistic — refresh() reconciles on success
+    try {
+      await persistInputConfig({ fixed_documents: docs.map(stripFixedDocumentFlags) })
+    } catch (err) {
+      // Roll back so the list only shows what's actually saved. Without this
+      // the rejection escaped every caller (add-selected button, remove ×,
+      // drop zone) as an unhandled promise rejection.
+      setFixedDocs(previous)
+      toast(describeConfigSaveError(err, 'fixed documents'), 'error')
+    }
   }
 
-  const addFixedDocs = async (docs: { uuid: string; title: string }[]) => {
+  const addFixedDocs = async (docs: FixedDocument[]) => {
     const existing = new Set(fixedDocs.map(d => d.uuid))
     const merged = [...fixedDocs]
     for (const d of docs) {
@@ -5990,14 +6557,40 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
   }
 
   const removeFixedDoc = (uuid: string) => {
-    saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
+    void saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
   }
 
+  const triggerLabel = triggerType === 'text_input' ? 'Text input'
+    : triggerType === 'no_input' ? 'No input'
+    : 'Select documents'
+  const inputSummary = fixedDocs.length > 0
+    ? `${triggerLabel} · ${fixedDocs.length} fixed document${fixedDocs.length === 1 ? '' : 's'}`
+    : triggerLabel
+  const oc = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
+  const storage = (oc?.storage || {}) as Record<string, unknown>
+  const storageEnabled = Boolean(storage.enabled)
+  const outputSummary = storageEnabled
+    ? `Saving to ${(storage.destination_folder as string) || 'library root'} as ${(storage.format as string) || 'markdown'}`
+    : 'Not saved to the library'
+
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 16 }}>
-        Input Configuration
-      </div>
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Each section folds to one line with a summary of what it is set to,
+          so the tab can be worked through a section at a time. Input starts
+          open (it is what the tab is for); Output starts open only when
+          something is configured there. */}
+      <CollapsibleSection title="Input Configuration" summary={inputSummary} testId="input-config-section">
+      {!canManage && (
+        <div
+          role="note"
+          style={{
+            fontSize: 12, color: '#6b7280', marginBottom: 16, padding: '8px 12px',
+            border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#f9fafb',
+          }}
+        >
+          {VIEW_ONLY_HINT}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Input type selector */}
         <div>
@@ -6006,7 +6599,7 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
             aria-label="Input type"
             value={triggerType}
             onChange={e => handleTriggerChange(e.target.value)}
-            disabled={saving}
+            disabled={saving || !canManage}
             style={{
               width: '100%', fontSize: 13, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 12px',
@@ -6028,12 +6621,15 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
               Fixed Documents
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Pre-assign documents that will always be included when this workflow runs.
+              Pre-assign documents that will always be included when this workflow runs — pick them from your Vandalizer library or upload from your computer.
+              They count as the selection: with a fixed document, Run works without selecting anything else,
+              and any documents you do select are added alongside them.
             </div>
             <FixedDocumentsZone
               fixedDocs={fixedDocs}
               onAddDocs={addFixedDocs}
               onRemoveDoc={removeFixedDoc}
+              readOnly={!canManage}
             />
           </div>
         )}
@@ -6065,6 +6661,7 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
                 fixedDocs={fixedDocs}
                 onAddDocs={addFixedDocs}
                 onRemoveDoc={removeFixedDoc}
+                readOnly={!canManage}
               />
             </div>
           </>
@@ -6087,15 +6684,16 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
         )}
 
       </div>
+      </CollapsibleSection>
 
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', margin: '32px 0 16px' }}>
-        Output Configuration
-      </div>
-      <OutputConfigCard
-        workflow={workflow}
-        openWorkflowId={openWorkflowId}
-        onRefresh={onRefresh}
-      />
+      <CollapsibleSection title="Output Configuration" summary={outputSummary} defaultOpen={storageEnabled} testId="output-config-section">
+        <OutputConfigCard
+          workflow={workflow}
+          openWorkflowId={openWorkflowId}
+          canManage={canManage}
+          onRefresh={onRefresh}
+        />
+      </CollapsibleSection>
     </div>
   )
 }
@@ -6108,12 +6706,15 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
 function OutputConfigCard({
   workflow,
   openWorkflowId,
+  canManage,
   onRefresh,
 }: {
   workflow: Workflow
   openWorkflowId: string | null
+  canManage: boolean
   onRefresh: () => void
 }) {
+  const { toast } = useToast()
   const oc = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
   const storage = (oc?.storage || {}) as Record<string, unknown>
   const enabled = (storage.enabled as boolean) || false
@@ -6135,14 +6736,20 @@ function OutputConfigCard({
     if (!openWorkflowId) return
     const current = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
     const nextStorage = { ...storage, ...patch }
-    await updateWorkflow(openWorkflowId, {
-      output_config: { ...(current || {}), storage: nextStorage },
-    })
-    onRefresh()
+    try {
+      await updateWorkflow(openWorkflowId, {
+        output_config: { ...(current || {}), storage: nextStorage },
+      })
+      onRefresh()
+    } catch (err) {
+      // Controls render from the persisted workflow, so there's nothing to roll
+      // back — just say why the change didn't stick.
+      toast(describeConfigSaveError(err, 'the output settings'), 'error')
+    }
   }
 
   return (
-    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+    <fieldset disabled={!canManage} style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb', margin: 0, minWidth: 0 }}>
       <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
         <input
           type="checkbox"
@@ -6268,178 +6875,9 @@ function OutputConfigCard({
           </label>
         </div>
       )}
-    </div>
+    </fieldset>
   )
 }
-
-// Drag-and-drop / click-to-browse zone for the workflow's fixed documents.
-// Accepts: (1) document rows dragged from the file browser (text/plain = uuid),
-// (2) files dropped from the OS (uploaded as new documents), (3) click → picker.
-function FixedDocumentsZone({
-  fixedDocs,
-  onAddDocs,
-  onRemoveDoc,
-}: {
-  fixedDocs: { uuid: string; title: string }[]
-  onAddDocs: (docs: { uuid: string; title: string }[]) => Promise<void> | void
-  onRemoveDoc: (uuid: string) => void
-}) {
-  const { selectedDocUuids, selectedDocNames } = useWorkspace()
-  const [dragOver, setDragOver] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [showPicker, setShowPicker] = useState(false)
-
-  const existingUuids = new Set(fixedDocs.map(d => d.uuid))
-  const addableSelected = selectedDocUuids.filter(uuid => !existingUuids.has(uuid))
-
-  const handleFileUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const reader = new FileReader()
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string
-          resolve(result.split(',')[1] || result)
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-      const ext = file.name.split('.').pop() || ''
-      const { uuid } = await uploadFile({
-        contentAsBase64String: base64,
-        fileName: file.name,
-        extension: ext,
-      })
-      if (uuid) await onAddDocs([{ uuid, title: file.name }])
-    } catch { /* ignore upload errors */ }
-    finally { setUploading(false) }
-  }
-
-  const handleDroppedUuid = async (uuid: string) => {
-    // Look up title via search; fall back to a stub if lookup fails.
-    let title = `Document ${uuid.slice(0, 8)}`
-    try {
-      const res = await searchDocuments('', 100)
-      const match = res.items.find(d => d.uuid === uuid)
-      if (match) title = match.title
-    } catch { /* keep stub title */ }
-    await onAddDocs([{ uuid, title }])
-  }
-
-  return (
-    <>
-      {fixedDocs.length > 0 && (
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden',
-          backgroundColor: '#fff', marginBottom: 8,
-        }}>
-          {fixedDocs.map((doc, idx) => (
-            <div
-              key={doc.uuid}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                borderBottom: idx < fixedDocs.length - 1 ? '1px solid #f3f4f6' : 'none',
-                fontSize: 13,
-              }}
-            >
-              <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
-              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {doc.title}
-              </span>
-              <button
-                type="button"
-                onClick={() => onRemoveDoc(doc.uuid)}
-                style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-                  color: '#6b7280', display: 'flex',
-                }}
-                aria-label={`Remove ${doc.title}`}
-              >
-                <X style={{ width: 14, height: 14 }} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div
-        onDragOver={e => {
-          e.preventDefault()
-          e.stopPropagation()
-          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
-          setDragOver(true)
-        }}
-        onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
-        onDrop={async e => {
-          e.preventDefault()
-          e.stopPropagation()
-          setDragOver(false)
-          // Internal drag from FileBrowser: text/plain = doc uuid
-          const uuid = e.dataTransfer.getData('text/plain')
-          if (uuid && !e.dataTransfer.files.length) {
-            await handleDroppedUuid(uuid)
-            return
-          }
-          // OS file drop: upload each as a new document
-          const files = Array.from(e.dataTransfer.files)
-          for (const file of files) {
-            await handleFileUpload(file)
-          }
-        }}
-        onClick={() => { if (!uploading) setShowPicker(true) }}
-        style={{
-          border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
-          borderRadius: 8, padding: '24px 16px', textAlign: 'center',
-          color: '#6b7280', fontSize: 13, cursor: uploading ? 'wait' : 'pointer',
-          backgroundColor: dragOver ? '#fefce8' : '#fff',
-          transition: 'all 0.15s ease',
-        }}
-      >
-        {uploading ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-            <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
-            Uploading...
-          </div>
-        ) : (
-          <>
-            <Upload style={{ width: 18, height: 18, color: '#6b7280', margin: '0 auto 6px' }} />
-            <div>Drag documents here or click to browse</div>
-          </>
-        )}
-      </div>
-
-      {addableSelected.length > 0 && (
-        <button
-          onClick={async () => {
-            const docs = addableSelected.map(uuid => ({
-              uuid,
-              title: selectedDocNames[uuid] || `Document ${uuid.slice(0, 8)}`,
-            }))
-            await onAddDocs(docs)
-          }}
-          style={{
-            marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-            borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
-            color: '#1d4ed8', cursor: 'pointer',
-          }}
-        >
-          <Plus style={{ width: 12, height: 12 }} />
-          Add {addableSelected.length} selected document{addableSelected.length !== 1 ? 's' : ''}
-        </button>
-      )}
-
-      {showPicker && (
-        <DocumentPickerDialog
-          onSelect={async docs => { await onAddDocs(docs) }}
-          onClose={() => setShowPicker(false)}
-          excludeUuids={fixedDocs.map(d => d.uuid)}
-        />
-      )}
-    </>
-  )
-}
-
 
 // ---------------------------------------------------------------------------
 // Validate Tab — run validation with grade + check results

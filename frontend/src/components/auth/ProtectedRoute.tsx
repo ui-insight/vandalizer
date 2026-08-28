@@ -29,7 +29,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return (
       <Navigate
         to="/landing"
-        search={{ error: undefined, invite_token: undefined, admin: undefined, next }}
+        search={{ error: undefined, invite_token: undefined, admin: undefined, next, register: undefined }}
       />
     )
   }

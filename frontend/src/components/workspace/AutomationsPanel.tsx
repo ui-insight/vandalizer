@@ -14,6 +14,7 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
   folder_watch: { label: 'Folder Watch', color: '#1d4ed8', bg: '#dbeafe' },
   api: { label: 'API', color: '#7c3aed', bg: '#ede9fe' },
   m365_intake: { label: 'M365', color: '#15803d', bg: '#dcfce7' },
+  schedule: { label: 'Schedule', color: '#b45309', bg: '#fef3c7' },
 }
 
 type FilterMode = 'all' | 'folder_watch' | 'api' | 'm365_intake'

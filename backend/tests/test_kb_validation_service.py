@@ -1138,3 +1138,181 @@ async def test_every_detail_row_records_what_it_scored_against():
     ):
         assert by_uuid[uuid]["expected_answer"] == answer, f"{uuid} lost its expected answer"
         assert by_uuid[uuid]["external_id"] == ext, f"{uuid} lost its external id"
+
+
+# ---------------------------------------------------------------------------
+# Overall score composition — the reported score is a composite, not the
+# judge's answer accuracy, and the breakdown must say so.
+# ---------------------------------------------------------------------------
+
+
+def test_kb_score_components_judged_run_uses_all_four_signals():
+    from app.services.kb_validation_service import kb_score_components
+
+    out = kb_score_components(
+        avg_judge_score=0.836,
+        num_queries_judged=95,
+        avg_precision=1.0,
+        source_health_ratio=1.0,
+        chunk_coverage_ratio=1.0,
+        num_test_queries=95,
+    )
+    # 0.4*83.6 + 0.25*100 + 0.2*100 + 0.15*100 = 93.44 — the ticket's exact
+    # shape: an 83.6% judge average reported as a low-90s overall score.
+    assert round(out["raw_score"], 1) == 93.4
+    assert [c["key"] for c in out["components"]] == [
+        "judge", "retrieval_precision", "source_health", "chunk_coverage",
+    ]
+    assert [c["weight"] for c in out["components"]] == [0.40, 0.25, 0.20, 0.15]
+    assert out["components"][0]["value"] == 83.6
+    assert out["components"][0]["label"] == "answer accuracy (judge)"
+    assert out["formula"] == (
+        "overall = 40% × answer accuracy (judge) + 25% × retrieval precision"
+        " + 20% × source health + 15% × chunk coverage"
+    )
+
+
+def test_kb_score_components_retrieval_only_when_nothing_was_judged():
+    from app.services.kb_validation_service import kb_score_components
+
+    out = kb_score_components(
+        avg_judge_score=None,
+        num_queries_judged=0,
+        avg_precision=0.8,
+        source_health_ratio=1.0,
+        chunk_coverage_ratio=0.5,
+        num_test_queries=4,
+    )
+    assert round(out["raw_score"], 1) == 80.0  # 0.5*80 + 0.3*100 + 0.2*50
+    assert [c["key"] for c in out["components"]] == [
+        "retrieval_precision", "source_health", "chunk_coverage",
+    ]
+    assert "answer accuracy" not in out["formula"]
+
+
+def test_kb_score_components_no_queries_scores_health_and_coverage():
+    from app.services.kb_validation_service import kb_score_components
+
+    out = kb_score_components(
+        avg_judge_score=None,
+        num_queries_judged=None,
+        avg_precision=None,
+        source_health_ratio=0.5,
+        chunk_coverage_ratio=1.0,
+        num_test_queries=0,
+    )
+    assert round(out["raw_score"], 1) == 70.0  # 0.6*50 + 0.4*100
+    assert out["formula"] == "overall = 60% × source health + 40% × chunk coverage"
+
+
+# ---------------------------------------------------------------------------
+# Stored answers and truncation flags (support ticket: exports cut at 2,000 chars)
+# ---------------------------------------------------------------------------
+
+
+def _tq(uuid="tq-1", query="What is the budget?", expected="$1.2M"):
+    tq = MagicMock()
+    tq.uuid = uuid
+    tq.query = query
+    tq.expected_answer = expected
+    tq.category = "factual"
+    tq.last_judged_score = None
+    tq.last_judged_at = None
+    tq.save = AsyncMock()
+    return tq
+
+
+async def _pass_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None, category=None):
+    return {
+        "score": 1.0, "verdict": "PASS", "confidence": 0.9, "reasoning": "ok",
+        "evidence": "", "missing_facts": [], "hallucinated_facts": [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_judge_test_queries_stores_the_full_answer_and_judges_it():
+    """A 6,000-character answer used to be stored as 2,000 with no flag — the
+    export then looked like the judge had scored a fragment. The judge always
+    saw the whole answer; now the row holds it too."""
+    long_answer = "x" * 6000
+    seen = {}
+
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+        return (long_answer, [{"content": "c", "metadata": {"source_name": "Doc"}}], 0)
+
+    async def spy_judge(**kw):
+        seen["actual_answer"] = kw["actual_answer"]
+        return await _pass_judge(**kw)
+
+    with patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer), \
+         patch.object(kb_validation_service, "_judge_answer", side_effect=spy_judge):
+        out = await kb_validation_service.judge_test_queries("kb-1", [_tq()], "test-model", mode="judge")
+
+    detail = out["details"][0]
+    assert seen["actual_answer"] == long_answer
+    assert detail["actual_answer"] == long_answer
+    assert detail["actual_answer_truncated"] is False
+    assert detail["generation_truncated"] is False
+    assert detail["baseline_answer"] is None
+    assert detail["baseline_answer_truncated"] is False
+    assert detail["baseline_generation_truncated"] is False
+
+
+@pytest.mark.asyncio
+async def test_judge_test_queries_flags_a_stored_answer_that_hits_the_cap():
+    huge = "y" * (kb_validation_service._STORED_ANSWER_MAX_CHARS + 10)
+
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+        return (huge, [], 0)
+
+    with patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer), \
+         patch.object(kb_validation_service, "_judge_answer", side_effect=_pass_judge):
+        out = await kb_validation_service.judge_test_queries("kb-1", [_tq()], "test-model", mode="judge")
+
+    detail = out["details"][0]
+    assert len(detail["actual_answer"]) == kb_validation_service._STORED_ANSWER_MAX_CHARS
+    assert detail["actual_answer_truncated"] is True
+    assert detail["generation_truncated"] is False
+
+
+@pytest.mark.asyncio
+async def test_judge_test_queries_records_generation_truncation_per_answer():
+    """A model stopping at its output cap is reported through the llm_service
+    truncation sink; the row records it separately for the with-KB and the
+    baseline answer, since only the one that was cut is suspect."""
+    from app.services.llm_service import record_truncation
+
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+        record_truncation("test-model", 1024)
+        return ("partial answer that stops mid", [], 0)
+
+    async def fake_baseline(query, model_name):
+        return ("complete baseline answer", 0)
+
+    with patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer), \
+         patch.object(kb_validation_service, "_generate_baseline_answer", side_effect=fake_baseline), \
+         patch.object(kb_validation_service, "_judge_answer", side_effect=_pass_judge):
+        out = await kb_validation_service.judge_test_queries("kb-1", [_tq()], "test-model", mode="analysis")
+
+    detail = out["details"][0]
+    assert detail["generation_truncated"] is True
+    assert detail["baseline_generation_truncated"] is False
+    assert detail["actual_answer_truncated"] is False
+
+
+@pytest.mark.asyncio
+async def test_judge_baselines_only_records_truncation_flags():
+    from app.services.llm_service import record_truncation
+
+    async def fake_baseline(query, model_name):
+        record_truncation("test-model", 512)
+        return ("cut baseline", 0)
+
+    with patch.object(kb_validation_service, "_generate_baseline_answer", side_effect=fake_baseline), \
+         patch.object(kb_validation_service, "_judge_answer", side_effect=_pass_judge):
+        out = await kb_validation_service.judge_baselines_only([_tq()], "test-model")
+
+    detail = out["details"][0]
+    assert detail["baseline_answer"] == "cut baseline"
+    assert detail["baseline_answer_truncated"] is False
+    assert detail["baseline_generation_truncated"] is True

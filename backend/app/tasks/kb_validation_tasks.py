@@ -156,6 +156,50 @@ async def _add_urls_async(
     return {"kb_uuid": kb_uuid, "added": added}
 
 
+@celery.task(
+    bind=True,
+    name="tasks.kb.refresh_url_source",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    soft_time_limit=900,  # 15 min — one page (or one large PDF) fetch + embed
+    time_limit=960,
+)
+def refresh_url_source_task(self, kb_uuid: str, source_uuid: str):
+    """Re-fetch one URL source in place. See knowledge_service.refresh_url_source."""
+    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid))
+
+
+async def _refresh_url_source_async(kb_uuid: str, source_uuid: str):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+    from app.services import knowledge_service as svc
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        logger.warning("KB %s not found for refresh_url_source; skipping.", kb_uuid)
+        return {"kb_uuid": kb_uuid, "refreshed": False}
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
+    )
+    if not source:
+        logger.warning("Source %s not found in KB %s for refresh; skipping.", source_uuid, kb_uuid)
+        # The router flipped the KB to "building"; restore its real status.
+        await svc.recalculate_stats(kb)
+        return {"kb_uuid": kb_uuid, "refreshed": False}
+
+    reason = await svc.refresh_url_source(source, kb)
+    # Unconditional: the router set status="building" before dispatching.
+    await svc.recalculate_stats(kb)
+    return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": reason is None, "reason": reason}
+
+
 # ---------------------------------------------------------------------------
 # KB Autovalidate optimizer task — long-running, no auto-retry.
 #

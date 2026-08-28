@@ -27,4 +27,14 @@ describe('formatPageLocator', () => {
   it('ignores a non-integer page rather than rendering "p. 1.5"', () => {
     expect(formatPageLocator(1.5)).toBeNull()
   })
+
+  it('renders a page range when a spanning chunk could not be pinned to one page', () => {
+    expect(formatPageLocator(2, false, 3)).toBe('p. 2–3')
+    expect(formatPageLocator(2, true, 4)).toBe('p. ~2–4')
+  })
+
+  it('ignores a page_end that does not extend past the page', () => {
+    expect(formatPageLocator(3, false, 3)).toBe('p. 3')
+    expect(formatPageLocator(3, false, null)).toBe('p. 3')
+  })
 })

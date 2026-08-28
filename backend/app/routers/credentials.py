@@ -1,5 +1,6 @@
 """Credentials API routes — team-scoped CRUD with secret payloads encrypted at rest."""
 
+import asyncio
 import datetime
 import logging
 
@@ -11,6 +12,9 @@ from app.models.credential import Credential
 from app.models.team import TeamMembership
 from app.models.user import User
 from app.schemas.credentials import (
+    CredentialTestResponse,
+    TestCredentialDraftRequest,
+    TestSavedCredentialRequest,
     CreateCredentialRequest,
     CredentialResponse,
     UpdateCredentialRequest,
@@ -97,6 +101,67 @@ async def _load_for_manage(credential_id: str, user: User) -> Credential:
     return cred
 
 
+async def _load_for_view(credential_id: str, user: User) -> Credential:
+    try:
+        cred = await Credential.get(PydanticObjectId(credential_id))
+    except Exception:
+        raise HTTPException(status_code=404, detail="Credential not found")
+    if not cred:
+        raise HTTPException(status_code=404, detail="Credential not found")
+    if cred.user_id != user.user_id and not await _can_view_team(user, cred.team_id):
+        raise HTTPException(status_code=404, detail="Credential not found")
+    return cred
+
+
+# ---------------------------------------------------------------------------
+# Connection test
+# ---------------------------------------------------------------------------
+
+@router.post("/test", response_model=CredentialTestResponse)
+async def test_credential_draft(
+    body: TestCredentialDraftRequest, user: User = Depends(get_current_user),
+) -> CredentialTestResponse:
+    """Test a credential before it is saved — the form's values, as typed.
+
+    A real attempt: OAuth performs the token exchange; a test URL, if given,
+    receives one GET with the auth applied. The report names each step and
+    why it failed; secret values never appear in it.
+    """
+    result = await asyncio.to_thread(
+        credentials_service.run_connection_test, body.type, body.payload, test_url=body.test_url,
+    )
+    return CredentialTestResponse(**result)
+
+
+@router.post("/{credential_id}/test", response_model=CredentialTestResponse)
+async def test_saved_credential(
+    credential_id: str,
+    body: TestSavedCredentialRequest | None = None,
+    user: User = Depends(get_current_user),
+) -> CredentialTestResponse:
+    """Test a saved credential with its stored secrets — anyone who can use
+    the credential may test it. Unsaved form edits in ``payload`` are merged
+    over the stored payload (blank secret = keep the stored one)."""
+    cred = await _load_for_view(credential_id, user)
+    encrypted = cred.payload or {}
+    if body and body.payload:
+        # Merged edits can redirect the stored secrets (a new token_endpoint
+        # receives the stored client_secret and a freshly signed assertion),
+        # so testing with edits needs the same permission as saving them.
+        if cred.user_id != user.user_id and not await _can_manage_team(user, cred.team_id):
+            raise HTTPException(status_code=403, detail="You don't have permission to manage this credential")
+        try:
+            encrypted = credentials_service.merge_update_payload(cred.type, encrypted, body.payload)
+        except credentials_service.CredentialError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+    payload = credentials_service.decrypt_payload(cred.type, encrypted)
+    result = await asyncio.to_thread(
+        credentials_service.run_connection_test, cred.type, payload,
+        test_url=(body.test_url if body else None) or payload.get("test_url") or None,
+    )
+    return CredentialTestResponse(**result)
+
+
 # ---------------------------------------------------------------------------
 # CRUD
 # ---------------------------------------------------------------------------
@@ -176,7 +241,28 @@ async def update_credential(
         cred.name = req.name
     if req.description is not None:
         cred.description = req.description
-    if req.payload is not None:
+    steps_updated: int | None = None
+    if req.type is not None and req.type != cred.type:
+        # The stored secrets belong to the old type, so a type change is a
+        # fresh credential under the same id: the new type's payload must be
+        # complete, nothing is merged, and the old secrets are gone.
+        if req.payload is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Changing the credential type requires the complete payload for the new type.",
+            )
+        try:
+            credentials_service.validate_payload(req.type, req.payload)
+        except credentials_service.CredentialError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        cred.type = req.type
+        cred.payload = credentials_service.encrypt_payload(req.type, req.payload)
+        credentials_service.invalidate_cached_token(str(cred.id))
+        # An API Node step stores auth_strategy alongside credential_id and
+        # the run refuses a mismatch — re-point every step that uses this
+        # credential so the workflows keep running.
+        steps_updated = await _repoint_api_steps(str(cred.id), req.type)
+    elif req.payload is not None:
         # Merge over the stored payload so a caller can rotate just the private
         # key (or change one field) without resending the others — secrets are
         # never returned, so the client can't echo them back.
@@ -192,7 +278,28 @@ async def update_credential(
         credentials_service.invalidate_cached_token(str(cred.id))
     cred.updated_at = _now()
     await cred.save()
-    return _to_response(cred)
+    resp = _to_response(cred)
+    if steps_updated is not None:
+        resp.steps_updated = steps_updated
+    return resp
+
+
+async def _repoint_api_steps(credential_id: str, new_type: str) -> int:
+    """Set ``auth_strategy`` to *new_type* on every API Node step task that
+    uses this credential. Returns how many were changed."""
+    from app.models.workflow import WorkflowStepTask
+
+    tasks = await WorkflowStepTask.find({"data.credential_id": credential_id}).to_list()
+    changed = 0
+    for task in tasks:
+        data = dict(task.data or {})
+        if data.get("auth_strategy") == new_type:
+            continue
+        data["auth_strategy"] = new_type
+        task.data = data
+        await task.save()
+        changed += 1
+    return changed
 
 
 @router.delete("/{credential_id}")

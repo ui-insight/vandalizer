@@ -948,6 +948,12 @@ async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User
     return {"entities": entities}
 
 
+EXTRACTION_NO_VALUES_ERROR = (
+    "Extraction returned no values — no field could be read from the selected "
+    "document(s). Check the fields and the documents, then run again."
+)
+
+
 @router.post("/run-sync")
 @limiter.limit("30/minute")
 async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
@@ -955,6 +961,16 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
     ss = await _get_search_set_or_404(req.search_set_uuid, user)
     document_uuids = await _authorize_documents(req.document_uuids, user)
     title = ss.title
+
+    # Nothing to extract with: refuse before a run exists. The service
+    # returns [] for a fieldless set, so this used to record a "completed"
+    # run in a few milliseconds — green tick in History, nothing to open —
+    # once per click (support ticket).
+    if not await svc.get_extraction_keys(req.search_set_uuid):
+        raise HTTPException(
+            status_code=400,
+            detail="This extraction has no fields yet — add at least one field before running it",
+        )
 
     # Create activity event
     activity = await activity_service.activity_start(
@@ -983,7 +999,18 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 combined_context=req.combined_context,
                 capture_sources=True,
             )
-        await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        # A run that produced no entities at all extracted nothing; recording
+        # it as completed gives History a green tick with nothing behind it.
+        # It is finished as failed with the reason, and the client is told
+        # so on the response rather than being pointed at details that
+        # don't exist.
+        no_values = not any(isinstance(e, dict) and e for e in results)
+        if no_values:
+            await activity_service.activity_finish(
+                activity.id, ActivityStatus.FAILED, error=EXTRACTION_NO_VALUES_ERROR,
+            )
+        else:
+            await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         # Split the per-field source sidecar out of each entity so `results`
         # keeps its historical flat {field: value} shape. `sources` stays
         # index-aligned with `results`.
@@ -1012,6 +1039,9 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 "search_set_uuid": req.search_set_uuid,
             },
         )
+
+        if no_values:
+            return {"results": results, "sources": sources, "error": EXTRACTION_NO_VALUES_ERROR}
 
         # Fire-and-forget auto-validation if test cases exist
         from app.tasks.quality_tasks import auto_validate_extraction
@@ -1656,7 +1686,9 @@ async def get_extraction_suggestions(
             }],
         }
 
-    suggestions = await generate_improvement_suggestions("search_set", uuid, result_snapshot)
+    suggestions = await generate_improvement_suggestions(
+        "search_set", uuid, result_snapshot, user_id=user.user_id,
+    )
     return {"suggestions": suggestions}
 
 

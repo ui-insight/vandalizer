@@ -8,7 +8,7 @@ Note: Celery tasks with bind=True receive `self` automatically. We call
 the underlying function directly via .__wrapped__ or the task object.
 """
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from bson import ObjectId
 
 import pytest
@@ -17,6 +17,17 @@ import pytest
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+@pytest.fixture(autouse=True)
+def _no_real_beanie_or_smtp():
+    """The approval-pause path initialises Beanie on a throwaway loop and sends
+    mail. Neither has a server under pytest, and every unmocked attempt burns
+    the 5 s Mongo server-selection timeout per Beanie call — the four
+    approval tests went from well under a second to ~10 s each."""
+    with patch("app.database.init_db", new=AsyncMock()), \
+         patch("app.services.email_service.send_email", new=AsyncMock(return_value=True)):
+        yield
+
 
 def _fake_oid():
     return ObjectId()
@@ -576,6 +587,41 @@ class TestExecuteTaskStepTest:
             doc_uuids=["uuid1"],
         )
         assert result is not None
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    def test_step_warning_is_returned_alongside_the_output(self, mock_get_db):
+        """A Form Filler that could not fill a field completes with a warning;
+        Test Step used to drop it and show a clean "Test Completed"."""
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "Rate 47%"}])
+        mock_get_db.return_value = db
+
+        with patch("app.services.workflow_engine._run_form_filler_model") as mock_model:
+            mock_model.return_value = '{"rate": "47%", "cap": "Not provided in context"}'
+            result = execute_task_step_test(
+                task_name="FormFiller",
+                task_data={"template": "Rate: {{rate}}\nCap: {{cap}}", "model": "gpt-4o"},
+                doc_uuids=["uuid1"],
+            )
+        assert result["output"] == "Rate: 47%\nCap: [Not provided: cap]"
+        assert result["step_test_warning"].startswith("1 field not found in the input")
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    def test_step_without_warning_returns_bare_output(self, mock_get_db):
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        db = _mock_db(smart_docs=[{"uuid": "uuid1", "raw_text": "Rate 47%"}])
+        mock_get_db.return_value = db
+
+        with patch("app.services.workflow_engine._run_form_filler_model") as mock_model:
+            mock_model.return_value = '{"rate": "47%"}'
+            result = execute_task_step_test(
+                task_name="FormFiller",
+                task_data={"template": "Rate: {{rate}}", "model": "gpt-4o"},
+                doc_uuids=["uuid1"],
+            )
+        assert result == "Rate: 47%"
 
     @patch("app.tasks.workflow_tasks._get_db")
     def test_unknown_task_type_raises(self, mock_get_db):
@@ -1261,12 +1307,13 @@ class TestInputReadinessGate:
         )
         mock_get_db.return_value = db
 
-        result = execute_workflow_task(
-            workflow_result_id=str(result_id),
-            workflow_id=str(wf_id),
-            trigger_step_data={"doc_uuids": ["uuid1"]},
-            model="gpt-4o",
-        )
+        with patch("app.tasks.workflow_tasks.logger") as mock_logger:
+            result = execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+            )
 
         assert result is None
         mock_build.assert_not_called()
@@ -1274,6 +1321,12 @@ class TestInputReadinessGate:
         assert set_op["status"] == "error"
         assert "Bad.pdf" in set_op["error"]
         assert set_op["error_payload"]["code"] == "input_documents_unready"
+        # A handled, user-actionable abort must not page Sentry as a fault
+        # (VANDALIZER-BACKEND-1T) — same level as the oversize pre-flight.
+        mock_logger.error.assert_not_called()
+        assert any(
+            "aborted pre-flight" in str(c.args[0]) for c in mock_logger.warning.call_args_list
+        )
 
     @patch("app.tasks.workflow_tasks._get_db")
     @patch("app.services.workflow_engine.build_workflow_engine")
@@ -1459,3 +1512,149 @@ class TestPreflightContextOverflow:
 
         assert result["status"] == "completed"
         mock_engine.execute.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight: a fixed document deleted from Files fails the run by name
+# ---------------------------------------------------------------------------
+
+class TestMissingFixedDocuments:
+    def test_lists_deleted_and_soft_deleted_by_saved_title(self):
+        from app.tasks.workflow_tasks import _missing_fixed_documents
+
+        db = _mock_db(smart_docs=[
+            {"uuid": "ok", "title": "Present.pdf", "raw_text": "x"},
+            {"uuid": "soft", "title": "Retired.pdf", "raw_text": "x", "soft_deleted": True},
+        ])
+        wf = {"input_config": {"fixed_documents": [
+            {"uuid": "ok", "title": "Present.pdf"},
+            {"uuid": "gone", "title": "Award Terms.pdf"},
+            {"uuid": "soft", "title": "Retired.pdf"},
+            "bare-uuid-gone",
+        ]}}
+        assert _missing_fixed_documents(db, wf) == ["Award Terms.pdf", "Retired.pdf", "bare-uuid-gone"]
+
+    def test_no_input_mode_ignores_fixed_documents(self):
+        from app.tasks.workflow_tasks import _missing_fixed_documents
+
+        wf = {"input_config": {"trigger_type": "no_input", "fixed_documents": [{"uuid": "gone", "title": "x"}]}}
+        assert _missing_fixed_documents(_mock_db(), wf) == []
+
+    def test_message_wording(self):
+        from app.tasks.workflow_tasks import fixed_documents_missing_message
+
+        one = fixed_documents_missing_message(["Award Terms.pdf"])
+        assert one.startswith("1 fixed document configured on this workflow's Input tab no longer exists: Award Terms.pdf.")
+        assert "It was deleted from Files. Remove it from the Input tab" in one
+        two = fixed_documents_missing_message(["a", "b"])
+        assert two.startswith("2 fixed documents") and "They were deleted" in two
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_run_fails_before_building_when_a_fixed_document_is_gone(self, mock_build, mock_get_db):
+        """Before: the missing document was logged and skipped, the run covered
+        only the selected document and reported Completed."""
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        wf = _make_workflow_doc(wf_id=wf_id)
+        wf["input_config"] = {"fixed_documents": [{"uuid": "fixed-gone", "title": "Award Terms.pdf"}]}
+        db = _mock_db(
+            workflow_doc=wf,
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            smart_docs=[{"uuid": "sel", "raw_text": "selected doc text", "processing": False, "title": "Selected.pdf"}],
+        )
+        mock_get_db.return_value = db
+
+        with patch("app.tasks.workflow_tasks.logger") as mock_logger:
+            result = execute_workflow_task(
+                workflow_result_id=str(result_id), workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["sel"]}, model="gpt-4o",
+            )
+
+        assert result is None
+        mock_build.assert_not_called()
+        set_op = db.workflow_result.update_one.call_args[0][1]["$set"]
+        assert set_op["status"] == "error"
+        assert "Award Terms.pdf" in set_op["error"]
+        assert set_op["error_payload"] == {
+            "code": "fixed_documents_missing", "missing_documents": ["Award Terms.pdf"],
+        }
+        mock_logger.error.assert_not_called()
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_run_proceeds_when_fixed_documents_exist(self, mock_build, mock_get_db):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        wf = _make_workflow_doc(wf_id=wf_id)
+        wf["input_config"] = {"fixed_documents": [{"uuid": "fixed", "title": "Award Terms.pdf"}]}
+        db = _mock_db(
+            workflow_doc=wf,
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            smart_docs=[
+                {"uuid": "sel", "raw_text": "selected", "processing": False, "title": "Selected.pdf"},
+                {"uuid": "fixed", "raw_text": "fixed", "processing": False, "title": "Award Terms.pdf"},
+            ],
+        )
+        mock_get_db.return_value = db
+        mock_build.return_value.execute.return_value = ("out", [])
+        execute_workflow_task(
+            workflow_result_id=str(result_id), workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": ["sel"]}, model="gpt-4o",
+        )
+        mock_build.assert_called_once()
+
+
+class TestBuildStepsDataFormFiller:
+    """Form Filler tasks carry document metadata (for per-field sources) and
+    their fillable-PDF template; other tasks are untouched."""
+
+    def _db(self, task_name, task_data):
+        step_id, task_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            step_docs=[{"_id": step_id, "name": "Fill", "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": task_name, "data": task_data}],
+        )
+        db.smart_document.find_one.side_effect = lambda q, *a, **k: {
+            "uuid": q.get("uuid"), "title": f"{q.get('uuid')}.pdf", "raw_text": f"text-{q.get('uuid')}",
+            "text_markers": [{"char_offset": 0, "kind": "page", "value": 1}],
+            "extension": "pdf", "path": f"u/{q.get('uuid')}.pdf",
+        }
+        return db, step_id
+
+    def test_form_filler_gets_doc_metas_aligned_with_doc_texts(self):
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db("FormFiller", {"template": "{{a}}", "input_sources": ["workflow_documents", "select_document"], "selected_document_uuid": "S"})
+        wf = _make_workflow_doc(step_ids=[step_id])
+        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1", "u2"]})
+
+        data = steps_data[1]["tasks"][0]["data"]
+        assert data["doc_texts"] == ["text-u1", "text-u2"]
+        assert [m["uuid"] for m in data["doc_metas"]] == ["u1", "u2"]
+        assert data["doc_metas"][0]["title"] == "u1.pdf"
+        assert data["doc_metas"][0]["text_markers"] == [{"char_offset": 0, "kind": "page", "value": 1}]
+        assert data["selected_doc_meta"]["uuid"] == "S"
+        assert "template_pdf_b64" not in data  # text mode
+
+    def test_other_tasks_do_not_get_metas(self):
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db("Prompt", {"prompt": "x"})
+        wf = _make_workflow_doc(step_ids=[step_id])
+        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
+        data = steps_data[1]["tasks"][0]["data"]
+        assert data["doc_texts"] == ["text-u1"]
+        assert "doc_metas" not in data
+
+    @patch("app.tasks.workflow_tasks._preload_form_filler_template")
+    def test_pdf_template_preload_is_called_for_form_filler(self, mock_preload):
+        from app.tasks.workflow_tasks import _build_steps_data
+
+        db, step_id = self._db("FormFiller", {"template_source": "pdf", "template_document_uuid": "T"})
+        wf = _make_workflow_doc(step_ids=[step_id])
+        _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+        mock_preload.assert_called_once()
+        assert mock_preload.call_args.args[1]["template_document_uuid"] == "T"

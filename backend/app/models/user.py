@@ -31,8 +31,23 @@ class User(Document):
     # version is stale.
     token_version: int = 0
     is_demo_user: bool = False
+    # Legacy clock field from the 14-day-trial era. New trials are token-
+    # metered and leave this None; feedback_prompt_service is None-safe.
     demo_expires_at: Optional[datetime.datetime] = None
-    demo_status: Optional[str] = None  # active | expired | locked
+    # active | exhausted | locked ("expired"/"locked" are legacy clock states;
+    # "exhausted" is soft — the app stays browsable, only LLM spend is gated).
+    demo_status: Optional[str] = None
+    # Lifetime LLM token budget for this trial account. None = the deployment
+    # default (Settings.trial_token_budget); raised by feedback-priced top-ups
+    # from the trial-end screen (demo_service.self_topup_trial).
+    trial_token_budget: Optional[int] = None
+    # Set once the account has demonstrably received mail at its address — by
+    # clicking any emailed sign-in/reset link, or by arriving through SSO. Only
+    # gates LLM spend for trial accounts (see trial_budget.check_*); staff on a
+    # self-hosted deployment arrive by bootstrap, invite, or SSO and are never
+    # asked. Accounts predating the field read False and are verified by their
+    # next emailed link.
+    email_verified: bool = False
     organization_id: Optional[str] = None  # org uuid for university hierarchy
 
     # Engagement tracking

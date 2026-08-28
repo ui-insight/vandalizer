@@ -126,6 +126,26 @@ class TestDispatchUploadTasks:
                 "document_uuid": "doc-uuid",
                 "document_path": "/uploads/test.pdf",
                 "background": True,
+                "user_id": "",
+            },
+            queue="uploads",
+        )
+
+    def test_validation_carries_the_uploader(self, mock_celery):
+        """Compliance validation spends LLM tokens, so it must be attributed:
+        an unattributed scope is neither counted against a trial budget nor
+        stopped by it."""
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks("doc-uuid", "pdf", "/uploads/test.pdf", user_id="ada@x.test")
+
+        mock_celery.send_task.assert_any_call(
+            "tasks.upload.validation",
+            kwargs={
+                "document_uuid": "doc-uuid",
+                "document_path": "/uploads/test.pdf",
+                "background": True,
+                "user_id": "ada@x.test",
             },
             queue="uploads",
         )

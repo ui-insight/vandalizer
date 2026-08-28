@@ -17,6 +17,7 @@ from app.schemas.documents import (
     RenameDocumentRequest,
     UploadRequest,
 )
+from app.services import document_usage as document_usage_service
 from app.services import file_service
 
 router = APIRouter()
@@ -212,6 +213,19 @@ async def sheet_json(
     result = await file_service.render_xlsx_sheets(doc_uuid, settings, user=user)
     if result is None:
         raise HTTPException(status_code=404, detail="Sheet rendering not available")
+    return result
+
+
+@router.get("/{doc_uuid}/usage")
+async def usage(
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Where this document is used: knowledge bases, extractions, workflows,
+    and its folder path. Read it before deleting."""
+    result = await document_usage_service.document_usage(doc_uuid, user=user)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Document not found")
     return result
 
 

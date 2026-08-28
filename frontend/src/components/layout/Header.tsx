@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
+import { TrialVerifyBanner } from '../trial/TrialVerifyBanner'
 import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useBranding } from '../../contexts/BrandingContext'
@@ -122,6 +123,10 @@ export function Header() {
           <TeamsDropdown />
         </div>
       </header>
+
+      {/* Renders only for a trial account that hasn't confirmed its email —
+          otherwise the spend gate is silent until something fails mid-task. */}
+      <TrialVerifyBanner />
 
       <SupportChatPanel
         open={supportOpen}

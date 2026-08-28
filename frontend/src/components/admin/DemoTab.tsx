@@ -15,6 +15,7 @@ import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '
 import * as supportApi from '../../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../../types/demo'
+import { formatTokens } from '../../lib/formatTokens'
 import { POST_SURVEY_FIELDS } from '../survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from '../survey/preSurveyFields'
 import { SurveyFieldRenderer } from '../survey/SurveyFieldRenderer'
@@ -186,7 +187,7 @@ export function DemoTab() {
       const headers = [
         'Name', 'Title', 'Email', 'Organization', 'Status',
         'Applied', 'Activated', 'Credentials Sent', 'First Login',
-        'Expires', 'Post-Survey Completed',
+        'Tokens Used', 'Token Budget', 'Post-Survey Completed',
         ...preCols.map(c => c.label),
         ...postCols.map(c => c.label),
       ]
@@ -208,7 +209,8 @@ export function DemoTab() {
           app.activated_at ? formatDate(app.activated_at) : null,
           app.credentials_sent_at ? formatDate(app.credentials_sent_at) : null,
           app.last_login_at ? formatDate(app.last_login_at) : 'Never',
-          app.expires_at ? formatDate(app.expires_at) : null,
+          app.tokens_used,
+          app.tokens_budget || null,
           app.post_questionnaire_completed ? 'Yes' : 'No',
           ...preCols.map(c => fmt(pre[c.key])),
           ...postCols.map(c => fmt(post[c.key])),
@@ -374,6 +376,8 @@ export function DemoTab() {
   const statusColors: Record<string, { bg: string; text: string }> = {
     pending: { bg: '#fef3c7', text: '#92400e' },
     active: { bg: '#dcfce7', text: '#166534' },
+    exhausted: { bg: '#fee2e2', text: '#991b1b' },
+    // Legacy clock-era status; still shown for records predating token metering.
     expired: { bg: '#fee2e2', text: '#991b1b' },
     completed: { bg: '#dbeafe', text: '#1e40af' },
   }
@@ -526,7 +530,7 @@ export function DemoTab() {
             { label: 'Total', value: stats.total_applications, color: '#6b7280' },
             { label: 'Active', value: stats.active_count, color: '#16a34a' },
             { label: 'Waitlist', value: stats.waitlist_count, color: '#d97706' },
-            { label: 'Expired', value: stats.expired_count, color: '#dc2626' },
+            { label: 'Out of tokens', value: stats.expired_count, color: '#dc2626' },
             { label: 'Completed', value: stats.completed_count, color: '#2563eb' },
           ].map((card) => (
             <div key={card.label} style={{
@@ -558,7 +562,7 @@ export function DemoTab() {
 
       {/* Filter */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
-        {['', 'pending', 'active', 'expired', 'completed'].map((s) => (
+        {['', 'pending', 'active', 'exhausted', 'completed'].map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
@@ -606,7 +610,7 @@ export function DemoTab() {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Applied</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Credentials Sent</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>First Login</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Expires</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Tokens</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
               </tr>
             </thead>
@@ -656,7 +660,9 @@ export function DemoTab() {
                         )}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
-                        {app.expires_at ? formatDate(app.expires_at) : '-'}
+                        {app.tokens_budget
+                          ? `${formatTokens(app.tokens_used)} / ${formatTokens(app.tokens_budget)}`
+                          : formatTokens(app.tokens_used)}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
@@ -674,7 +680,7 @@ export function DemoTab() {
                               {actionLoading === `activate-${app.uuid}` ? 'Activating...' : 'Activate'}
                             </button>
                           )}
-                          {(app.status === 'expired' || app.status === 'completed') && !app.admin_released && (
+                          {(app.status === 'exhausted' || app.status === 'expired' || app.status === 'completed') && !app.admin_released && (
                             <button
                               onClick={() => handleRelease(app.uuid)}
                               disabled={actionLoading === `release-${app.uuid}`}
@@ -688,11 +694,11 @@ export function DemoTab() {
                               {actionLoading === `release-${app.uuid}` ? 'Releasing...' : 'Release'}
                             </button>
                           )}
-                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && (
+                          {(app.status === 'active' || app.status === 'exhausted' || app.status === 'expired' || app.status === 'completed') && (
                             <button
                               onClick={() => handleRestartTrial(app.uuid)}
                               disabled={actionLoading === `restart-${app.uuid}`}
-                              title="Reset trial to 14 days and re-activate"
+                              title="Grant a fresh full token allowance and re-activate"
                               style={{
                                 padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
                                 background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
@@ -703,7 +709,7 @@ export function DemoTab() {
                               Restart Trial
                             </button>
                           )}
-                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && app.user_is_demo && (
+                          {(app.status === 'active' || app.status === 'exhausted' || app.status === 'expired' || app.status === 'completed') && app.user_is_demo && (
                             <button
                               onClick={() => handlePromote(app.uuid, app.email)}
                               disabled={actionLoading === `promote-${app.uuid}`}
@@ -719,7 +725,7 @@ export function DemoTab() {
                               <Award size={12} /> Promote
                             </button>
                           )}
-                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && !app.user_is_demo && (
+                          {(app.status === 'active' || app.status === 'exhausted' || app.status === 'expired' || app.status === 'completed') && !app.user_is_demo && (
                             <span style={{ fontSize: 12, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
                               <Award size={12} /> Full user
                             </span>
