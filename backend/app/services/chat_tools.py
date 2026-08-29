@@ -572,19 +572,47 @@ async def search_knowledge_base(
         ).to_list()
         source_map = {s.uuid: s for s in sources}
 
+    from app.services.page_locator import annotate_chunk_pages, cited_pages
+
     enriched: list[dict] = []
     citations: list[dict] = []
+    any_approximate = False
+    any_spanning = False
     for r in results:
         meta = r.get("metadata", {})
         sid = meta.get("source_id", "")
-        page = meta.get("page")
         sheet = meta.get("sheet")
+        content = r.get("content", "") or ""
+
+        # The two things `page_locator` exists to prevent, both of which this
+        # path had reintroduced by reading `metadata["page"]` directly:
+        #
+        #  * an interpolated OCR page stated as exact — the page count spread
+        #    evenly over text the OCR endpoint returned with no page structure,
+        #    which on a 400-page package with a 40-page budget table is off by
+        #    an unbounded amount;
+        #  * a chunk that crosses a page break cited by the page it *starts*
+        #    on rather than the page the answering passage is actually on.
+        cited = cited_pages(meta, content, query)
+        page, page_end = cited["page"], cited["page_end"]
+        approximate = bool(cited["page_approximate"])
+        any_approximate = any_approximate or (page is not None and approximate)
+
+        # `[p. N]` markers at each internal page break, so the model can see
+        # where the page changes instead of inferring it.
+        annotated = annotate_chunk_pages(content, meta)
+        any_spanning = any_spanning or annotated != content
+
         entry: dict = {
-            "content": r.get("content", ""),
+            "content": annotated,
             "source_name": meta.get("source_name", "unknown"),
         }
         if isinstance(page, int):
             entry["page"] = page
+            if isinstance(page_end, int) and page_end > page:
+                entry["page_end"] = page_end
+            if approximate:
+                entry["page_approximate"] = True
         if isinstance(sheet, str) and sheet:
             entry["sheet"] = sheet
         src = source_map.get(sid)
@@ -602,10 +630,14 @@ async def search_knowledge_base(
             "document_id": sid or None,
             "document_title": meta.get("source_name", "Unknown"),
             "page": page if isinstance(page, int) else None,
+            "page_end": page_end if isinstance(page_end, int) else None,
+            # The chip renderer already hedges on this key; it was simply never
+            # being sent, so every estimated page rendered as measured.
+            "page_approximate": approximate,
             "sheet": sheet if isinstance(sheet, str) else None,
             "chunk_id": r.get("chunk_id"),
             "score": r.get("score"),
-            "content_preview": (r.get("content") or "")[:240],
+            "content_preview": content[:240],
             "source_reference": src.source_reference if src and src.source_reference else None,
             "url": src.url if src and src.source_type == "url" and src.url else None,
         })
@@ -614,6 +646,27 @@ async def search_knowledge_base(
     # 'sources' chunk, and persists the citations on the assistant message.
     if citations and context.tool_call_id:
         context.deps.citation_annotations[context.tool_call_id] = citations
+
+    # The same labels the classic path gives the model, for the same measured
+    # reason: a tilde nobody explained gets normalised away and the estimate is
+    # restated as fact. Prepended so it is read before the passages it governs.
+    notes: list[str] = []
+    if any_approximate:
+        notes.append(
+            "A page marked page_approximate is an ESTIMATE — that source was "
+            "scanned, so page positions were interpolated rather than read. "
+            "Give such pages as approximate, e.g. \"around p. 4\". Never state "
+            "one as exact and never say a passage is \"explicitly\" or "
+            "\"clearly\" on it."
+        )
+    if any_spanning:
+        notes.append(
+            "A passage that runs across pages carries [p. N] where the next "
+            "page begins. Cite the page the passage you are using falls under, "
+            "not the page the passage starts on."
+        )
+    if notes:
+        return [{"note": " ".join(notes)}, *enriched]
 
     return enriched
 
