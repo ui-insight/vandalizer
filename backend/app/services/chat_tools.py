@@ -604,9 +604,18 @@ async def search_knowledge_base(
         any_spanning = any_spanning or annotated != content
 
         entry: dict = {
+            # Annotated for the model, so it can see where the page turns.
             "content": annotated,
+            # Unannotated, for anything that has to match this text against the
+            # document itself. The UI derives its click-to-highlight phrase
+            # from the passage, and an injected "[p. 3]" marker appears nowhere
+            # in the document — a chunk whose page break falls inside its first
+            # 60 characters would open the viewer on a highlight that can never
+            # match. Only set when the two differ.
             "source_name": meta.get("source_name", "unknown"),
         }
+        if annotated != content:
+            entry["content_verbatim"] = content
         if isinstance(page, int):
             entry["page"] = page
             if isinstance(page_end, int) and page_end > page:
@@ -666,7 +675,15 @@ async def search_knowledge_base(
             "not the page the passage starts on."
         )
     if notes:
-        return [{"note": " ".join(notes)}, *enriched]
+        # On every entry rather than as a leading pseudo-passage. The array is
+        # rendered by the UI as passages — a note dict prepended to it inflates
+        # "Found N relevant passages" by one, takes a slot in the 3-passage
+        # preview as a blank "Source ·" row, and leads the copied text with an
+        # empty [Source] block. Keeping the array homogeneous costs a little
+        # repetition in the model's view and keeps both consumers correct.
+        guidance = " ".join(notes)
+        for entry in enriched:
+            entry["citation_note"] = guidance
 
     return enriched
 

@@ -61,7 +61,15 @@ def _passages(out: list[dict]) -> list[dict]:
 
 
 def _note(out: list[dict]) -> str:
-    return " ".join(e["note"] for e in out if "note" in e and "content" not in e)
+    """The citation guidance, wherever it rides.
+
+    It sits on each passage rather than as a leading pseudo-entry: the UI
+    renders every element of this result as a passage, so a note dict of its
+    own inflated the passage count and took a preview slot.
+    """
+    return " ".join(
+        dict.fromkeys(e["citation_note"] for e in out if e.get("citation_note"))
+    )
 
 
 class TestApproximatePages:
@@ -155,3 +163,53 @@ class TestUnpagedSources:
         entry = _passages(out)[0]
         assert "page" not in entry and "sheet" not in entry
         assert ctx.deps.citation_annotations["call-1"][0]["page"] is None
+
+
+class TestTheResultStaysAListOfPassages:
+    """The UI treats every element of this tool's result as a passage: it
+    counts them for "Found N relevant passages", previews the first three, and
+    copies them. A note prepended as its own dict inflated the count by one,
+    took a preview slot as a blank "Source ·" row, and led the copied text with
+    an empty [Source] block."""
+
+    @pytest.mark.asyncio
+    async def test_guidance_does_not_add_a_pseudo_passage(self):
+        out, _ = await _search([
+            _result("text one", page=3, page_approximate=True),
+            _result("text two", page=4, page_approximate=True),
+        ])
+        assert len(out) == 2
+        assert all("content" in e and "source_name" in e for e in out)
+
+    @pytest.mark.asyncio
+    async def test_every_passage_carries_the_guidance(self):
+        out, _ = await _search([
+            _result("text one", page=3, page_approximate=True),
+            _result("text two", page=4, page_approximate=True),
+        ])
+        assert all("ESTIMATE" in e["citation_note"] for e in out)
+
+    @pytest.mark.asyncio
+    async def test_no_guidance_key_when_nothing_needs_hedging(self):
+        out, _ = await _search([_result("text", page=3)])
+        assert "citation_note" not in out[0]
+
+
+class TestVerbatimTextForMatching:
+    SPANNING = dict(page=2, page_end=3, page_breaks="[[26, 3]]")
+
+    @pytest.mark.asyncio
+    async def test_a_spanning_passage_exposes_its_unannotated_text(self):
+        """The annotated copy is for the model; anything matching against the
+        document needs the text the document actually contains."""
+        raw = "Budget narrative follows.\nThe award amount is $4.2M."
+        out, _ = await _search([_result(raw, **self.SPANNING)], query="award amount")
+        entry = out[0]
+        assert "[p. 3]" in entry["content"]
+        assert entry["content_verbatim"] == raw
+        assert "[p." not in entry["content_verbatim"]
+
+    @pytest.mark.asyncio
+    async def test_a_single_page_passage_needs_no_second_copy(self):
+        out, _ = await _search([_result("Plain single-page text.", page=3)])
+        assert "content_verbatim" not in out[0]

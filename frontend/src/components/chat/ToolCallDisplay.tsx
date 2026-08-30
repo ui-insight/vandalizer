@@ -879,6 +879,12 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
         const url = chunk.url as string | undefined
         const sourceName = String(chunk.source_name || 'Source')
         const chunkContent = String(chunk.content || '')
+        // The passage the model reads carries injected "[p. N]" markers at its
+        // page breaks. Those appear nowhere in the document, so anything that
+        // has to match this text against the document must use the verbatim
+        // copy — a marker inside the first ~60 characters would otherwise end
+        // up in the highlight phrase and match nothing.
+        const chunkVerbatim = String(chunk.content_verbatim || chunk.content || '')
 
         const isDoc = sourceType === 'document' && docUuid
         const isUrl = sourceType === 'url' && url
@@ -889,7 +895,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
           if (isDoc) {
             actions.setWorkspaceMode('files')
             actions.viewDocument(docUuid, sourceName)
-            actions.setHighlightTerms([pickHighlightPhrase(chunkContent)])
+            actions.setHighlightTerms([pickHighlightPhrase(chunkVerbatim)])
           } else if (isUrl) {
             window.open(url, '_blank', 'noopener,noreferrer')
           }
