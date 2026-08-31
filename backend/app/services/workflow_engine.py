@@ -197,6 +197,47 @@ def _stringify_context(value) -> str:
         return str(value)
 
 
+def _injection_warning(context, sources: list[str] | None = None) -> str | None:
+    """Warn when the text a step is about to reason over instructs the model.
+
+    A Prompt step asked "What is the total award amount?" over an award letter
+    showing 485,000 USD returned "$1" — the figure a line planted in the
+    document told it to report — and offered it as a completed deliverable
+    with Download and Save to folder beside it (support ticket). The prompt no
+    longer takes such a line as an instruction, and hidden text is cut at the
+    reader before it gets this far, but neither of those tells the user their
+    document was trying to steer the answer. This does, on the step, through
+    the warning channel the run UI already renders.
+    """
+    from app.services import injected_instructions
+
+    passages = injected_instructions.find_injected_instructions(
+        _stringify_context(context)
+    )
+    if not passages:
+        return None
+    # A step can read from three places at once — the run's documents, a
+    # document it selects, an earlier step's output — so "a passage of text"
+    # alone leaves the reader hunting for which one carried it (review
+    # finding). The context is assembled from all of them, so the input
+    # sources in play are the honest answer to "where".
+    where = ", ".join(
+        INPUT_SOURCE_LABELS.get(src, src) for src in (sources or [])
+    ) or None
+    return injected_instructions.describe_passages(
+        passages, where, advice=injected_instructions.WORKFLOW_ADVICE,
+    )
+
+
+def _with_injection_warning(result: dict, warning: str | None) -> dict:
+    """Attach *warning* to a step result, keeping any warning already there."""
+    if not warning:
+        return result
+    existing = result.get("warning")
+    result["warning"] = f"{existing} | {warning}" if existing else warning
+    return result
+
+
 def _join_doc_texts(doc_texts: list[str]) -> str:
     if not doc_texts:
         return ""
@@ -746,6 +787,9 @@ class PromptNode(Node):
 
         sources = _resolve_input_sources(self.data, prev_step_name)
         context = _build_combined_context(self.data, inputs, sources)
+        injection = _injection_warning(context, sources)
+        if injection:
+            self.report_progress(injection)
 
         chat_response = llm_chat_model(
             model=self.model, prompt=prompt, data=context,
@@ -753,7 +797,10 @@ class PromptNode(Node):
             usage_acc=self._usage_acc,
         )
 
-        return {"output": chat_response, "input": prompt, "step_name": self.name}
+        return _with_injection_warning(
+            {"output": chat_response, "input": prompt, "step_name": self.name},
+            injection,
+        )
 
 
 class FormatNode(Node):
@@ -769,10 +816,14 @@ class FormatNode(Node):
 
         sources = _resolve_input_sources(self.data, prev_step_name)
         text = _build_combined_context(self.data, inputs, sources)
+        injection = _injection_warning(text, sources)
 
         _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg,
                                  usage_acc=self._usage_acc)
-        return {"output": output, "input": formatting_prompt, "step_name": self.name}
+        return _with_injection_warning(
+            {"output": output, "input": formatting_prompt, "step_name": self.name},
+            injection,
+        )
 
 
 class WebsiteNode(Node):
@@ -1031,6 +1082,11 @@ class ResearchNode(Node):
 
         sources = _resolve_input_sources(self.data, prev_step_name)
         input_data = _build_combined_context(self.data, inputs, sources)
+        # Computed before the early exits below, not after: a document whose
+        # planted text told the model to find nothing takes the
+        # NO_RELEVANT_FINDINGS path, which is exactly the run where the user
+        # most needs to be told what was in the input (review finding).
+        injection = _injection_warning(input_data, sources)
 
         # No data means nothing to analyze — stop here, before any model call.
         # Sent through anyway, the chat helper would drop into its standalone
@@ -1045,12 +1101,12 @@ class ResearchNode(Node):
                 "Check that the preceding step produces output, or point this step at a document."
             )
             self.report_progress(warning)
-            return {
+            return _with_injection_warning({
                 "output": f"({warning})",
                 "input": inputs.get("output"),
                 "step_name": self.name,
                 "warning": warning,
-            }
+            }, injection)
 
         self.report_progress("Pass 1: Analyzing data")
 
@@ -1080,12 +1136,12 @@ class ResearchNode(Node):
             if no_findings_reason:
                 warning += f" {no_findings_reason}"
             self.report_progress(warning)
-            return {
+            return _with_injection_warning({
                 "output": f"({warning})",
                 "input": inputs.get("output"),
                 "step_name": self.name,
                 "warning": warning,
-            }
+            }, injection)
 
         self.report_progress("Pass 2: Synthesizing report")
         synthesis_prompt = (
@@ -1103,7 +1159,10 @@ class ResearchNode(Node):
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
-        return {"output": report, "input": inputs.get("output"), "step_name": self.name}
+        return _with_injection_warning(
+            {"output": report, "input": inputs.get("output"), "step_name": self.name},
+            injection,
+        )
 
 
 def _open_sync_db():

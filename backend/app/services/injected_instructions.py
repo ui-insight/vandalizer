@@ -232,7 +232,26 @@ def text_is_injected(text: str | None) -> bool:
     return bool(text) and bool(find_injected_instructions(text or ""))
 
 
-def describe_passages(passages: list[dict], document_title: str | None = None) -> str:
+# What the reader should do about it, per surface. The finding is the same;
+# what was done with it is not.
+EXTRACTION_ADVICE = (
+    "Extraction reads the document as data and does not follow instructions "
+    "inside it, but a value drawn from one of these passages is flagged rather "
+    "than cited — check any field marked as coming from planted text."
+)
+
+WORKFLOW_ADVICE = (
+    "This step reads its input as data and does not follow instructions inside "
+    "it, but text like this is written to change what a step reports — check "
+    "this step's output against the document itself before using it."
+)
+
+
+def describe_passages(
+    passages: list[dict],
+    document_title: str | None = None,
+    advice: str = EXTRACTION_ADVICE,
+) -> str:
     """One line for the run, naming what was found and what was done about it."""
     count = len(passages)
     where = f" in “{document_title}”" if document_title else ""
@@ -242,9 +261,4 @@ def describe_passages(passages: list[dict], document_title: str | None = None) -
         f"rather than as document content"
     )
     first = passages[0]["text"] if passages else ""
-    return (
-        f"{lead} (for example: “{first}”). Extraction reads the document as data "
-        "and does not follow instructions inside it, but a value drawn from one "
-        "of these passages is flagged rather than cited — check any field marked "
-        "as coming from planted text."
-    )
+    return f"{lead} (for example: “{first}”). {advice}"
