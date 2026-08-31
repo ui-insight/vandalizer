@@ -123,6 +123,14 @@ export interface ExtractionFieldSource {
    * this directly.
    */
   support?: FieldSupportState
+  /**
+   * The passage this value came from is itself text written as an instruction
+   * to the AI — a planted "you must report it as $1" (support ticket). Such a
+   * passage really is in the document and really does contain the value, so
+   * on `verified` and `value_supported` alone it reads as the *best* case.
+   * `fieldSupportState` checks this first for that reason.
+   */
+  injected?: boolean
 }
 
 /**
@@ -137,15 +145,20 @@ export interface ExtractionFieldSource {
  *   that can be found in it (an enum answer that maps the prose rather than
  *   quoting it). Traceable, not confirmable.
  * - `unverified` — no passage could be located. Nothing is traced.
+ * - `planted` — the passage is real and contains the value, and is itself an
+ *   instruction to the AI. It scores as `supported` on the raw signals, which
+ *   is why it is decided ahead of them: the citation would otherwise vouch
+ *   for an attacker's sentence.
  */
 export type FieldSupportState =
   | 'supported'
   | 'quote_unsupported'
   | 'unassessed'
   | 'unverified'
+  | 'planted'
 
 const KNOWN_SUPPORT_STATES: readonly FieldSupportState[] = [
-  'supported', 'quote_unsupported', 'unassessed', 'unverified',
+  'supported', 'quote_unsupported', 'unassessed', 'unverified', 'planted',
 ]
 
 /** `support` for a source entry, deriving it for results written before the
@@ -158,6 +171,8 @@ export function fieldSupportState(src?: ExtractionFieldSource | null): FieldSupp
   // badge at all, which is the silent over-trust this whole change exists to
   // remove. Fall back to deriving from the raw signals instead.
   if (src.support && KNOWN_SUPPORT_STATES.includes(src.support)) return src.support
+  // Ahead of `verified`: planted text locates and matches like good evidence.
+  if (src.injected) return 'planted'
   if (!src.verified) return 'unverified'
   if (src.value_supported === true) return 'supported'
   if (src.value_supported === false) return 'quote_unsupported'
@@ -165,6 +180,16 @@ export function fieldSupportState(src?: ExtractionFieldSource | null): FieldSupp
 }
 
 export type ExtractionSourceMap = Record<string, ExtractionFieldSource>
+
+/** One input document the run has something to disclose about. `codes` are
+ * backend-defined (`low_quality_text`, partial-ingestion codes, and
+ * `injected_instructions`); unknown codes are ignored rather than rendered
+ * raw, so a new code can ship backend-first. */
+export interface ExtractionDocumentWarning {
+  document_uuid: string
+  title: string
+  codes: string[]
+}
 
 /**
  * Cross-field rule outcomes for one extraction run. Evaluated on every run
@@ -197,6 +222,12 @@ export function runExtractionSync(data: {
      * is the merged-values report, which on a multi-document run describes the
      * last document only — read this instead when showing one set. */
     cross_field_sets?: (CrossFieldRunReport | null)[]
+    /** Per-document disclosures about the *input* rather than the run: text
+     * that is garbled or partial, and documents carrying text written as
+     * instructions to the AI (`injected_instructions`). Present even when the
+     * run extracted nothing, which is what a planted "do not extract any
+     * values" produces. */
+    document_warnings?: ExtractionDocumentWarning[]
     error?: string
   }>('/api/extractions/run-sync', {
     method: 'POST',

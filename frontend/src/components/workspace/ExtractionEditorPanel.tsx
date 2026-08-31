@@ -36,6 +36,7 @@ import { RunHistoryTab } from './RunHistoryTab'
 import { ApiError } from '../../api/client'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry, ExtractionFieldSource, ExtractionSourceMap, CrossFieldRunReport, FieldSupportState } from '../../api/extractions'
 import { fieldSupportState } from '../../api/extractions'
+import type { ExtractionDocumentWarning } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
@@ -130,6 +131,11 @@ export function ExtractionEditorPanel() {
   // user is actually looking at — a single merged report over a multi-document
   // run describes the last document and nothing else.
   const [crossFieldSets, setCrossFieldSets] = useState<(CrossFieldRunReport | null)[]>([])
+  // Input documents carrying text written as instructions to the AI. Reported
+  // per document, and reported even when the run extracted nothing — a
+  // planted "do not extract any values" leaves no field and no citation to
+  // mark, so this is the only place it can surface.
+  const [plantedDocs, setPlantedDocs] = useState<string[]>([])
 
   const results = resultSets[activeResultIdx] ?? {}
   const resultSources = resultSourceSets[activeResultIdx] ?? {}
@@ -193,6 +199,7 @@ export function ExtractionEditorPanel() {
     // rather than clearing to nothing: values without the strip re-open a run
     // that failed a rule looking exactly like one that passed.
     setCrossFieldSets(pending?.crossFieldSets ?? [])
+    setPlantedDocs([])
     setActiveTab('design')
     getSearchSet(openExtractionId)
       .then(setSearchSet)
@@ -272,6 +279,7 @@ export function ExtractionEditorPanel() {
     bumpActivitySignal()
     // A previous run's rule outcomes must not sit under a new run's values.
     setCrossFieldSets([])
+    setPlantedDocs([])
     // Snapshot doc names at run time so exports stay correct if the user
     // changes selection afterward.
     const runDocNames: string[] = combinedContext && docUuids.length > 1
@@ -310,6 +318,7 @@ export function ExtractionEditorPanel() {
       setResultSourceSets(sets.length > 0 ? srcSets : [{}])
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setCrossFieldSets(resp.cross_field_sets ?? (resp.cross_field ? [resp.cross_field] : []))
+      setPlantedDocs(documentsWithPlantedText(resp.document_warnings))
       setActiveResultIdx(0)
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
@@ -318,13 +327,14 @@ export function ExtractionEditorPanel() {
         // land here instead of only in the History tab.
         const run = await recoverRunFromHistory(openExtractionId)
         if (run?.status === 'completed') {
-          const snap = run.result_snapshot as { normalized?: Record<string, unknown>; sources?: ExtractionSourceMap; cross_field?: CrossFieldRunReport | null; cross_field_sets?: (CrossFieldRunReport | null)[] } | undefined
+          const snap = run.result_snapshot as { normalized?: Record<string, unknown>; sources?: ExtractionSourceMap; cross_field?: CrossFieldRunReport | null; cross_field_sets?: (CrossFieldRunReport | null)[]; document_warnings?: ExtractionDocumentWarning[] } | undefined
           const map: Record<string, string> = {}
           for (const [k, v] of Object.entries(snap?.normalized ?? {})) {
             map[k] = v === null ? 'N/A' : String(v)
           }
           setResultSets([map])
           setResultSourceSets([snap?.sources ?? {}])
+          setPlantedDocs(documentsWithPlantedText(snap?.document_warnings))
           setCrossFieldSets(
             snap?.cross_field_sets ?? (snap?.cross_field ? [snap.cross_field] : []),
           )
@@ -357,6 +367,14 @@ export function ExtractionEditorPanel() {
 
     const src: ExtractionFieldSource | undefined = resultSources[field]
     const support = src ? fieldSupportState(src) : undefined
+    if (support === 'planted' && src?.quote) {
+      // Showing it is the point: the viewer highlighting the planted line is
+      // the only place that text becomes visible to the reader at all.
+      toast(
+        "This value came from text inside the document written as an instruction to the AI, not from the document's own content. Check it against the document.",
+        'error',
+      )
+    }
     if (support === 'quote_unsupported' && src?.quote) {
       // The passage is real, so still take the reader to it — seeing the
       // sentence that does NOT say what the value claims is the fastest way
@@ -892,6 +910,7 @@ export function ExtractionEditorPanel() {
           onValueClick={handleValueClick}
           sources={resultSources}
           crossField={crossFieldSets[activeResultIdx] ?? null}
+          plantedDocs={plantedDocs}
           resultSets={resultSets}
           activeResultIdx={activeResultIdx}
           onSetActiveResultIdx={setActiveResultIdx}
@@ -1271,6 +1290,18 @@ function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) 
 // Phase 3, with the numbers behind it.
 const ALARM_ON_UNSUPPORTED_QUOTE = false
 
+/** Titles of the input documents that carry text written as instructions to
+ * the AI. Reads the backend's per-document disclosure list rather than a
+ * channel of its own, so one notice covers every way an input is not what it
+ * appears to be. */
+export function documentsWithPlantedText(
+  warnings?: { title?: string; codes?: string[] }[],
+): string[] {
+  return (warnings ?? [])
+    .filter(w => (w.codes ?? []).includes('injected_instructions'))
+    .map(w => w.title || 'Untitled document')
+}
+
 /** Presentation state: what the reader is shown, which is not always the same
  * as the recorded state (see ALARM_ON_UNSUPPORTED_QUOTE). */
 function presentedSupport(state: FieldSupportState): FieldSupportState {
@@ -1318,6 +1349,15 @@ const SUPPORT_BADGES: Record<
     color: '#92400e',
     background: '#fef3c7',
   },
+  planted: {
+    label: () => '⚠ planted text',
+    title:
+      'This value was taken from text inside the document written as an instruction to the AI, ' +
+      'not from the document\'s own content — the technique used to plant a false value. ' +
+      'Click to read the passage, and check the value against the document itself',
+    color: '#991b1b',
+    background: '#fef2f2',
+  },
 }
 
 function DesignTab({
@@ -1339,6 +1379,7 @@ function DesignTab({
   onValueClick,
   sources,
   crossField,
+  plantedDocs,
   resultSets,
   activeResultIdx,
   onSetActiveResultIdx,
@@ -1361,6 +1402,8 @@ function DesignTab({
   onValueClick: (field: string, value: string) => void
   sources: ExtractionSourceMap
   crossField: CrossFieldRunReport | null
+  /** Input documents carrying text written as instructions to the AI. */
+  plantedDocs: string[]
   resultSets: Record<string, string>[]
   activeResultIdx: number
   onSetActiveResultIdx: (idx: number) => void
@@ -1576,6 +1619,34 @@ function DesignTab({
       )}
 
       <CrossFieldRunStrip report={crossField} />
+
+      {/* A document that talks to the AI. Shown whether or not a field ended
+          up sourced to it: the "do not extract any values" variant blanks the
+          fields and leaves nothing per-field to badge. */}
+      {plantedDocs.length > 0 && (
+        <div role="alert" style={{
+          marginBottom: 16, padding: '10px 12px',
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6,
+        }}>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4,
+            fontSize: 13, fontWeight: 600, color: '#991b1b',
+          }}>
+            <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} aria-hidden="true" />
+            {plantedDocs.length === 1
+              ? 'This document contains instructions aimed at the AI'
+              : `${plantedDocs.length} of these documents contain instructions aimed at the AI`}
+          </div>
+          <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>
+            {plantedDocs.join(', ')} carr{plantedDocs.length === 1 ? 'ies' : 'y'} text
+            written as instructions to the AI rather than as document content — the
+            technique used to plant a false value. Extraction reads a document as data
+            and does not follow instructions inside it, and a value drawn from such a
+            passage is badged rather than cited, but check these results against the
+            documents themselves.
+          </div>
+        </div>
+      )}
 
       {/* Result set selector for multi-document extractions */}
       {resultSets.length > 1 && (

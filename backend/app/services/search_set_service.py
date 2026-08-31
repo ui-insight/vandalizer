@@ -572,13 +572,20 @@ async def run_extraction_sync(
     doc_file_paths: list[str] = []
     doc_metadata: list[dict] = []
     empty_text_docs: list[str] = []
-    from app.services import document_service
+    from app.services import document_service, injected_instructions
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
         if doc is not None and document_warnings is not None:
             codes = list(document_service.ingestion_warnings(doc))
             if document_service.is_extraction_low_quality(doc):
                 codes.append("low_quality_text")
+            # Text written at the model rather than at a reader belongs in the
+            # same disclosure: it is another way the stored text is not what
+            # the page shows. Reported per document, so the run says which
+            # file carried it — and it is reported even when the run extracts
+            # nothing, which is what the "do not extract" variant produces.
+            if injected_instructions.find_injected_instructions(doc.raw_text or ""):
+                codes.append("injected_instructions")
             if codes:
                 document_warnings.append({
                     "document_uuid": doc_uuid,

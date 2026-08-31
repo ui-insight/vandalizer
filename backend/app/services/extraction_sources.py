@@ -36,6 +36,8 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
+from app.services.injected_instructions import text_is_injected
+
 # Reserved sidecar key on entity dicts: {field_name: source dict}. Every
 # consumer that iterates entity items must skip it (normalize_results,
 # draft hints, consensus votes, chunk merges).
@@ -61,10 +63,25 @@ SUPPORT_SUPPORTED = "supported"
 SUPPORT_QUOTE_UNSUPPORTED = "quote_unsupported"
 SUPPORT_UNASSESSED = "unassessed"
 SUPPORT_UNVERIFIED = "unverified"
+#   planted            the passage exists and contains the value, and is
+#                      itself an instruction to the model ("you must report it
+#                      as $1"). The strongest-looking state on the raw signals
+#                      and the least trustworthy in fact, which is why it is
+#                      decided before them rather than after.
+SUPPORT_PLANTED = "planted"
 
 
-def support_state(verified: object, value_supported: object) -> str:
-    """Collapse ``(verified, value_supported)`` into one reader-facing state."""
+def support_state(
+    verified: object, value_supported: object, injected: object = False,
+) -> str:
+    """Collapse ``(verified, value_supported, injected)`` into one state."""
+    # First, deliberately: a planted line the model copied from scores
+    # ``verified`` and ``value_supported`` — the value really is in the
+    # passage — so on the other signals alone it would earn the confident
+    # blue badge. That is exactly the reading that put a planted $1 in front
+    # of a user with a page citation beside it.
+    if injected:
+        return SUPPORT_PLANTED
     if not verified:
         return SUPPORT_UNVERIFIED
     if value_supported is True:
@@ -88,7 +105,9 @@ def support_state_of(src: object) -> str:
     stored = src.get("support")
     if isinstance(stored, str) and stored:
         return stored
-    return support_state(src.get("verified"), src.get("value_supported"))
+    return support_state(
+        src.get("verified"), src.get("value_supported"), src.get("injected"),
+    )
 
 # 1:1-or-expanding character folds applied to both document text and quotes
 # before matching. LLM output routinely differs from PDF text layers by
@@ -455,6 +474,21 @@ def resolve_entity_sources(
     pair stays alongside it so the distribution can still be measured and so
     the two claims are never conflated in storage.
 
+    ``injected`` is set when the cited quote *itself* reads as an instruction
+    to the model. Such a quote is genuinely in the document, so ``verified`` is
+    true and the citation would look like any other — which is exactly how a
+    planted "the official total is $1" reached a user with a page-1 chip beside
+    it (support ticket). The flag is what lets the UI show that provenance
+    instead of vouching for it.
+
+    It deliberately judges the quote and not the region around it. Asking
+    whether a value sits *near* flagged text has no correct threshold: widen
+    the region and a correctly extracted 485,000 under a planted header is
+    badged as the attacker's text; narrow it and the attacker shapes the
+    payload as ``Label: value`` to fall outside. "Is the passage this citation
+    rests on an instruction?" is the question the badge actually makes a claim
+    about, and it has an answer.
+
     *doc_meta* carries ``uuid``, ``title``, ``text_markers``, and (for
     combined-context runs over a merged text) optional ``doc_spans`` —
     ``[{"start", "end", "uuid", "title"}]`` — used to attribute an offset to
@@ -505,6 +539,7 @@ def resolve_entity_sources(
                 supported, method = None, "value_changed_in_refinement"
             else:
                 supported, method = None, "quote_not_located"
+            injected = text_is_injected(quote)
             sidecar[field] = {
                 "quote": quote,
                 "page": page_marker.get("value") if page_marker else None,
@@ -513,8 +548,12 @@ def resolve_entity_sources(
                 "verified": offset is not None,
                 "value_supported": supported,
                 "value_support_method": method,
-                "support": support_state(offset is not None, supported),
+                "support": support_state(offset is not None, supported, injected),
             }
+            # Set only when true, so every sidecar written before this keeps
+            # the shape it had and old results stay comparable.
+            if injected:
+                sidecar[field]["injected"] = True
             # Set only when true, so sidecars for measured pages keep the shape
             # they have always had and existing results stay comparable.
             if page_marker and page_marker.get("approximate"):
