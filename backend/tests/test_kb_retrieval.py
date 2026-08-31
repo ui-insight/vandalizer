@@ -155,7 +155,7 @@ async def test_build_kb_segment_trims_to_cfg_k_and_builds_sources():
                       new=AsyncMock()), \
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(return_value=(chunks, cfg, 0))):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "q?", "test-model",
         )
 
@@ -178,7 +178,7 @@ async def test_build_kb_segment_empty_retrieval_returns_none():
                       new=AsyncMock()), \
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(return_value=([], cfg, 0))):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "q?", "test-model",
         )
 
@@ -317,7 +317,7 @@ async def test_build_kb_segment_targets_named_document():
                       new=AsyncMock()), \
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(side_effect=fake_retrieve)):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "what does the project timeline say?", "test-model",
             manifest=manifest,
         )
@@ -1000,7 +1000,7 @@ async def test_build_kb_segment_answers_section_only_query_when_semantic_empty()
                       new=AsyncMock(return_value=([], cfg, 0))), \
          patch.object(chat_service, "_retrieve_pinned_chunks",
                       new=AsyncMock(return_value=[section_hit])):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "What does § 200.1 say?", "test-model",
         )
 
@@ -1029,7 +1029,7 @@ async def test_build_kb_segment_pins_identifier_chunk_the_vector_pool_missed():
                       new=AsyncMock(return_value=(pool, cfg, 0))), \
          patch.object(chat_service, "_retrieve_pinned_chunks",
                       new=AsyncMock(side_effect=fake_pin)):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1",
             "Where did CSU-PI-001 earn the Ph.D. credential, and in what field?",
             "test-model",
@@ -1060,7 +1060,7 @@ async def test_build_kb_segment_leaves_prose_turns_on_the_vector_path():
          patch.object(kb_validation_service, "retrieve_kb_chunks",
                       new=AsyncMock(return_value=(pool, cfg, 0))), \
          patch.object(chat_service, "_retrieve_pinned_chunks", new=pin):
-        _, sources = await chat_service._build_kb_segment(
+        _, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "Summarize this project for me.", "test-model",
         )
 
@@ -1119,7 +1119,7 @@ async def test_build_kb_segment_fans_out_per_question():
                       new=AsyncMock(side_effect=fake_retrieve)), \
          patch.object(chat_service, "_retrieve_pinned_chunks",
                       new=AsyncMock(return_value=[])):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", msg, "test-model",
         )
 
@@ -1335,7 +1335,7 @@ async def test_build_kb_segment_attaches_openable_document_uuid():
                       new=AsyncMock(return_value=(chunks, cfg, 0))), \
          patch("app.services.knowledge_service.resolve_openable_documents",
                new=AsyncMock(return_value={"src-proposal.pdf": "doc-1"})):
-        _, sources = await chat_service._build_kb_segment(
+        _, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "q?", "test-model",
         )
 
@@ -1364,7 +1364,7 @@ async def test_kb_segment_explains_the_tilde_when_a_page_is_estimated():
                       new=AsyncMock(return_value=(chunks, cfg, 0))), \
          patch("app.services.knowledge_service.resolve_openable_documents",
                new=AsyncMock(return_value={})):
-        segment, sources = await chat_service._build_kb_segment(
+        segment, sources, _notice = await chat_service._build_kb_segment(
             "kb-1", "q?", "test-model",
         )
 
@@ -1393,7 +1393,7 @@ async def test_kb_segment_stays_quiet_when_every_page_is_measured():
                       new=AsyncMock(return_value=(chunks, cfg, 0))), \
          patch("app.services.knowledge_service.resolve_openable_documents",
                new=AsyncMock(return_value={})):
-        segment, _ = await chat_service._build_kb_segment(
+        segment, _, _notice = await chat_service._build_kb_segment(
             "kb-1", "q?", "test-model",
         )
 

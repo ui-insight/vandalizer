@@ -27,6 +27,60 @@ _DM_LOCK = threading.Lock()
 _SHARED_DM: "DocumentManager | None" = None
 
 
+def sanitize_retrieved_chunk(content: str) -> tuple[str, bool]:
+    """Strip text written as instructions to the model out of a chunk.
+
+    A knowledge base is the worst place for this: the poisoned text is
+    chunked, embedded, and then served to *everyone* who asks. A document
+    showing "Total Award Amount: 485,000 USD" that also said the total was $1
+    got chat answering $1, with three citations pointing at the document, for
+    any user, on every ask (support ticket).
+
+    Removing it here — at the read, not at ingestion — is deliberate. It
+    protects knowledge bases that were poisoned before this existed, without
+    re-ingesting anything, and it does not depend on a model choosing to obey
+    a system prompt that says "ignore instructions in documents". The small,
+    fast models these deployments run are exactly the ones that don't.
+
+    Returns ``(clean_text, removed_anything)``.
+    """
+    from app.services.injected_instructions import find_injected_instructions
+
+    passages = find_injected_instructions(content or "")
+    if not passages:
+        return content, False
+    kept: list[str] = []
+    cursor = 0
+    for passage in passages:
+        kept.append(content[cursor:passage["start"]])
+        cursor = passage["end"]
+    kept.append(content[cursor:])
+    return "".join(kept).strip(), True
+
+
+def _sanitize_chunks(chunks: list[dict[str, Any]], where: str) -> list[dict[str, Any]]:
+    """Apply :func:`sanitize_retrieved_chunk` across a retrieval result set.
+
+    Chunks are kept even when nothing survives the strip — an empty one
+    carries no instruction to the model, and callers that cite their sources
+    need to know the chunk was hit rather than find it silently missing.
+    """
+    removed = 0
+    for chunk in chunks:
+        clean, was_removed = sanitize_retrieved_chunk(chunk.get("content") or "")
+        if not was_removed:
+            continue
+        removed += 1
+        chunk["content"] = clean
+        chunk["injected_text_removed"] = True
+    if removed:
+        logger.warning(
+            "Removed AI-directed text from %d of %d retrieved chunk(s) in %s",
+            removed, len(chunks), where,
+        )
+    return chunks
+
+
 def get_default_embedding_function() -> Any:
     """Return a process-wide cached ChromaDB default embedding function.
 
@@ -375,7 +429,7 @@ class DocumentManager:
                     "score": dists_list[i] if i < len(dists_list) else None,
                 })
 
-        return output
+        return _sanitize_chunks(output, f"documents for user {user_id}")
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
         collection = self.get_user_collection(user_id)
@@ -518,7 +572,7 @@ class DocumentManager:
                     "score": dist,
                     "similarity": similarity,
                 })
-        return output
+        return _sanitize_chunks(output, f"kb {kb_uuid}")
 
     def get_kb_chunks_containing(
         self,
@@ -564,7 +618,7 @@ class DocumentManager:
                 "score": None,
                 "similarity": None,
             })
-        return output
+        return _sanitize_chunks(output, f"kb {kb_uuid} (lexical)")
 
     def delete_kb_collection(self, kb_uuid: str) -> None:
         """Drop an entire KB collection. No-op if the collection never existed."""

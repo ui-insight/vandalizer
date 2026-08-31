@@ -886,9 +886,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {contextNotices.length > 0 && (
           <div role="alert" className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
             <div className="font-medium mb-1">
-              {contextNotices.some((n) => n.action.startsWith('documents_'))
-                ? 'About your selected documents:'
-                : 'Context was compacted to fit the model:'}
+              {contextNotices.some((n) => n.action === 'kb_instructions_removed')
+                ? 'A document in this knowledge base tried to steer the answer:'
+                : contextNotices.some((n) => n.action.startsWith('documents_'))
+                  ? 'About your selected documents:'
+                  : 'Context was compacted to fit the model:'}
             </div>
             <ul className="list-disc pl-4 space-y-0.5">
               {contextNotices.map((n, i) => (

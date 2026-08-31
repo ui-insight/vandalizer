@@ -602,6 +602,8 @@ async def chat_stream(
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     kb_sources: list[dict] = []
     kb_manifest: list[dict] = []
+    # Set when retrieval had to strip instructions-to-the-AI out of a chunk.
+    kb_notice: Optional[str] = None
     if kb_uuid:
         try:
             from app.services.knowledge_service import get_kb_manifest
@@ -609,7 +611,7 @@ async def chat_stream(
         except Exception as e:
             logger.warning("KB manifest fetch failed for kb_uuid=%s: %s", kb_uuid, e)
         try:
-            kb_segment, kb_sources = await _build_kb_segment(
+            kb_segment, kb_sources, kb_notice = await _build_kb_segment(
                 kb_uuid, message, model_name, manifest=kb_manifest,
                 history=previous_messages, user_id=user_id,
             )
@@ -725,6 +727,18 @@ async def chat_stream(
             "content": action.detail,
             "action": action.kind,
             "tokens_dropped": action.tokens_dropped,
+        }) + "\n"
+
+    # A document in the knowledge base tried to steer the answer. Said on the
+    # same channel as "context was compacted" — anything that changed what the
+    # model read has to reach the reader, or the answer looks identical either
+    # way.
+    if kb_notice:
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": kb_notice,
+            "action": "kb_instructions_removed",
+            "tokens_dropped": 0,
         }) + "\n"
 
     # Emit KB sources before the LLM streams its answer so the UI can render
@@ -1537,12 +1551,18 @@ async def _build_kb_segment(
     manifest: Optional[list[dict]] = None,
     history: Optional[list[ModelMessage]] = None,
     user_id: Optional[str] = None,
-) -> tuple[Optional[DocumentSegment], list[dict]]:
+) -> tuple[Optional[DocumentSegment], list[dict], Optional[str]]:
     """Retrieve KB context for one chat turn.
 
-    Returns ``(segment, kb_sources)``; the segment is None when nothing clears
-    the KB's tuned relevance floor, so the caller falls through to the empty-KB
-    prompt and the model abstains instead of answering from junk.
+    Returns ``(segment, kb_sources, notice)``; the segment is None when nothing
+    clears the KB's tuned relevance floor, so the caller falls through to the
+    empty-KB prompt and the model abstains instead of answering from junk.
+
+    ``notice`` is set when retrieval had to strip text written as instructions
+    to the model out of a chunk (``document_manager.sanitize_retrieved_chunk``).
+    A poisoned knowledge base answers every user, so this is not a per-turn
+    curiosity — it is the only sign the reader gets that a document in the KB
+    is trying to steer the answer.
     """
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
@@ -1628,15 +1648,23 @@ async def _build_kb_segment(
     )
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
-        return None, []
+        return None, [], None
 
     kb_sources: list[dict] = []
     snippet_blocks: list[str] = []
     any_approximate = False
     any_spanning = False
+    sanitized_chunks = 0
     for r in kb_results:
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
+        if r.get("injected_text_removed"):
+            sanitized_chunks += 1
+            # Nothing survived the strip: the chunk was the planted text and
+            # nothing else. It has no evidence to offer, and citing it is how
+            # the false answer looked verified in the first place.
+            if not content.strip():
+                continue
         src = meta.get("source_name", "Unknown")
         sheet = meta.get("sheet")
         # A chunk that crosses a page break is cited by the page of the
@@ -1707,7 +1735,18 @@ async def _build_kb_segment(
         if doc_uuid:
             src_dict["document_uuid"] = doc_uuid
 
-    return DocumentSegment(label="kb", text=kb_text), kb_sources
+    notice = None
+    if sanitized_chunks:
+        notice = (
+            f"{sanitized_chunks} retrieved passage"
+            f"{'s' if sanitized_chunks != 1 else ''} in this knowledge base "
+            f"contained text written as instructions to the AI rather than as "
+            f"document content. That text was removed before the answer was "
+            f"written, and a passage that was nothing else is not cited — but "
+            f"a document in this knowledge base is trying to change the "
+            f"answers it gives, so check this one against the document itself."
+        )
+    return DocumentSegment(label="kb", text=kb_text), kb_sources, notice
 
 
 def _build_interrupted_body(full_response: list[str], reason: str) -> str:
