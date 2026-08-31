@@ -26,6 +26,7 @@ from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
+from app.services.page_locator import annotate_chunk_pages, cited_pages
 
 logger = logging.getLogger(__name__)
 
@@ -572,8 +573,6 @@ async def search_knowledge_base(
         ).to_list()
         source_map = {s.uuid: s for s in sources}
 
-    from app.services.page_locator import annotate_chunk_pages, cited_pages
-
     enriched: list[dict] = []
     citations: list[dict] = []
     any_approximate = False
@@ -606,15 +605,15 @@ async def search_knowledge_base(
         entry: dict = {
             # Annotated for the model, so it can see where the page turns.
             "content": annotated,
+            "source_name": meta.get("source_name", "unknown"),
+        }
+        if annotated != content:
             # Unannotated, for anything that has to match this text against the
             # document itself. The UI derives its click-to-highlight phrase
             # from the passage, and an injected "[p. 3]" marker appears nowhere
             # in the document — a chunk whose page break falls inside its first
             # 60 characters would open the viewer on a highlight that can never
             # match. Only set when the two differ.
-            "source_name": meta.get("source_name", "unknown"),
-        }
-        if annotated != content:
             entry["content_verbatim"] = content
         if isinstance(page, int):
             entry["page"] = page
