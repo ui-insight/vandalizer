@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical,
   Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
+  Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -34,12 +34,11 @@ import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
-import { searchDocuments, pollStatus as pollDocumentStatus } from '../../api/documents'
+import { searchDocuments } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { listCredentials } from '../../api/credentials'
 import type { Credential, CredentialType } from '../../types/credential'
 import { CredentialQuickCreateModal } from './CredentialQuickCreateModal'
-import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
@@ -53,7 +52,13 @@ import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCita
 import { describeUnfinishedSteps, findUnfinishedSteps, promptTaskIsEmpty } from './workflowStepIssues'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
-import { DeletedDocumentBadge, FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
+import { FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
+import { StepInputSources } from './StepInputSources'
+import {
+  DEFAULT_STEP_INPUT, deriveStepInput, INPUT_SOURCE_LABELS, inputValuePatch,
+  readInputValue, taskOverridesStepInput, TASK_INPUT_OVERRIDE_KEY,
+  type StepInputValue, type TaskInputSource,
+} from './stepInputConfig'
 import { FileOutputCard } from './FileOutputCard'
 import { summarizeFilePayload } from './outputFilePayload'
 import DOMPurify from 'dompurify'
@@ -77,8 +82,6 @@ import { TermDef } from '../shared/TermDef'
 
 type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'history'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
-type TaskSubTab = 'design' | 'input' | 'output'
-type TaskInputSource = 'step_input' | 'select_document' | 'workflow_documents'
 
 interface TaskTypeDef {
   name: string
@@ -535,6 +538,29 @@ export function WorkflowEditorPanel() {
       return
     }
     setEditingTask(null)
+    refresh()
+  }
+
+  // Input lives on the step: one PATCH writes it for every task in the step.
+  // For a step authored back when input was per-task and whose tasks disagree,
+  // the odd ones out are pinned to the advanced per-task override in the same
+  // save, so lifting the shared answer never silently repoints a task.
+  const handleStepInputSave = async (
+    step: WorkflowStep,
+    value: StepInputValue,
+    divergentTasks: WorkflowTask[],
+  ) => {
+    try {
+      await updateStep(step.id, { data: { ...step.data, ...inputValuePatch(value) } })
+      for (const task of divergentTasks) {
+        await updateTask(task.id, {
+          data: { ...task.data, [TASK_INPUT_OVERRIDE_KEY]: true },
+        })
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save this step's input", 'error')
+      return
+    }
     refresh()
   }
 
@@ -1261,6 +1287,7 @@ export function WorkflowEditorPanel() {
           onDeleteTask={handleDeleteTask}
           onStepNameSave={handleStepNameSave}
           onToggleOutput={handleToggleOutput}
+          onStepInputSave={handleStepInputSave}
           showTaskPicker={showTaskPicker}
           taskPickerCategory={taskPickerCategory}
           setTaskPickerCategory={setTaskPickerCategory}
@@ -1269,6 +1296,9 @@ export function WorkflowEditorPanel() {
           canManage={canManage}
           stepsOutput={effectiveStepsOutput}
           lastRunMeta={effectiveRunMeta}
+          workflowId={openWorkflowId}
+          workflowInputConfig={workflow?.input_config as Record<string, unknown> | undefined}
+          onRefreshWorkflow={refresh}
         />
       )}
 
@@ -1276,6 +1306,7 @@ export function WorkflowEditorPanel() {
       {editingTask && (
         <TaskEditModal
           task={editingTask}
+          step={editingStep}
           selectedDocUuids={selectedDocUuids}
           workflow={workflow}
           workflowId={openWorkflowId}
@@ -1908,12 +1939,21 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
 // Edit step overlay (with inline step name editing)
 // ---------------------------------------------------------------------------
 
+type StepTab = 'basic' | 'input' | 'output'
+
+const STEP_TABS: { key: StepTab; label: string }[] = [
+  { key: 'basic', label: 'Basic Setup' },
+  { key: 'input', label: 'Input' },
+  { key: 'output', label: 'Output' },
+]
+
 function EditStepOverlay({
   step, onClose, onDeleteStep, onAddTask, onEditTask, onDeleteTask,
-  onStepNameSave, onToggleOutput,
+  onStepNameSave, onToggleOutput, onStepInputSave,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
   canManage, stepsOutput, lastRunMeta,
+  workflowId, workflowInputConfig, onRefreshWorkflow,
 }: {
   step: WorkflowStep
   onClose: () => void
@@ -1923,6 +1963,7 @@ function EditStepOverlay({
   onDeleteTask: (taskId: string) => void
   onStepNameSave: (stepId: string, newName: string) => void
   onToggleOutput: (stepId: string, isOutput: boolean) => void
+  onStepInputSave: (step: WorkflowStep, value: StepInputValue, divergentTasks: WorkflowTask[]) => void
   showTaskPicker: boolean
   taskPickerCategory: TaskCategory
   setTaskPickerCategory: (cat: TaskCategory) => void
@@ -1931,10 +1972,25 @@ function EditStepOverlay({
   canManage: boolean
   stepsOutput?: Record<string, unknown> | null
   lastRunMeta?: { finishedAt: string | null; status: string } | null
+  workflowId: string | null
+  workflowInputConfig: Record<string, unknown> | undefined
+  onRefreshWorkflow: () => void
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(step.name)
+  const [stepTab, setStepTab] = useState<StepTab>('basic')
   const nameInputRef = useRef<HTMLInputElement>(null)
+
+  // Input is a step-level setting. Steps authored before it moved here have
+  // nothing stored, so seed from the tasks — see deriveStepInput.
+  const derived = deriveStepInput(step)
+  const [inputValue, setInputValue] = useState<StepInputValue>(derived.value)
+  const overriddenTasks = step.tasks.filter(taskOverridesStepInput)
+
+  const handleInputChange = (next: StepInputValue) => {
+    setInputValue(next)
+    onStepInputSave(step, next, derived.fromStep ? [] : derived.divergentTasks)
+  }
 
   useEffect(() => {
     if (editingName && nameInputRef.current) {
@@ -1950,13 +2006,18 @@ function EditStepOverlay({
     setEditingName(false)
   }
 
+  const sectionHeading: CSSProperties = {
+    fontSize: 12, fontWeight: 600, color: '#6b7280',
+    textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12,
+  }
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000,
       backgroundColor: '#fff', display: 'flex', flexDirection: 'column',
     }}>
       {/* Header */}
-      <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
+      <div style={{ padding: '16px 24px 0', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {editingName ? (
             <input
@@ -1998,143 +2059,245 @@ function EditStepOverlay({
           </button>
         </div>
         <div style={{ fontSize: 13, color: '#5f6368', marginTop: 4 }}>Build this step of the workflow</div>
+
+        {/* Step tab bar */}
+        <div role="tablist" aria-label="Step settings" style={{ display: 'flex', gap: 4, marginTop: 12 }}>
+          {STEP_TABS.map(t => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              id={`step-tab-${t.key}`}
+              aria-controls="step-tabpanel"
+              aria-selected={stepTab === t.key}
+              tabIndex={stepTab === t.key ? 0 : -1}
+              onClick={() => setStepTab(t.key)}
+              style={{
+                padding: '8px 16px', fontSize: 12, fontWeight: stepTab === t.key ? 700 : 500,
+                fontFamily: 'inherit', background: 'none', border: 'none', cursor: 'pointer',
+                borderBottom: stepTab === t.key
+                  ? '2px solid var(--highlight-color, #eab308)'
+                  : '2px solid transparent',
+                color: stepTab === t.key ? 'var(--highlight-color, #eab308)' : '#6b7280',
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 200px' }}>
-        <div style={{
-          fontSize: 12, fontWeight: 600, color: '#6b7280',
-          textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12,
-        }}>
-          Basic Setup
-        </div>
-
-        {/* Deliverable toggle — multiple steps can be marked; their outputs are bundled at download */}
-        <label style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-          cursor: 'pointer', padding: '10px 14px',
-          border: step.is_output ? '2px solid #7c3aed' : '1px solid #e5e7eb',
-          borderRadius: 8, backgroundColor: step.is_output ? '#f5f3ff' : '#fff',
-        }}>
-          <input
-            aria-label="Mark step as workflow output"
-            type="checkbox"
-            checked={step.is_output}
-            disabled={!canManage}
-            onChange={e => onToggleOutput(step.id, e.target.checked)}
-            style={{ accentColor: '#7c3aed' }}
-          />
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: step.is_output ? '#7c3aed' : '#374151' }}>
-              Include in deliverables
+      <div
+        id="step-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`step-tab-${stepTab}`}
+        style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 200px' }}
+      >
+        {stepTab === 'basic' && (
+          <>
+            <div style={sectionHeading}>Tasks</div>
+            <div style={{
+              fontSize: 12, color: '#6b7280', marginBottom: 12, lineHeight: 1.5,
+            }}>
+              What this step does. Every task here gets the same input — set once on the
+              Input tab — and they run at the same time, so a task only configures its own
+              work.
             </div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
-              When set, this step's output is included in the download. Mark multiple steps to bundle them as a ZIP.
-              If no step is marked, the last step is used by default.
-            </div>
-          </div>
-        </label>
 
-        {/* Task list in checkerboard container */}
-        <div style={{
-          ...checkerboardBg,
-          border: '1px solid #2f2f2fc2',
-          borderRadius: 'var(--ui-radius, 8px)',
-          padding: 20,
-        }}>
-          {step.tasks.map(task => {
-            const color = getTaskColor(task.name)
-            const Icon = getTaskIcon(task.name)
-            return (
-              <div
-                key={task.id}
-                onClick={() => onEditTask(task)}
-                style={{
-                  backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
-                  padding: 12, marginBottom: 8,
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  cursor: 'pointer',
-                }}
-              >
-                <div style={{
-                  width: 32, height: 32, borderRadius: 6,
-                  backgroundColor: color + '18',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                }}>
-                  <Icon style={{ width: 16, height: 16, color }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>{(task.data as Record<string, unknown>)?.name as string || task.name}</span>
-                    {promptTaskIsEmpty(task.name, task.data) && (
-                      <span
-                        title="This step has no prompt — open it and add instructions"
-                        style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                          fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
-                          padding: '1px 6px', borderRadius: 4,
-                          color: '#92400e', backgroundColor: '#fef3c7',
-                        }}
-                      >
-                        <AlertTriangle style={{ width: 10, height: 10 }} />
-                        NO PROMPT
-                      </span>
+            {/* Task list in checkerboard container */}
+            <div style={{
+              ...checkerboardBg,
+              border: '1px solid #2f2f2fc2',
+              borderRadius: 'var(--ui-radius, 8px)',
+              padding: 20,
+            }}>
+              {step.tasks.map(task => {
+                const color = getTaskColor(task.name)
+                const Icon = getTaskIcon(task.name)
+                return (
+                  <div
+                    key={task.id}
+                    onClick={() => onEditTask(task)}
+                    style={{
+                      backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
+                      padding: 12, marginBottom: 8,
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 6,
+                      backgroundColor: color + '18',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}>
+                      <Icon style={{ width: 16, height: 16, color }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span>{(task.data as Record<string, unknown>)?.name as string || task.name}</span>
+                        {promptTaskIsEmpty(task.name, task.data) && (
+                          <span
+                            title="This step has no prompt — open it and add instructions"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                              fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                              padding: '1px 6px', borderRadius: 4,
+                              color: '#92400e', backgroundColor: '#fef3c7',
+                            }}
+                          >
+                            <AlertTriangle style={{ width: 10, height: 10 }} />
+                            NO PROMPT
+                          </span>
+                        )}
+                        {taskOverridesStepInput(task) && (
+                          <span
+                            title="This task uses its own input instead of the step's"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                              fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                              padding: '1px 6px', borderRadius: 4,
+                              color: '#3730a3', backgroundColor: '#e0e7ff',
+                            }}
+                          >
+                            OWN INPUT
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                        {describeTaskType(task.name)}
+                      </div>
+                    </div>
+                    {canManage && (
+                      <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
+                      }}>
+                        <Trash2 style={{ width: 14, height: 14 }} />
+                      </button>
                     )}
                   </div>
-                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
-                    {task.name === 'Extraction' ? 'Extraction'
-                      : task.name === 'Prompt' ? 'LLM prompt task'
-                      : task.name === 'Formatter' || task.name === 'Format' ? 'Format output'
-                      : task.name === 'AddWebsite' ? 'Fetch URL text'
-                      : task.name === 'AddDocument' ? 'Add document text'
-                      : task.name === 'DescribeImage' ? 'AI image description'
-                      : task.name === 'CodeNode' ? 'Run Python code'
-                      : task.name === 'CrawlerNode' ? 'Web crawler'
-                      : task.name === 'ResearchNode' ? 'Two-pass document analysis'
-                      : task.name === 'KnowledgeBaseQuery' ? 'Search knowledge base'
-                      : task.name === 'APINode' ? 'HTTP API request'
-                      : task.name === 'DocumentRenderer' ? 'Render document'
-                      : task.name === 'FormFiller' ? 'Fill template'
-                      : task.name === 'DataExport' ? 'Export data'
-                      : task.name === 'PackageBuilder' ? 'Build zip package'
-                      : task.name === 'Approval' ? 'Approval gate'
-                      : task.name}
-                  </div>
+                )
+              })}
+
+              {/* Add task button — hidden when the workflow is read-only */}
+              {canManage && (
+                <div
+                  onClick={onAddTask}
+                  style={{
+                    backgroundColor: '#191919', color: '#fff',
+                    borderRadius: 'var(--ui-radius, 8px)',
+                    padding: 16, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    marginTop: step.tasks.length > 0 ? 8 : 0,
+                  }}
+                >
+                  <Plus style={{ width: 18, height: 18 }} />
+                  <span style={{ fontSize: 13, fontWeight: 600 }}>
+                    {step.tasks.length > 0 ? 'ADD A TASK' : 'ADD YOUR FIRST TASK'}
+                  </span>
                 </div>
-                {canManage && (
-                  <button type="button" aria-label="Delete task" onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }} style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex',
-                  }}>
-                    <Trash2 style={{ width: 14, height: 14 }} />
-                  </button>
-                )}
-              </div>
-            )
-          })}
-
-          {/* Add task button — hidden when the workflow is read-only */}
-          {canManage && (
-            <div
-              onClick={onAddTask}
-              style={{
-                backgroundColor: '#191919', color: '#fff',
-                borderRadius: 'var(--ui-radius, 8px)',
-                padding: 16, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 10,
-                marginTop: step.tasks.length > 0 ? 8 : 0,
-              }}
-            >
-              <Plus style={{ width: 18, height: 18 }} />
-              <span style={{ fontSize: 13, fontWeight: 600 }}>
-                {step.tasks.length > 0 ? 'ADD A TASK' : 'ADD YOUR FIRST TASK'}
-              </span>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
-        {/* Read-only output this step produced on the most recent run */}
-        <StepLastRunOutput step={step} stepsOutput={stepsOutput} lastRunMeta={lastRunMeta} />
+        {stepTab === 'input' && (
+          <>
+            <div style={sectionHeading}>Input</div>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 12px', marginBottom: 16,
+              backgroundColor: '#f3f4f6', borderRadius: 6,
+              border: '1px solid #e5e7eb',
+            }}>
+              <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
+                <strong>Set once for the whole step.</strong> {step.tasks.length === 1
+                  ? 'This step\u2019s task receives what you pick here.'
+                  : `All ${step.tasks.length} tasks in this step receive the same copy of what you pick here.`}
+                {' '}<strong>The step runs once per workflow run</strong> — selected inputs are
+                combined into a single call, so if an upstream step produced 5 results this
+                step receives one combined payload, not five separate executions. Lists are
+                stringified before reaching prompts.
+              </div>
+            </div>
+
+            {!derived.fromStep && derived.divergentTasks.length > 0 && (
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+                padding: '10px 12px', marginBottom: 16,
+                backgroundColor: '#fffbeb', borderRadius: 6, border: '1px solid #fde68a',
+              }}>
+                <AlertTriangle style={{ width: 14, height: 14, color: '#b45309', flexShrink: 0, marginTop: 1 }} />
+                <div style={{ fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                  This step was built when input was set per task, and its tasks disagree.
+                  Shown below is what <strong>{step.tasks.find(t => !derived.divergentTasks.includes(t))?.data?.name as string || step.tasks[0]?.name}</strong> uses.
+                  Changing it here keeps {derived.divergentTasks.length === 1 ? 'the other task' : `the other ${derived.divergentTasks.length} tasks`} on
+                  their own input, marked as an override — open{' '}
+                  {derived.divergentTasks.map(t => (t.data?.name as string) || t.name).join(', ')} to change or clear that.
+                </div>
+              </div>
+            )}
+
+            {overriddenTasks.length > 0 && (
+              <div style={{
+                padding: '10px 12px', marginBottom: 16,
+                backgroundColor: '#eef2ff', borderRadius: 6, border: '1px solid #c7d2fe',
+                fontSize: 12, color: '#3730a3', lineHeight: 1.5,
+              }}>
+                {overriddenTasks.length === 1 ? 'One task overrides' : `${overriddenTasks.length} tasks override`} this
+                step's input and will ignore what you set here:{' '}
+                {overriddenTasks.map(t => (t.data?.name as string) || t.name).join(', ')}.
+              </div>
+            )}
+
+            <StepInputSources
+              value={inputValue}
+              onChange={handleInputChange}
+              workflowId={workflowId}
+              workflowInputConfig={workflowInputConfig}
+              onRefreshWorkflow={onRefreshWorkflow}
+              disabled={!canManage}
+            />
+          </>
+        )}
+
+        {stepTab === 'output' && (
+          <>
+            <div style={sectionHeading}>Output</div>
+            <StepOutputExplainer step={step} />
+
+            {/* Deliverable toggle — multiple steps can be marked; their outputs are bundled at download */}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0',
+              cursor: 'pointer', padding: '10px 14px',
+              border: step.is_output ? '2px solid #7c3aed' : '1px solid #e5e7eb',
+              borderRadius: 8, backgroundColor: step.is_output ? '#f5f3ff' : '#fff',
+            }}>
+              <input
+                aria-label="Mark step as workflow output"
+                type="checkbox"
+                checked={step.is_output}
+                disabled={!canManage}
+                onChange={e => onToggleOutput(step.id, e.target.checked)}
+                style={{ accentColor: '#7c3aed' }}
+              />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: step.is_output ? '#7c3aed' : '#374151' }}>
+                  Include in deliverables
+                </div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+                  When set, this step's output is included in the download. Mark multiple steps to bundle them as a ZIP.
+                  If no step is marked, the last step is used by default.
+                </div>
+              </div>
+            </label>
+
+            {/* Read-only output this step produced on the most recent run */}
+            <StepLastRunOutput step={step} stepsOutput={stepsOutput} lastRunMeta={lastRunMeta} />
+          </>
+        )}
       </div>
 
       {/* Bottom toolbar */}
@@ -2181,6 +2344,92 @@ function EditStepOverlay({
     </div>
   )
 }
+
+
+/**
+ * How this step's tasks turn into the one value the next step receives.
+ *
+ * The combination is not configurable — it is what MultiTaskNode does — so this
+ * describes the actual mechanics against the step's real task list rather than
+ * offering settings that do not exist.
+ */
+function StepOutputExplainer({ step }: { step: WorkflowStep }) {
+  const count = step.tasks.length
+
+  if (count === 0) {
+    return (
+      <div style={{
+        padding: 16, backgroundColor: '#fafafa', border: '1px solid #e5e7eb',
+        borderRadius: 8, fontSize: 13, color: '#6b7280',
+      }}>
+        This step has no tasks yet, so it produces no output. Add one on the Basic Setup tab.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+    }}>
+      <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.6, marginBottom: count > 1 ? 12 : 0 }}>
+        {count === 1 ? (
+          <>This step runs one task and passes its output straight to the next step.</>
+        ) : (
+          <>
+            All {count} tasks run at the same time on the same input, and their outputs are
+            collected <strong>in the order listed below</strong> into a single list. That list is
+            what the next step receives as its Step Input.
+          </>
+        )}
+      </div>
+
+      {count > 1 && (
+        <ol style={{ margin: 0, paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {step.tasks.map(task => (
+            <li key={task.id} style={{ fontSize: 12, color: '#374151' }}>
+              <strong>{(task.data as Record<string, unknown>)?.name as string || task.name}</strong>
+              <span style={{ color: '#6b7280' }}> — {describeTaskType(task.name)}</span>
+              {typeof task.data?.post_process_prompt === 'string' && (task.data.post_process_prompt as string).trim() !== '' && (
+                <span style={{ color: '#6b7280' }}> · post-processed before it joins the list</span>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6, marginTop: 12 }}>
+        Warnings, citations and errors from every task are merged onto the step's result.
+        Post-processing a single task's output is set on that task, under Design.
+      </div>
+    </div>
+  )
+}
+
+
+/** One-line description of what a task type does, for task lists and summaries. */
+function describeTaskType(name: string): string {
+  switch (name) {
+    case 'Extraction': return 'Extraction'
+    case 'Prompt': return 'LLM prompt task'
+    case 'Formatter':
+    case 'Format': return 'Format output'
+    case 'AddWebsite': return 'Fetch URL text'
+    case 'AddDocument': return 'Add document text'
+    case 'DescribeImage': return 'AI image description'
+    case 'CodeNode': return 'Run Python code'
+    case 'CrawlerNode': return 'Web crawler'
+    case 'ResearchNode': return 'Two-pass document analysis'
+    case 'KnowledgeBaseQuery': return 'Search knowledge base'
+    case 'APINode': return 'HTTP API request'
+    case 'DocumentRenderer': return 'Render document'
+    case 'FormFiller': return 'Fill template'
+    case 'DataExport': return 'Export data'
+    case 'PackageBuilder': return 'Build zip package'
+    case 'Approval': return 'Approval gate'
+    default: return name
+  }
+}
+
 
 // ---------------------------------------------------------------------------
 // Task type picker (categorized)
@@ -2839,8 +3088,10 @@ function PdfTemplatePicker({ value, onChange }: {
   )
 }
 
-function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
+function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onClose, onSave, onRefreshWorkflow, canManage }: {
   task: WorkflowTask
+  /** The step this task belongs to — it owns the input the task will receive. */
+  step: WorkflowStep | null
   selectedDocUuids: string[]
   workflow: Workflow | null
   workflowId: string | null
@@ -2850,62 +3101,22 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   canManage: boolean
 }) {
   const { user } = useAuth()
-  const { toast } = useToast()
-  const { selectedDocNames } = useWorkspace()
   const [taskData, setTaskData] = useState<Record<string, unknown>>({ ...task.data })
   const [saving, setSaving] = useState(false)
-  const [subTab, setSubTab] = useState<TaskSubTab>('design')
 
-  // Input source config — multi-select. Migrate legacy single `input_source`
-  // when the new `input_sources` list is absent.
-  const [inputSources, setInputSources] = useState<TaskInputSource[]>(() => {
-    const list = task.data.input_sources as TaskInputSource[] | undefined
-    if (Array.isArray(list) && list.length > 0) return list
-    const legacy = (task.data.input_source as TaskInputSource) || 'step_input'
-    return [legacy]
-  })
-  const inputSource: TaskInputSource = inputSources[0] || 'step_input'
-  const toggleInputSource = (src: TaskInputSource) => {
-    setInputSources(prev => {
-      if (prev.includes(src)) {
-        const next = prev.filter(s => s !== src)
-        return next.length > 0 ? next : [src]  // never empty
-      }
-      return [...prev, src]
-    })
-  }
-  const [selectedDocUuid, setSelectedDocUuid] = useState<string>(
-    (task.data.selected_document_uuid as string) || ''
-  )
-  const [docSearchQuery, setDocSearchQuery] = useState('')
-  const [selectedDocTitle, setSelectedDocTitle] = useState('')
-  const [docSearchResults, setDocSearchResults] = useState<{ uuid: string; title: string }[]>([])
-  const [showDocDropdown, setShowDocDropdown] = useState(false)
-  const [docHighlight, setDocHighlight] = useState(0)
-
-  // Saved tasks only store the UUID — fetch the title so the chip shows the
-  // filename instead of a raw UUID when the editor reopens.
-  useEffect(() => {
-    if (!selectedDocUuid) { setSelectedDocTitle(''); return }
-    let cancelled = false
-    pollDocumentStatus(selectedDocUuid)
-      .then(res => { if (!cancelled && res?.title) setSelectedDocTitle(res.title) })
-      .catch(() => { /* leave title empty; chip will fall back to UUID */ })
-    return () => { cancelled = true }
-  }, [selectedDocUuid])
-
-  // Fixed documents for workflow_documents input source
+  // Input belongs to the step: this task receives whatever the step provides,
+  // unless it carries the advanced per-task override.
   const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
-  const [fixedDocs, setFixedDocs] = useState<FixedDocument[]>(
-    () => (((inputCfg?.fixed_documents) as FixedDocument[]) || [])
-  )
-  const [fixedDocSearch, setFixedDocSearch] = useState('')
-  const [fixedDocResults, setFixedDocResults] = useState<{ uuid: string; title: string }[]>([])
-  const [showFixedDocDropdown, setShowFixedDocDropdown] = useState(false)
-  const [fixedDocHighlight, setFixedDocHighlight] = useState(0)
-  const [dragOver, setDragOver] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const stepInput = step ? deriveStepInput(step).value : { ...DEFAULT_STEP_INPUT }
+  const [inputOverride, setInputOverride] = useState(() => taskOverridesStepInput(task))
+  const [showInputOverride, setShowInputOverride] = useState(() => taskOverridesStepInput(task))
+  const [overrideInput, setOverrideInput] = useState<StepInputValue>(() => readInputValue(task.data))
+  const effectiveInput = inputOverride ? overrideInput : stepInput
+  const inputSource: TaskInputSource = effectiveInput.sources[0] || 'step_input'
+  const stepInputSummary = stepInput.sources
+    .map(src => INPUT_SOURCE_LABELS[src])
+    .join(' + ')
+  const fixedDocUuids = ((inputCfg?.fixed_documents as FixedDocument[]) || []).map(d => d.uuid)
 
   // Credentials (API Node auth_strategy picker)
   const [credentials, setCredentials] = useState<Credential[] | null>(null)
@@ -2938,81 +3149,6 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     ).catch(() => { if (!cancelled) setApprovalTeamMembers([]) })
     return () => { cancelled = true }
   }, [task.name, user?.current_team_uuid])
-
-  // Save fixed documents to workflow input_config
-  const saveFixedDocs = async (docs: FixedDocument[]) => {
-    const previous = fixedDocs
-    setFixedDocs(docs)  // optimistic — refresh reconciles on success
-    if (!workflowId) return
-    try {
-      await updateWorkflow(workflowId, {
-        input_config: { ...inputCfg, fixed_documents: docs.map(stripFixedDocumentFlags) },
-      })
-      onRefreshWorkflow()
-    } catch (err) {
-      setFixedDocs(previous)
-      toast(describeConfigSaveError(err, 'fixed documents'), 'error')
-    }
-  }
-
-  const addFixedDoc = (doc: { uuid: string; title: string }) => {
-    if (fixedDocs.some(d => d.uuid === doc.uuid)) return
-    void saveFixedDocs([...fixedDocs, doc])
-  }
-
-  const removeFixedDoc = (uuid: string) => {
-    void saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
-  }
-
-  const handleFileUpload = async (file: File) => {
-    setUploading(true)
-    try {
-      const reader = new FileReader()
-      const base64 = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => {
-          const result = reader.result as string
-          resolve(result.split(',')[1] || result)
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
-      const ext = file.name.split('.').pop() || ''
-      const { uuid } = await uploadFile({
-        contentAsBase64String: base64,
-        fileName: file.name,
-        extension: ext,
-      })
-      if (uuid) {
-        addFixedDoc({ uuid, title: file.name })
-      }
-    } catch { /* ignore upload errors */ }
-    finally { setUploading(false) }
-  }
-
-  // Fixed doc search debounce — empty query loads recent docs so the field
-  // doubles as a browsable picker.
-  const fixedSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const wantsWorkflowDocs = inputSources.includes('workflow_documents')
-  const wantsSelectDocument = inputSources.includes('select_document')
-  useEffect(() => {
-    if (!wantsWorkflowDocs) return
-    if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current)
-    const query = fixedDocSearch.trim()
-    fixedSearchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const res = await searchDocuments(query, 20)
-        setFixedDocResults(
-          res.items
-            .filter(d => !fixedDocs.some(fd => fd.uuid === d.uuid))
-            .map(d => ({ uuid: d.uuid, title: d.title }))
-        )
-      } catch (err) {
-        console.error('Document search failed', err)
-        setFixedDocResults([])
-      }
-    }, query ? 250 : 0)
-    return () => { if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current) }
-  }, [fixedDocSearch, fixedDocs, wantsWorkflowDocs])
 
   // Output post-process
   const [postProcessEnabled, setPostProcessEnabled] = useState(
@@ -3121,26 +3257,6 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     }
   }, [task.name])
 
-  // Document search debounce — uses searchDocuments so files in any folder
-  // (personal subfolders, team folders) are findable, not just the root.
-  // Empty query loads recent docs so the field doubles as a browsable picker.
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => {
-    if (!wantsSelectDocument) return
-    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
-    const query = docSearchQuery.trim()
-    searchTimeoutRef.current = setTimeout(async () => {
-      try {
-        const res = await searchDocuments(query, 20)
-        setDocSearchResults(res.items.map(d => ({ uuid: d.uuid, title: d.title })))
-      } catch (err) {
-        console.error('Document search failed', err)
-        setDocSearchResults([])
-      }
-    }, query ? 250 : 0)
-    return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) }
-  }, [docSearchQuery, wantsSelectDocument])
-
   // Cleanup test intervals on unmount
   useEffect(() => {
     return () => {
@@ -3159,7 +3275,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     taskName: task.name,
     triggerType: inputCfg?.trigger_type as string | undefined,
     selectedDocUuids,
-    fixedDocUuids: fixedDocs.map(d => d.uuid),
+    fixedDocUuids,
   })
   // Whichever reason applies is what the button's tooltip says — a disabled
   // control that doesn't explain itself is the ticket this came from.
@@ -3176,13 +3292,15 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     }
     setSaving(true)
     try {
+      // Input keys are only written here when this task overrides its step.
+      // Without an override they are left untouched: on a workflow authored
+      // before input moved to the step, the task's own keys are still what the
+      // engine falls back to, and clearing them would silently repoint the task
+      // at the previous step's output.
       const finalData = {
         ...taskData,
-        input_sources: inputSources,
-        // Keep `input_source` for backward compatibility — set to the first
-        // selected source so older code paths still see something sensible.
-        input_source: inputSources[0] || 'step_input',
-        ...(inputSources.includes('select_document') ? { selected_document_uuid: selectedDocUuid } : {}),
+        [TASK_INPUT_OVERRIDE_KEY]: inputOverride ? true : undefined,
+        ...(inputOverride ? inputValuePatch(overrideInput) : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
       }
       await onSave(task.id, finalData)
@@ -3210,7 +3328,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     try {
       const { task_id } = await testStep({
         task_name: task.name,
-        task_data: taskData,
+        // The step owns the input, so the test has to be told what it is —
+        // otherwise a task whose own data predates the move would be tested
+        // against a source the real run no longer uses.
+        task_data: { ...taskData, ...inputValuePatch(effectiveInput) },
         document_uuids: testInput.docUuids,
       })
 
@@ -3412,12 +3533,6 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     }
   }
 
-  const SUB_TABS: { key: TaskSubTab; label: string }[] = [
-    { key: 'design', label: 'Design' },
-    { key: 'input', label: 'Input' },
-    { key: 'output', label: 'Output' },
-  ]
-
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002,
@@ -3466,38 +3581,11 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
           </button>
         </div>
 
-        {/* Sub-tab bar */}
-        <div role="tablist" aria-label="Task configuration sections" style={{ display: 'flex', gap: 0, marginTop: 12 }}>
-          {SUB_TABS.map(st => (
-            <button
-              key={st.key}
-              type="button"
-              role="tab"
-              id={`task-subtab-${st.key}`}
-              aria-selected={subTab === st.key}
-              aria-controls="task-subtabpanel"
-              tabIndex={subTab === st.key ? 0 : -1}
-              onClick={() => setSubTab(st.key)}
-              style={{
-                padding: '8px 16px', fontSize: 12, fontWeight: subTab === st.key ? 700 : 500,
-                fontFamily: 'inherit', background: 'none', border: 'none',
-                borderBottom: subTab === st.key
-                  ? '2px solid var(--highlight-color, #eab308)'
-                  : '2px solid transparent',
-                color: subTab === st.key ? 'var(--highlight-color, #eab308)' : '#6b7280',
-                cursor: 'pointer',
-              }}
-            >
-              {st.label}
-            </button>
-          ))}
-        </div>
       </div>
 
-      {/* Body */}
-      <div id="task-subtabpanel" role="tabpanel" aria-labelledby={`task-subtab-${subTab}`} style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
-        {/* ===== DESIGN SUB-TAB ===== */}
-        {subTab === 'design' && (
+      {/* Body — a task configures only what it does. */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+        {/* ===== DESIGN — what this task does ===== */}
           <div>
             {task.name === 'Extraction' && (
               <div>
@@ -3988,9 +4076,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   padding: 12, backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
                   borderRadius: 6, fontSize: 13, color: '#0369a1', lineHeight: 1.5,
                 }}>
-                  The document for this task is selected in the <strong>Input</strong> sub-tab.
-                  Choose "Select a Document" to pick a specific document, or "Step Input"
-                  to use text from the previous step.
+                  The document this task inserts comes from the step's{' '}
+                  <strong>Input</strong> tab, shared with every task in the step.
+                  Choose "Select a Document" there to pin a specific document, or
+                  "Step Input" to use text from the previous step.
                 </div>
               </div>
             )}
@@ -4924,460 +5013,107 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               </div>
             )}
           </div>
-        )}
 
-        {/* ===== INPUT SUB-TAB ===== */}
-        {subTab === 'input' && (
-          <div>
-            <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '10px 12px', marginBottom: 16,
-              backgroundColor: '#f3f4f6', borderRadius: 6,
-              border: '1px solid #e5e7eb',
-            }}>
-              <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
-              <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
-                <strong>This step runs once per workflow run.</strong> Selected inputs are
-                combined into a single call — there's no fan-out over upstream items. If an
-                upstream step produced 5 results, this step receives one combined payload (not
-                five separate executions). Lists are stringified before reaching prompts.
-              </div>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-              Data Sources
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Pick one or more. Multiple selections are combined in labeled sections — e.g.,
-              check Step Input + Workflow Documents to give this step both the prior output and the original documents.
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {/* Step Input */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSources.includes('step_input') ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
-                borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
+        {/* Post-processing is genuinely per-task: it rewrites this one task's
+            output before it joins the step's combined result. */}
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20, marginTop: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+            Post-Processing
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+            Optional. Rewrites this task's own output before it joins the step's result.
+          </div>
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 12,
+          }}>
+            <input
+              type="checkbox"
+              checked={postProcessEnabled}
+              onChange={e => setPostProcessEnabled(e.target.checked)}
+            />
+            <span style={{ fontSize: 13, color: '#374151' }}>Post-process output with a prompt</span>
+          </label>
+
+          {postProcessEnabled && (
+            <textarea
+              aria-label="Post-processing prompt"
+              value={postProcessPrompt}
+              onChange={e => setPostProcessPrompt(e.target.value)}
+              placeholder="e.g., Summarize the extracted data into bullet points"
+              rows={6}
+              style={{
+                width: '100%', padding: '10px 12px', fontSize: 13,
+                fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                lineHeight: 1.5,
+              }}
+            />
+          )}
+        </div>
+
+        {/* Advanced: the escape hatch for a task that genuinely needs a
+            different source than the rest of its step. Collapsed by default —
+            the step's Input tab is the way to configure input. */}
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginTop: 20 }}>
+          <button
+            type="button"
+            aria-expanded={showInputOverride}
+            aria-controls="task-input-override"
+            onClick={() => setShowInputOverride(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none',
+              padding: 0, cursor: 'pointer', fontFamily: 'inherit',
+              fontSize: 12, fontWeight: 600, color: '#6b7280',
+            }}
+          >
+            {showInputOverride ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
+            Advanced
+            {inputOverride && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.03em',
+                padding: '1px 6px', borderRadius: 4, color: '#3730a3', backgroundColor: '#e0e7ff',
               }}>
+                OWN INPUT
+              </span>
+            )}
+          </button>
+
+          {showInputOverride && (
+            <div id="task-input-override" style={{ marginTop: 12 }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
                 <input
                   type="checkbox"
-                  checked={inputSources.includes('step_input')}
-                  onChange={() => toggleInputSource('step_input')}
+                  checked={inputOverride}
+                  disabled={!canManage}
+                  onChange={e => setInputOverride(e.target.checked)}
                   style={{ marginTop: 2 }}
                 />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Step Input</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                    Give this task a different input from the rest of the step
+                  </div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Only the output of the immediately previous step — no documents, no earlier
-                    steps. Pair with another source to also include document context.
+                    Rarely needed. Every task in a step normally receives the same input,
+                    set once on the step's Input tab{stepInputSummary ? ` — currently ${stepInputSummary}` : ''}.
                   </div>
                 </div>
               </label>
 
-              {/* Select a Document */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: wantsSelectDocument ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
-                borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={wantsSelectDocument}
-                  onChange={() => toggleInputSource('select_document')}
-                  style={{ marginTop: 2 }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Select a Document</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    A single document pinned to this step now — used every run, regardless of
-                    what triggered the workflow.
-                  </div>
-                  {wantsSelectDocument && (
-                    <div style={{ marginTop: 8, position: 'relative' }}>
-                      <input
-                        aria-label="Search documents"
-                        role="combobox"
-                        aria-expanded={showDocDropdown}
-                        aria-controls="doc-search-listbox"
-                        aria-autocomplete="list"
-                        aria-haspopup="listbox"
-                        aria-activedescendant={showDocDropdown && docSearchResults.length > 0 ? `doc-search-opt-${Math.min(docHighlight, docSearchResults.length - 1)}` : undefined}
-                        type="text"
-                        value={docSearchQuery}
-                        onChange={e => { setDocSearchQuery(e.target.value); setDocHighlight(0) }}
-                        placeholder="Search documents..."
-                        style={{
-                          width: '100%', padding: '8px 12px', fontSize: 13,
-                          fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                          outline: 'none', boxSizing: 'border-box',
-                        }}
-                        onFocus={() => setShowDocDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowDocDropdown(false), 200)}
-                        onKeyDown={e => {
-                          if (e.key === 'Escape') {
-                            setShowDocDropdown(false)
-                          } else if (e.key === 'ArrowDown') {
-                            e.preventDefault()
-                            setShowDocDropdown(true)
-                            setDocHighlight(h => Math.min(h + 1, docSearchResults.length - 1))
-                          } else if (e.key === 'ArrowUp') {
-                            e.preventDefault()
-                            setDocHighlight(h => Math.max(h - 1, 0))
-                          } else if (e.key === 'Enter' && showDocDropdown && docSearchResults.length > 0) {
-                            e.preventDefault()
-                            const doc = docSearchResults[Math.min(docHighlight, docSearchResults.length - 1)]
-                            setSelectedDocUuid(doc.uuid)
-                            setSelectedDocTitle(doc.title)
-                            setDocSearchQuery(doc.title)
-                            setShowDocDropdown(false)
-                          }
-                        }}
-                      />
-                      {showDocDropdown && (
-                        <div id="doc-search-listbox" role="listbox" aria-label="Document search results" style={{
-                          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-                          backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
-                          boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10,
-                          maxHeight: 200, overflowY: 'auto',
-                        }}>
-                          {docSearchResults.length === 0 ? (
-                            <div style={{ padding: '8px 12px', fontSize: 13, color: '#6b7280' }}>
-                              No documents found
-                            </div>
-                          ) : docSearchResults.map((doc, i) => (
-                            <div
-                              key={doc.uuid}
-                              id={`doc-search-opt-${i}`}
-                              role="option"
-                              aria-selected={doc.uuid === selectedDocUuid}
-                              onMouseEnter={() => setDocHighlight(i)}
-                              onMouseDown={() => {
-                                setSelectedDocUuid(doc.uuid)
-                                setSelectedDocTitle(doc.title)
-                                setDocSearchQuery(doc.title)
-                                setShowDocDropdown(false)
-                              }}
-                              style={{
-                                padding: '8px 12px', fontSize: 13, cursor: 'pointer',
-                                display: 'flex', alignItems: 'center', gap: 8,
-                                backgroundColor: i === Math.min(docHighlight, docSearchResults.length - 1) || doc.uuid === selectedDocUuid ? '#f3f4f6' : '#fff',
-                              }}
-                            >
-                              <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {doc.title}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {selectedDocUuid && !showDocDropdown && (
-                        <div style={{
-                          marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
-                          padding: '6px 10px', backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 12,
-                        }}>
-                          <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
-                          <span
-                            style={{ color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            title={selectedDocTitle ? `${selectedDocTitle} (${selectedDocUuid})` : selectedDocUuid}
-                          >
-                            {selectedDocTitle || selectedDocUuid}
-                          </span>
-                          <button
-                            type="button"
-                            aria-label="Clear selected document"
-                            onClick={() => { setSelectedDocUuid(''); setSelectedDocTitle(''); setDocSearchQuery('') }}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex' }}
-                          >
-                            <X style={{ width: 12, height: 12 }} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+              {inputOverride && (
+                <div style={{ marginTop: 12 }}>
+                  <StepInputSources
+                    value={overrideInput}
+                    onChange={setOverrideInput}
+                    workflowId={workflowId}
+                    workflowInputConfig={inputCfg}
+                    onRefreshWorkflow={onRefreshWorkflow}
+                    disabled={!canManage}
+                  />
                 </div>
-              </label>
-
-              {/* Workflow Documents */}
-              <label style={{
-                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: wantsWorkflowDocs ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
-                borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={wantsWorkflowDocs}
-                  onChange={() => toggleInputSource('workflow_documents')}
-                  style={{ marginTop: 2 }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Workflow Documents</div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    The documents the workflow was triggered with this run, plus any fixed
-                    documents pinned below at the workflow level.
-                  </div>
-
-                  {wantsWorkflowDocs && (
-                    <div style={{ marginTop: 10 }} onClick={e => e.stopPropagation()}>
-                      {/* Fixed documents list */}
-                      {fixedDocs.length > 0 && (
-                        <div style={{ marginBottom: 8 }}>
-                          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                            Fixed Documents
-                          </div>
-                          {fixedDocs.map(doc => (
-                            <div key={doc.uuid} style={{
-                              display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
-                              backgroundColor: doc.missing ? '#fef2f2' : '#f3f4f6',
-                              border: `1px solid ${doc.missing ? '#fecaca' : 'transparent'}`,
-                              borderRadius: 6, fontSize: 12, marginBottom: 4,
-                            }}>
-                              <FileText style={{ width: 12, height: 12, color: doc.missing ? '#b91c1c' : '#6b7280', flexShrink: 0 }} />
-                              <span style={{
-                                color: doc.missing ? '#991b1b' : '#374151', flex: 1, overflow: 'hidden',
-                                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                textDecoration: doc.missing ? 'line-through' : 'none',
-                              }}>
-                                {doc.title}
-                              </span>
-                              {doc.missing && <DeletedDocumentBadge />}
-                              <button
-                                type="button"
-                                aria-label={doc.missing ? `Remove deleted document ${doc.title}` : 'Remove document'}
-                                onClick={() => removeFixedDoc(doc.uuid)}
-                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#6b7280', display: 'flex' }}
-                              >
-                                <X style={{ width: 12, height: 12 }} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Search existing documents */}
-                      <div style={{ position: 'relative', marginBottom: 8 }}>
-                        <div style={{ position: 'relative' }}>
-                          <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-                          <input
-                            aria-label="Search documents by name"
-                            role="combobox"
-                            aria-expanded={showFixedDocDropdown}
-                            aria-controls="fixed-doc-listbox"
-                            aria-autocomplete="list"
-                            aria-haspopup="listbox"
-                            aria-activedescendant={showFixedDocDropdown && fixedDocResults.length > 0 ? `fixed-doc-opt-${Math.min(fixedDocHighlight, fixedDocResults.length - 1)}` : undefined}
-                            type="text"
-                            value={fixedDocSearch}
-                            onChange={e => { setFixedDocSearch(e.target.value); setFixedDocHighlight(0) }}
-                            placeholder="Search documents by name..."
-                            style={{
-                              width: '100%', padding: '7px 10px 7px 28px', fontSize: 12,
-                              fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                              outline: 'none', boxSizing: 'border-box',
-                            }}
-                            onFocus={() => setShowFixedDocDropdown(true)}
-                            onBlur={() => setTimeout(() => setShowFixedDocDropdown(false), 200)}
-                            onKeyDown={e => {
-                              if (e.key === 'Escape') {
-                                setShowFixedDocDropdown(false)
-                              } else if (e.key === 'ArrowDown') {
-                                e.preventDefault()
-                                setShowFixedDocDropdown(true)
-                                setFixedDocHighlight(h => Math.min(h + 1, fixedDocResults.length - 1))
-                              } else if (e.key === 'ArrowUp') {
-                                e.preventDefault()
-                                setFixedDocHighlight(h => Math.max(h - 1, 0))
-                              } else if (e.key === 'Enter' && showFixedDocDropdown && fixedDocResults.length > 0) {
-                                e.preventDefault()
-                                addFixedDoc(fixedDocResults[Math.min(fixedDocHighlight, fixedDocResults.length - 1)])
-                                setFixedDocSearch('')
-                                setShowFixedDocDropdown(false)
-                              }
-                            }}
-                          />
-                        </div>
-                        {showFixedDocDropdown && (
-                          <div id="fixed-doc-listbox" role="listbox" aria-label="Document search results" style={{
-                            position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-                            backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10,
-                            maxHeight: 160, overflowY: 'auto',
-                          }}>
-                            {fixedDocResults.length === 0 ? (
-                              <div style={{ padding: '7px 10px', fontSize: 12, color: '#6b7280' }}>
-                                No documents found
-                              </div>
-                            ) : fixedDocResults.map((doc, i) => (
-                              <div
-                                key={doc.uuid}
-                                id={`fixed-doc-opt-${i}`}
-                                role="option"
-                                aria-selected={i === Math.min(fixedDocHighlight, fixedDocResults.length - 1)}
-                                onMouseEnter={() => setFixedDocHighlight(i)}
-                                onMouseDown={() => {
-                                  addFixedDoc(doc)
-                                  setFixedDocSearch('')
-                                  setShowFixedDocDropdown(false)
-                                }}
-                                style={{
-                                  padding: '7px 10px', fontSize: 12, cursor: 'pointer',
-                                  display: 'flex', alignItems: 'center', gap: 6,
-                                  backgroundColor: i === Math.min(fixedDocHighlight, fixedDocResults.length - 1) ? '#f3f4f6' : '#fff',
-                                }}
-                              >
-                                <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {doc.title}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Drag & drop zone + upload button */}
-                      <div
-                        onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOver(true) }}
-                        onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
-                        onDrop={async e => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          setDragOver(false)
-                          const files = Array.from(e.dataTransfer.files)
-                          for (const file of files) {
-                            await handleFileUpload(file)
-                          }
-                        }}
-                        style={{
-                          border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
-                          borderRadius: 8, padding: '14px 12px', textAlign: 'center',
-                          backgroundColor: dragOver ? '#fefce8' : '#fafafa',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {uploading ? (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
-                            <span style={{ fontSize: 12, color: '#6b7280' }}>Uploading...</span>
-                          </div>
-                        ) : (
-                          <>
-                            <Upload style={{ width: 18, height: 18, color: '#6b7280', margin: '0 auto 4px' }} />
-                            <div style={{ fontSize: 12, color: '#6b7280' }}>
-                              Drag & drop files here
-                            </div>
-                            <button
-                              onClick={() => fileInputRef.current?.click()}
-                              style={{
-                                marginTop: 6, padding: '4px 12px', fontSize: 12, fontWeight: 500,
-                                fontFamily: 'inherit', borderRadius: 5, border: '1px solid #d1d5db',
-                                backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
-                              }}
-                            >
-                              Browse Files
-                            </button>
-                            <input
-                              aria-label="Upload files"
-                              ref={fileInputRef}
-                              type="file"
-                              multiple
-                              style={{ display: 'none' }}
-                              onChange={async e => {
-                                const files = Array.from(e.target.files || [])
-                                for (const file of files) {
-                                  await handleFileUpload(file)
-                                }
-                                e.target.value = ''
-                              }}
-                            />
-                          </>
-                        )}
-                      </div>
-
-                      {/* Quick add selected docs from file browser */}
-                      {(() => {
-                        const existing = new Set(fixedDocs.map(d => d.uuid))
-                        const addable = selectedDocUuids.filter(uuid => !existing.has(uuid))
-                        if (addable.length === 0) return null
-                        return (
-                          <button
-                            onClick={() => {
-                              for (const uuid of addable) {
-                                addFixedDoc({
-                                  uuid,
-                                  title: selectedDocNames[uuid] || `Document ${uuid.slice(0, 8)}`,
-                                })
-                              }
-                            }}
-                            style={{
-                              marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-                              padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-                              borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
-                              color: '#1d4ed8', cursor: 'pointer',
-                            }}
-                          >
-                            <Plus style={{ width: 12, height: 12 }} />
-                            Add {addable.length} selected document{addable.length !== 1 ? 's' : ''}
-                          </button>
-                        )
-                      })()}
-                    </div>
-                  )}
-                </div>
-              </label>
+              )}
             </div>
-          </div>
-        )}
-
-        {/* ===== OUTPUT SUB-TAB ===== */}
-        {subTab === 'output' && (
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
-              Post-Processing
-            </div>
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 12,
-            }}>
-              <input
-                type="checkbox"
-                checked={postProcessEnabled}
-                onChange={e => setPostProcessEnabled(e.target.checked)}
-              />
-              <span style={{ fontSize: 13, color: '#374151' }}>Post-process output with a prompt</span>
-            </label>
-
-            {postProcessEnabled && (
-              <div>
-                <div style={{
-                  padding: '8px 12px', backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
-                  borderRadius: 6, fontSize: 12, color: '#0369a1', marginBottom: 12, lineHeight: 1.5,
-                }}>
-                  This prompt will be applied to the task's output before it passes to the next step.
-                </div>
-                <textarea
-                  aria-label="Post-processing prompt"
-                  value={postProcessPrompt}
-                  onChange={e => setPostProcessPrompt(e.target.value)}
-                  placeholder="e.g., Summarize the extracted data into bullet points"
-                  rows={6}
-                  style={{
-                    width: '100%', padding: '10px 12px', fontSize: 13,
-                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                    outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                    lineHeight: 1.5,
-                  }}
-                />
-              </div>
-            )}
-
-            {!postProcessEnabled && (
-              <div style={{
-                padding: 16, backgroundColor: '#fafafa', border: '1px solid #e5e7eb',
-                borderRadius: 8, fontSize: 13, color: '#6b7280', textAlign: 'center',
-              }}>
-                Output will pass directly to the next step without modification.
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Test progress bar */}
