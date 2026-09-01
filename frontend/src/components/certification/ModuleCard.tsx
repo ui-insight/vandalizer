@@ -82,8 +82,8 @@ export function ModuleCard({ module, completed, stars, locked, active, onClick, 
       </p>
 
       {/* Bottom row: stars + XP + time */}
-      <div className={cn('flex items-center justify-between w-full mt-auto', locked && 'invisible')}>
-        <Stars count={stars} size={14} />
+      <div className="flex items-center justify-between w-full mt-auto">
+        <span className={cn(locked && 'invisible')}><Stars count={stars} size={14} /></span>
         <div className="flex items-center gap-2">
           {module.estimatedMinutes && (
             <span className="flex items-center gap-0.5 text-[10px] text-gray-500">

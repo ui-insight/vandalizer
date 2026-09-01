@@ -1,4 +1,4 @@
-import { CheckCircle2, Sparkles } from 'lucide-react'
+import { CheckCircle2, Clock, Sparkles } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { ModuleDefinition, CertificationProgress } from '../../types/certification'
 import { TIERS } from './constants'
@@ -17,8 +17,16 @@ export function JourneyMap({
   isModuleLocked: (moduleId: string) => boolean
   onModuleClick: (moduleId: string) => void
 }) {
+  const totalMinutes = modules.reduce((sum, m) => sum + (m.estimatedMinutes || 0), 0)
+
   return (
     <div className="space-y-8">
+      {/* Course-size line: time-strapped RAs decide whether to start here. */}
+      <p className="text-xs text-gray-500 flex items-center gap-1.5 -mb-4">
+        <Clock size={12} aria-hidden="true" />
+        {modules.length} bite-sized modules, 10\u201325 minutes each \u2014 about {Math.round(totalMinutes / 60 * 2) / 2} hours in total.
+        Do one whenever you have a gap; your place is always saved.
+      </p>
       {TIERS.map((tier, tierIdx) => {
         const tierModules = tier.moduleIds
           .map(id => modules.find(m => m.id === id)!)

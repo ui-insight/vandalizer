@@ -116,7 +116,12 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               <h3 className="text-lg font-bold text-gray-900">
                 Module {module.number}: {module.title}
               </h3>
-              <p className="text-sm text-gray-500">{module.subtitle}</p>
+              <p className="text-sm text-gray-500">
+                {module.subtitle}
+                {module.estimatedMinutes && (
+                  <span className="text-gray-500"> \u00b7 ~{module.estimatedMinutes} min \u2014 your place is saved if you leave</span>
+                )}
+              </p>
             </div>
           </div>
           {completed && <Stars count={moduleProgress?.stars || 0} size={20} />}
