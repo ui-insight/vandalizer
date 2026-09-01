@@ -6,9 +6,10 @@ export const MODULES: ModuleDefinition[] = [
     number: 0,
     title: 'AI Literacy',
     subtitle: 'Understanding AI for Research Administration',
-    description: 'Welcome to the Vandal Workflow Architect certification. By the end of this program, you\'ll earn an official VWA credential recognizing your ability to design and deploy AI-powered workflows for research administration. This first module builds your foundation: what AI actually is, what it\'s good and bad at, and how it applies to your work. No technical skills required yet.',
+    description: 'Welcome to the Vandal Workflow Architect certification. By the end of this program, you\'ll earn an official VWA credential recognizing your ability to design and deploy AI-powered workflows for research administration. This first module starts with the big picture \u2014 what AI is, why it has landed in research administration, and how this course helps you \u2014 before touching any tool. No technical skills required, ever: every module is bite-sized (10\u201325 minutes), and you can leave and pick up exactly where you stopped.',
     objectives: [
-      'Understand what an LLM is and how it generates text',
+      'See the big picture: what AI is, why it matters for research administration, and how this course helps',
+      'Tell structured from unstructured data \u2014 the one distinction this whole course is built on',
       'Learn the key terms you\'ll encounter throughout this certification',
       'Reflect on your own experience and comfort level with AI tools',
     ],
@@ -18,6 +19,18 @@ export const MODULES: ModuleDefinition[] = [
       'If you\'re skeptical about AI, that\'s healthy. This module is designed to give you an honest picture',
     ],
     lessons: [
+      {
+        title: 'What is AI, and why is it in your office?',
+        objective: 'After this lesson, you\u2019ll be able to say in plain language what AI is, why it applies to research administration, and what this course will do for you.',
+        content: 'Before any tools or terminology, the big picture.\n\n**What AI is** \u2014 software that has learned patterns from enormous amounts of example text, well enough to do useful reading and writing tasks on new material. That\u2019s it. Not a mind, not magic \u2014 a very capable pattern machine.\n\n**Why it\u2019s suddenly everywhere** \u2014 in the last few years these systems got good enough at ordinary language that they can do real office work: read a 50-page proposal and pull out the PI, the budget, the dates; summarize a progress report; draft a routine email.\n\n**Why it matters for research administration** \u2014 your job is unusually document-heavy. Proposals, award notices, subawards, progress reports \u2014 most of the work is reading documents and moving what they say into spreadsheets, systems, and summaries. That\u2019s exactly the work this technology is best at drafting for you. It will not make judgment calls, know your institution\u2019s policies, or take responsibility \u2014 that stays yours.\n\n**How this course helps** \u2014 module by module, you\u2019ll turn one real process at a time into an AI-assisted pipeline you control and verify. Each module is bite-sized \u2014 10\u201325 minutes \u2014 and saves your place, so it fits between meetings. No coding, no technical background needed.',
+        variant: 'concept',
+      },
+      {
+        title: 'Structured vs. unstructured data',
+        objective: 'After this lesson, you\u2019ll be able to tell structured from unstructured data and explain why converting one to the other is the heart of this course.',
+        content: 'One distinction carries this whole course \u2014 and it has nothing to do with how AI works under the hood.\n\n**Unstructured data** is prose meant for people: a proposal PDF, an award letter, a progress report. The information is in there, but every document says it differently and puts it somewhere different.\n\n**Structured data** is information in labeled slots: your award-tracking spreadsheet, a sponsor form, a database record. Every row has the same columns \u2014 PI, sponsor, amount, dates \u2014 so you can sort it, total it, compare it, report on it.\n\nNow name a large part of research administration work: reading unstructured documents and re-typing what they say into structured form. Proposal arrives \u2192 fields go into the tracking sheet. Award letter arrives \u2192 terms go into the system.\n\nThat conversion \u2014 unstructured in, structured out \u2014 is precisely what Vandalizer automates. You define the columns once; it drafts the row for every document. You review instead of re-type. When later modules say \u201cextraction,\u201d this is all they mean.',
+        variant: 'concept',
+      },
       {
         title: 'What is an LLM, really?',
         objective: 'After this lesson, you\'ll be able to explain why LLMs make mistakes and why they\'re still useful.',
@@ -70,8 +83,13 @@ export const MODULES: ModuleDefinition[] = [
         variant: 'insight',
       },
       {
+        title: 'Worked example: Monday morning, 12 proposals',
+        content: 'The same task, twice.\n\n**Without AI** \u2014 Twelve new proposals in the inbox. For each one: open the PDF, scroll for the cover page, copy the PI name into the tracking sheet, find the total budget (page 2? page 14?), copy it, find the project period, the agency, the deadline\u2026 about 15 careful minutes each. Three hours of re-typing, and by proposal nine, attention is fading \u2014 which is when a $485,000 becomes a $48,500.\n\n**With a workflow** \u2014 The twelve PDFs are uploaded and a saved workflow runs. It reads each proposal and returns the same labeled fields for every one: PI Name, Institution, Total Budget, Project Period, Sponsoring Agency. In a few minutes there\u2019s a table \u2014 one row per proposal, ready to check and export.\n\n**What you do instead** \u2014 the 30-minute version of the job that\u2019s actually yours: scan the table against the source documents, catch the one proposal whose budget page was a scanned image and extracted oddly, and make the judgment calls \u2014 which proposals need a compliance look, which PI needs a call.\n\nBy Module 9 you will have built exactly this.',
+        variant: 'walkthrough',
+      },
+      {
         title: 'Glossary & Review',
-        content: 'LLM (Large Language Model) \u2014 You\'ve now seen how LLMs are used to extract structured fields from grant proposals and summarize documents. The key: an LLM is a pattern-completion engine, not a thinking machine. It predicts likely text based on training patterns. When you build a workflow step, you\'re giving it patterns to match \u2014 the clearer your field names and prompts, the better the results.\n\nPrompt \u2014 The instructions you give an LLM. You\'ll write many of these as you build workflows. Quality matters: "Extract the PI name from the proposal cover page" outperforms "find the PI."\n\nHallucination \u2014 When an LLM generates a plausible-sounding value that isn\'t actually in the document. The #1 risk in research administration AI use. It\'s why you\'ll learn to build validation plans in Module 8.\n\nStructured Output \u2014 The mechanism that makes batch processing possible. Instead of free-form text, the LLM is constrained to return JSON matching your field definitions \u2014 same fields, same format, every document, every time.\n\nToken \u2014 The unit LLMs work in. Roughly \u00be of a word. Relevant when documents are very long \u2014 models have context limits that affect how much text they can process at once.\n\nRAG (Retrieval-Augmented Generation) \u2014 How the chat feature works. Relevant document excerpts are retrieved and provided to the LLM before it answers. This grounds responses in your actual documents rather than the LLM\'s training data.',
+        content: 'LLM (Large Language Model) \u2014 You\'ve now seen how LLMs are used to extract structured fields from grant proposals and summarize documents. The key: an LLM is a pattern-completion engine, not a thinking machine. It predicts likely text based on training patterns. When you build a workflow step, you\'re giving it patterns to match \u2014 the clearer your field names and prompts, the better the results.\n\nPrompt \u2014 The instructions you give an LLM. You\'ll write many of these as you build workflows. Quality matters: "Extract the PI name from the proposal cover page" outperforms "find the PI."\n\nHallucination \u2014 When an LLM generates a plausible-sounding value that isn\'t actually in the document. The #1 risk in research administration AI use. It\'s why you\'ll learn to build validation plans in Module 8.\n\nStructured Output \u2014 The mechanism that makes batch processing possible. Instead of free-form text, the LLM is constrained to return JSON matching your field definitions \u2014 same fields, same format, every document, every time.\n\nJSON \u2014 The fill-in-the-form format structured output arrives in: each of your field names paired with the value found for it, like a completed intake form. You will see JSON in results; you never have to write it.\n\nToken \u2014 The unit AI models use to measure text \u2014 roughly \u00be of a word. The only time it matters to you: very long documents can exceed what a model reads at once, the way an email attachment can exceed a size limit.\n\nRAG (Retrieval-Augmented Generation) \u2014 How the chat feature works. Relevant document excerpts are retrieved and provided to the LLM before it answers. This grounds responses in your actual documents rather than the LLM\'s training data.',
         variant: 'key-terms',
       },
     ],
@@ -110,13 +128,13 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'The document pipeline',
         objective: 'After this lesson, you\'ll understand what happens to a document between upload and extraction.',
-        content: 'When you upload a document, Vandalizer processes it through several stages:\n\n1. **Text extraction** \u2014 The raw text is pulled from PDFs, DOCX, XLSX, and HTML files using specialized readers.\n2. **Chunking** \u2014 The text is split into overlapping segments for semantic search.\n3. **Embedding** \u2014 Each chunk is embedded into ChromaDB, a vector database, so it can be searched semantically.\n\nWhen a workflow runs an Extraction step, the LLM receives the full document text and your Extraction fields, and returns structured JSON with the extracted values.',
+        content: 'When you upload a document, Vandalizer prepares it for you automatically \u2014 you never manage any of this:\n\n1. **It reads the text out of the file** \u2014 PDFs, Word documents, spreadsheets, web pages.\n2. **It builds an index of the content** \u2014 like the index at the back of a book, so questions and searches can jump straight to the right passage.\n\nThat\u2019s all you need to know to use it. When a workflow runs an Extraction step, the AI reads the document text alongside your field list and hands back one filled-in record \u2014 every field name paired with the value it found.\n\n*For the curious (safe to skip):* the index is built by splitting the text into overlapping passages and storing them in a search database \u2014 the technique behind the chat feature\u2019s ability to quote your documents.',
         variant: 'concept',
       },
       {
         title: 'Build your first workflow',
         objective: 'After this lesson, you\'ll be ready to run your first extraction workflow on a real document.',
-        content: 'When you start the lab exercise, here\'s what you\'ll do:\n\n1. Click **Set Up Lab** (the button at the top of this module) to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n4. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n7. Select the sample NSF proposal, then click Run to execute the workflow.\n8. Review the extracted results in the output panel.',
+        content: 'When you start the lab exercise, here\'s what you\'ll do:\n\n1. Click **Set Up Lab** (the button at the top of this module) to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n4. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n7. Select the sample NSF proposal in the file browser \u2014 tick the checkbox next to its name (opening the file in the viewer also selects it). **The Run button stays greyed out until a document is selected**; its tooltip says what\u2019s missing.\n8. Click **Run** and review the extracted results in the output panel.',
         variant: 'walkthrough',
       },
       {
@@ -126,7 +144,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Glossary & Review',
-        content: 'Workflow \u2014 You just built one. A saved pipeline that processes documents through a series of steps. The recipe analogy holds: define it once, run it against any document. The extraction workflow from this module is the foundation for everything that follows.\n\nStep \u2014 One stage in your pipeline. Your first workflow had one step (extraction). Later modules add reasoning and delivery steps to create more powerful pipelines.\n\nTask \u2014 The specific operation inside a step. The Extraction task you configured defined which fields the LLM should find and return as structured JSON.\n\nExtraction \u2014 The collection of fields you defined. Think of it as your data dictionary \u2014 it tells the LLM exactly what to look for and what format to return it in.\n\nExtract Key \u2014 Each individual field in your Extraction: "PI Name", "Total Budget", "Sponsoring Agency". Well-named extract keys get better results because the LLM uses the name as a clue about what to find.',
+        content: 'Workflow \u2014 You just built one. A saved pipeline that processes documents through a series of steps. The recipe analogy holds: define it once, run it against any document. The extraction workflow from this module is the foundation for everything that follows.\n\nStep \u2014 One stage in your pipeline. Your first workflow had one step (extraction). Later modules add reasoning and delivery steps to create more powerful pipelines.\n\nTask \u2014 The specific operation inside a step. The Extraction task you configured defined which fields the AI should find and return as one filled-in record (JSON \u2014 the form-like format from Module 0; you read it, never write it).\n\nExtraction \u2014 The collection of fields you defined. Think of it as your data dictionary \u2014 it tells the LLM exactly what to look for and what format to return it in.\n\nExtract Key \u2014 Each individual field in your Extraction: "PI Name", "Total Budget", "Sponsoring Agency". Well-named extract keys get better results because the LLM uses the name as a clue about what to find.',
         variant: 'key-terms',
       },
     ],
@@ -188,6 +206,11 @@ export const MODULES: ModuleDefinition[] = [
         title: 'Common processes that become workflows',
         content: 'Here are the most common research administration processes and how they map to workflows:\n\n\u2022 **Proposal intake** \u2014 Extract key fields, check completeness, flag gaps. 3-4 steps.\n\u2022 **Progress report review** \u2014 Extract accomplishments, publications, expenditures. Summarize and compare to milestones. 3 steps.\n\u2022 **Compliance pre-screening** \u2014 Extract required elements, check against a compliance checklist, produce a gap report. 3-4 steps.\n\u2022 **Budget review** \u2014 Extract line items, compute totals, compare to limits, produce a summary. 4 steps.\n\u2022 **Subaward processing** \u2014 Extract parties, amounts, terms, deliverables. Flag deviations from templates. 3 steps.\n\u2022 **Award closeout** \u2014 Gather final expenditures, publications, and deliverables from multiple documents. 4-5 steps.\n\nNotice the pattern: every workflow starts with extraction (getting data out of documents) and ends with either a human review point or a produced deliverable. The middle steps are where analysis, comparison, and computation happen.',
         variant: 'concept',
+      },
+      {
+        title: 'Worked example: mapping progress-report review',
+        content: 'Apply the five elements to a second real process, end to end.\n\n**Input** \u2014 A PI\u2019s annual progress report (PDF) lands two weeks before the sponsor deadline.\n\n**Steps** \u2014 (1) Read it and pull out accomplishments, publications, students supported, and expenditures to date. (2) Check that every section the sponsor requires is present. (3) Compare reported spending against the award budget. (4) Draft the cover summary for the sponsor portal.\n\n**Decision points** \u2014 Is the spending variance large enough to question? Is a thin \u201cResults\u201d section acceptable this year? These stay human.\n\n**Handoffs** \u2014 Missing sections go back to the PI; a large variance goes to the fiscal officer.\n\n**Output** \u2014 A completed portal entry and a filed summary.\n\nNow the sort: steps 1 and 2 are reading \u2192 AI-suitable (Extraction, Prompt). Step 3 is arithmetic \u2192 code, never an LLM. Step 4 is drafting from extracted data \u2192 AI-suitable, human-reviewed. The decision points and handoffs stay exactly where they are \u2014 with you.',
+        variant: 'walkthrough',
       },
       {
         title: 'Glossary & Review',
@@ -254,6 +277,11 @@ export const MODULES: ModuleDefinition[] = [
         content: 'A common question: should this be one step or two?\n\n**Split into separate steps when:**\n\u2022 You\'d want to check the intermediate output\n\u2022 The operations are different types \u2014 extraction and analysis are different skills\n\u2022 You might reuse one part\n\u2022 Debugging would be easier\n\n**Combine into one step when:**\n\u2022 The operations are tightly coupled\n\u2022 The intermediate output isn\'t useful on its own\n\u2022 The combined prompt is simple and focused\n\nRule of thumb: start with more steps. You can always combine later once you know the workflow works. But splitting a monolithic step that\'s producing bad output is much harder than combining two steps that work well individually.',
         variant: 'insight',
         diagram: 'step-granularity',
+      },
+      {
+        title: 'Worked example: designing subaward intake',
+        content: 'Process: \u201cA signed subaward agreement arrives; get its terms into our tracking system and flag anything unusual.\u201d\n\n**Decompose** \u2014 (1) Pull the parties, amounts, period, deliverables, and reporting requirements out of the agreement. (2) Compare those terms against our standard template. (3) Write up deviations for the subaward officer. (4) Enter the data.\n\n**Map to task types** \u2014 (1) Extraction task \u2014 structured fields. (2) Prompt task \u2014 \u201ccompare these extracted terms to the standard terms below; list deviations.\u201d (3) Document Renderer \u2014 a one-page deviation memo. (4) The workflow\u2019s structured output makes entry copy-paste.\n\n**Design the data flow** \u2014 Step 1 outputs labeled fields; step 2 receives them (not the whole 40-page agreement \u2014 cleaner input, better analysis); step 3 formats step 2\u2019s findings.\n\n**Reviewer check** \u2014 the memo leads with the extracted terms table, then the flagged deviations, so the officer verifies in one glance. Three steps, one human checkpoint at the end \u2014 built in Module 5.',
+        variant: 'walkthrough',
       },
       {
         title: 'Glossary & Review',
@@ -324,6 +352,11 @@ export const MODULES: ModuleDefinition[] = [
         variant: 'insight',
       },
       {
+        title: 'Worked example: fixing a weak field list',
+        content: 'A first draft of an NIH R01 extraction, and the repair.\n\n**Draft fields** \u2014 \u201cName\u201d, \u201cBudget\u201d, \u201cPeople\u201d, \u201cAnimals\u201d. The run comes back muddled: \u201cName\u201d returns the grants officer from the cover letter, \u201cBudget\u201d returns Year 1 direct costs instead of the total, \u201cPeople\u201d returns a paragraph, and \u201cAnimals\u201d hallucinates \u201cN/A\u201d wording not in the document.\n\n**The repairs, one principle each:**\n\u2022 \u201cName\u201d \u2192 \u201cPI Name\u201d \u2014 the field name is the LLM\u2019s biggest clue; make it point at exactly one thing.\n\u2022 \u201cBudget\u201d \u2192 \u201cTotal Budget (all years, direct + indirect)\u201d \u2014 when a document holds five budget numbers, the name must say which one.\n\u2022 \u201cPeople\u201d \u2192 \u201cKey Personnel\u201d plus a separate \u201cCo-Investigator\u201d marked **optional** \u2014 one field, one value; optional stops made-up answers when no Co-I exists.\n\u2022 \u201cAnimals\u201d \u2192 \u201cVertebrate Animals\u201d with **Allowed values** \u201cYes, No\u201d \u2014 constrained fields can\u2019t invent prose.\n\nRe-run: James Park, $1,250,000, a clean personnel list, \u201cYes\u201d. Same document \u2014 the configuration was the difference.',
+        variant: 'walkthrough',
+      },
+      {
         title: 'Glossary & Review',
         content: 'Structured Output \u2014 You\'ve now seen this in action: the LLM is constrained to return data matching a schema built from your Extraction fields. This is what prevents formatting errors and ensures you get the same JSON structure every time, regardless of how different the source documents look.\n\nThinking Mode \u2014 When enabled, the LLM reasons step-by-step before answering. Two-pass extraction uses Thinking Mode in Pass 1 for accuracy and disables it in Pass 2 for speed \u2014 you get both benefits.\n\nConsensus Repetition \u2014 Runs the same extraction 3 times and takes the majority answer for each field. The right choice when stakes are high: compliance data, financial figures, legal terms. 3x the cost, but highest accuracy.\n\nChunking \u2014 When you have many fields (20+), the extraction splits into smaller batches to stay within the LLM\'s context window. Vandalizer handles this automatically when you exceed the threshold.',
         variant: 'key-terms',
@@ -392,6 +425,11 @@ export const MODULES: ModuleDefinition[] = [
         variant: 'insight',
       },
       {
+        title: 'Worked example: watching data flow through three steps',
+        content: 'The subaward pipeline from this module\u2019s lab, with the actual baton-passes visible.\n\n**Step 1 \u2014 Extraction** reads the agreement and outputs labeled fields:\nParties = University of Idaho; Boise State University \u00b7 Total = $148,500 \u00b7 Period = 09/01/2025\u201308/31/2027 \u00b7 Reports due = quarterly \u00b7 Deliverables = sensor data + annual analysis.\n\n**Step 2 \u2014 Prompt** receives those fields (not the 40-page PDF) with the instruction \u201cAnalyze these subaward terms; flag obligations and deadlines.\u201d It outputs a short analysis: quarterly reporting is tighter than our standard semi-annual; first report due 12/31/2025; deliverables assign data ownership ambiguously.\n\n**Step 3 \u2014 Formatter** turns that analysis into the compliance summary\u2019s house format: a header, a terms table, a numbered obligations list.\n\nTwo things to notice: each step\u2019s output is exactly the next step\u2019s input \u2014 and each step got a *simpler, cleaner* job than \u201cread this agreement and write a summary\u201d in one leap. That\u2019s why chained steps beat one giant prompt.',
+        variant: 'walkthrough',
+      },
+      {
         title: 'Glossary & Review',
         content: 'Input Source \u2014 Controls what data a step receives. You\'ve now seen "step_input" in action \u2014 the default that passes each step\'s output to the next. Other options let you inject a specific document or all workflow documents at any point in the chain.\n\nPrompt Node \u2014 The reasoning engine in your pipeline. It takes the previous step\'s output and your custom instruction, and returns the LLM\'s analysis. You used it to transform extracted JSON into a compliance summary.\n\nFormat Node \u2014 Transforms structured data into formatted text (markdown, plain text). Use it when you want a human-readable report from raw extracted data without writing a custom prompt.\n\nPost-process Prompt \u2014 An optional final LLM call on any node\'s output. Use it to clean up or lightly reformat results without adding a full extra step to your pipeline.',
         variant: 'key-terms',
@@ -458,6 +496,11 @@ export const MODULES: ModuleDefinition[] = [
         variant: 'walkthrough',
       },
       {
+        title: 'Worked example: a budget check with parallel tasks',
+        content: 'The budget justification from this module\u2019s lab claims a $542,800 total. Two tasks in one step, running at the same time on the same document:\n\n**Task A \u2014 Deep Analysis** gets the question \u201cDo the line items sum to the stated total?\u201d It works through the figures: personnel $312,400 + supplies $48,900 + travel $22,500 + subaward $159,000 = $542,800 \u2014 and reports that the arithmetic checks out, noting Year 2 travel relies on conference estimates.\n\n**Task B \u2014 Prompt** drafts the budget narrative paragraph for the proposal file from the same document.\n\nBoth finish, and the step hands their combined output \u2014 verification first, narrative second \u2014 to the next step, which formats a review memo.\n\nWhy parallel? The two tasks are independent \u2014 neither needs the other\u2019s answer \u2014 so running them side by side halves the wait. And why Deep Analysis rather than trusting a plain prompt with the math? Checking arithmetic is exactly where ordinary LLM answers are least reliable; the analysis node is built to work the numbers rather than guess at them.',
+        variant: 'walkthrough',
+      },
+      {
         title: 'Glossary & Review',
         content: 'Parallel Tasks \u2014 You\'ve now run multiple tasks within a single step concurrently. Their results are collected and passed to the next step together. The benefit: independent operations (two extractions, or an extraction + API call) happen simultaneously instead of sequentially.\n\nCode Execution \u2014 Python in a restricted sandbox with a 10-second timeout. The previous step\'s output is available as `input_data`. Assign your result to `output`. Use for any math, date calculations, or deterministic logic \u2014 never for work that needs language understanding.\n\nAPI Call \u2014 Connects your workflow to external services. Supports GET, POST, PUT, and PATCH. You can pass authentication headers and use the previous step\'s output in the request body \u2014 enabling real-time lookups and integrations.\n\nDeep Analysis Node \u2014 Two-stage analysis: first passes through the data to identify patterns, then synthesizes findings into a coherent report. Use when you need more depth than a single Prompt call provides.',
         variant: 'key-terms',
@@ -516,6 +559,11 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Build a deliverable workflow',
         content: '1. Start with a workflow that extracts and analyzes data (from Module 3).\n2. Add a new step at the end of your workflow.\n3. Add a Document Renderer or Data Export task to that step.\n4. For Document Renderer: the previous step\'s output will be rendered as a downloadable file.\n5. For Data Export: choose JSON or CSV format.\n6. Run the workflow on a document.\n7. In the results panel, you\'ll see a download link for the generated file.',
+        variant: 'walkthrough',
+      },
+      {
+        title: 'Worked example: one report in, two deliverables out',
+        content: 'The Year-2 progress report from this module\u2019s lab, taken all the way to files you could attach to an email.\n\n**Step 1 \u2014 Extraction**: accomplishments, publications (4), students trained (3), expenditures by category.\n\n**Step 2 \u2014 Prompt**: \u201cSummarize progress against the original aims; note anything under-spent or behind schedule.\u201d Output: a tight summary noting Aim 2 is a semester behind and equipment is 40% under-spent.\n\n**Step 3 \u2014 two tasks, side by side:**\n\u2022 **Document Renderer** \u2192 \u201cYear-2-Progress-Summary.pdf\u201d \u2014 the summary formatted with a title, for the award file and the PI.\n\u2022 **Data Export** \u2192 \u201cexpenditures.csv\u201d \u2014 the expenditure fields as a spreadsheet, ready to reconcile against the ledger.\n\nOne run, one download, both deliverables. The pattern to notice: the *same* extracted data fanned out into a document for people and a dataset for systems \u2014 which audience each output serves decided its format, not habit.',
         variant: 'walkthrough',
       },
       {
@@ -588,6 +636,11 @@ export const MODULES: ModuleDefinition[] = [
         variant: 'insight',
       },
       {
+        title: 'Worked example: five checks and a failing run',
+        content: 'A validation plan for the Module 1 NSF extractor, and what it caught.\n\n**The checks:**\n1. PI Name equals \u201cSarah Chen\u201d (exact expected value \u2014 we know this document).\n2. Total Budget equals $485,000.\n3. Project Period contains two dates.\n4. Sponsoring Agency is one of: NSF, NIH, DOE, USDA.\n5. No required field is empty.\n\n**Run 1** \u2014 5/5 pass. The score is recorded in quality history.\n\n**Two weeks later** someone \u201ctidies\u201d the field name \u201cTotal Budget\u201d to just \u201cBudget\u201d. **Run 2** \u2014 check 2 fails: the extraction returned $178,000, the Year 1 amount. Without validation this silently ships to the tracking sheet; with it, the run is flagged the same day, quality history shows exactly when the score dropped, and the fix is a rename.\n\nThe habit to copy: checks 1\u20132 pin known documents to known answers, 3\u20134 verify *shape* on any document, 5 catches silent blanks. Five checks, written once \u2014 they guard every future run.',
+        variant: 'walkthrough',
+      },
+      {
         title: 'Glossary & Review',
         content: 'Validation Plan \u2014 The definition of "correct" for your workflow. You\'ve now built one: a list of checks that specify what good output looks like. This is what separates a workflow you trust from one you hope works.\n\nValidation Input \u2014 The sample documents or text you test your workflow against. Good validation inputs are representative \u2014 they should reflect the range of documents the workflow will encounter in production.\n\nValidation Run \u2014 An execution of your workflow against validation inputs, automatically graded against your plan. Each run adds a data point to your quality history.\n\nQuality History \u2014 A log of validation run scores over time. This is how you detect regressions: if a score drops after you change a field name or update a model, quality history shows you exactly when.\n\nImprovement Suggestions \u2014 LLM-generated recommendations for improving extraction accuracy based on which checks failed and why. A starting point for iteration, not a final answer.',
         variant: 'key-terms',
@@ -651,6 +704,11 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Run your first batch',
         content: '1. Ensure you have a workflow that works reliably on a single document.\n2. Upload at least 3 documents of the same type to your workspace.\n3. Select all 3 documents, then open your workflow.\n4. Choose "Batch" mode.\n5. Start the batch. Watch the real-time progress.\n6. When complete, review the results for each document.\n7. If any failed, inspect the error, fix the issue, and re-run just the failed documents.',
+        variant: 'walkthrough',
+      },
+      {
+        title: 'Worked example: thirty proposals, one bad scan',
+        content: 'Proposal deadline week: 30 PDFs to triage into the tracking sheet.\n\n**Setup** \u2014 Select all 30 documents, pick the proposal extractor, run as a batch. Each document gets its own independent run \u2014 same workflow, 30 separate results.\n\n**Monitoring** \u2014 The batch view fills in: 28 complete, then 29\u2026 and one sits at *error*. Proposal #17 is a scanned image with garbled text \u2014 the extraction returned mostly empty fields.\n\n**The part worth copying** \u2014 nothing about the other 29 is blocked or redone. Their results export to CSV now. #17 gets handled alone: re-uploaded so the text can be read properly, then re-run \u2014 one document, not thirty-one.\n\n**Spot-check before you trust** \u2014 open three results at random against their PDFs. Budgets match, one \u201cProject Period\u201d picked up the submission date instead \u2014 noted, corrected, and a candidate for a validation check so it\u2019s caught automatically next deadline.\n\nTotal desk time: about 25 minutes for what was previously a day and a half of re-typing.',
         variant: 'walkthrough',
       },
       {
@@ -724,6 +782,11 @@ export const MODULES: ModuleDefinition[] = [
             { text: 'Extract the numbers and manually verify them after the workflow runs', correct: false, explanation: 'Manual verification defeats the purpose of a workflow. Building the check into the pipeline is the right architectural move.' },
           ],
         },
+      },
+      {
+        title: 'Worked example: one workflow, two offices',
+        content: 'The pre-award office builds \u201cSubaward Intake\u201d and it works well. The post-award office hears about it. What happens next decides whether this becomes shared infrastructure or a rumor.\n\n**Without governance** \u2014 someone emails a description, post-award rebuilds it from memory as \u201csubaward_test_v2_FINAL\u201d, the two copies drift, and six months later nobody knows which extracts the right indirect-cost field.\n\n**With the practices from this module** \u2014\n1. The workflow is named to say what it does: \u201cSubaward Intake \u2014 Terms & Deviations\u201d, with a description naming its expected input.\n2. It\u2019s shared to the team library \u2014 one copy, visible to both offices.\n3. An administrator reviews it against a real agreement and marks it **verified** \u2014 the badge that says \u201ctested, trusted, use this one.\u201d\n4. Post-award improves the deviation prompt \u2014 in the shared copy, so pre-award benefits the same day.\n\nThe rule of thumb it illustrates: share the workflow, not a description of it \u2014 and let verification, not word of mouth, mark which copy is the standard.',
+        variant: 'walkthrough',
       },
       {
         title: 'Glossary & Review',

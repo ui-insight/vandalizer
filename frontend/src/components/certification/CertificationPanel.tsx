@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { Fragment, useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -15,6 +15,7 @@ import {
   Star,
   Target,
   X,
+  ExternalLink,
 } from 'lucide-react'
 import { useCertificationPanel, type PanelMode } from '../../contexts/CertificationPanelContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -128,11 +129,11 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 // ---------------------------------------------------------------------------
 
 const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] = [
-  { mode: 'floating', icon: AppWindow, label: 'Float' },
-  { mode: 'fullscreen', icon: Maximize2, label: 'Full screen' },
-  { mode: 'docked-left', icon: PanelLeft, label: 'Dock left' },
-  { mode: 'docked-right', icon: PanelRight, label: 'Dock right' },
-  { mode: 'docked-bottom', icon: PanelBottom, label: 'Dock bottom' },
+  { mode: 'floating', label: 'Float \u2014 a movable window you can drag anywhere', icon: AppWindow },
+  { mode: 'fullscreen', label: 'Full screen \u2014 fill this browser window', icon: Maximize2 },
+  { mode: 'docked-left', label: 'Pin to the left edge of the screen', icon: PanelLeft },
+  { mode: 'docked-right', label: 'Pin to the right edge of the screen', icon: PanelRight },
+  { mode: 'docked-bottom', label: 'Pin along the bottom of the screen', icon: PanelBottom },
 ]
 
 // ---------------------------------------------------------------------------
@@ -496,21 +497,40 @@ export function CertificationPanel() {
           {/* Mode toggles */}
           <div className="flex items-center gap-0.5" onPointerDown={e => e.stopPropagation()}>
             {MODE_ICONS.map(({ mode: m, icon: Icon, label }) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                title={label}
-                aria-label={label}
-                aria-pressed={mode === m}
-                className={cn(
-                  'p-1.5 rounded-md transition-colors',
-                  mode === m ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-50',
-                )}
-              >
-                <Icon size={14} aria-hidden="true" />
-              </button>
+              <Fragment key={m}>
+                {/* The three pin buttons are near-identical glyphs — a divider
+                    at least separates them from float/full-screen as a group. */}
+                {m === 'docked-left' && <div aria-hidden="true" className="w-px h-4 bg-gray-200 mx-0.5" />}
+                <button
+                  type="button"
+                  onClick={() => setMode(m)}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={mode === m}
+                  className={cn(
+                    'p-1.5 rounded-md transition-colors',
+                    mode === m ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-50',
+                  )}
+                >
+                  <Icon size={14} aria-hidden="true" />
+                </button>
+              </Fragment>
             ))}
+            <div aria-hidden="true" className="w-px h-4 bg-gray-200 mx-0.5" />
+            {/* The second-monitor ask: an explicit pop-out, not a mode the
+                user has to discover by opening another browser tab herself. */}
+            <button
+              type="button"
+              onClick={() => {
+                window.open('/certification', '_blank', 'noopener,width=1080,height=860')
+                closePanel()
+              }}
+              title={'Open in a new window \u2014 put the course on another monitor while you work here'}
+              aria-label="Open certification in a new window"
+              className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50"
+            >
+              <ExternalLink size={14} aria-hidden="true" />
+            </button>
           </div>
 
           <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" aria-label="Back to badge" className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50 ml-1">

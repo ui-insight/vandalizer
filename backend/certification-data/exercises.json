@@ -56,7 +56,7 @@
       "Create a workflow named **NSF Proposal Extractor**.",
       "Add a step with an **Extraction** task.",
       "Create a Extraction with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
-      "Run the workflow against **nsf-proposal-alpine-ecology.pdf**.",
+      "Select **nsf-proposal-alpine-ecology.pdf** in the file browser (tick the checkbox next to it \u2014 opening it in the viewer also works), then click **Run**. The Run button stays greyed out until a document is selected.",
       "Verify: PI Name = Sarah Chen, Total Budget = $485,000."
     ],
     "expected_fields": ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"],
