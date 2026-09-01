@@ -1331,9 +1331,11 @@ async def check_source_health(kb_uuid: str) -> dict:
     """Check health of all sources in a knowledge base.
 
     For URL sources: HTTP HEAD check.
-    For document sources: verify SmartDocument still has text.
+    For document sources: verify SmartDocument still has text, and that the
+    pipeline did not record the text as only part of the document.
     """
     from app.models.document import SmartDocument
+    from app.services import document_service
 
     sources = await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
@@ -1368,12 +1370,19 @@ async def check_source_health(kb_uuid: str) -> dict:
                 entry["error"] = str(e)[:200]
         elif source.source_type == "document" and source.document_uuid:
             doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
-            if doc and (doc.raw_text or "").strip():
-                entry["status"] = "healthy"
-                healthy += 1
-            else:
+            if not doc or not (doc.raw_text or "").strip():
                 entry["status"] = "unhealthy"
                 entry["error"] = "Document not found or has no text"
+            elif document_service.is_partially_ingested(doc):
+                # Text is there, but the pipeline recorded that it is not
+                # the whole document. Source health is a fifth of the KB's
+                # quality score; a source that answers about a fraction of
+                # its document must not count as healthy in it.
+                entry["status"] = "partial"
+                entry["error"] = document_service.ingestion_warning_text(doc)
+            else:
+                entry["status"] = "healthy"
+                healthy += 1
         else:
             entry["status"] = "unhealthy"
             entry["error"] = "Missing source reference"

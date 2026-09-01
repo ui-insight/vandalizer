@@ -1267,7 +1267,15 @@ export function KnowledgePanel() {
                   // for anything past the cut. Show an amber warning, not a
                   // clean green check.
                   const isTruncated = source.status === 'ready' && !!source.truncated
-                  const st = isTruncated
+                  // Same shape for a document source: the pipeline recorded
+                  // that the text it indexed is not the whole document.
+                  const isPartial = source.status === 'ready' && !!source.ingestion_warning_text
+                  const incompleteReason = isTruncated
+                    ? 'Page too long — text was cut off; later sections aren’t in this source.'
+                    : isPartial
+                      ? `Incomplete — ${source.ingestion_warning_text}; answers from this source cover only part of it.`
+                      : null
+                  const st = incompleteReason
                     ? { icon: AlertTriangle, color: '#d97706' }
                     : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
@@ -1395,6 +1403,11 @@ export function KnowledgePanel() {
                         {!isRenaming && source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
                         )}
+                        {!isRenaming && isPartial && (
+                          <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                            Only part of this document is indexed — {source.ingestion_warning_text}. Answers from it cover a fraction of the file.
+                          </div>
+                        )}
                         {!isRenaming && source.status === 'ready' && (() => {
                           // Currency beside the size: when the text was last
                           // actually obtained / indexed, whether the last
@@ -1476,13 +1489,13 @@ export function KnowledgePanel() {
                         <>
                           <StatusIcon
                             size={14}
-                            aria-label={isTruncated ? 'Source text was truncated' : undefined}
+                            aria-label={isTruncated ? 'Source text was truncated' : isPartial ? 'Source document was only partly converted' : undefined}
                             style={{
                               color: st.color, flexShrink: 0,
                               ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
                             }}
                           >
-                            {isTruncated && <title>Page too long — text was cut off; later sections aren’t in this source.</title>}
+                            {incompleteReason && <title>{incompleteReason}</title>}
                           </StatusIcon>
                           {canManageKB && (
                             <>

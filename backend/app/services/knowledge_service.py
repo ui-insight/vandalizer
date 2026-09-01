@@ -424,6 +424,42 @@ async def resolve_existing_documents(sources) -> set[str]:
     return {d.uuid for d in docs}
 
 
+async def resolve_document_ingestion_warnings(sources) -> dict[str, list[str]]:
+    """Per-source ingestion-warning codes, keyed by source uuid.
+
+    A document source indexes ``SmartDocument.raw_text`` as it stands, and
+    the document pipeline already records when that text is not the whole
+    document (``partial_ocr`` — the converter gave up partway; ``sparse_text``
+    — far too little text for the page count). Chat and the file list say so;
+    the KB did not, so a source built on such a document wore a green check
+    and answered questions about a fraction of it (support ticket: a PAPPG
+    whose text had the Introduction, Chapter II and Chapter XII and none of
+    I, III, IV or V). Read live from the document rather than copied onto the
+    source at ingest, so a re-extraction that succeeds clears it.
+
+    A lookup failure yields no warnings: unknown beats "partial".
+    """
+    from app.services import document_service
+
+    doc_sources = [
+        s for s in sources if s.source_type == "document" and s.document_uuid
+    ]
+    if not doc_sources:
+        return {}
+    try:
+        docs = await SmartDocument.find(
+            {"uuid": {"$in": [s.document_uuid for s in doc_sources]}},
+        ).to_list()
+    except Exception:
+        return {}
+    by_doc = {d.uuid: document_service.ingestion_warnings(d) for d in docs}
+    return {
+        s.uuid: by_doc[s.document_uuid]
+        for s in doc_sources
+        if by_doc.get(s.document_uuid)
+    }
+
+
 async def resolve_openable_documents(
     source_uuids: list[str], user_id: str | None = None
 ) -> dict[str, str]:
@@ -1453,6 +1489,8 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
     text) so the importer can reconstruct + re-embed without re-fetching. Does
     NOT include ChromaDB vectors — embeddings are regenerated on import.
     """
+    from app.services import document_service
+
     await require_kb_sources(kb, "exporting")
 
     sources = await get_kb_sources(kb.uuid)
@@ -1460,16 +1498,22 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
     for s in sources:
         content = s.content
         document_title: str | None = None
+        ingestion_warnings: list[str] = []
         if s.source_type == "document" and s.document_uuid:
             doc = await SmartDocument.find_one(SmartDocument.uuid == s.document_uuid)
             if doc:
                 document_title = doc.title
                 if not content:
                     content = doc.raw_text or None
+                ingestion_warnings = document_service.ingestion_warnings(doc)
         exported_sources.append({
             "source_type": s.source_type,
             "document_uuid": s.document_uuid,
             "document_title": document_title,
+            # Why the content below may not be the whole document — the
+            # pipeline's own codes (partial_ocr, sparse_text), empty when it
+            # recorded none. The importer ignores it.
+            "ingestion_warnings": ingestion_warnings,
             "url": s.url,
             "url_title": s.url_title,
             "custom_name": s.custom_name,

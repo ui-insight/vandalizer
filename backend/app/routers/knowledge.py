@@ -5,7 +5,7 @@ import datetime
 import logging
 import re
 
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -268,7 +268,11 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
 
 def _source_response(
     s, *, document_title: str | None = None, document_exists: bool | None = None,
+    ingestion_warnings: list[str] | None = None,
 ) -> KBSourceResponse:
+    from app.services.document_service import INGESTION_WARNING_LABELS
+
+    warnings = [c for c in (ingestion_warnings or []) if c in INGESTION_WARNING_LABELS]
     return KBSourceResponse(
         uuid=s.uuid,
         source_type=s.source_type,
@@ -285,6 +289,10 @@ def _source_response(
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
         truncated=bool(getattr(s, "truncated", False)),
+        ingestion_warnings=warnings,
+        ingestion_warning_text=(
+            "; ".join(INGESTION_WARNING_LABELS[c] for c in warnings) or None
+        ),
         created_at=s.created_at.isoformat() if s.created_at else None,
         processed_at=_iso_or_none(getattr(s, "processed_at", None)),
         currency=KBSourceCurrency(**derive_source_currency(s)),
@@ -316,6 +324,37 @@ async def _document_exists_map(sources) -> dict[str, bool]:
         for s in sources
         if s.source_type == "document" and s.document_uuid
     }
+
+
+async def _document_warnings_map(sources) -> dict[str, list[str]]:
+    """Per-source ingestion-warning codes for document sources, keyed by
+    source uuid. Absent for URL sources and for documents with none."""
+    from app.services.knowledge_service import resolve_document_ingestion_warnings
+    return await resolve_document_ingestion_warnings(sources)
+
+
+async def _document_file_status(
+    doc, user: User,
+) -> Literal["available", "no_access", "missing"]:
+    """Whether ``user`` can open the stored file behind ``doc`` — see
+    ``KBSourceDetailResponse.document_file``. Access is decided the way the
+    download route decides it; a file the storage backend cannot find is
+    ``missing`` (a lookup error counts as missing: offering a File view that
+    then fails is the outcome this exists to prevent)."""
+    from app.dependencies import get_settings
+    from app.services import access_control
+    from app.services.storage import get_storage
+
+    if not await access_control.get_authorized_document(doc.uuid, user):
+        return "no_access"
+    relative_path = doc.downloadpath or doc.path
+    if not relative_path:
+        return "missing"
+    try:
+        present = await get_storage(get_settings()).exists(relative_path)
+    except Exception:
+        present = False
+    return "available" if present else "missing"
 
 
 @router.get("/list", response_model=list[KBResponse])
@@ -580,6 +619,7 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
     sources = await svc.get_kb_sources(kb.uuid)
     titles = await _resolve_document_titles(sources)
     exists = await _document_exists_map(sources)
+    warnings = await _document_warnings_map(sources)
     latest_runs = await _latest_runs_by_kb([kb.uuid])
     manage_flags = await _manage_flags_by_kb([kb], user, user_org_ancestry)
     optimization = await optimization_status_by_kb([kb])
@@ -595,6 +635,7 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
                 s,
                 document_title=titles.get(s.document_uuid or ""),
                 document_exists=exists.get(s.uuid),
+                ingestion_warnings=warnings.get(s.uuid),
             )
             for s in sources
         ],
@@ -874,10 +915,13 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         raise HTTPException(status_code=404, detail="Source not found")
 
     document_title: str | None = None
+    document_file = None
     # The inspector shows the full ingested text. URL sources cache it on
     # ``source.content``; document sources don't, so fall back to the
     # SmartDocument's extracted ``raw_text`` (the same text that was chunked
-    # into the KB) — mirroring what export_knowledge_base does.
+    # into the KB) — mirroring what export_knowledge_base does. The text is
+    # shown to anyone who can view the KB; the *file* only to someone who
+    # can open the document, and only if it is still there.
     content = source.content
     if source.source_type == "document" and source.document_uuid:
         doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
@@ -885,6 +929,7 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
             document_title = doc.title
             if not content:
                 content = doc.raw_text or None
+            document_file = await _document_file_status(doc, user)
 
     # Crawled children (only meaningful when this source is itself a crawl parent)
     children = await KnowledgeBaseSource.find(
@@ -892,14 +937,17 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
     ).to_list()
     child_titles = await _resolve_document_titles(children)
     child_exists = await _document_exists_map(children)
+    child_warnings = await _document_warnings_map(children)
 
     return KBSourceDetailResponse(
         **_source_response(
             source,
             document_title=document_title,
             document_exists=(await _document_exists_map([source])).get(source.uuid),
+            ingestion_warnings=(await _document_warnings_map([source])).get(source.uuid),
         ).model_dump(),
         content=content,
+        document_file=document_file,
         crawl_enabled=bool(source.crawl_enabled),
         max_crawl_pages=int(source.max_crawl_pages or 5),
         parent_source_uuid=source.parent_source_uuid,
@@ -910,6 +958,7 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
                 c,
                 document_title=child_titles.get(c.document_uuid or ""),
                 document_exists=child_exists.get(c.uuid),
+                ingestion_warnings=child_warnings.get(c.uuid),
             )
             for c in children
         ],
@@ -947,6 +996,7 @@ async def update_source(
         source,
         document_title=titles.get(source.document_uuid or ""),
         document_exists=(await _document_exists_map([source])).get(source.uuid),
+        ingestion_warnings=(await _document_warnings_map([source])).get(source.uuid),
     )
 
 
