@@ -23,6 +23,7 @@ from typing import Awaitable, Callable
 from bson import ObjectId
 
 from app.models.knowledge import KnowledgeBase
+from app.models.library import LibraryItem
 from app.models.search_set import SearchSet
 from app.models.workflow import Workflow
 
@@ -106,23 +107,72 @@ def _kb_scope(user_id: str, team_id: str | None) -> dict:
     return {"$and": [{"$or": or_clauses}, {"implicit": {"$ne": True}}]}
 
 
-async def workflow_name_taken(
+def _workflow_conflict_query(
     name: str, user_id: str, team_id: str | None, exclude_id: str | None = None,
-) -> bool:
+) -> dict:
     query: dict = {"$and": [_library_scope(user_id, team_id), {"name": _exact_name(name)}]}
     if exclude_id:
         query["$and"].append({"_id": {"$ne": ObjectId(exclude_id)}})
+    return query
+
+
+async def workflow_name_taken(
+    name: str, user_id: str, team_id: str | None, exclude_id: str | None = None,
+) -> bool:
+    query = _workflow_conflict_query(name, user_id, team_id, exclude_id=exclude_id)
     return await Workflow.find(query).count() > 0
+
+
+async def describe_workflow_name_conflict(
+    name: str, user_id: str, team_id: str | None, exclude_id: str | None = None,
+) -> str | None:
+    """The duplicate-name message for *name*, or None when the name is free.
+
+    The scope spans more than the user's personal library — a teammate's
+    team-shared workflow counts, and so does a workflow whose library bookmark
+    was removed while the object (and its name) lives on. The old flat message
+    claimed every conflict was "in your library", which read as a bug to a
+    user whose library plainly showed no such row (support ticket: an Explore
+    import "told her she already had a workflow with the same name even though
+    she didn't"). Say where the conflicting workflow actually is, in its exact
+    capitalization, so the user can find it — or at least believe us.
+    """
+    query = _workflow_conflict_query(name, user_id, team_id, exclude_id=exclude_id)
+    existing = await Workflow.find_one(query)
+    if existing is None:
+        return None
+
+    shown_name = existing.name or name
+    if team_id and existing.team_id == team_id:
+        owned = "your" if existing.user_id == user_id else "a teammate's"
+        location = f"in your team's library ({owned} workflow, on the Team tab)"
+    else:
+        location = "in your library"
+        # A workflow with no library bookmark shows up in no listing at all,
+        # yet still holds its name. Name the situation instead of pointing the
+        # user at a row that is not there.
+        bookmarked = await LibraryItem.find_one({"item_id": existing.id}) is not None
+        if not bookmarked:
+            location = (
+                "in your account but is not currently listed in your library "
+                "(it was removed from the library list without being deleted, "
+                "so its name is still in use)"
+            )
+
+    return (
+        f'A workflow named "{shown_name}" already exists {location}. '
+        "Choose a different name."
+    )
 
 
 async def ensure_workflow_name_available(
     name: str, user_id: str, team_id: str | None, exclude_id: str | None = None,
 ) -> None:
-    if await workflow_name_taken(name, user_id, team_id, exclude_id=exclude_id):
-        raise DuplicateNameError(
-            f'A workflow named "{name}" already exists in your library. '
-            "Choose a different name.",
-        )
+    message = await describe_workflow_name_conflict(
+        name, user_id, team_id, exclude_id=exclude_id
+    )
+    if message is not None:
+        raise DuplicateNameError(message)
 
 
 async def search_set_title_taken(
