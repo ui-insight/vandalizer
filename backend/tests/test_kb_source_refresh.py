@@ -78,7 +78,8 @@ async def test_refresh_replaces_text_title_and_chunks_on_good_fetch():
 async def test_refresh_keeps_custom_name_as_chunk_label():
     src = _source(custom_name="Prior approvals policy")
     dm = _dm()
-    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result("fresh body"))), \
+    fresh = "Last Updated: July 13, 2026\nA. Purpose. Prior approval is required for changes in scope."
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(fresh))), \
          patch.object(knowledge_service, "_get_dm", return_value=dm):
         await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
     assert dm.add_to_kb.call_args.args[2] == "Prior approvals policy"
@@ -179,3 +180,97 @@ async def test_partition_new_urls_splits_present_from_new_and_normalizes():
 
     assert new == ["https://www.uidaho.edu/policies/apm/45/14"]
     assert skipped == ["https://www.uidaho.edu/policies/apm/45/13"]
+
+
+# ---------------------------------------------------------------------------
+# A refresh that comes back with a fraction of the content it is replacing
+# ---------------------------------------------------------------------------
+# Support ticket: refreshing the Subpart E source of a 2 CFR 200 KB fetched
+# eCFR's JavaScript shell instead of the regulation. The shell carried no
+# phrase the wording-based gates knew, so it passed them, and the refresh
+# replaced 208 chunks with 1 — marked "Refreshed" with a green check. Chat
+# then answered §200.414 questions from general knowledge, wrongly.
+
+_SUBPART_E = "\n".join(
+    f"§ 200.{400 + i} Cost principle {i}. (a) Costs must be necessary and reasonable "
+    "for the performance of the Federal award and be allocable thereto under these "
+    "principles. (b) Conform to any limitations or exclusions set forth in these "
+    "principles or in the Federal award as to types or amount of cost items."
+    for i in range(300)
+)
+
+# eCFR's shell: the .gov banner and navigation, and none of the regulation.
+# Deliberately free of the session-dialog and JS-required phrases the
+# boilerplate gate needs, so it reaches the gate under test.
+_ECFR_SHELL = (
+    "eCFR :: 2 CFR Part 200 Subpart E -- Cost Principles\n"
+    "An official website of the United States government. Here's how you know.\n"
+    "Title 2 Subtitle A Chapter II Part 200 Subpart E\n"
+    "Enhanced Content - Table of Contents. Browse. Search. Timeline. Details. "
+    "Print/PDF. Display Options. Go to CFR Reference. Recent Changes. Comparison."
+)
+
+
+@pytest.mark.asyncio
+async def test_refresh_refuses_a_page_that_is_a_fraction_of_the_indexed_text():
+    src = _source(content=_SUBPART_E, chunk_count=208, content_hash="abc")
+    dm = _dm()
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(_ECFR_SHELL))), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason and "looks like the site's shell" in reason
+    # The index was never touched: the 208 chunks are still what chat searches.
+    dm.delete_kb_source.assert_not_called()
+    dm.add_to_kb.assert_not_called()
+    assert src.content == _SUBPART_E
+    assert src.chunk_count == 208
+    # And it does not wear a green check.
+    assert src.status == "ready"
+    assert src.error_message.startswith("Refresh failed — previous content kept:")
+    assert src.last_refresh_outcome == "retrieval_failed"
+    assert src.last_refresh_error == reason
+    # The content was not retrieved, so the retrieval date must not move.
+    assert getattr(src, "last_retrieved_at", None) is None
+
+
+@pytest.mark.asyncio
+async def test_refresh_accepts_a_genuine_revision_that_shrinks_the_page():
+    """A page that lost a third of its text was edited, not broken."""
+    revised = "\n".join(_SUBPART_E.splitlines()[:200])
+    src = _source(content=_SUBPART_E, chunk_count=208, content_hash="abc")
+    dm = _dm()
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(revised))), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    dm.add_to_kb.assert_called_once()
+    assert src.content == revised
+    assert src.last_refresh_outcome == "refreshed"
+
+
+@pytest.mark.asyncio
+async def test_refresh_of_source_with_no_retained_text_has_nothing_to_compare():
+    """An errored source has no baseline, so a short real page is simply ingested."""
+    src = _source(status="error", content=None, chunk_count=0)
+    dm = _dm()
+    short_page = "A. Purpose. This policy sets the prior-approval thresholds for sponsored projects."
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(short_page))), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    assert src.status == "ready"
+    assert src.content == short_page
+
+
+def test_collapse_gate_boundary():
+    gate = knowledge_service._reject_collapsed_refresh
+    previous = "x" * 1000
+    assert gate(previous, "y" * 249) is not None
+    assert gate(previous, "y" * 250) is None
+    assert gate(None, "y") is None
+    assert gate("", "y") is None
+    assert gate("   ", "y") is None
+    assert "1,000" in gate(previous, "y" * 10)

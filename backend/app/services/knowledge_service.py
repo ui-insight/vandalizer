@@ -1658,6 +1658,40 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
     return None
 
 
+# A refresh that returns a small fraction of the text it is replacing is not a
+# revised page, it is a page that did not load — a JavaScript app's shell, an
+# error page served with a 200, a login wall. Below this share of the retained
+# text the refresh is refused and the previous content kept.
+#
+# This gate is relative on purpose. The phrase-based gates above recognise
+# pages by their wording, and every site whose shell they have not seen
+# passes straight through: eCFR's did (support ticket — a 208-chunk Subpart
+# of 2 CFR 200 became 1 chunk, marked "Refreshed" with a green check, and
+# chat began answering §200.414 questions from general knowledge). The size
+# of what is already indexed is the one thing known about a page that no
+# phrase list can miss. A quarter is loose enough that a genuine revision —
+# which rarely removes most of a page — is not refused; a page that shrinks
+# that far on purpose can be removed and re-added.
+_REFRESH_COLLAPSE_RATIO = 0.25
+
+
+def _reject_collapsed_refresh(previous_text: str | None, new_text: str) -> str | None:
+    """Why a refreshed page must not replace what it fetched over, or None.
+
+    Compares the fetched text against the retained snapshot. Only meaningful
+    on a refresh — first ingest has nothing to compare to.
+    """
+    previous_len = len((previous_text or "").strip())
+    new_len = len(new_text.strip())
+    if not previous_len or new_len >= previous_len * _REFRESH_COLLAPSE_RATIO:
+        return None
+    return (
+        f"Page returned {new_len:,} characters where the indexed text has "
+        f"{previous_len:,} — this looks like the site's shell or an error page, "
+        "not the content"
+    )
+
+
 async def refresh_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
 ) -> str | None:
@@ -1670,7 +1704,10 @@ async def refresh_url_source(
 
     Unlike first ingest, a fetch that fails or is rejected by the content
     gates leaves the existing text and chunks untouched — a page that is
-    temporarily down must not blank out a working source. Returns None on
+    temporarily down must not blank out a working source. A refresh has one
+    gate first ingest cannot have: a page whose text is a small fraction of
+    the retained snapshot is refused as not having loaded, whatever it says
+    (see ``_reject_collapsed_refresh``). Returns None on
     success, otherwise the reason (also recorded on ``error_message`` so the
     source list can show it).
 
@@ -1695,6 +1732,8 @@ async def refresh_url_source(
 
         result = await fetch_url(source.url)
         reason = _reject_fetched_page(result)
+        if reason is None and previous_status == "ready" and source.chunk_count:
+            reason = _reject_collapsed_refresh(source.content, result.text)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
