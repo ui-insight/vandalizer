@@ -5,6 +5,7 @@ raise / auto-suffix behavior without MongoDB.
 """
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from types import SimpleNamespace
 
 import pytest
 
@@ -49,6 +50,89 @@ class TestScopeQueries:
 
 
 # ---------------------------------------------------------------------------
+# Workflow conflict messages say where the conflict actually is
+# ---------------------------------------------------------------------------
+
+def _wf(name, user_id, team_id, _id="wf-1"):
+    return SimpleNamespace(name=name, user_id=user_id, team_id=team_id, id=_id)
+
+
+def _find_one_returning(doc) -> AsyncMock:
+    return AsyncMock(return_value=doc)
+
+
+class TestConflictMessages:
+    """The scope spans team and unbookmarked workflows; the message must too.
+
+    Regression for the support ticket where an Explore import told a user she
+    "already had a workflow with the same name" while her personal library
+    showed no such row.
+    """
+
+    @pytest.mark.asyncio
+    async def test_free_name_returns_none(self):
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(None)):
+            msg = await nc.describe_workflow_name_conflict("Fresh", "user1", "team1")
+        assert msg is None
+
+    @pytest.mark.asyncio
+    async def test_personal_bookmarked_conflict_keeps_plain_message(self):
+        wf = _wf("Budget Analyzer", "user1", None)
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)), \
+             patch.object(nc.LibraryItem, "find_one", _find_one_returning(object())):
+            msg = await nc.describe_workflow_name_conflict("Budget Analyzer", "user1", "team1")
+        assert msg == (
+            'A workflow named "Budget Analyzer" already exists in your library. '
+            "Choose a different name."
+        )
+
+    @pytest.mark.asyncio
+    async def test_teammates_team_workflow_is_named_as_such(self):
+        wf = _wf("Budget Analyzer", "someone-else", "team1")
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)):
+            msg = await nc.describe_workflow_name_conflict("Budget Analyzer", "user1", "team1")
+        assert "team's library" in msg
+        assert "a teammate's workflow" in msg
+        assert "Team tab" in msg
+
+    @pytest.mark.asyncio
+    async def test_own_team_filed_workflow_points_at_team_tab(self):
+        # Her own workflow, filed under the Team tab because it is team-scoped
+        # — the Mine tab shows nothing, so "in your library" would mislead.
+        wf = _wf("Budget Analyzer", "user1", "team1")
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)):
+            msg = await nc.describe_workflow_name_conflict("Budget Analyzer", "user1", "team1")
+        assert "your team's library (your workflow, on the Team tab)" in msg
+
+    @pytest.mark.asyncio
+    async def test_unbookmarked_personal_workflow_is_explained(self):
+        # The object outlives its library bookmark and keeps holding the name.
+        wf = _wf("Budget Analyzer", "user1", None)
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)), \
+             patch.object(nc.LibraryItem, "find_one", _find_one_returning(None)):
+            msg = await nc.describe_workflow_name_conflict("Budget Analyzer", "user1", None)
+        assert "not currently listed in your library" in msg
+        assert "removed from the library list without being deleted" in msg
+
+    @pytest.mark.asyncio
+    async def test_message_quotes_the_existing_capitalization(self):
+        # The match is case-insensitive; quoting the stored name lets the user
+        # actually find the row their own spelling would never surface.
+        wf = _wf("budget analyzer", "user1", None)
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)), \
+             patch.object(nc.LibraryItem, "find_one", _find_one_returning(object())):
+            msg = await nc.describe_workflow_name_conflict("Budget Analyzer", "user1", None)
+        assert '"budget analyzer"' in msg
+
+    @pytest.mark.asyncio
+    async def test_ensure_raises_with_the_described_message(self):
+        wf = _wf("Budget Analyzer", "someone-else", "team1")
+        with patch.object(nc.Workflow, "find_one", _find_one_returning(wf)):
+            with pytest.raises(nc.DuplicateNameError, match="team's library"):
+                await nc.ensure_workflow_name_available("Budget Analyzer", "user1", "team1")
+
+
+# ---------------------------------------------------------------------------
 # ensure_* raise on conflict, pass when free
 # ---------------------------------------------------------------------------
 
@@ -56,23 +140,24 @@ class TestScopeQueries:
 class TestEnsureAvailable:
     @pytest.mark.asyncio
     async def test_workflow_conflict_raises(self):
-        with patch.object(nc.Workflow, "find", _find_returning(1)):
+        wf = SimpleNamespace(name="Budget Analyzer", user_id="someone", team_id="team1", id="wf-1")
+        with patch.object(nc.Workflow, "find_one", AsyncMock(return_value=wf)):
             with pytest.raises(nc.DuplicateNameError, match="Budget Analyzer"):
                 await nc.ensure_workflow_name_available("Budget Analyzer", "user1", "team1")
 
     @pytest.mark.asyncio
     async def test_workflow_free_passes(self):
-        with patch.object(nc.Workflow, "find", _find_returning(0)):
+        with patch.object(nc.Workflow, "find_one", AsyncMock(return_value=None)):
             await nc.ensure_workflow_name_available("Budget Analyzer", "user1", "team1")
 
     @pytest.mark.asyncio
     async def test_workflow_exclude_id_added_to_query(self):
-        find = _find_returning(0)
-        with patch.object(nc.Workflow, "find", find):
+        find_one = AsyncMock(return_value=None)
+        with patch.object(nc.Workflow, "find_one", find_one):
             await nc.ensure_workflow_name_available(
                 "X", "user1", None, exclude_id="0123456789ab0123456789ab",
             )
-        query = find.call_args.args[0]
+        query = find_one.call_args.args[0]
         assert any("_id" in clause for clause in query["$and"])
 
     @pytest.mark.asyncio
@@ -105,12 +190,13 @@ class TestEnsureAvailable:
 
     @pytest.mark.asyncio
     async def test_match_is_case_insensitive_regex(self):
-        find = _find_returning(0)
-        with patch.object(nc.Workflow, "find", find):
+        find_one = AsyncMock(return_value=None)
+        with patch.object(nc.Workflow, "find_one", find_one):
             await nc.ensure_workflow_name_available("budget analyzer", "user1", None)
-        query = find.call_args.args[0]
-        name_clause = next(c["name"] for c in query["$and"] if isinstance(c, dict) and "name" in c)
+        query = find_one.call_args.args[0]
+        name_clause = next(c["name"] for c in query["$and"] if "name" in c)
         assert name_clause["$options"] == "i"
+        assert name_clause["$regex"] == "^budget\\ analyzer$"
 
 
 # ---------------------------------------------------------------------------
