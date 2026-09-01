@@ -7,7 +7,7 @@ export async function streamChat(
   activityId?: string | null,
   onChunk?: (chunk: StreamChunk) => void,
   model?: string,
-  knowledgeBaseUuid?: string,
+  knowledgeBaseUuids?: string[],
   includeOnboardingContext?: boolean,
   folderUuids?: string[],
   isFirstSession?: boolean,
@@ -23,7 +23,9 @@ export async function streamChat(
       message,
       document_uuids: documentUuids,
       activity_id: activityId || null,
-      knowledge_base_uuid: knowledgeBaseUuid || null,
+      // Several knowledge bases can be attached to one turn; retrieval fans
+      // out across them server-side.
+      knowledge_base_uuids: knowledgeBaseUuids || [],
       ...(model ? { model } : {}),
       ...(includeOnboardingContext ? { include_onboarding_context: true } : {}),
       ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),

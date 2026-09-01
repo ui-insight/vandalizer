@@ -340,6 +340,24 @@ def build_document_segments(
     return segments, skipped_no_text, errored, low_quality
 
 
+def partially_ingested_titles(documents: list) -> list[str]:
+    """Titles of documents whose stored text is real but incomplete.
+
+    Deliberately not folded into ``build_document_segments``' return tuple:
+    "the text layer is garbled" and "this is only part of the document" call
+    for different advice, and widening that tuple would touch every caller for
+    a second list the same loop can produce.
+    """
+    out: list[str] = []
+    for doc in documents:
+        if not doc.raw_text:
+            continue
+        detail = document_service.ingestion_warning_text(doc)
+        if detail:
+            out.append(f"{doc.title or doc.uuid} ({detail})")
+    return out
+
+
 def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
     """Classify a chat stream error into (severity, user_message).
 
@@ -1071,6 +1089,9 @@ async def chat_stream(
     settings=None,
     model_override: Optional[str] = None,
     kb_uuid: Optional[str] = None,
+    # Several knowledge bases attached to one turn, as [(uuid, title)]. Takes
+    # precedence over ``kb_uuid``, which stays for the single-KB callers.
+    kbs: Optional[list[tuple[str, str]]] = None,
     project_uuid: Optional[str] = None,
     include_onboarding_context: bool = False,
     is_first_session: bool = False,
@@ -1287,6 +1308,7 @@ async def chat_stream(
     doc_segments, skipped_no_text, errored_docs, low_quality_docs = (
         build_document_segments(documents)
     )
+    partial_docs = partially_ingested_titles(documents)
 
     # Warn the caller about any selected document that the model won't see
     # because text extraction hasn't finished, errored out, or the doc is gone.
@@ -1334,6 +1356,23 @@ async def chat_stream(
             "action": "documents_low_quality",
             "tokens_dropped": 0,
         }) + "\n"
+    if partial_docs:
+        # Distinct from the garbled case: this text is fine, there is just less
+        # of it than the document contains. A confident summary of pages 1-30 of
+        # a 400-page package is the failure mode, and nothing about the answer
+        # would reveal it.
+        joined = ", ".join(partial_docs[:5]) + ("…" if len(partial_docs) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"{len(partial_docs)} selected document(s) were only partly "
+                f"ingested: {joined}. Answers about them may silently omit "
+                "whatever was not converted. Use \"Retry extraction\" on the "
+                "document to try for the full text."
+            ),
+            "action": "documents_partial_ingestion",
+            "tokens_dropped": 0,
+        }) + "\n"
 
     total_text_len = sum(len(s.text) for s in doc_segments)
     if document_uuids:
@@ -1347,24 +1386,47 @@ async def chat_stream(
         )
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.
+    active_kbs: list[tuple[str, str]] = list(kbs or [])
+    if not active_kbs and kb_uuid:
+        active_kbs = [(kb_uuid, "")]
     kb_sources: list[dict] = []
     kb_manifest: list[dict] = []
     kb_retrieval_failed = False
-    if kb_uuid:
+    manifests: dict[str, list[dict]] = {}
+    if active_kbs:
+        from app.services.knowledge_service import get_kb_manifest
+
+        for uuid, title in active_kbs:
+            try:
+                entries = await get_kb_manifest(uuid)
+            except Exception as e:
+                logger.warning("KB manifest fetch failed for kb_uuid=%s: %s", uuid, e)
+                continue
+            # With several KBs attached the manifest is a union, and a bare
+            # filename in it would not say which KB holds it.
+            if len(active_kbs) > 1 and title:
+                entries = [{**e, "kb_title": title} for e in entries]
+            manifests[uuid] = entries
+        # The manifest block is truncated by entry count and characters, so
+        # concatenating KB by KB lets a large first KB crowd the last one out
+        # entirely — and the model is then told those documents don't exist
+        # here. Interleave so the cut falls evenly across attached KBs.
+        kb_manifest = _round_robin_merge(
+            [manifests[uuid] for uuid, _ in active_kbs if uuid in manifests],
+            key="source_uuid",
+        )
         try:
-            from app.services.knowledge_service import get_kb_manifest
-            kb_manifest = await get_kb_manifest(kb_uuid)
-        except Exception as e:
-            logger.warning("KB manifest fetch failed for kb_uuid=%s: %s", kb_uuid, e)
-        try:
-            kb_segment, kb_sources = await _build_kb_segment(
-                kb_uuid, message, model_name, manifest=kb_manifest,
+            kb_segment, kb_sources = await _build_multi_kb_segment(
+                active_kbs, message, model_name, manifests=manifests,
                 history=previous_messages, user_id=user_id,
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
         except Exception as e:
-            logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
+            logger.error(
+                "KB context retrieval failed for kb_uuids=%s: %s",
+                [u for u, _ in active_kbs], e,
+            )
             kb_sources = []
             # A retrieval-backend outage is NOT an empty knowledge base. The
             # empty-KB mode below permits general-knowledge answers, which
@@ -1433,7 +1495,7 @@ async def chat_stream(
         reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
     elif have_context:
         reminder_blocks.append(DOCUMENT_CHAT_RULES)
-    elif kb_uuid and kb_retrieval_failed:
+    elif active_kbs and kb_retrieval_failed:
         # Retrieval itself errored (Chroma/embedding outage) — the KB was
         # never searched. Distinct from the empty-KB mode below, whose rules
         # permit general-knowledge answers: here the model must report the
@@ -1448,7 +1510,7 @@ async def chat_stream(
             "from memory or general knowledge, and do not present any answer "
             "as grounded in their documents this turn."
         )
-    elif kb_uuid:
+    elif active_kbs:
         # A project/KB chat was requested but retrieval returned nothing (empty
         # KB, docs not indexed yet, or no match). Do NOT skip the rules block —
         # that lets the model freely hallucinate document contents. Tell it the
@@ -1552,7 +1614,7 @@ async def chat_stream(
     # (the whole conversation is a distinct behavioral mode); everything else
     # uses ONE base per agent type so the cached prefix never shifts when the
     # user attaches a doc or a KB lookup hits/misses mid-conversation.
-    if is_first_session and not (kb_sources or have_context or kb_uuid):
+    if is_first_session and not (kb_sources or have_context or active_kbs):
         instruction_base = FIRST_SESSION_SYSTEM_PROMPT
     elif user and team_access:
         instruction_base = AGENTIC_CHAT_SYSTEM_PROMPT
@@ -1821,7 +1883,7 @@ async def chat_stream(
             system_config_doc=sys_config_doc,
             model_name=model_name,
             context_document_uuids=effective_doc_uuids,
-            active_kb_uuid=kb_uuid,
+            active_kb_uuid=active_kbs[0][0] if active_kbs else None,
             active_project_uuid=project_uuid,
             conversation=conversation,
             # Monotonic per-turn marker: the current user message is already
@@ -2087,6 +2149,27 @@ async def chat_stream(
                     plan_state=deps.plan_state if deps is not None else None,
                 )
 
+                # Ground truth has just arrived. The planner's belief and what
+                # the model charged are both in hand exactly once per request —
+                # compare them, because an estimate that reads low is how the
+                # tokenizer bug fixed in #648 hard-failed ordinary documents for
+                # months without a trace.
+                #
+                # By design, this only sees answered requests: one the provider
+                # rejects for overflowing the window reports no usage, so that
+                # bug's own hard failure can never raise this alert — only its
+                # latent precursor can. That is sufficient, because a systemic
+                # under-count announces itself on every preceding successful
+                # turn, so the cause is alerted long before the symptom.
+                from app.services.token_estimate_check import check_and_record
+
+                await check_and_record(
+                    model=compacted.plan.model,
+                    estimated=compacted.plan.total_input_tokens,
+                    charged=(usage.input_tokens if usage else 0) or 0,
+                    input_budget=compacted.plan.input_budget,
+                )
+
                 # Stream token usage so the frontend can display context utilization
                 input_toks = usage.input_tokens if usage else 0
                 output_toks = usage.output_tokens if usage else 0
@@ -2213,19 +2296,68 @@ _ANAPHORA_RE = re.compile(
 _FOLLOWUP_STARTERS = ("what about", "how about", "and ", "also ", "why", "same for")
 
 
+def _names_its_own_subject(message: str) -> bool:
+    """True when the message carries a subject of its own — a section
+    citation, an identifier, a quoted phrase, a run of shouted tokens.
+
+    Only the literal channels count. The "what is/are …" noun phrase that
+    ``_extract_pin_terms`` also infers is *not* a subject in this sense: "what
+    is the amount?" after a question about an award is exactly the elliptical
+    follow-up condensing exists for.
+    """
+    message = message or ""
+    if _SECTION_REF_RE.search(message) or _QUOTED_PHRASE_RE.search(message):
+        return True
+    for m in _IDENTIFIER_REF_RE.finditer(message):
+        if any(c.isdigit() for c in m.group(0)):
+            return True
+    if _CODE_REF_RE.search(message):
+        return True
+    for m in _SHOUTED_PHRASE_RE.finditer(message):
+        tokens = m.group(0).split()
+        if tokens[0] in _CITATION_TITLE_WORDS:
+            continue
+        if any(sum(ch.isalpha() for ch in tok) >= 3 for tok in tokens):
+            return True
+    return False
+
+
+def _keep_own_terms(message: str, condensed: Optional[str]) -> Optional[str]:
+    """Re-attach any literal term of the user's message the condenser dropped.
+
+    The condense step rewrites for referents, and a rewrite that resolves "it"
+    correctly can still lose the identifier the user typed — retrieving on the
+    conversation's topic instead of what was asked. Cheap to repair: append
+    what went missing rather than trusting the rewrite wholesale.
+    """
+    if not condensed:
+        return condensed
+    lowered = condensed.lower()
+    missing = [t for t in _extract_pin_terms(message) if t.lower() not in lowered]
+    return f"{condensed} {' '.join(missing)}" if missing else condensed
+
+
 def _looks_anaphoric(message: str) -> bool:
     """Heuristic: does this message likely depend on conversation context for
     retrieval? Errs toward True — a needless condense only costs one bounded
     LLM call, while retrieving on a bare "what about year 2?" loses grounding.
+
+    Short does not mean elliptical, though. Treating every message under 100
+    characters as a follow-up meant a new question that named its own subject
+    ("SCARLET ALBATROSS CLOSEOUT 9928") got condensed against the previous
+    turn, retrieved the *previous* question's chunks, and was answered on that
+    subject. A message that names its own subject is left alone.
     """
     msg = " ".join((message or "").strip().lower().split())
     if not msg:
         return False
-    if len(msg) < 100:
-        return True
     if _ANAPHORA_RE.search(msg):
         return True
-    return msg.startswith(_FOLLOWUP_STARTERS)
+    if msg.startswith(_FOLLOWUP_STARTERS):
+        return True
+    if len(msg) < 100:
+        return not _names_its_own_subject(message)
+    return False
 
 
 def _recent_turns(
@@ -2265,7 +2397,14 @@ def _build_manifest_block(manifest: list[dict]) -> str:
         if not name:
             continue
         status = entry.get("status")
-        line = f"- {name}" + (" (still indexing)" if status and status != "ready" else "")
+        kb_title = entry.get("kb_title")
+        line = f"- {name}"
+        # Only set when several knowledge bases are attached, where a bare
+        # filename would not say which one holds the document.
+        if kb_title:
+            line += f" — {kb_title}"
+        if status and status != "ready":
+            line += " (still indexing)"
         if total_chars + len(line) > _MANIFEST_MAX_CHARS:
             break
         lines.append(line)
@@ -2701,13 +2840,13 @@ def _split_questions(message: str) -> list[str]:
     return questions if len(questions) >= 2 else []
 
 
-def _round_robin_merge(pools: list[list[dict]]) -> list[dict]:
-    """Interleave per-question result pools so each question is fairly ranked.
+def _round_robin_merge(pools: list[list[dict]], key: str = "chunk_id") -> list[dict]:
+    """Interleave pools so each contributes before any contributes twice.
 
-    Taking each pool's #1 before any pool's #2 means the downstream top-k trim
-    can't spend the whole budget on the first (or loudest) question — every
-    question contributes before any question gets a second chunk. Deduped by
-    chunk_id.
+    Taking each pool's #1 before any pool's #2 means the downstream trim can't
+    spend the whole budget on the first (or loudest) pool — used for the
+    per-question retrieval pools, for the per-KB pools of a multi-KB turn, and
+    for the manifest union those KBs produce. Deduped on ``key``.
     """
     import itertools
 
@@ -2717,7 +2856,7 @@ def _round_robin_merge(pools: list[list[dict]]) -> list[dict]:
         for r in tier:
             if r is None:
                 continue
-            cid = r.get("chunk_id")
+            cid = r.get(key)
             if cid is not None and cid in seen:
                 continue
             if cid is not None:
@@ -2740,6 +2879,98 @@ async def _build_kb_segment(
     the KB's tuned relevance floor, so the caller falls through to the empty-KB
     prompt and the model abstains instead of answering from junk.
     """
+    results = await _retrieve_kb_results(
+        kb_uuid, message, model_name,
+        manifest=manifest, history=history,
+    )
+    if not results:
+        return None, []
+    return await _render_kb_segment(results, message, user_id=user_id)
+
+
+# One KB contributes its own tuned ``k`` (typically 8) snippets. Three at full
+# budget would triple the prompt for one question, so a multi-KB turn shares a
+# single ceiling: each KB is retrieved at its own settings, then the pools are
+# round-robined — so every attached KB is represented before the trim — and cut
+# to this many snippets in total.
+MULTI_KB_SNIPPET_BUDGET = 12
+
+
+async def _build_multi_kb_segment(
+    kbs: list[tuple[str, str]],
+    message: str,
+    model_name: str,
+    manifests: Optional[dict[str, list[dict]]] = None,
+    history: Optional[list[ModelMessage]] = None,
+    user_id: Optional[str] = None,
+) -> tuple[Optional[DocumentSegment], list[dict]]:
+    """Retrieve across several knowledge bases for one chat turn.
+
+    ``kbs`` is ``[(kb_uuid, kb_title)]``. Each KB is retrieved with its own
+    tuned config — they differ, and a shared floor would either drown a strict
+    KB in a loose one's near-misses or discard a strict KB's good hits. The
+    pools are then merged round-robin so a KB that ranks lower overall still
+    reaches the prompt, and every snippet carries the KB it came from.
+
+    A KB whose retrieval fails is skipped rather than failing the turn: the
+    answer is then grounded in the ones that did respond, which is what the
+    model is told it has.
+    """
+    if not kbs:
+        return None, []
+    if len(kbs) == 1:
+        # One KB reads exactly as it always has: naming it on every snippet
+        # and citation would relabel every existing chat, where there is no
+        # other KB to tell it apart from. The uuid still rides along for
+        # callers that want to know which KB answered.
+        kb_uuid, _kb_title = kbs[0]
+        results = await _retrieve_kb_results(
+            kb_uuid, message, model_name,
+            manifest=(manifests or {}).get(kb_uuid), history=history,
+        )
+        if not results:
+            return None, []
+        for r in results:
+            r["kb_uuid"] = kb_uuid
+        return await _render_kb_segment(results, message, user_id=user_id)
+
+    pools = await asyncio.gather(*[
+        _retrieve_kb_results(
+            kb_uuid, message, model_name,
+            manifest=(manifests or {}).get(kb_uuid), history=history,
+        )
+        for kb_uuid, _ in kbs
+    ], return_exceptions=True)
+
+    tagged: list[list[dict]] = []
+    for (kb_uuid, kb_title), pool in zip(kbs, pools):
+        if isinstance(pool, BaseException):
+            logger.error("KB retrieval failed for kb_uuid=%s: %s", kb_uuid, pool)
+            continue
+        for r in pool:
+            r["kb_title"] = kb_title
+            r["kb_uuid"] = kb_uuid
+        tagged.append(pool)
+
+    merged = _round_robin_merge(tagged)[:MULTI_KB_SNIPPET_BUDGET]
+    if not merged:
+        logger.warning(
+            "KB query returned no results across %d knowledge bases", len(kbs),
+        )
+        return None, []
+    return await _render_kb_segment(merged, message, user_id=user_id)
+
+
+async def _retrieve_kb_results(
+    kb_uuid: str,
+    message: str,
+    model_name: str,
+    manifest: Optional[list[dict]] = None,
+    history: Optional[list[ModelMessage]] = None,
+) -> list[dict]:
+    """The ranked chunks one KB contributes to a turn, already trimmed to its
+    tuned ``k``. Split out from ``_build_kb_segment`` so a multi-KB turn can
+    fan out over it and merge the pools before any prompt text is built."""
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
         condense_retrieval_query,
@@ -2762,6 +2993,7 @@ async def _build_kb_segment(
             retrieval_query, _ = await condense_retrieval_query(
                 message, recent, model_name,
             )
+            retrieval_query = _keep_own_terms(message, retrieval_query)
 
     # Honour the KB's tuned retrieval knobs (k, min_similarity, query
     # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
@@ -2823,6 +3055,21 @@ async def _build_kb_segment(
     )
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+    return kb_results
+
+
+async def _render_kb_segment(
+    kb_results: list[dict],
+    message: str,
+    user_id: Optional[str] = None,
+) -> tuple[Optional[DocumentSegment], list[dict]]:
+    """Turn ranked chunks into the prompt segment and the citation list.
+
+    Knowledge-base agnostic: a chunk carrying ``kb_title`` (a multi-KB turn)
+    is labelled with it, so the model — and the reader — can tell which
+    knowledge base a claim came from when several are attached.
+    """
+    if not kb_results:
         return None, []
 
     kb_sources: list[dict] = []
@@ -2841,6 +3088,9 @@ async def _build_kb_segment(
         page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
         locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
         label = f"{src} ({locator})" if locator else src
+        kb_title = r.get("kb_title")
+        if kb_title:
+            label = f"{label} — {kb_title}"
         any_approximate = any_approximate or approximate
         annotated = annotate_chunk_pages(content, meta)
         any_spanning = any_spanning or annotated != content
@@ -2856,6 +3106,11 @@ async def _build_kb_segment(
             "score": r.get("score"),
             "similarity": r.get("similarity"),
             "content_preview": (r.get("content") or "")[:240],
+            # Which knowledge base this snippet came from. Only set on a
+            # multi-KB turn; the UI shows it beside the filename so a merged
+            # answer stays auditable.
+            "kb_title": kb_title,
+            "kb_uuid": r.get("kb_uuid"),
         })
     kb_text = (
         "\n\n## Retrieved Knowledge Base Snippets\n"

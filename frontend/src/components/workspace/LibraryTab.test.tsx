@@ -207,6 +207,14 @@ describe('LibraryTab delete flow', () => {
     expect(await screen.findByText('Delete permanently')).toBeTruthy()
   }
 
+  it('labels the menu action "Delete" only when the user owns the underlying item', async () => {
+    mockItems.current = [makeOwnedWorkflow()]
+    render(<LibraryTab />)
+    fireEvent.mouseOver(screen.getByText('NSF Proposal Extractor'))
+    fireEvent.click(await screen.findByLabelText('More actions'))
+    expect(screen.getByText('Delete')).toBeTruthy()
+  })
+
   it('offers permanent delete when the user can manage the underlying workflow', async () => {
     mockItems.current = [makeOwnedWorkflow()]
     removeItemMock.mockResolvedValue(undefined)
@@ -231,7 +239,9 @@ describe('LibraryTab delete flow', () => {
     render(<LibraryTab />)
     fireEvent.mouseOver(screen.getByText('NSF Proposal Extractor'))
     fireEvent.click(await screen.findByLabelText('More actions'))
-    fireEvent.click(screen.getByText('Delete'))
+    // Bookmark-only items say "Remove", never "Delete"
+    expect(screen.queryByText('Delete')).toBeNull()
+    fireEvent.click(screen.getByText('Remove'))
     // Bookmark-only removal goes through the (mocked, auto-confirming) confirm
     // dialog — no "Delete permanently" option should ever render.
     await waitFor(() => expect(removeItemMock).toHaveBeenCalledWith('li-wf'))

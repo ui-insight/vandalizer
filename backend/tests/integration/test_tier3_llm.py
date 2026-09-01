@@ -299,6 +299,29 @@ class TestExtractionJudgeCalibration:
         min_accuracy = float(os.environ.get("JUDGE_CALIBRATION_MIN_ACCURACY", "0.80"))
         max_length_bias = float(os.environ.get("JUDGE_CALIBRATION_MAX_LENGTH_BIAS", "0.20"))
 
+        # Record BEFORE asserting. The measurement is a fact regardless of
+        # whether it clears the floor, and a run that trips the floor is
+        # exactly the history a later median wants — recording after the
+        # asserts meant those runs raised first and were never written, so the
+        # ledger only ever held passing runs and the workflow's `if: always()`
+        # had nothing to commit.
+        from app.services import judge_drift
+
+        # Captured before recording: `record` appends this very measurement, so
+        # a median taken afterwards would include the value under test.
+        drift_baseline = judge_drift.trailing_median(
+            "extraction", judge_model=_llm_model(),
+        )
+        judge_drift.record(
+            "extraction",
+            judge_model=_llm_model(),
+            kappa=kappa,
+            accuracy=accuracy,
+            bias_metric_name="length_bias_fail_to_pass",
+            bias_rate=length_bias_rate,
+            n_cases=len(cases),
+        )
+
         assert kappa >= min_kappa, (
             f"Cohen's κ {kappa:.3f} < {min_kappa}. {report}"
         )
@@ -309,19 +332,13 @@ class TestExtractionJudgeCalibration:
             f"Length-bias rate {length_bias_rate:.3f} > {max_length_bias}. {report}"
         )
 
-        # Drift ledger — record this run and fail if κ regressed > 0.05 vs
-        # the trailing-30-run median for this surface. Catches silent rubric
-        # / model drift that doesn't trip the absolute κ floor.
-        from app.services import judge_drift
-        judge_drift.assert_no_regression("extraction", kappa)
-        judge_drift.record(
-            "extraction",
-            judge_model=_llm_model(),
-            kappa=kappa,
-            accuracy=accuracy,
-            bias_metric_name="length_bias_fail_to_pass",
-            bias_rate=length_bias_rate,
-            n_cases=len(cases),
+        # Relative drift: fail if κ regressed > 0.05 vs the trailing-30-run
+        # median for this surface AND this judge model. Catches silent rubric
+        # drift that doesn't trip the absolute floor above. Scoped to the model
+        # because a model rotation is a step change, not drift.
+        judge_drift.assert_no_regression(
+            "extraction", kappa, judge_model=_llm_model(),
+            baseline=drift_baseline,
         )
 
         # Per-field-type κ — surface regressions in low-frequency types (dates,

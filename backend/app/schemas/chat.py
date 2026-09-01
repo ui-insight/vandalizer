@@ -12,6 +12,10 @@ class ChatRequest(BaseModel):
     folder_uuids: list[str] = []
     model: Optional[str] = None
     knowledge_base_uuid: Optional[str] = None
+    # Several knowledge bases in one turn. Retrieval fans out across them and
+    # merges the results; ``knowledge_base_uuid`` remains for single-KB
+    # callers and is folded in when both are sent.
+    knowledge_base_uuids: list[str] = []
     # Scope chat to a project's implicit KB. Access is governed by project
     # membership; resolves to the project's hidden kb_uuid server-side.
     project_uuid: Optional[str] = None

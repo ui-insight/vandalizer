@@ -519,6 +519,44 @@ def verification_submitted_email(
     return subject, html
 
 
+def quality_regression_email(
+    owner_name: str,
+    item_name: str,
+    item_kind_label: str,
+    previous_score: float,
+    current_score: float,
+    item_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) telling an owner their item's quality dropped.
+
+    Sent only for ``critical`` regressions. An in-app bell entry is the right
+    weight for a warning; a critical drop on something the owner may be about
+    to rely on has to reach them where they actually are.
+    """
+    drop = previous_score - current_score
+    subject = f'Quality regression: "{item_name}"'
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Quality dropped on "{item_name}"</h1>
+      <p>Hi {owner_name}, the automatic revalidation of your {item_kind_label}
+      <span class="highlight">{item_name}</span> scored materially lower than it did before.</p>
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #ef4444;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;">
+          <strong style="color:#fff;">{previous_score:.0f}</strong> &rarr;
+          <strong style="color:#fff;">{current_score:.0f}</strong>
+          &nbsp;({drop:.0f} points)
+        </p>
+      </div>
+      <p>Until someone reviews it, this item shows <strong style="color:#fff">regression pending review</strong>
+      instead of its previous quality rating. Re-validating it is the fastest way to find out whether the
+      drop is real.</p>
+      <p style="margin-top:24px"><a class="btn" href="{item_url}">Open and re-validate</a></p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 def verification_status_email(
     submitter_name: str,
     item_name: str,

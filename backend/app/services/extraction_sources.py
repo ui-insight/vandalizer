@@ -17,6 +17,15 @@ budget section earns a located quote. ``value_supported`` answers the second,
 load-bearing question — is the extracted value actually present in the
 passage — and is recorded separately so the two claims never get conflated.
 
+``support`` collapses the pair into the one state a reader needs, so every
+surface (the extraction panel, chat, exports) renders the same judgement
+instead of each deciding for itself. It exists because the badge used to key
+off ``verified`` alone, which certified the weaker proposition: a fabricated
+award amount carrying any real sentence from the budget section earned the
+same "traced to p. 12" chip as a correct one — provenance theatre, and the
+exact failure mode a research administrator has already been burned by
+elsewhere.
+
 Pure string/offset logic only; no DB or LLM access, safe to import anywhere.
 That purity is why the number/date parsing below is duplicated here in
 miniature rather than imported from ``extraction_validation_service``, which
@@ -31,6 +40,55 @@ from typing import Optional
 # consumer that iterates entity items must skip it (normalize_results,
 # draft hints, consensus votes, chunk merges).
 SOURCE_KEY = "_field_sources"
+
+# The four states a reader can be in about one extracted value. Derived from
+# (verified, value_supported) so no consumer has to re-derive it — and so a
+# consumer that only knows about ``verified`` cannot quietly re-certify the
+# weaker claim.
+#
+#   supported          the value itself appears in a passage located in the
+#                      document. The only state that earns a plain page badge.
+#   quote_unsupported  the passage is real, the value is not in it. The
+#                      hallucination signal: a located quote that does not say
+#                      what the value claims.
+#   unassessed         the passage is real, but the value is not the kind of
+#                      thing that can be found in it — an enum answer that maps
+#                      the prose rather than quoting it, a non-scalar, a quote
+#                      too long to scan. Traceable, not confirmable.
+#   unverified         the passage could not be located at all (or none was
+#                      returned). Nothing here is traced.
+SUPPORT_SUPPORTED = "supported"
+SUPPORT_QUOTE_UNSUPPORTED = "quote_unsupported"
+SUPPORT_UNASSESSED = "unassessed"
+SUPPORT_UNVERIFIED = "unverified"
+
+
+def support_state(verified: object, value_supported: object) -> str:
+    """Collapse ``(verified, value_supported)`` into one reader-facing state."""
+    if not verified:
+        return SUPPORT_UNVERIFIED
+    if value_supported is True:
+        return SUPPORT_SUPPORTED
+    if value_supported is False:
+        return SUPPORT_QUOTE_UNSUPPORTED
+    return SUPPORT_UNASSESSED
+
+
+def support_state_of(src: object) -> str:
+    """``support`` for a stored sidecar entry, deriving it when absent.
+
+    Results written before ``support`` existed carry only ``verified`` and
+    (sometimes) ``value_supported``. A sidecar with no ``value_supported`` key
+    at all was never measured, so it reads as ``unassessed`` rather than being
+    promoted to ``supported`` — an unmeasured value must not inherit the
+    strongest badge by default.
+    """
+    if not isinstance(src, dict):
+        return SUPPORT_UNVERIFIED
+    stored = src.get("support")
+    if isinstance(stored, str) and stored:
+        return stored
+    return support_state(src.get("verified"), src.get("value_supported"))
 
 # 1:1-or-expanding character folds applied to both document text and quotes
 # before matching. LLM output routinely differs from PDF text layers by
@@ -387,14 +445,15 @@ def resolve_entity_sources(
     This fills each entry out to::
 
         {"quote", "page", "document_uuid", "document_title", "verified",
-         "value_supported", "value_support_method"}
+         "value_supported", "value_support_method", "support"}
 
     ``verified`` is unchanged: the quote was located in the document.
     ``value_supported`` is the separate, stronger claim that the value shown
     to the user actually appears in that quote (None when the check does not
-    apply — see :func:`value_supported_by_quote`). Keeping them apart is
-    deliberate: today's UI treats a located quote as proof of the value, and
-    collapsing the two here would bake that error in permanently.
+    apply — see :func:`value_supported_by_quote`). ``support`` is the
+    reader-facing collapse of the two, and is what surfaces render; the raw
+    pair stays alongside it so the distribution can still be measured and so
+    the two claims are never conflated in storage.
 
     *doc_meta* carries ``uuid``, ``title``, ``text_markers``, and (for
     combined-context runs over a merged text) optional ``doc_spans`` —
@@ -454,6 +513,7 @@ def resolve_entity_sources(
                 "verified": offset is not None,
                 "value_supported": supported,
                 "value_support_method": method,
+                "support": support_state(offset is not None, supported),
             }
             # Set only when true, so sidecars for measured pages keep the shape
             # they have always had and existing results stay comparable.

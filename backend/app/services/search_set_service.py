@@ -534,12 +534,19 @@ async def run_extraction_sync(
     extraction_config_override: dict | None = None,
     combined_context: bool = False,
     capture_sources: bool = False,
+    document_warnings: list[dict] | None = None,
 ) -> list:
     """Run extraction synchronously via asyncio.to_thread.
 
     With ``capture_sources``, each returned entity carries a
     ``SOURCE_KEY`` sidecar mapping field names to the verified verbatim
     passage + page the value came from (see ``extraction_sources``).
+
+    ``document_warnings``, when given, collects one entry per input document
+    whose stored text is known to be degraded — garbled, or only part of the
+    document. Chat already warned about these; extraction did not, which is the
+    surface where being quietly wrong costs the most. Passed as an out-list
+    rather than returned so the historical ``list[entity]`` return stands.
     """
     keys = await get_extraction_keys(search_set_uuid)
     if not keys:
@@ -584,8 +591,19 @@ async def run_extraction_sync(
     doc_file_paths: list[str] = []
     doc_metadata: list[dict] = []
     empty_text_docs: list[str] = []
+    from app.services import document_service
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if doc is not None and document_warnings is not None:
+            codes = list(document_service.ingestion_warnings(doc))
+            if document_service.is_extraction_low_quality(doc):
+                codes.append("low_quality_text")
+            if codes:
+                document_warnings.append({
+                    "document_uuid": doc_uuid,
+                    "title": doc.title or doc_uuid,
+                    "codes": codes,
+                })
         doc_metadata.append({
             "uuid": doc_uuid,
             "title": doc.title if doc else None,

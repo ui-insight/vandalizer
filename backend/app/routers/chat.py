@@ -42,6 +42,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# Each attached knowledge base is retrieved separately (its own embedding
+# query, and its own optional rewrite/rerank LLM steps) before the pools are
+# merged, so the ceiling is about latency and spend per turn, not storage.
+MAX_CHAT_KNOWLEDGE_BASES = 3
+
 
 async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEvent:
     """Resolve an activity only when it belongs to the caller."""
@@ -89,28 +94,43 @@ async def chat(
         source_documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
     document_uuids = authorized_document_uuids
 
-    # The KB scope passed to retrieval. A project scope overrides it with the
-    # project's implicit KB (authorized by project access, not KB sharing).
-    resolved_kb_uuid = body.knowledge_base_uuid
-
-    if body.knowledge_base_uuid:
-        user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-        kb = await access_control.get_authorized_knowledge_base(
-            body.knowledge_base_uuid,
-            user,
-            user_org_ancestry=user_org_ancestry,
-            allow_admin=True,
-            team_access=team_access,
+    # The KB scope passed to retrieval, as [(uuid, title)]. A project scope
+    # overrides it with the project's implicit KB (authorized by project
+    # access, not KB sharing).
+    requested_kb_uuids = list(dict.fromkeys(
+        [u for u in ([body.knowledge_base_uuid] if body.knowledge_base_uuid else [])
+         + list(body.knowledge_base_uuids) if u]
+    ))
+    if len(requested_kb_uuids) > MAX_CHAT_KNOWLEDGE_BASES:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"At most {MAX_CHAT_KNOWLEDGE_BASES} knowledge bases can be "
+                "attached to one chat."
+            ),
         )
-        if not kb:
-            raise HTTPException(status_code=404, detail="Knowledge base not found")
-        try:
-            from app.services import knowledge_service
 
-            await knowledge_service.record_kb_usage(user_id, kb.uuid)
-        except Exception:
-            # Usage tracking is best-effort — never block chat on it.
-            logger.warning("Failed to record KB usage", exc_info=True)
+    resolved_kbs: list[tuple[str, str]] = []
+    if requested_kb_uuids:
+        user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+        for kb_uuid in requested_kb_uuids:
+            kb = await access_control.get_authorized_knowledge_base(
+                kb_uuid,
+                user,
+                user_org_ancestry=user_org_ancestry,
+                allow_admin=True,
+                team_access=team_access,
+            )
+            if not kb:
+                raise HTTPException(status_code=404, detail="Knowledge base not found")
+            resolved_kbs.append((kb.uuid, kb.title or ""))
+            try:
+                from app.services import knowledge_service
+
+                await knowledge_service.record_kb_usage(user_id, kb.uuid)
+            except Exception:
+                # Usage tracking is best-effort — never block chat on it.
+                logger.warning("Failed to record KB usage", exc_info=True)
 
     if body.project_uuid:
         from app.services import project_service
@@ -119,7 +139,9 @@ async def chat(
         if not project:
             raise HTTPException(status_code=404, detail="Project not found")
         if project.kb_uuid:
-            resolved_kb_uuid = project.kb_uuid
+            # A project chat is scoped to the project's own KB, whatever else
+            # was attached.
+            resolved_kbs = [(project.kb_uuid, project.title or "")]
 
     # Resolve folder selections: find all documents inside selected folders
     if body.folder_uuids:
@@ -249,7 +271,7 @@ async def chat(
                 activity_id=str(activity.id) if activity else None,
                 settings=settings,
                 model_override=body.model,
-                kb_uuid=resolved_kb_uuid,
+                kbs=resolved_kbs,
                 project_uuid=body.project_uuid,
                 include_onboarding_context=body.include_onboarding_context,
                 is_first_session=body.is_first_session,

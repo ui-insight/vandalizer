@@ -3,6 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 tests/
+# ...except the κ ledger, which the admin Quality panel reads at runtime.
+!tests/fixtures/judge_drift_history.jsonl
 data/
 .pytest_cache/
 *.log

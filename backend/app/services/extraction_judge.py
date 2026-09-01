@@ -13,6 +13,13 @@ Shape:
         Returns {score: 0..1, verdict: PASS|PARTIAL|FAIL, reasoning, tokens_used}.
     judge_test_case_extraction(keys, expected, actual, model_name) -> dict
         Per-field judgements + aggregate avg_score for one test case.
+
+A judge that could not be reached returns ``verdict=JUDGE_UNAVAILABLE`` with
+``score=None`` — never a 0.0 FAIL. "The judge is down" and "the extraction was
+wrong" are different facts, and scoring the first as the second turns a
+provider outage into a permanent false regression in the quality history.
+Callers must exclude unavailable judgements from aggregates rather than
+defaulting them to zero; :func:`is_judge_unavailable` is the check.
 """
 
 from __future__ import annotations
@@ -28,6 +35,16 @@ from app.models.system_config import SystemConfig
 from app.services.llm_service import get_agent_model
 
 logger = logging.getLogger(__name__)
+
+#: Verdict for a judgement that could not be made — the judge call raised.
+#: Distinct from FAIL, which is a measurement saying the value is wrong.
+JUDGE_UNAVAILABLE = "JUDGE_UNAVAILABLE"
+
+
+def is_judge_unavailable(verdict: dict | None) -> bool:
+    """True when a verdict is an outage, not a measurement."""
+    return bool(verdict) and verdict.get("verdict") == JUDGE_UNAVAILABLE
+
 
 
 EXTRACTION_JUDGE_SYSTEM_PROMPT = (
@@ -176,9 +193,10 @@ async def judge_field_value(
     """Judge a single (expected, actual) pair for one field.
 
     Returns ``{score, verdict, reasoning, tokens_used, comparator}``. On judge
-    failure returns ``verdict='FAIL', score=0.0`` rather than raising — the
-    caller is typically inside a per-trial loop and one judge error shouldn't
-    crash the whole trial.
+    failure returns ``verdict=JUDGE_UNAVAILABLE, score=None`` rather than
+    raising — the caller is typically inside a per-trial loop and one judge
+    error shouldn't crash the whole trial. It must not be read as a 0.0 either:
+    see :func:`is_judge_unavailable`.
 
     For dates/numbers/enums/exact-string matches, the deterministic pre-judge
     router resolves the comparison without an LLM call (``comparator="deterministic"``).
@@ -212,9 +230,9 @@ async def judge_field_value(
     except Exception as e:
         logger.exception("Extraction judge call failed for field %s: %s", field_name, e)
         return {
-            "score": 0.0,
-            "verdict": "FAIL",
-            "reasoning": f"judge error: {str(e)[:200]}",
+            "score": None,
+            "verdict": JUDGE_UNAVAILABLE,
+            "reasoning": f"judge unavailable: {str(e)[:200]}",
             "tokens_used": 0,
             "comparator": "llm_error",
         }
@@ -238,14 +256,20 @@ async def judge_test_case_extraction(
 
     Returns:
         {
-          "fields": [{field, score, verdict, reasoning}, ...],
+          "fields": [{field, score, verdict, reasoning, unavailable}, ...],
           "avg_score": float,
           "num_fields_judged": int,
+          "num_fields_unavailable": int,
+          "judge_coverage": float,
           "tokens_used": int,
         }
 
     Skips fields that have no expected value (we can't judge what we can't
-    compare). The aggregate is over fields actually judged.
+    compare). The aggregate is over fields actually *scored*: a field whose
+    judge call failed is counted in ``num_fields_unavailable`` and left out of
+    ``avg_score`` entirely, because averaging it in as a zero would report an
+    outage as a quality collapse. ``judge_coverage`` is the scored fraction of
+    the fields we tried to judge — 1.0 when the judge answered for all of them.
     """
     sem = asyncio.Semaphore(max(1, concurrency))
 
@@ -267,16 +291,22 @@ async def judge_test_case_extraction(
             "verdict": v["verdict"],
             "reasoning": v["reasoning"],
             "tokens_used": v.get("tokens_used", 0),
+            "unavailable": is_judge_unavailable(v),
         }
 
     field_results = await asyncio.gather(*(judge_one(k) for k in keys))
-    judged = [r for r in field_results if not r.get("skipped")]
-    avg = sum(r["score"] for r in judged) / len(judged) if judged else 0.0
-    tokens = sum(int(r.get("tokens_used", 0) or 0) for r in judged)
+    attempted = [r for r in field_results if not r.get("skipped")]
+    scored = [r for r in attempted if not r.get("unavailable") and r.get("score") is not None]
+    # None, not 0.0: "nothing could be judged" is not "everything failed",
+    # which is the whole contract this module now publishes.
+    avg = sum(r["score"] for r in scored) / len(scored) if scored else None
+    tokens = sum(int(r.get("tokens_used", 0) or 0) for r in attempted)
 
     return {
         "fields": field_results,
-        "avg_score": round(avg, 4),
-        "num_fields_judged": len(judged),
+        "avg_score": round(avg, 4) if avg is not None else None,
+        "num_fields_judged": len(scored),
+        "num_fields_unavailable": len(attempted) - len(scored),
+        "judge_coverage": round(len(scored) / len(attempted), 4) if attempted else 1.0,
         "tokens_used": tokens,
     }

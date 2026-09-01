@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
@@ -19,6 +19,7 @@ help:
 	@printf "  make security          Full vulnerability report (deps, images, secrets, config)\n"
 	@printf "  make security-gate     Release-gating scan: fails on CRITICAL or a leaked secret\n"
 	@printf "  make security-built-images  Scan the published images (run after docker-build)\n"
+	@printf "  make review-graph      Build/refresh the optional local code graph\n"
 
 backend-install:
 	cd $(BACKEND_DIR) && uv sync --frozen --extra dev
@@ -40,6 +41,28 @@ backend-security:
 
 backend-audit:
 	cd $(BACKEND_DIR) && uv run pip-audit
+
+# Optional local code graph for review navigation. Deliberately not a
+# prerequisite of any other target: it needs a third-party tool, so nothing
+# here runs unless a person types it. See docs/review-graph.md.
+#
+# Absent a graph, `update` would create the database, index HEAD~1..HEAD, and
+# exit 0 -- leaving a one-file graph that answers every query confidently and
+# wrongly. Hence the explicit build branch. ORIG_HEAD (set by git across a
+# pull) is the right base for a refresh; HEAD~1, the tool's default, would
+# index only the last commit of a multi-commit pull.
+review-graph:
+	@command -v code-review-graph >/dev/null 2>&1 || { \
+	  printf 'review-graph: code-review-graph is not installed.\n' >&2; \
+	  printf '  install it with: uv tool install code-review-graph\n' >&2; \
+	  printf '  it is optional -- no other make target needs it.\n' >&2; \
+	  exit 1; }
+	@if [ ! -f .code-review-graph/graph.db ]; then \
+	  code-review-graph build; \
+	else \
+	  base=$${CRG_BASE:-$$(git rev-parse --verify --quiet ORIG_HEAD || echo HEAD~1)}; \
+	  code-review-graph update --base "$$base"; \
+	fi
 
 # Writes scripts/ui_endpoint_map.md and .json for reading; regenerate on demand,
 # never commit (see .gitignore).

@@ -41,6 +41,18 @@ class SmartDocument(Document):
     # None = not measured (legacy docs, or docs whose text bypassed extraction).
     extraction_nonletter_ratio: Optional[float] = None
 
+    # Ingestion warnings — machine-readable codes for the ways an extraction can
+    # succeed and still not be the whole document. Emptiness and garbling are
+    # already covered (task_status="error" and the ratio above); these are the
+    # partial outcomes that used to be a log line only:
+    #   "partial_ocr"  — the converter reported per-document errors and returned
+    #                    what it managed. Real text, not all of it.
+    #   "sparse_text"  — far too few characters for the PDF's page count. A
+    #                    400-page scan yielding 150 characters clears the
+    #                    whole-document minimum and is still a failure.
+    # None/[] = measured and clean, or never measured (legacy documents).
+    ingestion_warnings: list[str] = []
+
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for
     # formats with no location structure (docx, txt, html, code).

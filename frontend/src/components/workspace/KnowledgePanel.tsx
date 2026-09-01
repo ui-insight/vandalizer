@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { useProjectPins } from '../../hooks/useProjectPins'
@@ -252,6 +252,8 @@ export function KnowledgePanel() {
   // Clone lands an owned, editable copy in My KBs (sources re-ingest in the
   // background, so it opens in 'building' status).
   const handleClone = async (uuid: string) => {
+    if (cloning) return
+    setCloning(true)
     try {
       const clone = await api.cloneKnowledgeBase(uuid)
       const newUuid = (clone as { uuid?: string }).uuid
@@ -264,6 +266,8 @@ export function KnowledgePanel() {
     } catch (err) {
       console.error('Failed to clone KB:', err)
       toast(err instanceof Error ? err.message : 'Failed to clone knowledge base', 'error')
+    } finally {
+      setCloning(false)
     }
   }
 
@@ -524,6 +528,7 @@ export function KnowledgePanel() {
 
   // Export / Import state
   const [exporting, setExporting] = useState(false)
+  const [cloning, setCloning] = useState(false)
   const [importing, setImporting] = useState(false)
   const importInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -1115,6 +1120,27 @@ export function KnowledgePanel() {
                 {exporting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
                 {exporting ? 'Exporting...' : 'Export'}
               </button>
+              {/* Clone lives on the KB cards too, but this is the page you are
+                  on once you have opened a KB and decided you want a copy of
+                  it — the support ticket was written from here. */}
+              <button
+                onClick={() => handleClone(selectedKB.uuid)}
+                disabled={cloning || !hasSources}
+                title={hasSources
+                  ? 'Make an editable copy of this knowledge base'
+                  : 'Add at least one source to this knowledge base first'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  color: '#e5e5e5', backgroundColor: '#2a2a2a',
+                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  cursor: cloning || !hasSources ? 'default' : 'pointer',
+                  opacity: cloning || !hasSources ? 0.5 : 1,
+                }}
+              >
+                {cloning ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Copy size={13} />}
+                {cloning ? 'Cloning...' : 'Clone'}
+              </button>
               {selectedKB.status === 'ready' && !selectedKB.verified && (
                 verificationSubmitted ? (
                   <span style={{
@@ -1249,6 +1275,12 @@ export function KnowledgePanel() {
                     ? (source.url_title || source.url || source.uuid)
                     : (source.document_title || source.document_uuid || source.uuid)
                   const displayLabel = source.custom_name || autoLabel
+                  // The document was deleted from Files. Its chunks are still
+                  // indexed and still answer questions, so the row stays — but
+                  // it says so, the way an extraction test case does.
+                  const docDeleted = source.source_type === 'document'
+                    && !!source.document_uuid
+                    && source.document_exists === false
                   // Verifiable provenance: an explicit source_reference, else the
                   // origin URL for url sources. Linkify http(s)/www, else show text.
                   const effectiveSource = source.source_reference || (source.source_type === 'url' ? (source.url || '') : '')
@@ -1327,6 +1359,14 @@ export function KnowledgePanel() {
                             {source.custom_name && autoLabel && autoLabel !== source.custom_name && (
                               <span style={{ color: '#888', marginLeft: 6, fontStyle: 'italic' }}>
                                 · {autoLabel}
+                              </span>
+                            )}
+                            {docDeleted && (
+                              <span
+                                style={{ color: '#d97706', marginLeft: 6, fontStyle: 'italic' }}
+                                title="The source document was deleted from Files. This knowledge base still answers from the text it indexed."
+                              >
+                                · source deleted
                               </span>
                             )}
                           </div>

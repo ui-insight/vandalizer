@@ -266,12 +266,17 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
     return out
 
 
-def _source_response(s, *, document_title: str | None = None) -> KBSourceResponse:
+def _source_response(
+    s, *, document_title: str | None = None, document_exists: bool | None = None,
+) -> KBSourceResponse:
     return KBSourceResponse(
         uuid=s.uuid,
         source_type=s.source_type,
         document_uuid=s.document_uuid,
-        document_title=document_title,
+        # Falls back to the title ingest recorded, so a source whose document
+        # was deleted from Files keeps its filename instead of showing a UUID.
+        document_title=document_title or getattr(s, "document_title", None),
+        document_exists=document_exists,
         url=s.url,
         url_title=s.url_title or "",
         custom_name=s.custom_name,
@@ -295,6 +300,22 @@ async def _resolve_document_titles(sources) -> dict[str, str]:
     """Batch-load SmartDocument titles for the given KB sources."""
     from app.services.knowledge_service import resolve_document_titles
     return await resolve_document_titles(sources)
+
+
+async def _document_exists_map(sources) -> dict[str, bool]:
+    """Per-source ``document_exists`` flags, keyed by source uuid.
+
+    ``None`` for URL sources and for document sources with no document_uuid —
+    "deleted" is only meaningful for a source that points at a document.
+    """
+    from app.services.knowledge_service import resolve_existing_documents
+
+    existing = await resolve_existing_documents(sources)
+    return {
+        s.uuid: (s.document_uuid in existing)
+        for s in sources
+        if s.source_type == "document" and s.document_uuid
+    }
 
 
 @router.get("/list", response_model=list[KBResponse])
@@ -558,6 +579,7 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     sources = await svc.get_kb_sources(kb.uuid)
     titles = await _resolve_document_titles(sources)
+    exists = await _document_exists_map(sources)
     latest_runs = await _latest_runs_by_kb([kb.uuid])
     manage_flags = await _manage_flags_by_kb([kb], user, user_org_ancestry)
     optimization = await optimization_status_by_kb([kb])
@@ -569,7 +591,11 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
             optimization=optimization.get(kb.uuid),
         ).model_dump(),
         sources=[
-            _source_response(s, document_title=titles.get(s.document_uuid or ""))
+            _source_response(
+                s,
+                document_title=titles.get(s.document_uuid or ""),
+                document_exists=exists.get(s.uuid),
+            )
             for s in sources
         ],
     )
@@ -865,9 +891,14 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         {"knowledge_base_uuid": kb.uuid, "parent_source_uuid": source.uuid},
     ).to_list()
     child_titles = await _resolve_document_titles(children)
+    child_exists = await _document_exists_map(children)
 
     return KBSourceDetailResponse(
-        **_source_response(source, document_title=document_title).model_dump(),
+        **_source_response(
+            source,
+            document_title=document_title,
+            document_exists=(await _document_exists_map([source])).get(source.uuid),
+        ).model_dump(),
         content=content,
         crawl_enabled=bool(source.crawl_enabled),
         max_crawl_pages=int(source.max_crawl_pages or 5),
@@ -875,7 +906,11 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         crawled_urls=source.crawled_urls,
         skipped_urls=source.skipped_urls,
         child_sources=[
-            _source_response(c, document_title=child_titles.get(c.document_uuid or ""))
+            _source_response(
+                c,
+                document_title=child_titles.get(c.document_uuid or ""),
+                document_exists=child_exists.get(c.uuid),
+            )
             for c in children
         ],
     )
@@ -908,7 +943,11 @@ async def update_source(
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
     titles = await _resolve_document_titles([source])
-    return _source_response(source, document_title=titles.get(source.document_uuid or ""))
+    return _source_response(
+        source,
+        document_title=titles.get(source.document_uuid or ""),
+        document_exists=(await _document_exists_map([source])).get(source.uuid),
+    )
 
 
 @router.delete("/{uuid}/source/{source_uuid}")

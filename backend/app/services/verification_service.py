@@ -720,6 +720,9 @@ async def list_verified_items(
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
+            # The catalog is where an unfamiliar user picks something to trust,
+            # so a regression nobody has reviewed has to travel with the row.
+            "regression_pending_review": bool(meta and meta.regression_pending_review),
             "submitted_by": submitter_ref.model_dump() if submitter_ref else None,
             "created_by": creator_ref.model_dump() if creator_ref else None,
             # Static credit shaped like an AuthorRef so the UI can fall back

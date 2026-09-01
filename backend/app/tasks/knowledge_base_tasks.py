@@ -146,6 +146,9 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
+                    # Kept so the source still has a name if the document is
+                    # later deleted from Files — the chunks outlive it.
+                    "document_title": doc.get("title") or None,
                     **currency.ingestion_stamp(raw_text),
                 }
             },
@@ -212,6 +215,7 @@ def kb_reingest(self, kb_uuid: str) -> None:
                 )
                 text_markers: list = []
                 source_id = source_uuid
+                document_title = None
             else:
                 doc = (
                     db.smart_document.find_one({"uuid": document_uuid})
@@ -223,6 +227,7 @@ def kb_reingest(self, kb_uuid: str) -> None:
                 source_id = (
                     document_uuid if is_implicit and document_uuid else source_uuid
                 )
+                document_title = (doc or {}).get("title") or None
 
             if not raw_text.strip():
                 logger.warning(
@@ -254,6 +259,9 @@ def kb_reingest(self, kb_uuid: str) -> None:
                         "chunk_count": chunk_count,
                         "status": "ready",
                         "error_message": None,
+                        # Kept so the row still has a name if the document is
+                        # later deleted from Files — the chunks outlive it.
+                        "document_title": document_title,
                         # Re-embeds the stored snapshot: the text is no newer
                         # than it was, so only the ingestion date moves. A
                         # row that never recorded a retrieval date keeps its

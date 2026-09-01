@@ -6,14 +6,40 @@ const tierColors: Record<string, { bg: string; text: string; border: string }> =
 
 const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
 
-export function QualityBadge({ tier, score, title }: { tier: string | null; score: number | null; title?: string }) {
-  const colors = tier ? tierColors[tier] || defaultColor : defaultColor
+// A regression the system has already detected outranks the tier the item used
+// to hold. Leaving the old colour up would keep endorsing something monitoring
+// has decided is broken, which is the one thing a quality badge must not do.
+const regressionColor = { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
+
+const REGRESSION_TITLE =
+  'Automatic revalidation scored this materially lower than before. ' +
+  'The previous rating no longer applies until someone reviews it.'
+
+export function QualityBadge({
+  tier,
+  score,
+  title,
+  regressionPending = false,
+}: {
+  tier: string | null
+  score: number | null
+  title?: string
+  regressionPending?: boolean
+}) {
+  const colors = regressionPending
+    ? regressionColor
+    : tier
+      ? tierColors[tier] || defaultColor
+      : defaultColor
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
-  const label = tierLabel ? `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}` : 'Unvalidated'
+  const baseLabel = tierLabel
+    ? `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
+    : 'Unvalidated'
+  const label = regressionPending ? 'Regression pending review' : baseLabel
 
   return (
     <span
-      title={title}
+      title={regressionPending ? REGRESSION_TITLE : title}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

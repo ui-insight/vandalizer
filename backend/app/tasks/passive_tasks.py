@@ -13,7 +13,7 @@ from uuid import uuid4
 from bson import ObjectId
 
 from app.celery_app import celery_app
-from app.services.form_fill import document_meta
+from app.services.form_fill import DOC_META_TASKS, document_meta
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
@@ -500,8 +500,27 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                                 doc_texts.append(doc["raw_text"])
                                 doc_metas.append(document_meta(doc))
                         task_data["doc_texts"] = doc_texts
-                        if task_doc.get("name") == "FormFiller":
+                        if task_doc.get("name") in DOC_META_TASKS:
                             task_data["doc_metas"] = doc_metas
+
+                    # The other two hydration sites load this; the automation
+                    # path never did, so a step configured with "Selected
+                    # Document" as its input ran with no text at all under
+                    # folder-watch — an empty answer produced on schedule, with
+                    # nothing saying the input was missing.
+                    from app.tasks.workflow_tasks import _wants_selected_document
+
+                    if (
+                        _wants_selected_document(task_data)
+                        and task_data.get("selected_document_uuid")
+                    ):
+                        sel_doc = db.smart_document.find_one(
+                            {"uuid": task_data["selected_document_uuid"]},
+                        )
+                        if sel_doc and sel_doc.get("raw_text"):
+                            task_data["selected_doc_text"] = sel_doc["raw_text"]
+                            if task_doc.get("name") in DOC_META_TASKS:
+                                task_data["selected_doc_meta"] = document_meta(sel_doc)
 
                     if task_doc.get("name") == "FormFiller":
                         from app.tasks.workflow_tasks import _preload_form_filler_template

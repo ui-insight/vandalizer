@@ -8,6 +8,7 @@ import { apiFetch } from '../../api/client'
 import { getFeatureFlags } from '../../api/config'
 import { ItemPickerModal } from './ItemPickerModal'
 import type { ActionType, TriggerType } from '../../types/automation'
+import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 interface Props {
   onClose: () => void
   onCreate: (id: string) => void
@@ -26,7 +27,10 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[
   { value: 'task', label: 'Run Task', description: 'Execute a standalone task' },
 ]
 
-const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
+// The filter can only ever match extensions the uploader accepts, so the
+// options are the accepted set — no more, no less.
+const FILE_TYPE_OPTIONS = SUPPORTED_EXTENSIONS
+const DEFAULT_FILE_TYPES = ['pdf', 'docx', 'xlsx']
 
 export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [m365Enabled, setM365Enabled] = useState(false)
@@ -56,7 +60,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
   const [foldersLoading, setFoldersLoading] = useState(false)
   const [watchFolderId, setWatchFolderId] = useState('')
-  const [fileTypes, setFileTypes] = useState<string[]>(['pdf', 'docx', 'xlsx', 'html'])
+  const [fileTypes, setFileTypes] = useState<string[]>(DEFAULT_FILE_TYPES)
   const [excludePatterns, setExcludePatterns] = useState('')
   const [batchMode, setBatchMode] = useState(false)
   const [creatingFolder, setCreatingFolder] = useState(false)
@@ -119,7 +123,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
     setTriggerType(type)
     if (type !== 'folder_watch') {
       setWatchFolderId('')
-      setFileTypes(['pdf', 'docx', 'xlsx', 'html'])
+      setFileTypes(DEFAULT_FILE_TYPES)
       setExcludePatterns('')
       setBatchMode(false)
     }

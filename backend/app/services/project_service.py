@@ -254,6 +254,10 @@ async def copy_project_contents(
             token_count=doc.token_count,
             num_pages=doc.num_pages,
             extraction_nonletter_ratio=doc.extraction_nonletter_ratio,
+            # The copy holds identical text, so it holds identical caveats.
+            # Dropping these silently upgrades a partially-ingested document to
+            # a clean one just by duplicating the project it lives in.
+            ingestion_warnings=list(getattr(doc, "ingestion_warnings", None) or []),
             classification=doc.classification,
             classification_confidence=doc.classification_confidence,
             classified_at=doc.classified_at,

@@ -110,15 +110,72 @@ export interface ExtractionFieldSource {
    * mapping of the prose rather than a span of it); absent on results
    * extracted before this was recorded.
    *
-   * Recorded but not yet surfaced: the badge still keys off `verified` until
-   * the true/false distribution across real extractions is known.
+   * Surfaced via `support` / `fieldSupportState` — the badge keys off this,
+   * not off `verified`, which certifies only that the passage exists.
    */
   value_supported?: boolean | null
   /** How `value_supported` was decided, for measuring that distribution. */
   value_support_method?: string
+  /**
+   * The reader-facing collapse of (`verified`, `value_supported`), computed by
+   * the backend so every surface renders the same judgement. Absent on results
+   * extracted before it existed — use `fieldSupportState` rather than reading
+   * this directly.
+   */
+  support?: FieldSupportState
+}
+
+/**
+ * How much a value's cited passage actually backs it.
+ *
+ * - `supported` — the value itself appears in a passage located in the document.
+ * - `quote_unsupported` — the passage is real, the value is not in it. This is
+ *   the hallucination signal, and the reason the badge cannot key off
+ *   `verified` alone: a fabricated award amount carrying any real sentence from
+ *   the budget section is `verified`.
+ * - `unassessed` — the passage is real but the value is not the kind of thing
+ *   that can be found in it (an enum answer that maps the prose rather than
+ *   quoting it). Traceable, not confirmable.
+ * - `unverified` — no passage could be located. Nothing is traced.
+ */
+export type FieldSupportState =
+  | 'supported'
+  | 'quote_unsupported'
+  | 'unassessed'
+  | 'unverified'
+
+const KNOWN_SUPPORT_STATES: readonly FieldSupportState[] = [
+  'supported', 'quote_unsupported', 'unassessed', 'unverified',
+]
+
+/** `support` for a source entry, deriving it for results written before the
+ * field existed. An unmeasured value reads as `unassessed`, never `supported`. */
+export function fieldSupportState(src?: ExtractionFieldSource | null): FieldSupportState {
+  if (!src) return 'unverified'
+  // `support` arrives from stored snapshots cast with `as ExtractionSourceMap`,
+  // so TypeScript enforces nothing at runtime. An unrecognised value — a
+  // rolling deploy, a renamed or fifth state — used to fall through to no
+  // badge at all, which is the silent over-trust this whole change exists to
+  // remove. Fall back to deriving from the raw signals instead.
+  if (src.support && KNOWN_SUPPORT_STATES.includes(src.support)) return src.support
+  if (!src.verified) return 'unverified'
+  if (src.value_supported === true) return 'supported'
+  if (src.value_supported === false) return 'quote_unsupported'
+  return 'unassessed'
 }
 
 export type ExtractionSourceMap = Record<string, ExtractionFieldSource>
+
+/**
+ * Cross-field rule outcomes for one extraction run. Evaluated on every run
+ * that has rules — these are the checks that catch a wrong number (a budget
+ * that doesn't add up, an end date before a start date), so they are part of
+ * extracting rather than a separate button.
+ */
+export interface CrossFieldRunReport {
+  results: CrossFieldRuleResult[]
+  summary: CrossFieldSummary
+}
 
 export function runExtractionSync(data: {
   search_set_uuid: string
@@ -130,7 +187,18 @@ export function runExtractionSync(data: {
   // `sources` is index-aligned with `results` (per-field source map per entity).
   // `error` is set when the run produced no values: the backend records
   // the run as failed with this reason rather than completed.
-  return apiFetch<{ results: unknown[]; sources?: ExtractionSourceMap[]; error?: string }>('/api/extractions/run-sync', {
+  // `cross_field` is absent when the set defines no rules — absent means
+  // "nothing to check", never "everything passed".
+  return apiFetch<{
+    results: unknown[]
+    sources?: ExtractionSourceMap[]
+    cross_field?: CrossFieldRunReport | null
+    /** One report per result set, index-aligned with `results`. `cross_field`
+     * is the merged-values report, which on a multi-document run describes the
+     * last document only — read this instead when showing one set. */
+    cross_field_sets?: (CrossFieldRunReport | null)[]
+    error?: string
+  }>('/api/extractions/run-sync', {
     method: 'POST',
     body: JSON.stringify(data),
     signal,
@@ -379,6 +447,8 @@ export interface QualityStatus {
   last_validated_at?: string | null
   config_changed: boolean
   stale: boolean
+  /** Monitoring found a regression here and nobody has reviewed it yet. */
+  regression_pending_review?: boolean
 }
 
 export function getQualityStatus(uuid: string) {

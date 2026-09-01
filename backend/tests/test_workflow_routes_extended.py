@@ -103,6 +103,55 @@ class TestGetWorkflowStatus:
 
         assert resp.status_code == 404
 
+    async def test_accepts_api_key(self, client):
+        """Scripts poll with x-api-key — the same key that started the run.
+
+        POST /run-integrated is key-authenticated, so polling the session it
+        returns has to accept the key too (it used to 401 "Not authenticated").
+        """
+        user = _make_user()
+        user.api_token_expires_at = None
+
+        with patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(return_value={
+                "status": "completed",
+                "num_steps_completed": 2,
+                "num_steps_total": 2,
+                "current_step_name": None,
+                "current_step_detail": None,
+                "current_step_preview": None,
+                "final_output": {"output": "result"},
+                "steps_output": {},
+            })
+
+            resp = await client.get(
+                "/api/workflows/status?session_id=sess123",
+                headers={"x-api-key": "test-api-key"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["final_output"] == {"output": "result"}
+        # Authorization still runs against the key's user
+        assert mock_svc.get_workflow_status.await_args.kwargs["user"] is user
+
+    async def test_rejects_unknown_api_key(self, client):
+        with patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=None)
+            resp = await client.get(
+                "/api/workflows/status?session_id=sess123",
+                headers={"x-api-key": "nope"},
+            )
+
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Invalid API key"
+
+    async def test_rejects_no_credentials(self, client):
+        resp = await client.get("/api/workflows/status?session_id=sess123")
+        assert resp.status_code == 401
+        assert resp.json()["detail"] == "Not authenticated"
+
 
 # ---------------------------------------------------------------------------
 # GET /api/workflows/batch-status

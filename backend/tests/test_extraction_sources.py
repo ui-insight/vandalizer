@@ -146,15 +146,18 @@ class TestPageResolution:
             # "Yes" is a judgment about the passage, not a span of it, so the
             # literal check reads it as unsupported. Declaring the field's
             # enum_values (see TestValueSupport) is what marks such fields
-            # unassessable instead — the reason value_supported is recorded
-            # and measured before it is allowed to drive any badge.
+            # unassessable instead — without that declaration this field earns
+            # the "quote doesn't match" badge, which is the conservative
+            # direction but is why enum_values matters on judgment fields.
             "value_supported": False,
             "value_support_method": "no_match",
+            "support": "quote_unsupported",
         }
         missing = entities[0][SOURCE_KEY]["Award Number"]
         assert missing["verified"] is False
         assert missing["page"] is None
         assert missing["value_supported"] is None
+        assert missing["support"] == "unverified"
 
     def test_resolve_combined_doc_spans(self):
         doc = "first document text" + "\n\n---\n\n" + "second document text"

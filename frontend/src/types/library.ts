@@ -41,6 +41,8 @@ export interface LibraryItem {
   quality_tier?: string | null
   quality_score?: number | null
   last_validated_at?: string | null
+  /** Monitoring found a regression here and nobody has reviewed it yet. */
+  regression_pending_review?: boolean
   created_by?: AuthorRef | null
   /** Whether the current user may permanently delete the backing workflow/extraction. */
   can_delete_underlying?: boolean
@@ -163,6 +165,8 @@ export interface VerifiedCatalogItem {
   quality_grade: string | null
   last_validated_at: string | null
   validation_run_count: number
+  /** Monitoring found a regression here and nobody has reviewed it yet. */
+  regression_pending_review?: boolean
   // KB-specific fields
   total_sources?: number
   total_chunks?: number

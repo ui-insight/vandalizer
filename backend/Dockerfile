@@ -65,6 +65,10 @@ COPY app ./app
 COPY certification-data ./certification-data
 COPY scripts ./scripts
 COPY seeds ./seeds
+# The κ-drift ledger. Without it the admin Quality panel reads an empty
+# history in every deployment and reports every model as unmeasured —
+# including one running exactly the model CI measured.
+COPY tests/fixtures/judge_drift_history.jsonl ./tests/fixtures/judge_drift_history.jsonl
 COPY bootstrap_install.py ./
 COPY celery_worker.py ./
 COPY create_admin.py ./

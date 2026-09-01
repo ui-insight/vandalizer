@@ -22,6 +22,7 @@ import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFold
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
+import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
 export type SortColumn = 'name' | 'modified'
 export type SortDirection = 'asc' | 'desc'
@@ -648,7 +649,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           type="file"
           multiple
           aria-label="Upload files"
-          accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
+          accept={SUPPORTED_ACCEPT_ATTR}
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) upload(e.target.files)

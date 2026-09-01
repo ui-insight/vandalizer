@@ -119,6 +119,18 @@ class VerifiedItemMetadata(Document):
     official_baseline_score: Optional[float] = None
     official_baseline_pinned_by_user_id: Optional[str] = None
     official_baseline_history: list[dict] = Field(default_factory=list)
+    # Regression review state. Set when monitoring detects a quality drop past
+    # the alert threshold; until a human clears it the item advertises
+    # "regression pending review" instead of the tier it used to hold. The
+    # score alone is not enough — a badge that merely dips still reads as an
+    # endorsement, and the system has already decided this item is broken.
+    regression_pending_review: bool = False
+    regression_detected_at: Optional[datetime.datetime] = None
+    regression_severity: Optional[str] = None  # "warning" | "critical"
+    # The score to get back to. Clears the flag automatically when a later
+    # validation recovers it, so a transient dip does not need a human.
+    regression_baseline_score: Optional[float] = None
+
     # Last drift check (Phase E)
     last_drift_check_at: Optional[datetime.datetime] = None
     last_drift_score: Optional[float] = None  # the score the live config achieved on the pinned baseline

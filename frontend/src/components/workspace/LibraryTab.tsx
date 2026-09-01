@@ -1364,6 +1364,7 @@ export function LibraryTab() {
                   folders={folders}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
+                  regressionPending={item.regression_pending_review}
                   onOpen={(it) => {
                     if (it.kind === 'workflow') {
                       markUsed(it.id)

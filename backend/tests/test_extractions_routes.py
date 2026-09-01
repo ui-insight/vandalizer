@@ -1191,3 +1191,80 @@ class TestExtractionBaselineProbe:
         assert body["no_settings_score"] is None
         assert body["num_cases_judged"] == 0
         assert body["sample_case_ids"] == []
+
+
+class TestApplyRequiresABaseline:
+    """The optimizer refuses to auto-apply a winner with no baseline to have
+    beaten. The manual apply endpoint checked `tied_with_baseline` — which is
+    False both when the winner genuinely won and when there was nothing to
+    win against — so a judge outage during the baseline trial turned the
+    significance gate into no gate, by hand."""
+
+    @pytest.mark.asyncio
+    async def test_apply_409s_when_the_baseline_was_never_measured(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        ss = _mock_search_set()
+
+        run = MagicMock()
+        run.uuid = "opt-uuid-1"
+        run.status = "completed"
+        run.best_config = {"model": "some-model"}
+        run.baseline_default_score = None   # the judge was down for the baseline
+        run.tied_with_baseline = False      # ...which is why this is False
+        run.winner_cross_field_summary = None
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+            patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            MockRun.find_one = AsyncMock(return_value=run)
+
+            resp = await client.post(
+                "/api/extractions/search-sets/ss-uuid-1/optimize/opt-uuid-1/apply",
+                json={},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"]["code"] == "no_baseline"
+
+    @pytest.mark.asyncio
+    async def test_force_still_applies_without_a_baseline(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        ss = _mock_search_set()
+
+        run = MagicMock()
+        run.uuid = "opt-uuid-1"
+        run.status = "completed"
+        run.best_config = {"model": "some-model"}
+        run.baseline_default_score = None
+        run.tied_with_baseline = False
+        run.winner_cross_field_summary = None
+        run.save = AsyncMock()
+        ss.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+            patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            MockRun.find_one = AsyncMock(return_value=run)
+
+            resp = await client.post(
+                "/api/extractions/search-sets/ss-uuid-1/optimize/opt-uuid-1/apply",
+                json={"force": True},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code != 409

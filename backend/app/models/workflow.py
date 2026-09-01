@@ -102,6 +102,12 @@ class WorkflowResult(Document):
     output_step_names: list[str] = []
     start_time: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     status: str = "running"
+    # Claimed once, atomically, by whichever pass first reaches the post-run
+    # side effects (library write, execution counter). Those sit after
+    # execute() and outside the try, so a failure there retries the whole task;
+    # the resume then skips every step and lands back on them. Missing on rows
+    # written before this existed, which a `None` query matches.
+    finalized_at: Optional[datetime.datetime] = None
     error: Optional[str] = None
     # Machine-readable error payload set by the runner when the failure has a
     # suggested user action (e.g. oversize-context with a convert-to-KB hint).

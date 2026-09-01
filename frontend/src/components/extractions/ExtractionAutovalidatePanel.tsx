@@ -769,6 +769,10 @@ function summariseExtractionConfig(c: Record<string, unknown>, verbose = false):
 // ---------------------------------------------------------------------------
 
 function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
+  // A null score means the run declined to score this trial (judge
+  // coverage below the floor). Rendering it as 0% puts the outage back
+  // on screen as a quality collapse — the exact misreport this guards.
+  const unscored = trial.score == null
   const score = trial.score ?? 0
   const cf = trial.cross_field_summary
   return (
@@ -780,7 +784,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: '50%',
-        backgroundColor: scoreColor(score),
+        backgroundColor: unscored ? '#666' : scoreColor(score),
       }} />
       <span style={{
         flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
@@ -818,10 +822,14 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
           {trial.lift_vs_default > 0 ? '+' : ''}{(trial.lift_vs_default * 100).toFixed(0)}pts
         </span>
       )}
-      <span style={{
-        width: 50, textAlign: 'right', fontWeight: 600, color: '#e5e5e5',
-      }}>
-        {(score * 100).toFixed(0)}%
+      <span
+        title={unscored ? (trial.error || 'Not scored') : undefined}
+        style={{
+          width: 50, textAlign: 'right', fontWeight: 600,
+          color: unscored ? '#888' : '#e5e5e5',
+        }}
+      >
+        {unscored ? '—' : `${(score * 100).toFixed(0)}%`}
       </span>
     </div>
   )

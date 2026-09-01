@@ -334,6 +334,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         # a page that has no text layer and no form fields.
         num_pages: int | None = None
 
+        # Filled in by the PDF reader: what the returned text cannot say about
+        # itself, notably that the OCR conversion was only partial.
+        ocr_report: dict = {}
+
         if extension == "xlsx":
             from app.services.document_readers import extract_text_with_markers
             raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
@@ -360,7 +364,9 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 extract_text_with_markers,
                 pdf_page_count,
             )
-            raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
+            raw_text, text_markers = extract_text_with_markers(
+                str(absolute_path), extension, report=ocr_report,
+            )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file
             # can't be opened, which is the same as the model default.
@@ -376,8 +382,24 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         from app.services.context_budget import count_raw_tokens
         token_count = count_raw_tokens(raw_text) if raw_text else 0
 
-        from app.utils.extraction_quality import nonletter_ratio
+        from app.utils.extraction_quality import is_sparse_extraction, nonletter_ratio
         extraction_ratio = nonletter_ratio(raw_text) if raw_text else None
+
+        # Ways an extraction can succeed and still not be the whole document.
+        # Both used to be invisible: the partial conversion was a log line in
+        # the OCR client, and the density check did not exist at all, so a
+        # 400-page package whose OCR produced 150 characters was stored as
+        # complete and answered questions as if it were.
+        ingestion_warnings: list[str] = []
+        if ocr_report.get("partial"):
+            ingestion_warnings.append("partial_ocr")
+        if extension == "pdf" and raw_text and is_sparse_extraction(raw_text, num_pages):
+            ingestion_warnings.append("sparse_text")
+        if ingestion_warnings:
+            logger.warning(
+                "Document %s ingested with warnings %s (pages=%s, chars=%d)",
+                document_uuid, ingestion_warnings, num_pages, len(raw_text or ""),
+            )
 
         # An "extracted successfully but got zero text" outcome is almost always
         # a silent OCR/extraction failure (image-only PDF, OCR endpoint down,
@@ -404,6 +426,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         "token_count": 0,
                         "text_markers": [],
                         "extraction_nonletter_ratio": None,
+                        "ingestion_warnings": [],
                         # Don't leave a stale page count beside empty text when
                         # a previously-good document is reprocessed.
                         "num_pages": 0,
@@ -424,6 +447,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             "token_count": token_count,
             "text_markers": text_markers,
             "extraction_nonletter_ratio": extraction_ratio,
+            "ingestion_warnings": ingestion_warnings,
             "error_message": None,
         }
         if num_pages is not None:
@@ -456,6 +480,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": "",
                     "processing": False,
                     "extraction_nonletter_ratio": None,
+                    "ingestion_warnings": [],
                     "task_status": "error",
                     "error_message": message,
                 }
@@ -493,6 +518,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": "",
                     "processing": False,
                     "extraction_nonletter_ratio": None,
+                    "ingestion_warnings": [],
                     "task_status": "error",
                     "error_message": message,
                 }
@@ -511,6 +537,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": "",
                     "processing": False,
                     "extraction_nonletter_ratio": None,
+                    "ingestion_warnings": [],
                     "task_status": "error",
                     "error_message": message,
                 }

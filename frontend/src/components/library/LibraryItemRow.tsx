@@ -38,9 +38,10 @@ interface Props {
   folders?: LibraryFolder[]
   qualityTier?: string | null
   qualityScore?: number | null
+  regressionPending?: boolean
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
+export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
   const { user } = useAuth()
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -52,6 +53,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const [flipUp, setFlipUp] = useState(false)
+
+  // The backend reports whether this user may delete the underlying object;
+  // without it, removal is bookmark-only.
+  const canDelete = item.can_delete_underlying === true
 
   const updateMenuPos = useCallback(() => {
     const btn = triggerRef.current
@@ -163,7 +168,11 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             <AuthorChip author={item.created_by} />
           )}
           {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
-            <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
+            <QualityBadge
+              tier={qualityTier ?? null}
+              score={qualityScore ?? null}
+              regressionPending={regressionPending}
+            />
           )}
         </div>
         {item.tags.length > 0 && (
@@ -535,10 +544,14 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     </>
                   )}
                   <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  {/* Only owners can truly delete. For a bookmark of someone
+                      else's item (e.g. added from Explore) removal only drops
+                      the bookmark, so label it "Remove" — same as KB cards. */}
                   <MenuItem
                     icon={<Trash2 size={14} />}
-                    label="Delete"
-                    danger
+                    label={canDelete ? 'Delete' : 'Remove'}
+                    title={canDelete ? undefined : `Remove from library — the ${kindLabel.toLowerCase()} itself is kept by its owner`}
+                    danger={canDelete}
                     onClick={() => {
                       onRemove(item.id)
                       setMenuOpen(false)

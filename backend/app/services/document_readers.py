@@ -11,6 +11,8 @@ from datetime import date, datetime, time
 
 from markitdown import MarkItDown
 
+from app.services import pdf_hidden_text
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,7 +69,8 @@ def convert_to_markdown(doc_path: str, keep_data_uris: bool = True) -> str:
 def extract_text_from_pdf(pdf_path: str) -> str:
     """Extract text from a PDF using PyMuPDF. See _pymupdf_extract_with_pages for the page-aware variant."""
     text, _ = _pymupdf_extract_with_pages(pdf_path)
-    return text
+    scrubbed, _ = pdf_hidden_text.scrub_pdf(pdf_path, text)
+    return scrubbed
 
 
 def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
@@ -124,12 +127,18 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
     return "\n".join(parts), markers
 
 
-def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
+def ocr_extract_text_from_pdf(
+    pdf_path: str, retries: int = 3, report: dict | None = None,
+) -> str:
     """Extract text from a PDF using the configured OCR endpoint.
 
     The request/response contract depends on the configured provider — see
     ``app.services.ocr_client``. Falls back gracefully (returns "") if the OCR
     service is unavailable or misconfigured; callers then use PyMuPDF.
+
+    ``report``, when given, is filled in with what the returned string cannot
+    say — notably ``{"partial": True}`` when the converter only managed part of
+    the document. Optional so existing callers are unaffected.
     """
     # OCR endpoint is stored in the database via admin config (SystemConfig)
     from app.services import ocr_client
@@ -183,6 +192,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                     provider=provider,
                     options=options,
                     use_async=use_async,
+                    report=report,
                 )
         except ocr_client.OcrRequestError as e:
             last_error = e
@@ -824,7 +834,91 @@ def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | 
     return text, markers
 
 
-def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str, list[dict]]:
+def _extract_pdf_text_and_markers(
+    file_path: str, report: dict | None = None,
+) -> tuple[str, list[dict]]:
+    """The one PDF path: read the text, then remove what the page hides.
+
+    Every reader below — the local Markdown fast path, the OCR service,
+    PyMuPDF — reports a PDF's text layer, and a text layer can carry words
+    the page never shows (render mode 3, white on white, sub-point type).
+    Those words are how a prompt injection reaches chat, extraction and
+    Deep Analysis dressed as the document's own content, so they are cut
+    here, at the single point every caller goes through, rather than
+    defended against separately in each prompt downstream.
+    """
+    text, markers = _read_pdf_text_and_markers(file_path, report=report)
+    return pdf_hidden_text.scrub_pdf(file_path, text, markers)
+
+
+def _read_pdf_text_and_markers(
+    file_path: str, report: dict | None = None,
+) -> tuple[str, list[dict]]:
+    """Extract a PDF's text and page markers with the best reader available."""
+    if not pdf_has_ocrable_content(file_path):
+        logger.warning(
+            "PDF %s rendered blank on every page — skipping OCR so the "
+            "vision model can't fabricate text",
+            file_path,
+        )
+        return "", []
+
+    fast_path = _local_markdown_extract_from_pdf(file_path)
+    if fast_path is not None:
+        return fast_path
+
+    # Prefer OCR text for accuracy. When OCR is used we lose true page
+    # boundaries, so fall back to interpolating against PyMuPDF's page
+    # count — approximate, but enough for "around page N" citations.
+    from app.services import ocr_client
+
+    try:
+        ocr_text = ocr_extract_text_from_pdf(file_path, report=report)
+    except ocr_client.OcrUnavailableError:
+        # Deliberately not swallowed: a transient outage must reach the task
+        # layer so the whole extraction is retried later, rather than being
+        # degraded to whatever PyMuPDF can scrape off a scanned page now.
+        raise
+    except Exception as e:
+        logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
+        ocr_text = ""
+    if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
+        num_pages = pdf_page_count(file_path)
+        return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
+    # Falling back means the partial OCR text is not what we return, so the
+    # partial-conversion warning must not survive onto the PyMuPDF result.
+    ocr_report_partial = bool(report and report.get("partial"))
+    ocr_report_errors = list(report.get("errors") or []) if report else []
+    if report is not None:
+        report.pop("partial", None)
+        report.pop("errors", None)
+    # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
+    # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
+    # hard requirement. If it fails (corrupt PDF, or the source file was
+    # removed between the OCR read and here — a document deleted mid-
+    # processing), a short-but-valid OCR result still beats losing the
+    # extraction and crashing the task.
+    try:
+        return _pymupdf_extract_with_pages(file_path)
+    except Exception as e:
+        if ocr_text and ocr_text.strip():
+            logger.warning(
+                "PyMuPDF page extraction failed for %s (%s); using OCR text",
+                file_path, e,
+            )
+            if report is not None and ocr_report_partial:
+                # We are shipping the partial OCR text after all.
+                report["partial"] = True
+                report["errors"] = ocr_report_errors
+            return ocr_text, _interpolate_page_markers(
+                ocr_text, pdf_page_count(file_path)
+            )
+        raise
+
+
+def extract_text_with_markers(
+    file_path: str, file_extension: str, report: dict | None = None,
+) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
     Markers are a list of ``{"char_offset": int, "kind": "page"|"sheet",
@@ -838,54 +932,7 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
     ext = file_extension.lower().lstrip(".")
 
     if ext == "pdf":
-        if not pdf_has_ocrable_content(file_path):
-            logger.warning(
-                "PDF %s rendered blank on every page — skipping OCR so the "
-                "vision model can't fabricate text",
-                file_path,
-            )
-            return "", []
-
-        fast_path = _local_markdown_extract_from_pdf(file_path)
-        if fast_path is not None:
-            return fast_path
-
-        # Prefer OCR text for accuracy. When OCR is used we lose true page
-        # boundaries, so fall back to interpolating against PyMuPDF's page
-        # count — approximate, but enough for "around page N" citations.
-        from app.services import ocr_client
-
-        try:
-            ocr_text = ocr_extract_text_from_pdf(file_path)
-        except ocr_client.OcrUnavailableError:
-            # Deliberately not swallowed: a transient outage must reach the task
-            # layer so the whole extraction is retried later, rather than being
-            # degraded to whatever PyMuPDF can scrape off a scanned page now.
-            raise
-        except Exception as e:
-            logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
-            ocr_text = ""
-        if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
-            num_pages = pdf_page_count(file_path)
-            return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
-        # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
-        # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
-        # hard requirement. If it fails (corrupt PDF, or the source file was
-        # removed between the OCR read and here — a document deleted mid-
-        # processing), a short-but-valid OCR result still beats losing the
-        # extraction and crashing the task.
-        try:
-            return _pymupdf_extract_with_pages(file_path)
-        except Exception as e:
-            if ocr_text and ocr_text.strip():
-                logger.warning(
-                    "PyMuPDF page extraction failed for %s (%s); using OCR text",
-                    file_path, e,
-                )
-                return ocr_text, _interpolate_page_markers(
-                    ocr_text, pdf_page_count(file_path)
-                )
-            raise
+        return _extract_pdf_text_and_markers(file_path, report=report)
 
     if ext == "xlsx":
         text = extract_text_from_xlsx(file_path)
@@ -904,50 +951,13 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
 
     try:
         if file_extension == "pdf":
-            if not pdf_has_ocrable_content(file_path):
-                logger.warning(
-                    "PDF %s rendered blank on every page — skipping OCR so "
-                    "the vision model can't fabricate text",
-                    file_path,
-                )
-                return ""
-
-            fast_path = _local_markdown_extract_from_pdf(file_path)
-            if fast_path is not None:
-                return fast_path[0]
-
-            # Prefer OCR when available — it handles scanned pages,
-            # complex layouts, and image-heavy PDFs far better than PyPDF2.
-            from app.services import ocr_client
-
-            try:
-                ocr_text = ocr_extract_text_from_pdf(file_path)
-            except ocr_client.OcrUnavailableError:
-                # Same contract as ``extract_text_with_markers``: a transient
-                # outage is for the task layer to retry, not a reader crash.
-                # Without this the catch-all below logged it at error and
-                # re-wrapped it as ``DocumentReadError`` — a RuntimeError the
-                # task's ``autoretry_for`` never matches — so the outage was
-                # paged to Sentry and the retry the log line promised never
-                # happened (VANDALIZER-BACKEND-1F).
-                raise
-            if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
-                return ocr_text
-            # Fall back to PyMuPDF if OCR unavailable or returned nothing.
-            logger.info("OCR returned %d chars, falling back to PyMuPDF", len(ocr_text))
-            try:
-                return extract_text_from_pdf(file_path)
-            except Exception as e:
-                # Keep a short-but-valid OCR result rather than losing the
-                # extraction if the PyMuPDF fallback fails (corrupt PDF or the
-                # source file was removed mid-processing).
-                if ocr_text and ocr_text.strip():
-                    logger.warning(
-                        "PyMuPDF extraction failed for %s (%s); using OCR text",
-                        file_path, e,
-                    )
-                    return ocr_text
-                raise
+            # Same flow — and same hidden-text scrub — as the markers
+            # variant; only the page offsets are dropped here. A transient
+            # OCR outage still propagates unwrapped through the
+            # ``ConnectionError`` clause below so the task layer retries it
+            # rather than seeing a ``DocumentReadError`` its ``autoretry_for``
+            # never matches (VANDALIZER-BACKEND-1F).
+            return _extract_pdf_text_and_markers(file_path)[0]
 
         elif file_extension in ("html", "htm"):
             return convert_to_markdown(file_path, keep_data_uris=False)

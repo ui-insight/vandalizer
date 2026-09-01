@@ -162,6 +162,10 @@ export interface Citation {
   /** Page was interpolated from OCR text, not measured. See #603. */
   page_approximate?: boolean
   sheet?: string | null
+  /** Which knowledge base this snippet came from. Only set when several are
+   *  attached to the chat, where the filename alone doesn't say. */
+  kb_title?: string | null
+  kb_uuid?: string | null
   chunk_id?: string | null
   score?: number | null
   content_preview?: string

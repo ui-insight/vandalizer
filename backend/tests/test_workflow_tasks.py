@@ -624,6 +624,27 @@ class TestExecuteTaskStepTest:
         assert result == "Rate: 47%"
 
     @patch("app.tasks.workflow_tasks._get_db")
+    def test_api_step_tests_with_no_documents(self, mock_get_db):
+        """An API Node's input is its own URL, headers and body — a test needs
+        no document, and the editor's Test Step button now sends none
+        (support ticket: the button was greyed out and unclickable)."""
+        from app.tasks.workflow_tasks import execute_task_step_test
+
+        mock_get_db.return_value = _mock_db()
+
+        with patch("app.services.workflow_engine.httpx.Client") as mock_client:
+            resp = MagicMock(status_code=200, text='{"rows": 2}', headers={})
+            resp.json.return_value = {"rows": 2}
+            mock_client.return_value.__enter__.return_value.request.return_value = resp
+            result = execute_task_step_test(
+                task_name="APINode",
+                task_data={"url": "https://example.com/query", "method": "POST"},
+                doc_uuids=[],
+            )
+
+        assert "rows" in str(result)
+
+    @patch("app.tasks.workflow_tasks._get_db")
     def test_unknown_task_type_raises(self, mock_get_db):
         from app.tasks.workflow_tasks import execute_task_step_test
 

@@ -33,3 +33,29 @@ def nonletter_ratio(text: str) -> float:
     if considered == 0:
         return 0.0
     return suspicious / considered
+
+
+#: A page of a real sponsored-programs document — even a sparse cover page or a
+#: budget table — carries far more than this. The floor is deliberately well
+#: below any plausible real page so that crossing it means the OCR gave up, not
+#: that the document is terse. ``MIN_PDF_TEXT_LENGTH = 100`` is a whole-document
+#: floor, which a 400-page scan yielding 150 characters clears comfortably;
+#: this is the per-page equivalent that catches it.
+MIN_CHARS_PER_PAGE = 40
+
+
+def chars_per_page(text: str, num_pages: int | None) -> float | None:
+    """Average non-whitespace characters per page, or None when unmeasurable."""
+    if not num_pages or num_pages <= 0:
+        return None
+    return len("".join(text.split())) / num_pages
+
+
+def is_sparse_extraction(text: str, num_pages: int | None) -> bool:
+    """True when a PDF yielded far too little text for its page count.
+
+    The whole-document minimum cannot see this: 150 characters is a complete
+    failure spread over 400 pages and a perfectly ordinary result over one.
+    """
+    density = chars_per_page(text, num_pages)
+    return density is not None and density < MIN_CHARS_PER_PAGE

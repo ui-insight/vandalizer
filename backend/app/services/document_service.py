@@ -5,6 +5,39 @@ from app.models.user import User
 from app.services import access_control
 
 
+#: Human-readable text for each stored ingestion-warning code. Kept beside the
+#: predicate rather than in the router so chat, the file list, and the
+#: extraction path all say the same thing about the same document.
+INGESTION_WARNING_LABELS = {
+    "partial_ocr": "only part of this document could be converted",
+    "sparse_text": "far less text than its page count suggests",
+    # Emitted by the extraction path from `is_extraction_low_quality`, which
+    # reads the stored nonletter ratio rather than these codes. Without an
+    # entry here `ingestion_warnings()` filtered it straight back out, so the
+    # extraction run reported a warning code that rendered as nothing.
+    "low_quality_text": "most of the stored text is unreadable",
+}
+
+
+def ingestion_warnings(doc: SmartDocument) -> list[str]:
+    """Stored warning codes for a document, ignoring any we no longer emit."""
+    return [
+        code for code in (getattr(doc, "ingestion_warnings", None) or [])
+        if code in INGESTION_WARNING_LABELS
+    ]
+
+
+def ingestion_warning_text(doc: SmartDocument) -> str:
+    """The warnings as one readable clause, or "" when there are none."""
+    labels = [INGESTION_WARNING_LABELS[c] for c in ingestion_warnings(doc)]
+    return "; ".join(labels)
+
+
+def is_partially_ingested(doc: SmartDocument) -> bool:
+    """True when the stored text is real but is not the whole document."""
+    return bool(ingestion_warnings(doc))
+
+
 def is_extraction_low_quality(doc: SmartDocument) -> bool:
     """True when the document's stored text is a garbled extraction (non-letter
     ratio above the configured threshold). Documents never measured (legacy, or
@@ -119,6 +152,7 @@ async def list_contents(
                 "ingest_error": d.ingest_error,
                 "error_message": d.error_message,
                 "extraction_low_quality": is_extraction_low_quality(d),
+                "ingestion_warnings": ingestion_warnings(d),
             }
             for d in documents
         ],
@@ -209,4 +243,5 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "processing": doc.processing,
         "title": doc.title,
         "extraction_low_quality": is_extraction_low_quality(doc),
+        "ingestion_warnings": ingestion_warnings(doc),
     }

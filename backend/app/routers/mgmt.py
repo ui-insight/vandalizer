@@ -1190,6 +1190,10 @@ async def run_extraction(
         search_set_uuid=body.search_set_uuid,
     )
     try:
+        # Same disclosure the in-app run makes — see the note there. A caller
+        # automating against this endpoint is the least likely of all to spot
+        # a half-read document behind a confident answer.
+        document_warnings: list[dict] = []
         results = await ss_svc.run_extraction_sync(
             search_set_uuid=body.search_set_uuid,
             document_uuids=body.document_uuids,
@@ -1197,13 +1201,32 @@ async def run_extraction(
             model=body.model,
             extraction_config_override=body.extraction_config_override,
             combined_context=body.combined_context,
+            document_warnings=document_warnings,
         )
-        await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        from app.routers.extractions import (
+            EXTRACTION_NO_VALUES_ERROR,
+            _entity_has_values,
+        )
+
+        # The same guard the in-app path applies: a run whose every field came
+        # back null extracted nothing, and recording it as completed hands an
+        # API caller a green tick over a set of confident "not found" answers.
+        no_values = not any(_entity_has_values(e) for e in results)
+        await activity_service.activity_finish(
+            activity.id,
+            ActivityStatus.FAILED if no_values else ActivityStatus.COMPLETED,
+            error=EXTRACTION_NO_VALUES_ERROR if no_values else None,
+        )
         await activity_service.activity_update(
             activity.id,
             documents_touched=len(body.document_uuids),
         )
-        return {"results": results, "activity_id": str(activity.id)}
+        return {
+            "results": results,
+            "activity_id": str(activity.id),
+            "document_warnings": document_warnings,
+            **({"error": EXTRACTION_NO_VALUES_ERROR} if no_values else {}),
+        }
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e)

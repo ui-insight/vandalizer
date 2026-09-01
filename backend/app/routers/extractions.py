@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import json
 import logging
@@ -67,6 +68,7 @@ async def _attach_quality(ss) -> dict:
             "quality_tier": meta.quality_tier,
             "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count or 0,
+            "regression_pending_review": meta.regression_pending_review,
         }
 
     latest = await get_latest_validation("search_set", ss.uuid)
@@ -76,9 +78,13 @@ async def _attach_quality(ss) -> dict:
             "quality_tier": None,
             "last_validated_at": latest.get("created_at"),
             "validation_run_count": 1,
+            "regression_pending_review": False,
         }
 
-    return {"quality_score": None, "quality_tier": None, "last_validated_at": None, "validation_run_count": 0}
+    return {
+        "quality_score": None, "quality_tier": None, "last_validated_at": None,
+        "validation_run_count": 0, "regression_pending_review": False,
+    }
 
 
 async def _ss_response(ss, *, can_manage: bool = True) -> SearchSetResponse:
@@ -642,19 +648,35 @@ async def upload_pdf_template(
     settings = Settings()
     file_bytes = await file.read()
 
+    # Read the form fields BEFORE writing anything: this template file is
+    # named after the search set, so saving first meant a PDF that turns out
+    # to have no fields overwrote the bytes of the template already attached.
+    import io
+    try:
+        reader = PdfReader(io.BytesIO(file_bytes))
+        raw_fields = reader.get_fields() or {}
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="That file could not be read as a PDF. Attach a fillable PDF.",
+        )
+    if not raw_fields:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "This PDF has no form fields, so there is nothing to build "
+                "extraction fields from. Attach Template needs a fillable PDF "
+                "(one with form fields you can type into). To build fields from "
+                "a regular document, use From Document instead."
+            ),
+        )
+
     # Save template file
     upload_dir = Path(settings.upload_dir)
     upload_dir.mkdir(parents=True, exist_ok=True)
     template_filename = f"{uuid}_template.pdf"
     template_path = upload_dir / template_filename
     template_path.write_bytes(file_bytes)
-
-    # Extract form field names
-    import io
-    reader = PdfReader(io.BytesIO(file_bytes))
-    raw_fields = reader.get_fields() or {}
-    if not raw_fields:
-        raise HTTPException(status_code=422, detail="No form fields found in PDF")
 
     # Build field info dict: {field_name: value_or_options}
     field_info: dict[str, object] = {}
@@ -954,6 +976,57 @@ EXTRACTION_NO_VALUES_ERROR = (
 )
 
 
+def _entity_has_values(entity) -> bool:
+    """Whether an extracted entity carries at least one real value.
+
+    A dict of nothing but nulls is not a result. Testing the dict for
+    truthiness (the previous check) passed it, so a run where every field came
+    back null — a key-mismatched fallback parse, a document whose text never
+    loaded — was recorded as completed and rendered as a confident set of
+    "not found" answers. The source sidecar is skipped: it is metadata about
+    the values, not a value.
+    """
+    from app.services.extraction_sources import SOURCE_KEY
+
+    if not isinstance(entity, dict):
+        return False
+    return any(
+        value not in (None, "", [], {})
+        for key, value in entity.items()
+        if key != SOURCE_KEY
+    )
+
+
+def _evaluate_cross_field_rules(search_set, values: dict) -> Optional[dict]:
+    """Run a search set's cross-field rules over one run's merged values.
+
+    Returns ``{"results", "summary"}``, or None when the set has no rules — so
+    the response shape is self-describing: absent means "nothing to check",
+    not "everything passed". Never raises: a rule engine fault must not fail
+    an extraction that already produced values.
+    """
+    if not search_set or not getattr(search_set, "cross_field_rules", None):
+        return None
+    try:
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+
+        rules = search_set.normalized_cross_field_rules()
+        results = CrossFieldValidator().validate(values, rules)
+        if not results:
+            return None
+        return {"results": results, "summary": summarize_results(results)}
+
+    except Exception:
+        logger.exception(
+            "Cross-field evaluation failed for search set %s",
+            getattr(search_set, "uuid", "?"),
+        )
+        return None
+
+
 @router.post("/run-sync")
 @limiter.limit("30/minute")
 async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
@@ -990,6 +1063,11 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             team_id=str(user.current_team) if user.current_team else None,
             activity_id=str(activity.id),
         ):
+            # Degraded inputs the run should disclose: text that is garbled,
+            # or that is only part of the document. Chat already warns about
+            # these; a wrong extracted deadline or dollar amount is the more
+            # expensive place to stay quiet.
+            document_warnings: list[dict] = []
             results = await svc.run_extraction_sync(
                 search_set_uuid=req.search_set_uuid,
                 document_uuids=document_uuids,
@@ -998,13 +1076,15 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 extraction_config_override=req.extraction_config_override,
                 combined_context=req.combined_context,
                 capture_sources=True,
+                document_warnings=document_warnings,
             )
-        # A run that produced no entities at all extracted nothing; recording
+        # A run that produced no values at all extracted nothing; recording
         # it as completed gives History a green tick with nothing behind it.
         # It is finished as failed with the reason, and the client is told
         # so on the response rather than being pointed at details that
-        # don't exist.
-        no_values = not any(isinstance(e, dict) and e for e in results)
+        # don't exist. "No values" covers both shapes: no entities, and
+        # entities whose every field is null.
+        no_values = not any(_entity_has_values(e) for e in results)
         if no_values:
             await activity_service.activity_finish(
                 activity.id, ActivityStatus.FAILED, error=EXTRACTION_NO_VALUES_ERROR,
@@ -1029,25 +1109,88 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             if isinstance(entity, dict):
                 normalized.update(entity)
                 merged_sources.update(entity_sources)
+        # Cross-field rules run on every run that has them, not only when
+        # someone remembers to open the Validate tab. These are the checks that
+        # catch a wrong number — a budget that doesn't add up, an end date
+        # before a start date, a required field missing given its trigger — and
+        # leaving them behind a separate button meant a production extraction
+        # shipped with none of them applied. Read-only: evaluation counters
+        # stay tied to validation runs, where the user can mark a false
+        # positive, so this doesn't quietly move a rule toward auto-disable.
+        # Off the event loop: a `custom_expression` rule runs through
+        # `execute_sandboxed_code`, which joins a worker thread with a 5s
+        # timeout plus stop-grace. On the opt-in Validate button that stalled
+        # one request; on the hot path of every extraction it would stall the
+        # whole server, repeatedly, for one bad expression.
+        # One report per result set, index-aligned with `results` exactly like
+        # `sources` — because `normalized` is a last-document-wins merge. On a
+        # 5-proposal run the merged map is document 5's values, so a single
+        # report rendered above a per-document selector told a user reading
+        # document 1 that document 5's budget added up. Rules are per-document
+        # claims; the report has to be too.
+        cross_field_sets: list[Optional[dict]] = []
+        if not no_values:
+            for entity in results:
+                cross_field_sets.append(
+                    await asyncio.to_thread(
+                        _evaluate_cross_field_rules,
+                        ss,
+                        entity if isinstance(entity, dict) else {},
+                    )
+                )
+        # The merged report stays for the combined-context case and for any
+        # consumer that wants one answer for the run. For a single result set
+        # it is the same evaluation, so reuse it rather than paying for it
+        # twice — a `custom_expression` rule costs up to 5s of thread time per
+        # evaluation, and N+1 of those on a 20-document run is a minute of
+        # worker time bought for nothing.
+        if no_values:
+            cross_field = None
+        elif len(cross_field_sets) == 1:
+            cross_field = cross_field_sets[0]
+        else:
+            cross_field = await asyncio.to_thread(
+                _evaluate_cross_field_rules, ss, normalized,
+            )
+
         await activity_service.activity_update(
             activity.id,
             documents_touched=len(document_uuids),
             result_snapshot={
                 "normalized": normalized,
                 "sources": merged_sources,
+                "cross_field": cross_field,
+                "cross_field_sets": cross_field_sets,
                 "document_uuids": document_uuids,
                 "search_set_uuid": req.search_set_uuid,
             },
         )
 
         if no_values:
-            return {"results": results, "sources": sources, "error": EXTRACTION_NO_VALUES_ERROR}
+            # Same keys as the success return. A caller should not have to
+            # branch on which shape it got to know that no rules ran — the
+            # values are absent, so the rule outcomes are too, and saying so
+            # explicitly is cheaper than an optional key with two meanings.
+            return {
+                "results": results,
+                "sources": sources,
+                "cross_field": None,
+                "cross_field_sets": [],
+                "document_warnings": document_warnings,
+                "error": EXTRACTION_NO_VALUES_ERROR,
+            }
 
         # Fire-and-forget auto-validation if test cases exist
         from app.tasks.quality_tasks import auto_validate_extraction
         auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
 
-        return {"results": results, "sources": sources}
+        return {
+            "results": results,
+            "sources": sources,
+            "cross_field": cross_field,
+            "cross_field_sets": cross_field_sets,
+            "document_warnings": document_warnings,
+        }
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, ActivityStatus.FAILED, error=str(e),
@@ -1187,12 +1330,25 @@ async def run_extraction_integrated(
     assert activity.id is not None
 
     try:
+        # Same disclosure the in-app run makes: a document whose text is only
+        # partly there produces answers that look exactly like answers read
+        # from all of it. An API caller has even less chance of noticing.
+        document_warnings: list[dict] = []
         results = await svc.run_extraction_sync(
             search_set_uuid=search_set_uuid,
             document_uuids=all_doc_uuids,
             user_id=user.user_id,
+            document_warnings=document_warnings,
         )
-        await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        # The same all-null run /run-sync now fails. Reporting it "completed"
+        # here just moves the confident set of "not found" answers onto the
+        # external API, where the caller has even less chance of noticing.
+        no_values = not any(_entity_has_values(e) for e in results)
+        await activity_service.activity_finish(
+            activity.id,
+            ActivityStatus.FAILED if no_values else ActivityStatus.COMPLETED,
+            error=EXTRACTION_NO_VALUES_ERROR if no_values else None,
+        )
         await activity_service.activity_update(activity.id, documents_touched=len(all_doc_uuids))
 
         # Per-document diagnostics. Empty results when uploading a file are
@@ -1215,10 +1371,12 @@ async def run_extraction_integrated(
                 })
 
         return {
-            "status": "completed",
+            "status": "error" if no_values else "completed",
             "activity_id": str(activity.id),
             "results": results,
             "documents": doc_diagnostics,
+            "document_warnings": document_warnings,
+            **({"error": EXTRACTION_NO_VALUES_ERROR} if no_values else {}),
         }
     except Exception as e:
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
@@ -1588,7 +1746,11 @@ async def get_extraction_quality_status(
     latest = await get_latest_validation("search_set", uuid)
 
     if not latest and not meta:
-        return {"status": "unvalidated", "score": None, "tier": None, "config_changed": False, "stale": False}
+        return {
+            "status": "unvalidated", "score": None, "tier": None,
+            "config_changed": False, "stale": False,
+            "regression_pending_review": False,
+        }
 
     score = meta.quality_score if meta else latest.get("score") if latest else None
     tier = meta.quality_tier if meta else None
@@ -1627,6 +1789,9 @@ async def get_extraction_quality_status(
         "last_validated_at": last_at,
         "config_changed": config_changed,
         "stale": stale,
+        # Monitoring already decided this item regressed and nobody has looked
+        # at it yet; the badge says so instead of showing the tier alone.
+        "regression_pending_review": bool(meta and meta.regression_pending_review),
     }
 
 
@@ -2195,7 +2360,7 @@ async def apply_extraction_optimization(
             force=body.force,
         )
     except OptimizationActionError as e:
-        if e.code in ("cross_field_below_threshold", "tied_with_baseline"):
+        if e.code in ("cross_field_below_threshold", "tied_with_baseline", "no_baseline"):
             raise HTTPException(
                 status_code=409,
                 detail={"code": e.code, "message": e.message, **e.detail},

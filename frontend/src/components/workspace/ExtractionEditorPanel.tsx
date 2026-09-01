@@ -34,7 +34,8 @@ import {
 } from '../../api/extractions'
 import { RunHistoryTab } from './RunHistoryTab'
 import { ApiError } from '../../api/client'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry, ExtractionFieldSource, ExtractionSourceMap } from '../../api/extractions'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry, ExtractionFieldSource, ExtractionSourceMap, CrossFieldRunReport, FieldSupportState } from '../../api/extractions'
+import { fieldSupportState } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
@@ -123,6 +124,12 @@ export function ExtractionEditorPanel() {
   const [resultDocNames, setResultDocNames] = useState<string[]>([])
   const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
+  // Cross-field rule outcomes for the last run. null = the set defines no
+  // rules; an empty-failure report is a different thing from no report.
+  // Index-aligned with resultSets. The strip shows the report for the set the
+  // user is actually looking at — a single merged report over a multi-document
+  // run describes the last document and nothing else.
+  const [crossFieldSets, setCrossFieldSets] = useState<(CrossFieldRunReport | null)[]>([])
 
   const results = resultSets[activeResultIdx] ?? {}
   const resultSources = resultSourceSets[activeResultIdx] ?? {}
@@ -178,6 +185,14 @@ export function ExtractionEditorPanel() {
     setResultSourceSets(pending ? [pending.sources ?? {}] : [])
     setResultDocNames([])
     setActiveResultIdx(0)
+    // A previous run's rule outcomes must not sit under a new run's values —
+    // the run path already resets this; the open path (rail click, or a
+    // different set entirely) did not, so a red "2 of 3 failed" strip survived
+    // onto a run that never produced it. A run reopened from the rail carries
+    // its own verdict in the same snapshot as its values, so restore that
+    // rather than clearing to nothing: values without the strip re-open a run
+    // that failed a rule looking exactly like one that passed.
+    setCrossFieldSets(pending?.crossFieldSets ?? [])
     setActiveTab('design')
     getSearchSet(openExtractionId)
       .then(setSearchSet)
@@ -255,6 +270,8 @@ export function ExtractionEditorPanel() {
     // picks up the running record the backend creates — otherwise no entry
     // shows until this sync request returns.
     bumpActivitySignal()
+    // A previous run's rule outcomes must not sit under a new run's values.
+    setCrossFieldSets([])
     // Snapshot doc names at run time so exports stay correct if the user
     // changes selection afterward.
     const runDocNames: string[] = combinedContext && docUuids.length > 1
@@ -292,6 +309,7 @@ export function ExtractionEditorPanel() {
       setResultSets(finalSets)
       setResultSourceSets(sets.length > 0 ? srcSets : [{}])
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
+      setCrossFieldSets(resp.cross_field_sets ?? (resp.cross_field ? [resp.cross_field] : []))
       setActiveResultIdx(0)
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
@@ -300,13 +318,16 @@ export function ExtractionEditorPanel() {
         // land here instead of only in the History tab.
         const run = await recoverRunFromHistory(openExtractionId)
         if (run?.status === 'completed') {
-          const snap = run.result_snapshot as { normalized?: Record<string, unknown>; sources?: ExtractionSourceMap } | undefined
+          const snap = run.result_snapshot as { normalized?: Record<string, unknown>; sources?: ExtractionSourceMap; cross_field?: CrossFieldRunReport | null; cross_field_sets?: (CrossFieldRunReport | null)[] } | undefined
           const map: Record<string, string> = {}
           for (const [k, v] of Object.entries(snap?.normalized ?? {})) {
             map[k] = v === null ? 'N/A' : String(v)
           }
           setResultSets([map])
           setResultSourceSets([snap?.sources ?? {}])
+          setCrossFieldSets(
+            snap?.cross_field_sets ?? (snap?.cross_field ? [snap.cross_field] : []),
+          )
           // The history snapshot merges all documents into one value map, so
           // a multi-doc run recovers as a single combined result set.
           setResultDocNames([docUuids.length > 1 ? `Combined (${docUuids.length} docs)` : runDocNames[0] ?? 'Result 1'])
@@ -335,6 +356,32 @@ export function ExtractionEditorPanel() {
       .catch(() => toast('Failed to copy to clipboard', 'error'))
 
     const src: ExtractionFieldSource | undefined = resultSources[field]
+    const support = src ? fieldSupportState(src) : undefined
+    if (support === 'quote_unsupported' && src?.quote) {
+      // The passage is real, so still take the reader to it — seeing the
+      // sentence that does NOT say what the value claims is the fastest way
+      // to catch the error.
+      const highlight = {
+        terms: [src.quote],
+        page: src.page ?? null,
+        pageApproximate: src.page_approximate ?? false,
+      }
+      if (src.document_uuid) {
+        viewDocument(src.document_uuid, src.document_title ?? 'Document', highlight)
+      } else {
+        setHighlightTerms(highlight.terms, highlight.page, highlight.pageApproximate)
+      }
+      // Same phase gate as the badge: while the check's false-positive rate is
+      // unmeasured, this says the automatic check could not confirm the value,
+      // not that the passage contradicts it.
+      toast(
+        ALARM_ON_UNSUPPORTED_QUOTE
+          ? "The cited passage doesn't contain this value — check it before relying on it"
+          : "This value couldn't be confirmed against the cited passage — read it and check",
+        ALARM_ON_UNSUPPORTED_QUOTE ? 'error' : 'info',
+      )
+      return
+    }
     if (src && src.verified && src.quote) {
       const highlight = {
         terms: [src.quote],
@@ -353,9 +400,17 @@ export function ExtractionEditorPanel() {
       return
     }
     if (src) {
-      // The backend couldn't trace this answer back to the document text.
       setHighlightTerms([])
-      toast("No source found — this value couldn't be traced back to the document, so double-check it before relying on it", 'info')
+      // Derive the message from the same state the badge renders. A sidecar
+      // carrying verified=true with no quote used to land here and toast "No
+      // source found" while the badge beside it read "unconfirmed" — two
+      // surfaces giving contradictory reasons for the same field.
+      toast(
+        support === 'unverified' || support === undefined
+          ? "No source found — this value couldn't be traced back to the document, so double-check it before relying on it"
+          : "This value couldn't be confirmed against the document — double-check it before relying on it",
+        'info',
+      )
       return
     }
     // Legacy run without source data — search for the value's own wording,
@@ -487,14 +542,31 @@ export function ExtractionEditorPanel() {
     }
   }
 
+  // Persisted next to the Attach Template card: the failure explanation is
+  // two sentences long, which a toast doesn't hold on screen long enough for.
+  const [templateError, setTemplateError] = useState<string | null>(null)
   const handleAttachTemplate = async (file: File) => {
     if (!openExtractionId) return
+    setTemplateError(null)
     setAttachingTemplate(true)
     try {
       const ss = await uploadPdfTemplate(openExtractionId, file)
       setSearchSet(ss)
       refreshItems()
       setActiveTab('design')
+      toast(
+        ss.item_count
+          ? `Template attached — ${ss.item_count} field${ss.item_count === 1 ? '' : 's'} generated from the PDF form`
+          : 'Template attached',
+        'success',
+      )
+    } catch (err) {
+      // The common failure is a PDF with no form fields (422). It used to
+      // reject silently: nothing awaited this promise, so the button just sat
+      // there and the upload looked broken.
+      const message = err instanceof ApiError ? err.message : 'Could not attach the template'
+      setTemplateError(message)
+      toast(message, 'error')
     } finally {
       setAttachingTemplate(false)
     }
@@ -637,7 +709,11 @@ export function ExtractionEditorPanel() {
               </button>
               {searchSet.quality_tier && (
                 <>
-                  <QualityBadge tier={searchSet.quality_tier} score={searchSet.quality_score ?? null} />
+                  <QualityBadge
+                    tier={searchSet.quality_tier}
+                    score={searchSet.quality_score ?? null}
+                    regressionPending={searchSet.regression_pending_review}
+                  />
                   {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
                 </>
               )}
@@ -815,6 +891,7 @@ export function ExtractionEditorPanel() {
           searchSetUuid={openExtractionId ?? undefined}
           onValueClick={handleValueClick}
           sources={resultSources}
+          crossField={crossFieldSets[activeResultIdx] ?? null}
           resultSets={resultSets}
           activeResultIdx={activeResultIdx}
           onSetActiveResultIdx={setActiveResultIdx}
@@ -868,6 +945,7 @@ export function ExtractionEditorPanel() {
           onBuildFromDocument={handleBuildFromDocument}
           buildingFromDoc={buildingFromDoc}
           attachingTemplate={attachingTemplate}
+          templateError={templateError}
           generatingTemplate={generatingTemplate}
           exportingPdf={exportingPdf}
           hasDocuments={selectedDocUuids.length > 0}
@@ -1111,6 +1189,137 @@ function useRotatingTip(running: boolean, config: ExtractionConfig, docCount: nu
   return running && applicable.length > 0 ? applicable[tipIdx % applicable.length].text : null
 }
 
+/** Cross-field rule outcomes for the run just shown, above the values.
+ *
+ * These checks used to live behind a separate button in the Validate tab, so a
+ * production extraction shipped with none of them applied. A failure is the
+ * loudest thing on the panel because it is the one signal here that says a
+ * number is wrong rather than merely untraced. `null` means the set defines no
+ * rules and nothing is claimed either way; `unparseable` counts are shown
+ * rather than folded into "passed", because a rule the parser could not
+ * evaluate is not a rule that passed.
+ */
+function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) {
+  if (!report || !report.results.length) return null
+  const { summary } = report
+  const failures = report.results.filter(r => r.status === 'fail')
+  const failed = failures.length > 0
+  // No rule reached a verdict — every one was unparseable. "All 0 checks
+  // passed" in green is the exact claim this strip exists to avoid: the
+  // checks did not run, and a budget that came back as "TBD" is the case
+  // that produces it. Absent is not passing.
+  const decisive = summary.pass + summary.fail
+  const inconclusive = decisive === 0
+  return (
+    <div
+      role={failed ? 'alert' : undefined}
+      style={{
+        margin: '8px 0',
+        padding: '8px 10px',
+        borderRadius: 6,
+        fontSize: 12,
+        border: `1px solid ${failed ? '#fca5a5' : inconclusive ? '#e5e7eb' : '#bbf7d0'}`,
+        background: failed ? '#fef2f2' : inconclusive ? '#f9fafb' : '#f0fdf4',
+        color: failed ? '#991b1b' : inconclusive ? '#4b5563' : '#166534',
+      }}
+    >
+      <div style={{ fontWeight: 600 }}>
+        {failed
+          ? `${summary.fail} of ${decisive} cross-field check${decisive === 1 ? '' : 's'} failed`
+          : inconclusive
+            ? `No cross-field check could be evaluated on these values`
+            : `All ${summary.pass} cross-field check${summary.pass === 1 ? '' : 's'} passed`}
+        {summary.unparseable > 0 && (
+          <span style={{ fontWeight: 400, color: '#6b7280' }}>
+            {' '}· {summary.unparseable} could not be evaluated
+          </span>
+        )}
+      </div>
+      {failed && (
+        <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+          {failures.map((r, i) => (
+            <li key={r.rule_id ?? i} style={{ marginBottom: 2 }}>{r.message}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/** How each support state renders beside a value.
+ *
+ * Four states, not two. The old badge had only "traced to p. N" and
+ * "no source", which forced the two genuinely different failures —
+ * "we could not find the passage" and "we found the passage and it does not
+ * say this" — to share a colour with each other or with success. The second
+ * is the hallucination signal and gets its own, loudest treatment.
+ */
+// `value_supported` is recorded but its false-positive rate has never been
+// measured. `extraction_sources.value_supported_by_quote` says so in its own
+// docstring — "the distribution can be measured before any of this drives a
+// badge" — and names the cases it gets wrong: a multi-part value assembled
+// from a sentence ("Jane Smith, Department of Chemistry" out of "Dr. Jane
+// Smith of the Department of Chemistry will serve as PI") reads as
+// unsupported, as does any judgement-shaped value on a field that declares no
+// enum_values.
+//
+// A red "quote doesn't match" on a correct value is the fastest way to teach a
+// grants officer to ignore the badge entirely, which costs more than the
+// over-trust it was meant to fix. So until the distribution is measured, this
+// state presents as neutral "unconfirmed" — the state stays distinct in
+// storage, which is what makes the measurement possible. Flip this to true in
+// Phase 3, with the numbers behind it.
+const ALARM_ON_UNSUPPORTED_QUOTE = false
+
+/** Presentation state: what the reader is shown, which is not always the same
+ * as the recorded state (see ALARM_ON_UNSUPPORTED_QUOTE). */
+function presentedSupport(state: FieldSupportState): FieldSupportState {
+  if (state === 'quote_unsupported' && !ALARM_ON_UNSUPPORTED_QUOTE) return 'unassessed'
+  return state
+}
+
+const SUPPORT_BADGES: Record<
+  FieldSupportState,
+  { label: (locator: string | null) => string; title: string; color: string; background: string }
+> = {
+  supported: {
+    label: (locator) => locator ?? 'sourced',
+    // "an automatic check found" rather than "this is confirmed": the check
+    // tests whether the value appears in the passage, not whether the passage
+    // assigns it to this field — a "Direct Costs" value matches a quote that
+    // labels the same figure indirect, and a year (2024) matches "$2,024".
+    title: 'An automatic check found this value in the cited passage. Click to show it in the document',
+    color: '#1d4ed8',
+    background: '#eff6ff',
+  },
+  quote_unsupported: {
+    label: () => "quote doesn't match",
+    title:
+      'The cited passage is real, but this value does not appear in it. Check it before relying on it',
+    color: '#b91c1c',
+    background: '#fee2e2',
+  },
+  unassessed: {
+    label: (locator) => (locator ? `${locator} · unconfirmed` : 'unconfirmed'),
+    // Covers both recorded states this presents: a value that is a judgement
+    // about the passage rather than a span of it, and one the automatic check
+    // could not match. Both mean the same thing to a reader — the passage is
+    // there, the value was not confirmed against it — so the copy says that
+    // rather than asserting which of the two it was.
+    title:
+      'A passage was located, but this value could not be automatically confirmed against it. Click to read the passage and check it yourself',
+    color: '#4b5563',
+    background: '#f3f4f6',
+  },
+  unverified: {
+    label: () => 'no source',
+    title:
+      "This value couldn't be traced back to the document — double-check it before relying on it",
+    color: '#92400e',
+    background: '#fef3c7',
+  },
+}
+
 function DesignTab({
   items,
   itemsLoading,
@@ -1129,6 +1338,7 @@ function DesignTab({
   searchSetUuid,
   onValueClick,
   sources,
+  crossField,
   resultSets,
   activeResultIdx,
   onSetActiveResultIdx,
@@ -1150,6 +1360,7 @@ function DesignTab({
   searchSetUuid?: string
   onValueClick: (field: string, value: string) => void
   sources: ExtractionSourceMap
+  crossField: CrossFieldRunReport | null
   resultSets: Record<string, string>[]
   activeResultIdx: number
   onSetActiveResultIdx: (idx: number) => void
@@ -1363,6 +1574,8 @@ function DesignTab({
           <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
         </div>
       )}
+
+      <CrossFieldRunStrip report={crossField} />
 
       {/* Result set selector for multi-document extractions */}
       {resultSets.length > 1 && (
@@ -1608,15 +1821,18 @@ function DesignTab({
                 {resultVal !== undefined && (() => {
                   const src = sources[item.searchphrase]
                   const clickable = !!resultVal && resultVal !== 'N/A'
-                  const hasSource = !!src?.verified && !!src?.quote
-                  const noSource = !!src && !hasSource
+                  // The badge keys off support, not `verified`. A located quote
+                  // proves the passage exists, not that it says what the value
+                  // claims — certifying the weaker proposition is how a
+                  // hallucinated figure earned a blue "traced" chip.
+                  const support = src ? fieldSupportState(src) : undefined
+                  const badge = support ? SUPPORT_BADGES[presentedSupport(support)] : undefined
+                  const locator = formatPageLocator(src?.page, src?.page_approximate)
                   const clickTitle = !clickable
                     ? undefined
-                    : hasSource
-                      ? `Click to show the source passage${formatPageLocator(src?.page, src?.page_approximate) ? ` (${formatPageLocator(src?.page, src?.page_approximate)})` : ''}`
-                      : noSource
-                        ? 'No source found for this value — click to copy'
-                        : 'Click to highlight in PDF'
+                    : badge
+                      ? `${badge.title}${locator && support !== 'unverified' ? ` (${locator})` : ''}`
+                      : 'Click to highlight in PDF'
                   return (
                     <div
                       onClick={() => {
@@ -1643,25 +1859,16 @@ function DesignTab({
                       title={clickTitle}
                     >
                       {resultVal}
-                      {clickable && hasSource && src?.page != null && (
-                        <span style={{
-                          marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#1d4ed8',
-                          background: '#eff6ff', borderRadius: 3, padding: '1px 4px',
-                          whiteSpace: 'nowrap',
-                        }}>
-                          {formatPageLocator(src.page, src.page_approximate)}
-                        </span>
-                      )}
-                      {clickable && noSource && (
+                      {clickable && badge && (
                         <span
-                          title="This value couldn't be traced back to the document — double-check it before relying on it"
+                          title={badge.title}
                           style={{
-                            marginLeft: 6, fontSize: 10, fontWeight: 500, color: '#92400e',
-                            background: '#fef3c7', borderRadius: 3, padding: '1px 4px',
-                            whiteSpace: 'nowrap',
+                            marginLeft: 6, fontSize: 10, fontWeight: 500,
+                            color: badge.color, background: badge.background,
+                            borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap',
                           }}
                         >
-                          no source
+                          {badge.label(locator)}
                         </span>
                       )}
                     </div>
@@ -1777,7 +1984,11 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
       }} />
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <QualityBadge tier={status.tier} score={status.score} />
+          <QualityBadge
+            tier={status.tier}
+            score={status.score}
+            regressionPending={status.regression_pending_review}
+          />
           {status.last_validated_at && (
             <span style={{ fontSize: 11, color: '#6b7280' }}>
               {relativeTime(status.last_validated_at)}
@@ -1796,7 +2007,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
 
 /* ── Tools Tab ── */
 
-function ToolsTab({
+export function ToolsTab({
   onClone,
   onDelete,
   onAttachTemplate,
@@ -1805,6 +2016,7 @@ function ToolsTab({
   onBuildFromDocument,
   buildingFromDoc,
   attachingTemplate,
+  templateError,
   generatingTemplate,
   exportingPdf,
   hasDocuments,
@@ -1820,6 +2032,7 @@ function ToolsTab({
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
   attachingTemplate: boolean
+  templateError: string | null
   generatingTemplate: boolean
   exportingPdf: boolean
   hasDocuments: boolean
@@ -1854,7 +2067,7 @@ function ToolsTab({
           description={
             !hasDocuments
               ? 'Select a document first, then use AI to generate extraction fields'
-              : 'Build extraction from a selected document using AI'
+              : 'Build extraction fields from a selected document using AI — works with any document'
           }
           onClick={onBuildFromDocument}
           disabled={buildingFromDoc || !hasDocuments}
@@ -1871,10 +2084,11 @@ function ToolsTab({
           description={
             hasTemplate
               ? 'A fillable PDF template is attached. Click to replace it.'
-              : 'Upload a fillable PDF to auto-generate extraction fields and enable PDF export'
+              : 'Upload a fillable PDF — one with form fields in it — to auto-generate matching extraction fields and enable PDF export. For a regular document, use From Document.'
           }
           onClick={onAttachTemplate}
           disabled={attachingTemplate || generatingTemplate}
+          error={templateError}
           secondaryAction={{
             label: generatingTemplate ? 'Generating...' : 'Generate example from fields →',
             onClick: onGenerateTemplate,
@@ -1903,6 +2117,7 @@ function ToolCard({
   onClick,
   style,
   secondaryAction,
+  error,
 }: {
   title: string
   description: string
@@ -1911,6 +2126,7 @@ function ToolCard({
   onClick: () => void
   style?: React.CSSProperties
   secondaryAction?: { label: string; onClick: () => void; disabled?: boolean }
+  error?: string | null
 }) {
   return (
     <div
@@ -1955,6 +2171,18 @@ function ToolCard({
         {title}
       </div>
       <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
+      {error && (
+        <div
+          role="alert"
+          style={{
+            fontSize: 12, lineHeight: 1.4, color: '#991b1b',
+            background: '#fef2f2', border: '1px solid #fecaca',
+            borderRadius: 6, padding: '8px 10px',
+          }}
+        >
+          {error}
+        </div>
+      )}
       {secondaryAction && (
         <>
           <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 4 }} />

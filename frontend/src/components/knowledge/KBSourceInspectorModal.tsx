@@ -68,6 +68,11 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
   }
 
   const isDoc = source.source_type === 'document'
+  // The document was deleted from Files. Its indexed text is still here (and
+  // still answers questions), but there is no file left to render.
+  const docDeleted = isDoc
+    && !!source.document_uuid
+    && (detail?.document_exists ?? source.document_exists) === false
   const displayTitle =
     source.document_title
     || source.url_title
@@ -119,9 +124,14 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               {isDoc ? 'Document source' : 'URL source'}
               {source.chunk_count > 0 && <> · {source.chunk_count} chunks</>}
               {source.status !== 'ready' && <> · {source.status}</>}
+              {docDeleted && (
+                <span style={{ color: '#d97706', fontStyle: 'italic' }}>
+                  {' '}· source deleted — answers still come from the text below
+                </span>
+              )}
             </div>
           </div>
-          {isDoc && source.document_uuid && (
+          {isDoc && source.document_uuid && !docDeleted && (
             <div style={{ display: 'inline-flex', border: '1px solid #2e2e2e', borderRadius: 5, overflow: 'hidden' }}>
               {(['text', 'file'] as const).map(mode => (
                 <button
@@ -212,7 +222,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
 
         {/* Body */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-          {isDoc && docView === 'file' ? (
+          {isDoc && docView === 'file' && !docDeleted ? (
             source.document_uuid ? (
               <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                 <DocumentViewer docUuid={source.document_uuid} />

@@ -13,7 +13,18 @@ the trailing-30-run median for the same surface — catching silent drift
 between an explicit gate violation and the previous baseline.
 
 File format: JSON-Lines at ``backend/tests/fixtures/judge_drift_history.jsonl``.
-Each line is one entry; the file is checked in and appended to in CI.
+Each line is one entry; the file is checked in and appended to in CI — which
+required a commit-back step in ``integration-llm.yaml``, because the tier-3 job
+runs on an ephemeral GitHub Actions disk. Without it every run wrote one line
+and threw it away, ``trailing_median`` never reached its three-entry minimum,
+and drift detection was structurally incapable of ever firing.
+
+**A κ measured in CI belongs to the model CI measured it on.** The tier-3 job
+runs against ``INTEGRATION_LLM_MODEL``; a deployment whose judge is a local 8B
+has no claim on that number. :func:`calibration_for` returns a figure only for
+the exact model it was measured on, and returns None otherwise, so the honest
+answer — "κ unmeasured for this model" — is the one a caller gets by default
+rather than one it has to remember to ask for.
 """
 
 from __future__ import annotations
@@ -163,16 +174,30 @@ def trailing_median(
     surface: str,
     window: int = TRAILING_WINDOW,
     path: Path | None = None,
+    judge_model: str | None = None,
 ) -> float | None:
     """Median κ over the most recent ``window`` entries for a surface.
 
     Returns None when fewer than 3 prior entries exist — drift detection
     needs a stable baseline, not a single anchor point.
+
+    ``judge_model`` scopes the baseline to one model, and callers that gate on
+    the result should always pass it. Pooling models means the first run after
+    a model rotation is compared against the *previous* model's median — a
+    spurious regression on the exact event ("the judge model is silently
+    swapped") this ledger exists to detect, followed by a permanently mixed
+    baseline. Rotating models is a step change, not drift.
     """
     history = load_history(surface=surface, path=path)
+    if judge_model is not None:
+        history = [e for e in history if e.judge_model == judge_model]
     if len(history) < 3:
         return None
-    recent = history[-window:]
+    # By timestamp, not file order, for the reason `calibration_for` gives:
+    # line order is only chronological while the file is strictly appended, and
+    # the commit-back flow can reorder it on a conflict resolution. "The most
+    # recent `window` entries" has to mean the most recent ones.
+    recent = sorted(history, key=lambda e: e.timestamp)[-window:]
     return statistics.median(e.kappa for e in recent)
 
 
@@ -183,6 +208,8 @@ def assert_no_regression(
     window: int = TRAILING_WINDOW,
     max_regression: float = MAX_KAPPA_REGRESSION,
     path: Path | None = None,
+    judge_model: str | None = None,
+    baseline: float | None = None,
 ) -> None:
     """Raise AssertionError if ``new_kappa`` regresses > max_regression
     vs the trailing-``window`` median.
@@ -191,8 +218,19 @@ def assert_no_regression(
     establish a baseline, we *don't* fail — a brand-new surface can't have
     drifted from a non-existent past. The κ gate in the calibration test
     catches absolute floor violations; this catches *relative* drift.
+
+    ``baseline`` lets a caller that records its measurement *before* asserting
+    — which the tier-3 job does, so a run that trips the absolute floor still
+    reaches the ledger — pass the median it captured beforehand. Without it the
+    new entry sits inside the baseline it is being judged against: with exactly
+    two prior runs for the model, a κ of 0.60 against a prior [0.80, 0.60]
+    medians to 0.60 and silently clears a check the ledger was still too thin
+    to make.
     """
-    baseline = trailing_median(surface, window=window, path=path)
+    if baseline is None:
+        baseline = trailing_median(
+            surface, window=window, path=path, judge_model=judge_model,
+        )
     if baseline is None:
         return
     if baseline - new_kappa > max_regression:
@@ -204,3 +242,92 @@ def assert_no_regression(
             "Either revert the change, or — if intentional — update the "
             "ledger by appending the new entry and reviewing the trend."
         )
+
+
+def calibration_for(
+    surface: str,
+    judge_model: str,
+    path: Path | None = None,
+) -> dict | None:
+    """The measured agreement for ``judge_model`` on ``surface``, or None.
+
+    None means exactly one thing: nobody has ever measured this model on this
+    surface. It must not be filled in with another model's figure — that is the
+    substitution this function exists to prevent. A customer running a local 8B
+    as their judge would otherwise inherit an agreement number established
+    against a frontier model in someone else's CI, and the whole point of a
+    published κ is that it was measured on the thing doing the judging.
+
+    Returns ``{judge_model, kappa, accuracy, measured_at, n_runs}`` using the
+    most recent entry for the model, with ``n_runs`` counting how many times it
+    has been measured — one run is a data point, not a baseline.
+    """
+    entries = [e for e in load_history(surface=surface, path=path)
+               if e.judge_model == judge_model]
+    if not entries:
+        return None
+    # By timestamp, not file order. Line order is only chronological while the
+    # file is strictly appended, and the commit-back flow can reorder it on a
+    # conflict resolution — after which `entries[-1]` would publish a stale κ
+    # under a `measured_at` that is not the maximum.
+    latest = max(entries, key=lambda e: e.timestamp)
+    return {
+        "judge_model": judge_model,
+        "kappa": latest.kappa,
+        "accuracy": latest.accuracy,
+        "measured_at": latest.timestamp,
+        "n_runs": len(entries),
+    }
+
+
+def measured_models(surface: str, path: Path | None = None) -> list[str]:
+    """Judge models this surface has ever been calibrated against, newest last."""
+    seen: list[str] = []
+    for entry in load_history(surface=surface, path=path):
+        if entry.judge_model and entry.judge_model not in seen:
+            seen.append(entry.judge_model)
+    return seen
+
+
+def calibration_status(
+    surface: str,
+    judge_models: list[str],
+    *,
+    published_floor: float | None = None,
+    path: Path | None = None,
+) -> dict:
+    """What can honestly be said about this surface's judge agreement here.
+
+    ``judge_models`` are the models this deployment could actually judge with.
+    The result names, per model, whether κ was measured *for that model* — never
+    borrowing another's — plus the ledger-wide context a reader needs to
+    interpret it: the published floor, which models have ever been measured,
+    and whether the ledger has enough history for drift detection to fire at all.
+    """
+    history = load_history(surface=surface, path=path)
+    models = []
+    for model in judge_models:
+        measured = calibration_for(surface, model, path=path)
+        # Per model, because that is the scope the check actually runs at.
+        n_for_model = sum(1 for e in history if e.judge_model == model)
+        models.append({
+            "judge_model": model,
+            "calibrated": measured is not None,
+            "drift_detectable": n_for_model >= 3,
+            **(measured or {"kappa": None, "accuracy": None,
+                            "measured_at": None, "n_runs": 0}),
+        })
+    return {
+        "surface": surface,
+        "published_floor": published_floor,
+        "models": models,
+        "measured_models": measured_models(surface, path=path),
+        "ledger_entries": len(history),
+        # Counted per model, not pooled. `trailing_median` needs three entries
+        # *for the model being checked*, so a ledger holding one run each for
+        # three different models has no baseline for any of them — pooling the
+        # count claimed drift was detectable while `assert_no_regression` could
+        # never fire for any model, which is the model-substitution error this
+        # file exists to prevent, in the field that reports whether it works.
+        "drift_detectable": any(m["drift_detectable"] for m in models),
+    }

@@ -477,8 +477,16 @@ def fill_pdf_form(pdf_bytes: bytes, values: dict) -> tuple[bytes, list[str], lis
 _DOC_META_FIELDS = ("uuid", "title", "text_markers")
 
 
+#: Step tasks whose node needs per-document metadata hydrated alongside
+#: ``doc_texts``. Form Filler attributes each filled value to a document and
+#: page; Extraction resolves each field's supporting quote the same way.
+#: Anything else would carry the markers unread.
+DOC_META_TASKS = ("FormFiller", "Extraction")
+
+
 def document_meta(doc: dict) -> dict:
-    """The per-document metadata a Form Filler task carries for attribution."""
+    """The per-document metadata a Form Filler or Extraction task carries for
+    attribution."""
     return {
         "uuid": doc.get("uuid"),
         "title": doc.get("title") or doc.get("uuid") or "Document",
