@@ -63,7 +63,13 @@ describe('a11y — no axe violations', () => {
         fileAttachments={[{ id: 'f1', filename: 'report.pdf' } as never]}
         urlAttachments={[]}
         selectedDocUuids={[]}
+        selectedFolderUuids={['fld-1']}
+        selectedFolderNames={{ 'fld-1': 'FY26 Awards' }}
+        knowledgeBases={[{ uuid: 'kb-1', title: 'Export Control' }]}
         onRemoveFile={() => {}}
+        onDeselectFolder={() => {}}
+        onDetachKB={() => {}}
+        onShareKB={() => {}}
       />,
     )
     expect(await axe(container)).toHaveNoViolations()
