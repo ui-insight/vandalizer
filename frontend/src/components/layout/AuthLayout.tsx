@@ -30,7 +30,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
           <h1 className="mb-8 text-center text-2xl font-bold text-white">{title}</h1>
           {children}
           <p className="mt-6 text-center text-sm text-gray-500">
-            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }} className="text-gray-400 hover:text-[#f1b300] transition-colors">
+            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }} className="text-gray-400 hover:text-highlight-on-dark transition-colors">
               &larr; Back to home
             </Link>
           </p>

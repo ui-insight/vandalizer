@@ -25,7 +25,7 @@ const PAGE_SIZE = 30
 // Dark palette (matches KnowledgePanel)
 const C = {
   bg: '#1e1e1e',
-  panel: '#191919',
+  panel: 'var(--color-panel-dark)',
   card: '#262626',
   cardHover: '#2f2f2f',
   border: '#3a3a3a',

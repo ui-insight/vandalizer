@@ -239,7 +239,7 @@ export function LeftPanel() {
         className="relative z-[300] flex items-center"
         style={{
           height: 50,
-          backgroundColor: '#191919',
+          backgroundColor: 'var(--color-panel-dark)',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
           padding: '0 15px',
         }}

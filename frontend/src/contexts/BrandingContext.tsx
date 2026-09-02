@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { getThemeConfig, type ThemeConfig } from '../api/config'
-import { getContrastTextColor, getComplementaryColor, getHoverColor, getAccessibleOnLight } from '../utils/color'
+import { getContrastTextColor, getComplementaryColor, getHoverColor, getAccessibleOnLight, getAccessibleOnDark, getPanelDark } from '../utils/color'
 
 export const DEFAULT_ORG_NAME = 'Vandalizer'
 export const DEFAULT_LOGO_URL = '/images/Vandalizer_Wordmark_RGB.png'
@@ -11,6 +11,13 @@ export const DEFAULT_ICON_URL = '/images/joevandal.png'
 // the first frame instead of flashing the defaults while GET /theme is in
 // flight. Kept in sync with the inline bootstrap script in index.html.
 const THEME_CACHE_KEY = 'vandalizer.theme'
+
+// The theme's own default highlight; if highlight_color still equals this, the
+// admin hasn't picked a brand color, so leave the dark chrome neutral (#191919)
+// alone. Mirrors _THEME_DEFAULT_COLOR in backend/app/services/email_service.py,
+// which guards the branded-email color the same way — a deployment that never
+// chose a brand should not silently acquire one.
+const THEME_DEFAULT_COLOR = '#eab308'
 
 function readCachedTheme(): ThemeConfig | null {
   try {
@@ -64,6 +71,21 @@ function applyTheme(theme: ThemeConfig) {
   // Accessible variant of the brand color for use as text/icons on light
   // backgrounds (the raw highlight often fails 4.5:1 on white — e.g. #eab308).
   root.style.setProperty('--highlight-on-light', getAccessibleOnLight(theme.highlight_color))
+  // And the mirror image, for the near-black auth/marketing surfaces (a dark
+  // brand color — e.g. #163A64 — is ~1.6:1 on #0a0a0a).
+  root.style.setProperty('--highlight-on-dark', getAccessibleOnDark(theme.highlight_color))
+  // The dark app chrome (tab strip, panel headers, left rail) takes the brand's
+  // hue and saturation but keeps a pinned lightness, so its contrast against
+  // white chrome text stays predictable for any brand color. On the untouched
+  // default gold we clear the property instead, so the :root neutral wins and an
+  // unbranded deployment's chrome is pixel-identical. removeProperty (not skip)
+  // because applyTheme also runs for a cached theme: an admin resetting a navy
+  // brand back to the default must clear the navy this same call previously set.
+  if ((theme.highlight_color || '').trim().toLowerCase() === THEME_DEFAULT_COLOR) {
+    root.style.removeProperty('--panel-dark')
+  } else {
+    root.style.setProperty('--panel-dark', getPanelDark(theme.highlight_color))
+  }
 }
 
 function resolve(theme: ThemeConfig | null): Omit<Branding, 'refresh'> {

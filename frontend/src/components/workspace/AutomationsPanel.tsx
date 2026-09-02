@@ -112,7 +112,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       <div
         style={{
           height: 50,
-          backgroundColor: '#191919',
+          backgroundColor: 'var(--color-panel-dark)',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
           padding: '0 20px',
           display: 'flex',
@@ -196,7 +196,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,
             padding: '0 8px', height: 26,
-            backgroundColor: '#191919', border: '1px solid #3a3a3a', borderRadius: 5,
+            backgroundColor: 'var(--color-panel-dark)', border: '1px solid #3a3a3a', borderRadius: 5,
             maxWidth: 160,
           }}>
             <Search size={11} style={{ color: '#555', flexShrink: 0 }} />

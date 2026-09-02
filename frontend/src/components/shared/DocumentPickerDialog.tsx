@@ -137,7 +137,7 @@ export function DocumentPickerDialog({
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
-              backgroundColor: selected.size > 0 ? '#191919' : '#e5e7eb',
+              backgroundColor: selected.size > 0 ? 'var(--color-panel-dark)' : '#e5e7eb',
               color: selected.size > 0 ? '#fff' : '#6b7280',
               cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
             }}

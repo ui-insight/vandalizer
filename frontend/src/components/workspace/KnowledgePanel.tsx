@@ -725,7 +725,7 @@ export function KnowledgePanel() {
         <div
           style={{
             height: 50,
-            backgroundColor: '#191919',
+            backgroundColor: 'var(--color-panel-dark)',
             boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
             padding: '0 12px',
             display: 'flex',
@@ -1707,7 +1707,7 @@ export function KnowledgePanel() {
       <div
         style={{
           minHeight: 50,
-          backgroundColor: '#191919',
+          backgroundColor: 'var(--color-panel-dark)',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
           padding: '8px 20px',
           display: 'flex',
@@ -1794,7 +1794,7 @@ export function KnowledgePanel() {
         style={{
           display: 'flex', gap: 0,
           borderBottom: '1px solid #3a3a3a',
-          backgroundColor: '#191919',
+          backgroundColor: 'var(--color-panel-dark)',
           flexShrink: 0,
         }}
       >

@@ -1074,7 +1074,7 @@ export function ExtractionEditorPanel() {
                 fontFamily: 'inherit',
                 borderRadius: 6,
                 border: 'none',
-                backgroundColor: '#191919',
+                backgroundColor: 'var(--color-panel-dark)',
                 color: '#fff',
                 cursor: 'pointer',
               }}
@@ -3546,7 +3546,7 @@ function ValidateTab({
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '8px 16px', fontSize: 13, fontWeight: 600,
                   fontFamily: 'inherit', borderRadius: 8, border: 'none',
-                  backgroundColor: '#191919', color: '#fff', cursor: 'pointer',
+                  backgroundColor: 'var(--color-panel-dark)', color: '#fff', cursor: 'pointer',
                 }}
               >
                 <Plus style={{ width: 14, height: 14 }} aria-hidden="true" /> Add Documents
@@ -3827,7 +3827,7 @@ function ValidateTab({
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 8, border: 'none',
-              backgroundColor: '#191919', color: '#fff',
+              backgroundColor: 'var(--color-panel-dark)', color: '#fff',
               cursor: validating || sources.length === 0 ? 'not-allowed' : 'pointer',
               opacity: validating || sources.length === 0 ? 0.5 : 1,
             }}
@@ -4413,7 +4413,7 @@ function ValidateTab({
                 style={{
                   padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
                   borderRadius: 8, border: 'none',
-                  backgroundColor: '#191919', color: '#fff',
+                  backgroundColor: 'var(--color-panel-dark)', color: '#fff',
                   cursor: autoFilling ? 'not-allowed' : 'pointer',
                   opacity: autoFilling ? 0.6 : 1,
                 }}

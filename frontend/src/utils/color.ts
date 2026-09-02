@@ -84,6 +84,24 @@ export function getAccessibleOnLight(hex: string, bg = '#ffffff', target = 4.5):
   return '#1a1a1a'
 }
 
+/** Lighten a color (preserving hue/saturation) until it meets the target WCAG
+ *  contrast ratio against a dark background — for using the brand color as
+ *  *text/icons on near-black*, where a dark brand (e.g. #163A64 ≈ 1.6:1 on
+ *  #0a0a0a) is illegible. Returns the original color if it already passes. */
+export function getAccessibleOnDark(hex: string, bg = '#0a0a0a', target = 4.5): string {
+  if (contrastRatio(hex, bg) >= target) return hex
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s } = rgbToHsl(r, g, b)
+  let { l } = rgbToHsl(r, g, b)
+  // Step lightness up until contrast is met (or we top out near white).
+  for (let i = 0; i < 100 && l < 1; i++) {
+    l = Math.min(1, l + 0.02)
+    const candidate = hslToHex(h, s, l)
+    if (contrastRatio(candidate, bg) >= target) return candidate
+  }
+  return '#f5f5f5'
+}
+
 /** Derive a deep, rich gradient partner by shifting hue slightly and darkening.
  *  Produces a harmonious gradient without the ugly midtones of a true complement. */
 export function getComplementaryColor(hex: string): string {
@@ -98,4 +116,17 @@ export function getHoverColor(hex: string): string {
   const { r, g, b } = hexToRgb(hex)
   const { h, s, l } = rgbToHsl(r, g, b)
   return hslToHex(h, s, Math.max(l - 0.08, 0))
+}
+
+/** The app's dark chrome, tinted toward the brand. Takes the brand's hue and
+ *  saturation but pins lightness, so contrast against white chrome text stays
+ *  predictable whatever color an admin picks. */
+export function getPanelDark(hex: string, lightness = 0.12): string {
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s } = rgbToHsl(r, g, b)
+  // Cap saturation: at this lightness a fully saturated hue reads as a muddy
+  // stain rather than a tint (e.g. #ff0000 -> a brown-red chrome). Half
+  // saturation is enough for the surface to read as "the brand, darkened".
+  // A greyscale brand (s ~ 0) is untouched by the cap and stays neutral.
+  return hslToHex(h, Math.min(s, 0.5), lightness)
 }

@@ -2118,7 +2118,7 @@ function EditStepOverlay({
             <div
               onClick={onAddTask}
               style={{
-                backgroundColor: '#191919', color: '#fff',
+                backgroundColor: 'var(--color-panel-dark)', color: '#fff',
                 borderRadius: 'var(--ui-radius, 8px)',
                 padding: 16, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 10,

@@ -218,7 +218,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
     padding: '9px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
     border: 'none', borderRadius: 8,
     cursor: enabled ? 'pointer' : 'not-allowed',
-    backgroundColor: enabled ? '#191919' : '#e5e7eb',
+    backgroundColor: enabled ? 'var(--color-panel-dark)' : '#e5e7eb',
     color: enabled ? '#fff' : '#9ca3af',
     transition: 'background-color 0.15s',
   })

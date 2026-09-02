@@ -284,7 +284,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
         padding: 15,
         marginBottom: isUser ? 10 : 15,
         color: isUser ? 'white' : 'black',
-        backgroundColor: isUser ? '#191919' : '#00000008',
+        backgroundColor: isUser ? 'var(--color-panel-dark)' : '#00000008',
         borderLeft: isUser ? '7px solid var(--highlight-color, #f1b300)' : 'none',
         borderRadius: 'var(--ui-radius, 12px)',
       }}
