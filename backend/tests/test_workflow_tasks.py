@@ -48,6 +48,9 @@ def _mock_db(
 
     db.workflow.find_one.return_value = workflow_doc
     db.workflow_result.find_one.side_effect = lambda *a, **kw: result_doc
+    # The pickup's delivery counter ($inc + read-back). A real int matters:
+    # it is compared against MAX_DELIVERY_ATTEMPTS.
+    db.workflow_result.find_one_and_update.return_value = {"delivery_attempts": 1}
     db.system_config.find_one.return_value = sys_config or {}
     db.approval_request.find_one.return_value = approval_doc
 

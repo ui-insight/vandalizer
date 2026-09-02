@@ -12,6 +12,14 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
+# Ceiling on how many times one run may be delivered to a worker. Legitimate
+# paths spend a handful (first delivery + up to max_retries retries + a rare
+# broker redelivery); a run that keeps OOM-killing its worker is requeued by
+# reject_on_worker_lost with a fresh retry counter each time and would loop
+# forever without this — invisible to the heartbeat reaper, since every pass
+# rewrites last_progress_at.
+MAX_DELIVERY_ATTEMPTS = 8
+
 
 def _preload_form_filler_template(db, task_data: dict) -> None:
     """Attach a Form Filler task's fillable-PDF template bytes (see form_fill)."""
@@ -487,11 +495,17 @@ def _make_progress_updater(db, workflow_result_id):
     other shapes pymongo refuses. An unencodable write used to raise from
     inside ``execute()`` and kill an otherwise healthy run mid-way.
     """
+    import datetime as _dt
+
     from bson import ObjectId
 
     def update_progress(updates: dict):
         set_ops = {k: _bson_safe(v) for k, v in updates.items()}
         if set_ops:
+            # Heartbeat for tasks.activity.reap_stale_workflow_runs: a run
+            # whose worker died stops writing this, which is how the reaper
+            # tells a dead run from one that is merely slow.
+            set_ops["last_progress_at"] = _dt.datetime.now(_dt.timezone.utc)
             db.workflow_result.update_one(
                 {"_id": ObjectId(workflow_result_id)},
                 {"$set": set_ops},
@@ -825,6 +839,16 @@ def _mark_workflow_failed(
     rate_limit="1/s",
     max_retries=3,
     default_retry_delay=5,
+    # Ack after the task finishes, not on delivery. Workers ack on delivery by
+    # default, so an OOM kill or a deploy replacing the worker mid-run lost the
+    # message for good: no retry, no failure handler, and the WorkflowResult
+    # sat at "running" forever. Redelivery is safe *here specifically* because
+    # this task is built for re-entry — the resume-at-step logic below skips
+    # completed steps, and the atomic `finalized_at` claim makes the post-run
+    # side effects run exactly once. Do not copy these two flags onto tasks
+    # without that machinery.
+    acks_late=True,
+    reject_on_worker_lost=True,
 )
 def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_data, model, activity_id=None):
     """Execute a full workflow.
@@ -852,6 +876,42 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 
     if not workflow_doc or not result_doc:
         raise ValueError(f"Workflow {workflow_id} or result {workflow_result_id} not found")
+
+    # With acks_late, this task can be delivered more than once: a broker
+    # visibility-timeout redelivery, or a requeue after worker loss. A run
+    # that reached a terminal state in the meantime — the user canceled it,
+    # the reaper failed it, an earlier delivery completed it — must stay
+    # there; without this guard a late redelivery flipped "canceled" back to
+    # "running" and finished a run the user explicitly stopped.
+    if result_doc.get("status") in ("completed", "error", "canceled"):
+        logger.info(
+            "Skipping delivery of workflow run %s — already terminal (%s)",
+            workflow_result_id, result_doc.get("status"),
+        )
+        return {"status": "skipped_terminal", "result_id": workflow_result_id}
+
+    # Bound the poison-message loop: reject_on_worker_lost requeues with a
+    # fresh retry counter, so a run that deterministically OOM-kills its
+    # worker would otherwise loop forever — invisible to the heartbeat reaper,
+    # because every pass rewrites last_progress_at. Delivery attempts are
+    # counted on the run document itself, which survives requeues.
+    from pymongo import ReturnDocument
+
+    counted = db.workflow_result.find_one_and_update(
+        {"_id": ObjectId(workflow_result_id)},
+        {"$inc": {"delivery_attempts": 1}},
+        projection={"delivery_attempts": 1},
+        return_document=ReturnDocument.AFTER,
+    ) or {}
+    if counted.get("delivery_attempts", 1) > MAX_DELIVERY_ATTEMPTS:
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id,
+            "This run repeatedly crashed the worker executing it (usually a "
+            "step that runs the worker out of memory) and has been stopped. "
+            "Reduce the input size — or convert large documents to a "
+            "Knowledge Base — and run the workflow again.",
+        )
+        return {"status": "error", "result_id": workflow_result_id}
 
     # Load system config for sync engine
     sys_config = db.system_config.find_one() or {}
@@ -954,12 +1014,18 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # ValueError from the builder, and leaving the row at "queued" with no
     # output_step_names hides a run that is never coming back. Only the
     # progress fields wait for the resume decision below.
+    import datetime as _dt
+
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},
         {"$set": {
             "status": "running",
             "num_steps_total": len(steps_data) - 1,
             "output_step_names": output_step_names,
+            # First heartbeat: marks the run as picked up by a worker, which
+            # moves it from the reaper's generous never-started sweep to the
+            # strict no-progress one.
+            "last_progress_at": _dt.datetime.now(_dt.timezone.utc),
         }},
     )
 
@@ -972,15 +1038,19 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         config_override=workflow_doc.get("config_override"),
     )
 
-    # A retry resumes where the failed attempt stopped. On the first attempt
-    # there is nothing to resume from and this is (0, None).
-    start_index, initial_output = (
-        _resume_point(engine, result_doc) if self.request.retries else (0, None)
-    )
+    # Any pickup resumes where a previous attempt stopped, decided from the
+    # run document itself: a fresh run has no stored step output, so
+    # _resume_point returns (0, None) for it. Deciding from the message
+    # instead — retry counter, or the broker's `redelivered` flag — misses
+    # the acks_late redelivery cases (a requeue after worker loss arrives
+    # with retries == 0, and `redelivered` semantics vary by transport), and
+    # restarting from step 0 would discard completed steps and re-spend
+    # their tokens.
+    start_index, initial_output = _resume_point(engine, result_doc)
     prior_steps_output = (result_doc.get("steps_output") or {}) if start_index else {}
     if start_index:
         logger.info(
-            "Workflow %s retry %d/%d resuming at step %d of %d",
+            "Workflow %s (retry %d/%d) resuming at step %d of %d",
             workflow_id, self.request.retries, self.max_retries,
             start_index, len(steps_data) - 1,
         )
@@ -1444,6 +1514,13 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
+    # Same reasoning as execute_workflow_task: a worker dying mid-resume used
+    # to eat the message, leaving the approved run at "running" forever with
+    # the reviewer certain they had approved it. Redelivery re-runs the
+    # post-gate steps, and the `finalized_at` claim keeps the side effects
+    # single-shot.
+    acks_late=True,
+    reject_on_worker_lost=True,
 )
 def resume_workflow_after_approval(self, approval_uuid):
     """Resume a workflow after an approval request has been approved."""
@@ -1491,13 +1568,29 @@ def resume_workflow_after_approval(self, approval_uuid):
     # the gate: cancel_batch expires the pending approvals it cancels, but a
     # reviewer holding a stale page can still approve one, and resuming would
     # restart a run the user explicitly stopped — spending tokens hours later.
+    import datetime as _dt
+
+    # Positive status filter, not just "$ne canceled": a run the reaper
+    # already failed (approved-but-never-resumed, or a dead worker) must not
+    # be silently resurrected by a late resume delivery after its owner was
+    # told to re-run it — that executes the post-gate steps twice. "running"
+    # stays eligible so a Celery retry of this task can proceed past its own
+    # first attempt's write.
     resumed = db.workflow_result.update_one(
-        {"_id": ObjectId(workflow_result_id), "status": {"$ne": "canceled"}},
-        {"$set": {"status": "running", "current_step_detail": "Resuming after approval"}},
+        {
+            "_id": ObjectId(workflow_result_id),
+            "status": {"$in": ["pending_approval", "running"]},
+        },
+        {"$set": {
+            "status": "running",
+            "current_step_detail": "Resuming after approval",
+            "last_progress_at": _dt.datetime.now(_dt.timezone.utc),
+        }},
     )
     if resumed.matched_count == 0:
         logger.info(
-            "Not resuming workflow_result %s after approval — it was canceled",
+            "Not resuming workflow_result %s after approval — it was "
+            "canceled or already finalized",
             workflow_result_id,
         )
         return {"status": "canceled", "result_id": workflow_result_id}

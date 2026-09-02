@@ -62,10 +62,13 @@ class TestNormalization:
 # page_for_offset / resolve_entity_sources
 # ---------------------------------------------------------------------------
 
+# Irregular spacing on purpose: these represent measured boundaries, and
+# perfectly uniform offsets are the interpolator's signature — the legacy
+# detector in with_marker_provenance would (correctly) hedge a uniform list.
 MARKERS = [
     {"char_offset": 0, "kind": "page", "value": 1},
     {"char_offset": 100, "kind": "page", "value": 2},
-    {"char_offset": 200, "kind": "page", "value": 3},
+    {"char_offset": 230, "kind": "page", "value": 3},
 ]
 
 

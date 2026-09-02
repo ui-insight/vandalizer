@@ -526,6 +526,51 @@ async def build_from_documents(
 # Run extraction
 # ---------------------------------------------------------------------------
 
+_COMBINED_CONTEXT_SEP = "\n\n---\n\n"
+
+
+def merge_combined_context(
+    doc_texts: list[str], doc_metadata: list[dict],
+) -> tuple[str, dict]:
+    """Merge per-document texts and markers into one extraction context.
+
+    Markers and per-doc spans are re-offset into the merged text so source
+    passages still resolve to the right page and document. Marker provenance
+    is restored *per document, before the shift*: uniform spacing is how
+    legacy interpolated page markers are recognized, and merging destroys
+    that signature — and one modern document's already-flagged markers would
+    exempt a legacy sibling's from detection entirely.
+    """
+    from app.services.page_locator import with_marker_provenance
+
+    sep = _COMBINED_CONTEXT_SEP
+    merged_parts: list[str] = []
+    merged_markers: list[dict] = []
+    doc_spans: list[dict] = []
+    cursor = 0
+    for text, meta in zip(doc_texts, doc_metadata):
+        if not text:
+            continue
+        if merged_parts:
+            cursor += len(sep)
+        for m in with_marker_provenance(meta.get("text_markers")) or []:
+            merged_markers.append({**m, "char_offset": m.get("char_offset", 0) + cursor})
+        doc_spans.append({
+            "start": cursor,
+            "end": cursor + len(text),
+            "uuid": meta.get("uuid"),
+            "title": meta.get("title"),
+        })
+        merged_parts.append(text)
+        cursor += len(text)
+    return sep.join(merged_parts), {
+        "uuid": None,
+        "title": None,
+        "text_markers": merged_markers,
+        "doc_spans": doc_spans,
+    }
+
+
 async def run_extraction_sync(
     search_set_uuid: str,
     document_uuids: list[str],
@@ -634,36 +679,10 @@ async def run_extraction_sync(
         return []
 
     # Combined context: merge all documents into a single text for extraction.
-    # Markers and per-doc spans are re-offset into the merged text so source
-    # passages still resolve to the right page and document.
     if combined_context and len(doc_texts) > 1:
-        sep = "\n\n---\n\n"
-        merged_parts: list[str] = []
-        merged_markers: list[dict] = []
-        doc_spans: list[dict] = []
-        cursor = 0
-        for text, meta in zip(doc_texts, doc_metadata):
-            if not text:
-                continue
-            if merged_parts:
-                cursor += len(sep)
-            for m in meta.get("text_markers") or []:
-                merged_markers.append({**m, "char_offset": m.get("char_offset", 0) + cursor})
-            doc_spans.append({
-                "start": cursor,
-                "end": cursor + len(text),
-                "uuid": meta.get("uuid"),
-                "title": meta.get("title"),
-            })
-            merged_parts.append(text)
-            cursor += len(text)
-        doc_texts = [sep.join(merged_parts)]
-        doc_metadata = [{
-            "uuid": None,
-            "title": None,
-            "text_markers": merged_markers,
-            "doc_spans": doc_spans,
-        }]
+        merged_text, merged_meta = merge_combined_context(doc_texts, doc_metadata)
+        doc_texts = [merged_text]
+        doc_metadata = [merged_meta]
         doc_file_paths = []  # image mode not supported for combined
 
     # Resolve model

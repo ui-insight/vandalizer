@@ -504,9 +504,21 @@ async def add_document(
             })
         except Exception as e:
             logger.error(f"Error processing file {file.filename}: {e}")
+            # A DocumentReadError carries an actionable, user-facing message
+            # (e.g. "re-save it as PDF, DOCX, or plain text"); surfacing it
+            # beats the generic placeholder the user can do nothing with.
+            from app.services.document_readers import DocumentReadError
+
+            if isinstance(e, DocumentReadError):
+                placeholder = f"[This file couldn't be read: {e}]"
+            else:
+                placeholder = (
+                    "[This file couldn't be read — it may be corrupted, "
+                    "password-protected, or an unsupported format.]"
+                )
             file_attachment = FileAttachment(
                 filename=file.filename,
-                content="[This file couldn't be read — it may be corrupted, password-protected, or an unsupported format.]",
+                content=placeholder,
                 file_type="",
                 user_id=user_id,
             )

@@ -45,7 +45,13 @@ from app.services.model_routing import (
     choose_document_model,
     suggest_document_model,
 )
-from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
+from app.services.page_locator import (
+    annotate_chunk_pages,
+    cited_pages,
+    format_page_range,
+    locator_for_meta,
+    with_marker_provenance,
+)
 from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
     build_project_kb_empty_reminder,
@@ -158,6 +164,10 @@ def annotate_pages(text: str, markers: list[dict] | None) -> str:
     if not text or not markers:
         return text
 
+    # This branch's extracted helper (main inlines the same loop); the legacy
+    # provenance restoration lives inside _page_positions, which also covers
+    # derive_document_citations' chips — a raw read there would emit
+    # page_approximate: false chips contradicting the hedged prose.
     positions = _page_positions(markers, len(text))
     if not positions:
         return text
@@ -175,6 +185,10 @@ def annotate_pages(text: str, markers: list[dict] | None) -> str:
 
 def _page_positions(markers: list[dict] | None, text_len: int) -> list[tuple[int, int, bool]]:
     """Sorted ``(char_offset, page, approximate)`` for usable page markers."""
+    # Restores the `approximate` flag on markers interpolated before it
+    # existed, so legacy scanned documents hedge instead of citing exact
+    # pages — both in annotated text and in derive_document_citations' chips.
+    markers = with_marker_provenance(markers)
     positions: list[tuple[int, int, bool]] = []
     for m in markers or []:
         if not isinstance(m, dict) or m.get("kind") != "page":
@@ -301,7 +315,7 @@ def _has_approximate_pages(markers: list[dict] | None) -> bool:
     """True when any usable page marker came from interpolation, not measurement."""
     return any(
         isinstance(m, dict) and m.get("kind") == "page" and m.get("approximate")
-        for m in markers or []
+        for m in with_marker_provenance(markers) or []
     )
 
 

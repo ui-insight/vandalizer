@@ -36,6 +36,8 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
+from app.services.page_locator import with_marker_provenance
+
 # Reserved sidecar key on entity dicts: {field_name: source dict}. Every
 # consumer that iterates entity items must skip it (normalize_results,
 # draft hints, consensus votes, chunk merges).
@@ -462,7 +464,9 @@ def resolve_entity_sources(
     metadata map (``{key: {"enum_values", "is_optional"}}``), used to skip the
     value check on enum fields.
     """
-    markers = doc_meta.get("text_markers") or []
+    # Legacy interpolated markers stored before the `approximate` flag existed
+    # would otherwise resolve to confident exact pages.
+    markers = with_marker_provenance(doc_meta.get("text_markers")) or []
     doc_spans = doc_meta.get("doc_spans") or []
     normalized = normalize_with_map(doc_text) if doc_text else ("", [])
 

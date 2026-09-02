@@ -595,3 +595,411 @@ class TestExtractTextFromFileMissingFile:
         assert "[Error extracting content" not in result
         mock_logger.error.assert_not_called()
         mock_logger.warning.assert_called()
+
+
+_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+
+
+def _docx_with_tracked_changes(tmp_path):
+    document_xml = (
+        f'<w:document xmlns:w="{_W_NS}"><w:body>'
+        f'  <w:p><w:r><w:t>The budget totals </w:t></w:r>'
+        f'    <w:ins w:author="PI" w:date="2026-04-01">'
+        f'      <w:r><w:t>485,000</w:t></w:r>'
+        f'    </w:ins>'
+        f'    <w:del w:author="OSP" w:date="2026-04-02">'
+        f'      <w:r><w:delText>512,000</w:delText></w:r>'
+        f'    </w:del>'
+        f'  </w:p>'
+        f'</w:body></w:document>'
+    )
+    docx = tmp_path / "tracked.docx"
+    with zipfile.ZipFile(docx, "w") as zf:
+        zf.writestr("word/document.xml", document_xml)
+    return str(docx)
+
+
+class TestDocxTrackedChangeExtras:
+    """The body is read with tracked changes accepted (insertions in,
+    deletions out), so the extras must report deletions — review history
+    worth seeing, labeled as deleted — and must NOT re-list insertions,
+    which are already in the body: listing them again put every inserted
+    figure into the context window twice, and a "sum the personnel costs"
+    prompt double-counted them.
+    """
+
+    def test_deletions_are_reported_and_labeled(self, tmp_path):
+        out = extract_docx_extras(_docx_with_tracked_changes(tmp_path))
+        assert "## Tracked changes" in out
+        assert "**Deleted** by OSP" in out
+        assert "512,000" in out
+        # The section says what it is: text NOT in the body.
+        assert "NOT part of the document body" in out
+
+    def test_insertions_are_not_listed_twice(self, tmp_path):
+        out = extract_docx_extras(_docx_with_tracked_changes(tmp_path))
+        assert "485,000" not in out
+        assert "Inserted" not in out
+
+    def test_parse_failures_are_logged_not_silent(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        docx = tmp_path / "bad.docx"
+        with zipfile.ZipFile(docx, "w") as zf:
+            zf.writestr("word/comments.xml", "<not valid xml")
+            zf.writestr("word/document.xml", "<also broken")
+        with patch.object(dr, "logger") as mock_logger:
+            out = extract_docx_extras(str(docx))
+        assert out == ""
+        assert mock_logger.warning.call_count == 2
+
+
+class TestReadDocxMarkdown:
+    """One DOCX reader for every path. Upload ingestion used pypandoc with a
+    silent fallback; chat attachments used MarkItDown only — the same file
+    read differently depending on how it entered the system. And the Docker
+    image ships no pandoc binary, so on the supported deploy the "fallback"
+    is the path every document takes; it must be logged, not swallowed bare.
+    """
+
+    def test_pandoc_is_told_explicitly_to_accept_tracked_changes(self):
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        fake = MagicMock()
+        fake.convert_file.return_value = "body"
+        with patch.dict(sys.modules, {"pypandoc": fake}):
+            out = dr.read_docx_markdown("some.docx")
+        assert out == "body"
+        kwargs = fake.convert_file.call_args.kwargs
+        assert kwargs["extra_args"] == ["--track-changes=accept"]
+
+    def test_pypandoc_failure_falls_back_to_markitdown_with_a_log(self):
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        fake = MagicMock()
+        fake.convert_file.side_effect = OSError("No pandoc was found")
+        with patch.dict(sys.modules, {"pypandoc": fake}), \
+             patch.object(dr, "convert_to_markdown", return_value="md body") as mock_md, \
+             patch.object(dr, "logger") as mock_logger:
+            out = dr.read_docx_markdown("some.docx")
+        assert out == "md body"
+        mock_md.assert_called_once_with("some.docx", keep_data_uris=False)
+        assert mock_logger.info.called
+
+    def test_chat_attachment_path_uses_the_same_reader(self, tmp_path):
+        """extract_text_from_file('docx') must go through read_docx_markdown,
+        not straight to MarkItDown — otherwise upload and chat attachment
+        diverge again."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = str(tmp_path / "a.docx")
+        with zipfile.ZipFile(path, "w") as zf:
+            zf.writestr("[Content_Types].xml", "<x/>")
+        with patch.object(dr, "read_docx_markdown", return_value="unified body") as mock_read:
+            out = dr.extract_text_from_file(path, "docx")
+        mock_read.assert_called_once_with(path)
+        assert "unified body" in out
+
+
+def _tracked_changes_docx(tmp_path):
+    """A minimal but structurally valid .docx with one insertion + deletion."""
+    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    document_xml = (
+        f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        f'<w:document xmlns:w="{ns}"><w:body>'
+        f'<w:p><w:r><w:t xml:space="preserve">The budget totals </w:t></w:r>'
+        f'<w:ins w:author="PI" w:date="2026-04-01">'
+        f'<w:r><w:t>485,000</w:t></w:r>'
+        f'</w:ins>'
+        f'<w:del w:author="OSP" w:date="2026-04-02">'
+        f'<w:r><w:delText>512,000</w:delText></w:r>'
+        f'</w:del>'
+        f'</w:p>'
+        f'</w:body></w:document>'
+    )
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+        '</Types>'
+    )
+    rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+        'Target="word/document.xml"/>'
+        '</Relationships>'
+    )
+    docx = tmp_path / "tracked_real.docx"
+    with zipfile.ZipFile(docx, "w") as zf:
+        zf.writestr("[Content_Types].xml", content_types)
+        zf.writestr("_rels/.rels", rels)
+        zf.writestr("word/document.xml", document_xml)
+    return str(docx)
+
+
+class TestDocxBodyTrackedChangeSemantics:
+    """The extras design rests on the BODY readers accepting revisions
+    (insertions in once, deletions out). That is third-party behavior —
+    mammoth for MarkItDown, pandoc where installed — and an upgrade that
+    changes it would silently make inserted figures vanish (or deleted ones
+    reappear) everywhere on the Docker deploy while the extras tests stayed
+    green. This pins it against the installed packages.
+    """
+
+    def test_markitdown_body_keeps_insertions_and_drops_deletions(self, tmp_path):
+        from app.services.document_readers import convert_to_markdown
+
+        body = convert_to_markdown(_tracked_changes_docx(tmp_path), keep_data_uris=False)
+        assert "485,000" in body   # inserted text is part of the body
+        assert "512,000" not in body  # deleted text is not
+
+    def test_read_docx_markdown_via_fallback_matches(self, tmp_path):
+        """The full shared reader, on a host with no pandoc (the Docker
+        reality): same semantics, and the image-strip post-process applies
+        on the fallback branch too."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        no_pandoc = MagicMock()
+        no_pandoc.convert_file.side_effect = OSError("No pandoc was found")
+        with patch.dict(sys.modules, {"pypandoc": no_pandoc}):
+            body = dr.read_docx_markdown(_tracked_changes_docx(tmp_path))
+        assert "485,000" in body
+        assert "512,000" not in body
+
+
+class TestReadDocxMarkdownLogLevels:
+    def test_missing_pandoc_logs_info_not_warning(self):
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        fake = MagicMock()
+        fake.convert_file.side_effect = OSError("No pandoc was found")
+        with patch.dict(sys.modules, {"pypandoc": fake}), \
+             patch.object(dr, "convert_to_markdown", return_value="md"), \
+             patch.object(dr, "logger") as mock_logger:
+            dr.read_docx_markdown("a.docx")
+        assert mock_logger.info.called
+        mock_logger.warning.assert_not_called()
+
+    def test_real_pandoc_failure_logs_warning(self):
+        """On a pandoc host, one document switching readers relative to its
+        neighbors must be visible at default (warning+) log levels."""
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        fake = MagicMock()
+        fake.convert_file.side_effect = RuntimeError("pandoc died parsing")
+        with patch.dict(sys.modules, {"pypandoc": fake}), \
+             patch.object(dr, "convert_to_markdown", return_value="md"), \
+             patch.object(dr, "logger") as mock_logger:
+            dr.read_docx_markdown("a.docx")
+        assert mock_logger.warning.called
+
+    def test_fallback_strips_images_like_the_pandoc_branch(self):
+        import sys
+        from unittest.mock import MagicMock, patch
+        import app.services.document_readers as dr
+
+        fake = MagicMock()
+        fake.convert_file.side_effect = OSError("No pandoc was found")
+        with patch.dict(sys.modules, {"pypandoc": fake}), \
+             patch.object(dr, "convert_to_markdown",
+                          return_value="Before ![chart](media/img1.png) after"):
+            out = dr.read_docx_markdown("a.docx")
+        assert "media/img1.png" not in out
+        assert "Before" in out and "after" in out
+
+class TestPartialOcrSuppressesPageMarkers:
+    """Interpolation spreads the source PDF's page count uniformly over the
+    OCR text. When the conversion was partial, the text covers an unknown
+    fraction of those pages — spreading 400 page numbers over text from 30
+    pages is systematically wrong on every marker, hedge or not. No page
+    beats a wrong page: partial conversions get no page markers at all, and
+    citations fall back to the document title.
+    """
+
+    def _read(self, tmp_path, partial: bool, report=None):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        long_text = "line of ocr text\n" * 500
+
+        def fake_ocr(path, report=None):
+            if partial and report is not None:
+                report["partial"] = True
+                report["errors"] = ["page 31: conversion failed"]
+            return long_text
+
+        with patch.object(dr, "pdf_has_ocrable_content", return_value=True), \
+             patch.object(dr, "_local_markdown_extract_from_pdf", return_value=None), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=fake_ocr), \
+             patch.object(dr, "pdf_page_count", return_value=400):
+            return dr._read_pdf_text_and_markers(str(tmp_path / "scan.pdf"), report=report)
+
+    def test_partial_conversion_emits_no_page_markers(self, tmp_path):
+        report: dict = {}
+        text, markers = self._read(tmp_path, partial=True, report=report)
+        assert text
+        assert markers == []
+        # The disclosure signal still reaches the ingestion layer.
+        assert report.get("partial") is True
+
+    def test_partial_is_suppressed_even_when_no_caller_wants_the_report(self, tmp_path):
+        text, markers = self._read(tmp_path, partial=True, report=None)
+        assert text
+        assert markers == []
+
+    def test_full_conversion_still_interpolates_hedged_markers(self, tmp_path):
+        text, markers = self._read(tmp_path, partial=False)
+        assert text
+        assert len(markers) == 400
+        assert all(m["approximate"] is True for m in markers)
+
+class TestGatedTextReader:
+    """The last-resort decode used to be latin-1, which cannot fail: any
+    binary "decoded", was stored as raw_text, chunked, embedded, and chat
+    answered from it as a successfully processed document. read_text_file is
+    now the one gated reader for every plain-text path.
+    """
+
+    def _extract_unknown(self, tmp_path, payload: bytes, ext="dat"):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        path = tmp_path / f"upload.{ext}"
+        path.write_bytes(payload)
+        # Force the fallback chain: markitdown refuses the format.
+        with patch.object(dr, "convert_to_markdown", side_effect=RuntimeError("no reader")):
+            return dr.extract_text_from_file(str(path), ext)
+
+    def test_a_binary_blob_fails_the_document_instead_of_becoming_text(self, tmp_path):
+        from app.services.document_readers import DocumentReadError
+
+        payload = b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 64
+        with pytest.raises(DocumentReadError) as exc:
+            self._extract_unknown(tmp_path, payload)
+        assert "readable text" in str(exc.value)
+        assert "re-save it" in str(exc.value)
+        # Not double-wrapped by the generic handler.
+        assert "Could not read this" not in str(exc.value)
+
+    def test_nul_free_binary_is_still_refused_by_density(self, tmp_path):
+        """Every other refusal fixture contains NULs, which short-circuit the
+        gate; this one has none, so it pins the density check itself."""
+        from app.services.document_readers import DocumentReadError
+
+        # Control-dense but NUL-free: the shape of a structured binary.
+        payload = bytes(b for b in range(1, 256)) * 40
+        with pytest.raises(DocumentReadError):
+            self._extract_unknown(tmp_path, payload)
+
+    def test_binary_with_a_clean_text_preamble_is_caught_by_its_tail(self, tmp_path):
+        """A self-extracting archive opens with a readable script; sniffing
+        only the head would ingest the binary tail as document text."""
+        from app.services.document_readers import _BINARY_SNIFF_BYTES, DocumentReadError
+
+        preamble = b"#!/bin/sh\n# self-extracting installer\n" * 40000
+        assert len(preamble) > _BINARY_SNIFF_BYTES
+        tail = bytes(b for b in range(1, 256)) * 8000
+        with pytest.raises(DocumentReadError):
+            self._extract_unknown(tmp_path, preamble + preamble + tail)
+
+    def test_legacy_cp1252_text_decodes_with_its_punctuation_intact(self, tmp_path):
+        """The branch's legitimate customer. Previously this decoded via
+        latin-1, which preserved the bytes but rendered every curly quote and
+        the euro sign as C1 mojibake."""
+        payload = "It\u2019s a \u201cbudget\u201d \u2014 total \u20ac5,000.\n".encode("cp1252") * 40
+        result = self._extract_unknown(tmp_path, payload)
+        assert "\u2019" in result       # curly apostrophe survived
+        assert "\u20ac5,000" in result  # euro sign survived
+        assert "budget" in result
+
+    def test_bomless_utf16le_decodes_instead_of_passing_as_nul_junk(self, tmp_path):
+        """BOM-less UTF-16LE ASCII is *valid UTF-8* (NUL-interleaved), so the
+        old utf-8-first chain stored it as junk without the gate ever
+        running. It now decodes properly via the utf-16 codec — PowerShell
+        `>` redirection and SQL Server bcp emit exactly this."""
+        text = "quarterly personnel costs: 485,000\n" * 30
+        result = self._extract_unknown(tmp_path, text.encode("utf-16-le"))
+        assert "\x00" not in result
+        assert "485,000" in result
+
+    def test_utf16_with_bom_decodes_too(self, tmp_path):
+        text = "plain looking text, saved by notepad\n" * 20
+        result = self._extract_unknown(tmp_path, text.encode("utf-16"))
+        assert "\x00" not in result
+        assert "notepad" in result
+
+    def test_ansi_colored_log_is_text_not_binary(self, tmp_path):
+        """ESC is deliberately not in the junk set: a color-dense terminal
+        capture is pure ASCII text."""
+        line = "\x1b[0;32mPASS\x1b[0m test_module.py::test_case\n"
+        result = self._extract_unknown(tmp_path, (line * 200).encode("utf-8"), ext="ansi")
+        assert "PASS" in result
+
+    def test_short_file_with_a_stray_control_byte_is_not_refused(self, tmp_path):
+        """One \x1a (the historical DOS EOF marker) in a 20-byte file is 5%
+        "junk"; the density test needs a real sample to mean anything."""
+        result = self._extract_unknown(tmp_path, b"legacy dos text\x1a")
+        assert "legacy dos text" in result
+
+    def test_a_binary_named_txt_gets_the_actionable_refusal(self, tmp_path):
+        """The known-text extensions used to fail with a raw codec error
+        ("'utf-8' codec can't decode byte 0x89...") while unknown extensions
+        got the re-save message — one condition, two user-facing outcomes."""
+        import app.services.document_readers as dr
+        from app.services.document_readers import DocumentReadError
+
+        path = tmp_path / "report.txt"
+        path.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 64)
+        with pytest.raises(DocumentReadError) as exc:
+            dr.extract_text_from_file(str(path), "txt")
+        assert "re-save it" in str(exc.value)
+
+    def test_extensionless_file_message_does_not_read_this_dot_file(self, tmp_path):
+        from app.services.document_readers import DocumentReadError
+
+        with pytest.raises(DocumentReadError) as exc:
+            self._extract_unknown(tmp_path, b"\x00" * 4096, ext="")
+        assert "This . file" not in str(exc.value)
+        assert "This file" in str(exc.value)
+
+    def test_refusal_is_logged_at_warning(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+        from app.services.document_readers import DocumentReadError
+
+        path = tmp_path / "blob.bin"
+        path.write_bytes(b"\x00" * 4096)
+        with patch.object(dr, "logger") as mock_logger, pytest.raises(DocumentReadError):
+            dr.read_text_file(str(path), "bin")
+        assert mock_logger.warning.called
+
+    def test_looks_like_binary_density_boundary(self):
+        from app.services.document_readers import (
+            _BINARY_SNIFF_MIN_LENGTH,
+            _looks_like_binary,
+        )
+
+        assert _looks_like_binary("abc\x00def" * 100)
+        # 6% junk over a real sample: refused.
+        junky = ("\x01" * 6 + "a" * 94) * 10
+        assert len(junky) >= _BINARY_SNIFF_MIN_LENGTH
+        assert _looks_like_binary(junky)
+        # 4% junk: allowed.
+        assert not _looks_like_binary(("\x01" * 4 + "a" * 96) * 10)
+        assert not _looks_like_binary("")

@@ -8,6 +8,7 @@ import io
 import logging
 import re
 from datetime import date, datetime, time
+from typing import NoReturn
 
 from markitdown import MarkItDown
 
@@ -597,12 +598,67 @@ def _docx_text_of(element) -> str:
     return "".join(parts).strip()
 
 
+def read_docx_markdown(docx_path: str) -> str:
+    """Body text of a .docx as markdown — the one reader for every path.
+
+    Upload ingestion used pypandoc (with a silent, unlogged fallback to
+    MarkItDown) while chat attachments used MarkItDown only, so the same file
+    yielded different text depending on how it entered the system. Both now
+    come through here. Note the fallback is not an edge case: the Docker
+    image installs no pandoc binary, so on the supported deploy pypandoc
+    raises OSError on every call and MarkItDown does all the work — which is
+    why a *missing binary* logs at info. Any other pypandoc failure means a
+    host that normally converts with pandoc just switched readers for this
+    one document (different table/list rendering than its neighbors), which
+    is worth a warning.
+
+    ``--track-changes=accept`` is passed explicitly (insertions kept,
+    deletions dropped from the body). That is pandoc's documented default,
+    but the default was an assumption about whichever pandoc binary a host
+    happens to have; struck-through text in a budget must not depend on it.
+    Deleted text is not lost — ``extract_docx_extras`` reports it, labeled
+    as deleted. MarkItDown's mammoth backend likewise accepts revisions
+    (``w:ins`` content is read, ``w:del`` is in its ignored-elements list —
+    pinned by test against the installed package).
+    """
+    try:
+        import pypandoc
+
+        body = pypandoc.convert_file(
+            docx_path, "markdown", extra_args=["--track-changes=accept"],
+        )
+    except OSError as e:
+        # "No pandoc was found" — the expected state on the Docker deploy.
+        logger.info("pandoc not available for %s (%s); reading with MarkItDown", docx_path, e)
+        body = None
+    except Exception as e:
+        logger.warning(
+            "pypandoc failed to convert %s (%s); reading with MarkItDown",
+            docx_path, e,
+        )
+        body = None
+    if body is None:
+        body = convert_to_markdown(docx_path, keep_data_uris=False)
+    # Applied on BOTH branches: leaving image refs in only the MarkItDown
+    # output would make the same docx read differently on Docker (no pandoc)
+    # vs a pandoc host — the per-environment divergence this function exists
+    # to kill.
+    return remove_images_from_markdown(body)
+
+
 def extract_docx_extras(docx_path: str) -> str:
-    """Pull comments and tracked changes from a .docx file.
+    """Pull comments and tracked-change deletions from a .docx file.
 
     Returns a markdown block to append after the body, or "" if there's
     nothing notable. Research admins live in Word comments during
     proposal review, and pypandoc/MarkItDown both drop them silently.
+
+    Deletions are reported because the body (read with tracked changes
+    accepted) no longer contains them — a struck-through dollar figure is
+    review history worth seeing, clearly labeled as deleted. Insertions are
+    deliberately NOT listed: accepted insertions are already part of the
+    body, and listing them again put every inserted figure into the context
+    window twice — a "sum the personnel costs" prompt double-counted them.
     """
     import defusedxml.ElementTree as ET
     import zipfile
@@ -621,6 +677,10 @@ def extract_docx_extras(docx_path: str) -> str:
             try:
                 tree = ET.fromstring(zf.read("word/comments.xml"))
             except ET.ParseError:
+                logger.warning(
+                    "Could not parse word/comments.xml in %s — comments will "
+                    "be missing from the extracted text", docx_path,
+                )
                 tree = None
             if tree is not None:
                 lines = []
@@ -641,20 +701,29 @@ def extract_docx_extras(docx_path: str) -> str:
             try:
                 doc_tree = ET.fromstring(zf.read("word/document.xml"))
             except ET.ParseError:
+                logger.warning(
+                    "Could not parse word/document.xml in %s — tracked-change "
+                    "deletions will be missing from the extracted text",
+                    docx_path,
+                )
                 doc_tree = None
             if doc_tree is not None:
                 changes: list[str] = []
-                for kind, label in (("ins", "Inserted"), ("del", "Deleted")):
-                    for el in doc_tree.iter(f"{{{_DOCX_W_NS}}}{kind}"):
-                        text = _docx_text_of(el)
-                        if not text:
-                            continue
-                        author = el.attrib.get(f"{{{_DOCX_W_NS}}}author", "Unknown")
-                        date = el.attrib.get(f"{{{_DOCX_W_NS}}}date", "")
-                        suffix = f" ({date})" if date else ""
-                        changes.append(f"- **{label}** by {author}{suffix}: {text}")
+                for el in doc_tree.iter(f"{{{_DOCX_W_NS}}}del"):
+                    text = _docx_text_of(el)
+                    if not text:
+                        continue
+                    author = el.attrib.get(f"{{{_DOCX_W_NS}}}author", "Unknown")
+                    date = el.attrib.get(f"{{{_DOCX_W_NS}}}date", "")
+                    suffix = f" ({date})" if date else ""
+                    changes.append(f"- **Deleted** by {author}{suffix}: {text}")
                 if changes:
-                    sections.append("## Tracked changes\n" + "\n".join(changes))
+                    sections.append(
+                        "## Tracked changes\n"
+                        "_The following text was deleted in tracked changes "
+                        "and is NOT part of the document body above._\n"
+                        + "\n".join(changes)
+                    )
 
     return "\n\n".join(sections)
 
@@ -855,6 +924,11 @@ def _read_pdf_text_and_markers(
     file_path: str, report: dict | None = None,
 ) -> tuple[str, list[dict]]:
     """Extract a PDF's text and page markers with the best reader available."""
+    # A local dict when the caller passed none: the partial-conversion signal
+    # the OCR client records here decides below whether page markers can be
+    # emitted at all, so it is needed even when no caller wants the report.
+    if report is None:
+        report = {}
     if not pdf_has_ocrable_content(file_path):
         logger.warning(
             "PDF %s rendered blank on every page — skipping OCR so the "
@@ -883,15 +957,27 @@ def _read_pdf_text_and_markers(
         logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
         ocr_text = ""
     if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
+        # Interpolation spreads the *source PDF's* page count uniformly over
+        # whatever text OCR returned. When the conversion was partial, the
+        # text covers some unknown fraction of those pages, so every marker —
+        # hedged or not — is systematically wrong (400 page numbers spread
+        # over text from 30 pages). No page beats a wrong page: citations
+        # fall back to the document title.
+        if report.get("partial"):
+            logger.warning(
+                "OCR conversion of %s was partial — suppressing page markers, "
+                "citations will carry no page numbers",
+                file_path,
+            )
+            return ocr_text, []
         num_pages = pdf_page_count(file_path)
         return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
     # Falling back means the partial OCR text is not what we return, so the
     # partial-conversion warning must not survive onto the PyMuPDF result.
-    ocr_report_partial = bool(report and report.get("partial"))
-    ocr_report_errors = list(report.get("errors") or []) if report else []
-    if report is not None:
-        report.pop("partial", None)
-        report.pop("errors", None)
+    ocr_report_partial = bool(report.get("partial"))
+    ocr_report_errors = list(report.get("errors") or [])
+    report.pop("partial", None)
+    report.pop("errors", None)
     # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
     # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
     # hard requirement. If it fails (corrupt PDF, or the source file was
@@ -906,10 +992,13 @@ def _read_pdf_text_and_markers(
                 "PyMuPDF page extraction failed for %s (%s); using OCR text",
                 file_path, e,
             )
-            if report is not None and ocr_report_partial:
-                # We are shipping the partial OCR text after all.
+            if ocr_report_partial:
+                # We are shipping the partial OCR text after all — and, as
+                # above, page markers interpolated against the full PDF's
+                # page count over partial text would all be wrong.
                 report["partial"] = True
                 report["errors"] = ocr_report_errors
+                return ocr_text, []
             return ocr_text, _interpolate_page_markers(
                 ocr_text, pdf_page_count(file_path)
             )
@@ -942,6 +1031,125 @@ def extract_text_with_markers(
     return extract_text_from_file(file_path, ext), []
 
 
+# Sample sizes for the binary sniff below. The head and tail are checked so a
+# binary with a clean text preamble (self-extracting archive, tar whose first
+# member is text) can't sneak its tail through, and the byte-level sniff runs
+# BEFORE the file is fully read so a 500 MB binary is refused without ever
+# materializing it as a Python str in the worker.
+_BINARY_SNIFF_BYTES = 1_000_000
+# Below this, one stray control byte dominates the ratio (a 19-byte DOS text
+# file with its historical \x1a EOF marker is 5.3% "junk"); the density test
+# is only meaningful over a real sample. NUL/decode checks still apply.
+_BINARY_SNIFF_MIN_LENGTH = 256
+
+# Fraction of never-printable characters above which content is judged to be
+# a binary, not text. Uniformly distributed bytes (compressed or encrypted
+# data) land around 13%; structured binaries higher. Legacy text is at or
+# near zero — the sets below deliberately exclude the C1 range cp1252 uses
+# for curly quotes, dashes and €, and ESC, so quote-heavy prose and
+# ANSI-colored logs/terminal captures can't trip it.
+_BINARY_JUNK_THRESHOLD = 0.05
+
+# Code points no text encoding prints: C0 controls minus real whitespace and
+# ESC (see above), DEL, and the five code points cp1252 leaves undefined.
+_JUNK_ORDINALS = (
+    (set(range(32)) - {ord(c) for c in "\t\n\r\f\x0b"} - {0x1B})
+    | {0x7F, 0x81, 0x8D, 0x8F, 0x90, 0x9D}
+)
+# For bytes.translate / str.translate — deleting junk and measuring the
+# shrinkage counts occurrences in C instead of a per-character Python loop.
+_JUNK_BYTES = bytes(sorted(_JUNK_ORDINALS - {0}))  # NUL handled separately
+_JUNK_STR_TABLE = dict.fromkeys(_JUNK_ORDINALS, None)
+
+
+def _byte_junk_fraction(sample: bytes) -> float:
+    """Never-printable density of a byte sample, NUL excluded.
+
+    NUL is excluded *here* because UTF-16 text is half NULs at the byte
+    level; the per-decode check below rejects NULs that survive decoding.
+    """
+    if len(sample) < _BINARY_SNIFF_MIN_LENGTH:
+        return 0.0
+    kept = sample.translate(None, _JUNK_BYTES)
+    return (len(sample) - len(kept)) / len(sample)
+
+
+def _looks_like_binary(text: str) -> bool:
+    """Whether a decoded string is a binary file wearing a text coat.
+
+    A permissive codec's decode "succeeding" proves nothing (latin-1 maps
+    every byte to a character). Two signals separate binaries from text: NUL
+    characters (no text encoding decodes to them — a NUL-interleaved result
+    means the wrong codec was used), and the density of characters no text
+    encoding uses for content.
+    """
+    sample = text[:_BINARY_SNIFF_BYTES]
+    if not sample:
+        return False
+    if "\x00" in sample:
+        return True
+    if len(sample) < _BINARY_SNIFF_MIN_LENGTH:
+        return False
+    junk = len(sample) - len(sample.translate(_JUNK_STR_TABLE))
+    return junk / len(sample) > _BINARY_JUNK_THRESHOLD
+
+
+def _refuse_binary(file_path: str, file_extension: str) -> "NoReturn":
+    desc = f".{file_extension} file" if file_extension else "file"
+    # The refusal is deliberate and user-actionable — log it here (the
+    # DocumentReadError passthrough below skips the generic handler's log),
+    # at warning rather than error so ordinary binary uploads don't page.
+    logger.warning("Refusing to ingest %s as text — content looks binary", file_path)
+    raise DocumentReadError(
+        f"This {desc} does not appear to contain readable text — it may be "
+        "a binary format this system cannot read. If it is a document, "
+        "re-save it as PDF, DOCX, or plain text (UTF-8) and upload that."
+    ) from None
+
+
+def read_text_file(file_path: str, file_extension: str) -> str:
+    """Read a plain-text file, refusing content that is not actually text.
+
+    The one text reader for both the known-text extensions (txt/csv/code…)
+    and the unknown-extension fallback, so a binary gets the same actionable
+    refusal whatever it is named, instead of a raw codec error on one path
+    and a latin-1 mojibake ingest on the other.
+
+    Encodings are tried best-first, and a decode only counts when the result
+    looks like text: BOM-less UTF-16LE ASCII is *valid UTF-8* (as
+    NUL-interleaved junk), so "utf-8 decoded it" alone proves nothing — the
+    NUL check sends it on to the utf-16 codec instead. utf-16 itself is only
+    attempted when the byte-level NUL fraction carries the interleaved-text
+    signature (~50% for ASCII), because the codec happily "decodes" arbitrary
+    even-length binaries into CJK soup that would pass the density gate.
+    cp1252 is tried before latin-1 so legacy memos keep their curly quotes
+    and € instead of surviving as C1 mojibake.
+    """
+    with open(file_path, "rb") as f:
+        head = f.read(_BINARY_SNIFF_BYTES)
+        if _byte_junk_fraction(head) > _BINARY_JUNK_THRESHOLD:
+            _refuse_binary(file_path, file_extension)
+        raw = head + f.read()
+
+    if len(raw) > 2 * _BINARY_SNIFF_BYTES and (
+        _byte_junk_fraction(raw[-_BINARY_SNIFF_BYTES:]) > _BINARY_JUNK_THRESHOLD
+    ):
+        _refuse_binary(file_path, file_extension)
+
+    nul_fraction = (raw.count(0) / len(raw)) if raw else 0.0
+    for encoding in ("utf-8-sig", "utf-8", "utf-16", "cp1252", "latin-1"):
+        if encoding == "utf-16" and not (0.25 <= nul_fraction <= 0.60):
+            continue
+        try:
+            text = raw.decode(encoding)
+        except (UnicodeDecodeError, UnicodeError):
+            continue
+        if _looks_like_binary(text):
+            continue
+        return text
+    _refuse_binary(file_path, file_extension)
+
+
 def extract_text_from_file(file_path: str, file_extension: str) -> str:
     """Extract text from a file based on its extension.
 
@@ -963,14 +1171,19 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
             return convert_to_markdown(file_path, keep_data_uris=False)
 
         elif file_extension in ("txt", "md", "csv", "json", "xml", "log"):
-            with open(file_path, encoding="utf-8") as f:
-                return f.read()
+            # Through the gated reader rather than a strict utf-8 open: a
+            # binary named report.txt used to fail with a raw codec error
+            # while report.dat got the actionable refusal, and a legacy
+            # cp1252 .txt failed outright instead of decoding.
+            return read_text_file(file_path, file_extension)
 
         elif file_extension == "xlsx":
             return extract_text_from_xlsx(file_path)
 
         elif file_extension == "docx":
-            body = convert_to_markdown(file_path, keep_data_uris=False)
+            # Same reader as upload ingestion (document_tasks) — a chat
+            # attachment must not read differently from the uploaded copy.
+            body = read_docx_markdown(file_path)
             extras = extract_docx_extras(file_path)
             return (body.rstrip() + "\n\n" + extras) if extras else body
 
@@ -978,19 +1191,20 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
             return convert_to_markdown(file_path, keep_data_uris=False)
 
         elif file_extension in ("py", "js", "java", "cpp", "c", "h", "css", "sql"):
-            with open(file_path, encoding="utf-8") as f:
-                return f.read()
+            return read_text_file(file_path, file_extension)
 
         else:
             try:
                 return convert_to_markdown(file_path, keep_data_uris=False)
             except Exception:
-                try:
-                    with open(file_path, encoding="utf-8") as f:
-                        return f.read()
-                except Exception:
-                    with open(file_path, encoding="latin-1") as f:
-                        return f.read()
+                # Unknown extension MarkItDown refused. The gated reader is
+                # the last resort: it decodes real text (any of the cascade's
+                # encodings) and refuses binaries with an actionable message.
+                # latin-1 used to be the terminal step here bare — it cannot
+                # raise on any byte sequence, so any unrecognized *binary*
+                # decoded "successfully", was stored as raw_text, chunked,
+                # embedded, and answered from.
+                return read_text_file(file_path, file_extension)
 
     except FileNotFoundError:
         # A missing source file (deleted mid-processing, retention sweep, or a
@@ -1003,6 +1217,12 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
     except ConnectionError:
         # ``OcrUnavailableError`` (a ConnectionError subclass) re-raised above
         # must reach the task layer as itself, not as a DocumentReadError.
+        raise
+
+    except DocumentReadError:
+        # Already carries a user-facing message (e.g. the binary-content
+        # refusal above) — re-wrapping would just prefix it with a second
+        # "Could not read this file:".
         raise
 
     except Exception as e:
