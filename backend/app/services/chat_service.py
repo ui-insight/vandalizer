@@ -27,14 +27,17 @@ from app.services import document_service
 from app.services.config_service import get_llm_model_by_name, get_user_model_name
 from app.services.context_budget import (
     DocumentSegment,
+    NativeCount,
     estimate_input_tokens,
     plan_and_compact_context,
+    token_safety_margin,
 )
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
     suggest_document_model,
 )
+from app.services.native_token_count import count_natively, native_count_for
 from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 from app.services.llm_service import (
     build_project_kb_empty_prompt,
@@ -394,12 +397,137 @@ def select_chat_system_prompt(
     return NO_DOCUMENT_SYSTEM_PROMPT
 
 
+def _build_chat_prompt(
+    message: str,
+    documents: list[DocumentSegment],
+    attachments: list[DocumentSegment],
+    *,
+    have_context: bool,
+    include_onboarding_context: bool,
+) -> str:
+    """The single user prompt this turn sends, documents and attachments included.
+
+    Extracted so the native pre-flight can count the request chat is actually
+    about to make. The provider is asked for one figure over one payload, and
+    in document chat the documents *are* the payload — they are also the
+    digit-dense content the 1.5 default margin was sized for. Measuring the
+    divergence on the question and the history alone would sample flowing prose
+    and then apply the result to a budget table.
+
+    The onboarding-only branch keeps its own wording deliberately: it is the
+    prompt the model sees, not merely one we count, and collapsing it into the
+    reference-documents shape would change an answer.
+    """
+    if not (have_context or include_onboarding_context):
+        return message
+
+    context_pieces: list[str] = [s.text for s in documents]
+    context_pieces.extend(s.text for s in attachments)
+    context_block = "\n\n".join(context_pieces)
+
+    if include_onboarding_context and not have_context:
+        return f"{context_block}\n\nUser question: {message}"
+    return (
+        f"{message}\n\n"
+        "--- BEGIN REFERENCE DOCUMENTS (provided for context only) ---\n"
+        f"{context_block}\n"
+        "--- END REFERENCE DOCUMENTS ---"
+    )
+
+
+async def _measure_native_count(
+    *,
+    model_name: str,
+    model_config: Optional[dict],
+    sys_config_doc: Optional[dict],
+    system_prompt: str,
+    prompt: str,
+    history: list,
+) -> Optional[NativeCount]:
+    """Ask the provider what this turn costs, or return None.
+
+    None is the ordinary answer: most deployments are OpenAI-compatible, and
+    `count_natively` gates those out before building anything, so this costs
+    nothing at all there. No gating happens here — one gate, in one place.
+
+    ``prompt`` must be the assembled user prompt, not the bare message, and the
+    baseline is taken over the same components by `native_count_for`. The two
+    have to describe the same characters or the ratio they form is not a
+    measurement.
+
+    Wrapped even though `count_natively` promises never to raise. This sits in
+    front of the first token of a chat response, and a budget refinement is
+    never worth a failed answer; the promise is a property of today's providers,
+    not of every one that will be added.
+    """
+    try:
+        result = await count_natively(
+            model_name=model_name,
+            model_config=model_config,
+            system_config_doc=sys_config_doc,
+            system_prompt=system_prompt,
+            user_message=prompt,
+            history=history,
+        )
+        return native_count_for(
+            result,
+            model_name=model_name,
+            model_config=model_config,
+            system_prompt=system_prompt,
+            user_message=prompt,
+            history=history,
+        )
+    except Exception:
+        logger.debug(
+            "native token count unavailable for %s", model_name, exc_info=True
+        )
+        return None
+
+
+def _native_for_model(
+    native: Optional[NativeCount], model_name: str
+) -> Optional[NativeCount]:
+    """The count, but only when it was measured for *this* model.
+
+    Routing can reassign the model between the count and the plan. Vocabularies
+    differ per model, so carrying a measurement across is the wrong-ruler
+    mistake the safety margin exists to correct. `context_budget._native_margin`
+    does reject on the name mismatch, so this fails closed either way — but a
+    stale count travelling silently through the planner on the strength of a
+    check two modules away is not something to leave implicit.
+    """
+    if native is None or native.model_name != model_name:
+        return None
+    return native
+
+
+def _margin_for(
+    native: Optional[NativeCount], model_name: str, model_config: Optional[dict]
+) -> Optional[float]:
+    """The safety margin an estimate measured with ``native`` actually carries.
+
+    `token_safety_margin` and not ``tokens / baseline_tokens`` computed here:
+    that function weighs exactness, a deployment's configured margin and
+    tiktoken-is-the-real-tokenizer *ahead* of the measurement, and it is what
+    `estimate_input_tokens` just applied. A ratio re-derived at this call site
+    would hand routing a number the request was never sized with.
+
+    None when there is no count, which is what keeps the routing call identical
+    to what it was: ``current_margin=None`` makes `model_routing._sized_for`
+    derive the margin from the name and config exactly as before.
+    """
+    if native is None:
+        return None
+    return token_safety_margin(model_name, model_config, native=native)
+
+
 def _suggest_model_for_overflow(
     compacted,
     model_name: str,
     model_config: Optional[dict],
     sys_config_doc: dict,
     input_tokens: int,
+    current_margin: Optional[float] = None,
 ) -> Optional[dict]:
     """A larger model to offer, or None when nothing needs offering.
 
@@ -413,6 +541,12 @@ def _suggest_model_for_overflow(
     is always within the current model's budget. Passing it made
     :func:`suggest_document_model` return None every time and the dialog's
     fourth option could never appear.
+
+    ``current_margin`` is the margin ``input_tokens`` was measured with, when
+    the caller knows it — a provider-native count carries a much tighter one
+    than :func:`token_safety_margin` can derive from a name and a config, and
+    dividing by a factor never applied would understate the request and offer a
+    model it would then fail on. Omitted, the margin is derived as before.
     """
     if not compacted.actions:
         return None
@@ -421,6 +555,7 @@ def _suggest_model_for_overflow(
         current_config=model_config,
         models=(sys_config_doc or {}).get("available_models") or [],
         input_tokens=input_tokens,
+        current_margin=current_margin,
     )
     if not suggestion:
         return None
@@ -684,6 +819,28 @@ async def chat_stream(
     # is an upper bound rather than an optimistic one. Routing decides off this
     # number: an estimate that reads low makes the router see headroom that is
     # not there and decline to move a request that does not fit.
+    #
+    # Before estimating, ask the provider what this turn really costs. Anthropic
+    # and Google will say; everything else is gated out inside `count_natively`
+    # at no cost. The payload counted is the prompt this turn is about to send —
+    # built from the *uncompacted* segments, so it covers the same text
+    # `estimate_input_tokens` is about to size, and so the ratio is measured
+    # over the documents that dominate it rather than over the question alone.
+    native = await _measure_native_count(
+        model_name=model_name,
+        model_config=model_config,
+        sys_config_doc=sys_config_doc,
+        system_prompt=system_prompt or "",
+        prompt=_build_chat_prompt(
+            message,
+            doc_segments,
+            attachment_segments,
+            have_context=have_context,
+            include_onboarding_context=include_onboarding_context,
+        ),
+        history=previous_messages,
+    )
+
     requested_input_tokens = estimate_input_tokens(
         model_name=model_name,
         system_prompt=system_prompt or "",
@@ -692,7 +849,14 @@ async def chat_stream(
         documents=doc_segments,
         attachments=attachment_segments,
         model_config=model_config,
+        native=native,
     )
+    # The margin `requested_input_tokens` carries. A property of that number,
+    # not of whichever model is current — so it is computed once here and is
+    # deliberately *not* recomputed after routing switches models below: the
+    # measurement it describes does not change when the model does, and
+    # `_sized_for` needs it to restate that number in a candidate's units.
+    requested_margin = _margin_for(native, model_name, model_config)
 
     routing = RoutingDecision(model_name, False, "")
     candidate_name = (sys_config_doc or {}).get("long_document_model") or ""
@@ -704,6 +868,7 @@ async def chat_stream(
             candidate_name=candidate_name,
             candidate_config=candidate_config,
             input_tokens=requested_input_tokens,
+            current_margin=requested_margin,
         )
         if routing.switched:
             logger.info(
@@ -719,6 +884,11 @@ async def chat_stream(
         history=previous_messages,
         documents=doc_segments,
         attachments=attachment_segments,
+        # Dropped when routing switched models above: the count was measured
+        # against the previous model's tokenizer and says nothing about this
+        # one. `_native_margin` would refuse it on the name mismatch, but a
+        # stale measurement should not reach the planner and depend on that.
+        native=_native_for_model(native, model_name),
     )
 
     # Tell the client what we planned (and whether we had to compact).
@@ -733,7 +903,7 @@ async def chat_stream(
         # would walk around that gate.
         "suggested_model": _suggest_model_for_overflow(
             compacted, model_name, model_config, sys_config_doc,
-            requested_input_tokens,
+            requested_input_tokens, requested_margin,
         ),
     }) + "\n"
     # Switching the model without saying so is the same failure as trimming a
@@ -817,23 +987,16 @@ async def chat_stream(
 
     previous_messages = compacted.history
 
-    # Rebuild the final prompt from compacted segments.
-    if have_context or include_onboarding_context:
-        context_pieces: list[str] = [s.text for s in compacted.documents]
-        context_pieces.extend(s.text for s in compacted.attachments)
-        context_block = "\n\n".join(context_pieces)
-        if include_onboarding_context and not have_context:
-            # Preserve the original onboarding wording when that's the only context.
-            prompt = f"{context_block}\n\nUser question: {message}"
-        else:
-            prompt = (
-                f"{message}\n\n"
-                "--- BEGIN REFERENCE DOCUMENTS (provided for context only) ---\n"
-                f"{context_block}\n"
-                "--- END REFERENCE DOCUMENTS ---"
-            )
-    else:
-        prompt = message
+    # Rebuild the final prompt from compacted segments. Same assembly the
+    # native pre-flight counted above, over the trimmed segments this time —
+    # sharing it is what keeps the counted payload the shape of the real one.
+    prompt = _build_chat_prompt(
+        message,
+        compacted.documents,
+        compacted.attachments,
+        have_context=have_context,
+        include_onboarding_context=include_onboarding_context,
+    )
 
     agent = create_chat_agent(model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc)
 

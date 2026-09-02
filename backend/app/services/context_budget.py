@@ -282,8 +282,60 @@ def _is_openai_model(name: str) -> bool:
     return any(tok in n for tok in ("gpt-3.5", "gpt-4"))
 
 
+@dataclass(frozen=True)
+class NativeCount:
+    """A provider's own token count, next to our local count of the same text.
+
+    Deliberately carries both numbers rather than a ready-made ratio, so the
+    pair can be checked for coherence at the point of use — a count with no
+    baseline, or a baseline of zero, is not a measurement of anything.
+
+    ``model_name`` is not decoration. Vocabularies differ per model, so a count
+    measured against one model says nothing about another; carrying it across is
+    the same wrong-ruler mistake the safety margin exists to correct.
+    """
+
+    model_name: str        # the model this was measured for
+    tokens: int            # the provider's count of some text
+    baseline_tokens: int   # _count_raw_tokens over the SAME text, taken locally
+
+
+def _native_margin(
+    model_name: str, native: Optional[NativeCount]
+) -> Optional[float]:
+    """The provider's own divergence from our estimate, or None when unusable.
+
+    A ratio and not a total, because the margin is applied per component (see
+    :func:`estimate_input_tokens`) and the planner recounts on mutated text
+    inside its trim loop. A recorded total stops being true the moment anything
+    is trimmed; a ratio stays approximately valid.
+
+    Clamped at 1.0 on purpose. A provider counting *below* tiktoken may only
+    reduce over-inflation, never reclaim window: counting low is the direction
+    that hard-fails, and this ratio is measured over one sample of text rather
+    than the request being planned.
+    """
+    if native is None:
+        return None
+    if native.model_name != model_name:
+        # A count for another model is not a count for this one.
+        return None
+    if not (native.baseline_tokens > 0) or not (native.tokens > 0):
+        return None
+    ratio = native.tokens / native.baseline_tokens
+    if not math.isfinite(ratio):
+        # Nothing validates the dataclass, and a nan/inf reaching `_apply_margin`
+        # would either raise inside `math.ceil` or produce a budget no request
+        # could fit. Fall through to the ladder instead.
+        return None
+    return max(1.0, ratio)
+
+
 def token_safety_margin(
-    model_name: str, model_config: Optional[dict] = None
+    model_name: str,
+    model_config: Optional[dict] = None,
+    *,
+    native: Optional[NativeCount] = None,
 ) -> float:
     """Multiplier that turns a tiktoken estimate into a safe upper bound.
 
@@ -304,6 +356,13 @@ def token_safety_margin(
     factor through ``raw_usable``. ``stored_count_margin`` still honours the
     configured value: it corrects a tiktoken figure taken at ingestion, which is
     not the same question.
+
+    ``native`` is a count the provider itself returned, paired with a local
+    baseline over the same text. It sits immediately above the default, so it
+    only ever displaces the 1.5 guess: exactness, a deployment's own configured
+    number, and tiktoken-is-the-real-tokenizer all still win. When it does
+    supply the margin the estimate is measured rather than guessed, so the
+    "estimated" warning stays quiet.
     """
     # An exact count needs no correction. Inflating it would only route early.
     if resolve_exact_tokenizer(model_name, model_config) is not None:
@@ -315,6 +374,11 @@ def token_safety_margin(
 
     if _is_openai_model(model_name):
         return 1.0
+
+    measured = _native_margin(model_name, native)
+    if measured is not None:
+        return measured
+
     _warn_estimated_once(model_name or "<unnamed>")
     return DEFAULT_TOKEN_SAFETY_MARGIN
 
@@ -434,15 +498,24 @@ def count_raw_tokens(
 
 
 def count_tokens(
-    text: str, model_name: str = "", model_config: Optional[dict] = None
+    text: str,
+    model_name: str = "",
+    model_config: Optional[dict] = None,
+    *,
+    native: Optional[NativeCount] = None,
 ) -> int:
     """Estimate token count for ``text``, erring high for non-OpenAI models."""
     raw = _count_raw_tokens(text, model_name, model_config)
-    return _apply_margin(raw, token_safety_margin(model_name, model_config))
+    margin = token_safety_margin(model_name, model_config, native=native)
+    return _apply_margin(raw, margin)
 
 
 def count_message_tokens(
-    message: Any, model_name: str = "", model_config: Optional[dict] = None
+    message: Any,
+    model_name: str = "",
+    model_config: Optional[dict] = None,
+    *,
+    native: Optional[NativeCount] = None,
 ) -> int:
     """Estimate tokens for one pydantic-ai ``ModelMessage``.
 
@@ -457,7 +530,9 @@ def count_message_tokens(
         if content is None:
             content = str(part)
         total += _count_raw_tokens(str(content), model_name, model_config)
-    return _apply_margin(total, token_safety_margin(model_name, model_config))
+    return _apply_margin(
+        total, token_safety_margin(model_name, model_config, native=native)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -666,6 +741,8 @@ def _truncate_text_to_tokens(
     model_name: str,
     marker: str = "\n\n…[truncated]…\n\n",
     model_config: Optional[dict] = None,
+    *,
+    native: Optional[NativeCount] = None,
 ) -> tuple[str, int]:
     """Truncate ``text`` to ≤ ``max_tokens``, preserving head and tail.
 
@@ -687,14 +764,14 @@ def _truncate_text_to_tokens(
 
     Returns ``(truncated_text, dropped_tokens)``, both in inflated space.
     """
-    margin = token_safety_margin(model_name, model_config)
-    original_tokens = count_tokens(text, model_name, model_config)
+    margin = token_safety_margin(model_name, model_config, native=native)
+    original_tokens = count_tokens(text, model_name, model_config, native=native)
     if max_tokens <= 0:
         return "", original_tokens
     if original_tokens <= max_tokens:
         return text, 0
 
-    marker_tokens = count_tokens(marker, model_name, model_config)
+    marker_tokens = count_tokens(marker, model_name, model_config, native=native)
     usable = max(1, max_tokens - marker_tokens)
     raw_usable = max(1, int(usable / margin))
 
@@ -709,7 +786,8 @@ def _truncate_text_to_tokens(
             new_text = halves[0] + marker + halves[1]
             return new_text, max(
                 0,
-                original_tokens - count_tokens(new_text, model_name, model_config),
+                original_tokens
+                - count_tokens(new_text, model_name, model_config, native=native),
             )
         except Exception:
             logger.warning(
@@ -727,7 +805,8 @@ def _truncate_text_to_tokens(
             new_text = halves[0] + marker + halves[1]
             return new_text, max(
                 0,
-                original_tokens - count_tokens(new_text, model_name, model_config),
+                original_tokens
+                - count_tokens(new_text, model_name, model_config, native=native),
             )
         except Exception:
             pass
@@ -739,7 +818,8 @@ def _truncate_text_to_tokens(
         return text, 0
     new_text = text[:head_chars] + marker + (text[-tail_chars:] if tail_chars else "")
     return new_text, max(
-        0, original_tokens - count_tokens(new_text, model_name, model_config)
+        0,
+        original_tokens - count_tokens(new_text, model_name, model_config, native=native),
     )
 
 
@@ -778,6 +858,7 @@ def estimate_input_tokens(
     documents: list[DocumentSegment],
     attachments: list[DocumentSegment],
     model_config: Optional[dict] = None,
+    native: Optional[NativeCount] = None,
 ) -> int:
     """Input size of a request before any trimming.
 
@@ -791,18 +872,32 @@ def estimate_input_tokens(
     Carries the model's safety margin, so the answer is an upper bound rather
     than an optimistic guess. Routing depends on this: a router that trusts an
     estimate which reads low will decline to move a request that does not fit.
+
+    ``native`` is threaded to every component so the margin is chosen once for
+    the whole aggregate, exactly as the model_config path already is — a
+    per-component disagreement about the ruler is the unit error this module
+    keeps having to defend against.
     """
     return (
         REQUEST_SCAFFOLD_TOKENS
         + (
-            count_tokens(system_prompt, model_name, model_config)
+            count_tokens(system_prompt, model_name, model_config, native=native)
             if system_prompt
             else 0
         )
-        + count_tokens(user_message, model_name, model_config)
-        + sum(count_message_tokens(m, model_name, model_config) for m in history)
-        + sum(count_tokens(d.text, model_name, model_config) for d in documents)
-        + sum(count_tokens(a.text, model_name, model_config) for a in attachments)
+        + count_tokens(user_message, model_name, model_config, native=native)
+        + sum(
+            count_message_tokens(m, model_name, model_config, native=native)
+            for m in history
+        )
+        + sum(
+            count_tokens(d.text, model_name, model_config, native=native)
+            for d in documents
+        )
+        + sum(
+            count_tokens(a.text, model_name, model_config, native=native)
+            for a in attachments
+        )
     )
 
 
@@ -816,6 +911,7 @@ def plan_and_compact_context(
     documents: list[DocumentSegment],
     attachments: list[DocumentSegment],
     response_reserve: Optional[int] = None,
+    native: Optional[NativeCount] = None,
 ) -> CompactedContext:
     """Plan a context budget for this request and compact oversize components.
 
@@ -843,18 +939,18 @@ def plan_and_compact_context(
     )
     actions: list[CompactionAction] = []
 
-    # Bound to this model and its config once, so no call site below can
-    # silently size a segment with a different (optimistic) ruler than the one
-    # the budget was planned against.
+    # Bound to this model, its config and any native count once, so no call site
+    # below can silently size a segment with a different (optimistic) ruler than
+    # the one the budget was planned against.
     def _ct(text: str) -> int:
-        return count_tokens(text, model_name, model_config)
+        return count_tokens(text, model_name, model_config, native=native)
 
     def _cmt(message: Any) -> int:
-        return count_message_tokens(message, model_name, model_config)
+        return count_message_tokens(message, model_name, model_config, native=native)
 
     def _trunc(text: str, max_tokens: int) -> tuple[str, int]:
         return _truncate_text_to_tokens(
-            text, max_tokens, model_name, model_config=model_config
+            text, max_tokens, model_name, model_config=model_config, native=native
         )
 
     plan.system_tokens = _ct(system_prompt) if system_prompt else 0
