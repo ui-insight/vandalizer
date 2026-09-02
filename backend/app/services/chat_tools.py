@@ -791,9 +791,46 @@ async def get_quality_info(
         result["grade"] = latest_run.grade
         result["num_test_cases"] = latest_run.num_test_cases
         result["num_runs"] = latest_run.num_runs
+        result["model"] = latest_run.model
         result["last_validated_at"] = latest_run.created_at.isoformat() if latest_run.created_at else None
         if latest_run.score_breakdown:
             result["score_breakdown"] = latest_run.score_breakdown
+
+        # Per-model comparison over this item's measured history — answers
+        # "which model does best on THIS template" without leaving chat.
+        # Runs that recorded no model (older history) group as unattributed.
+        # Best-effort like the other enrichment lookups below: a failure here
+        # must not take down the main quality answer.
+        try:
+            model_scores: dict = {}
+            all_runs = await ValidationRun.find(
+                ValidationRun.item_kind == item_kind,
+                ValidationRun.item_id == item_uuid,
+            ).to_list()
+            for r in all_runs:
+                if getattr(r, "source", None) == "demo_seed":
+                    continue
+                entry = model_scores.setdefault(r.model, {"scores": [], "count": 0})
+                entry["scores"].append(r.score)
+                entry["count"] += 1
+            model_comparison = [
+                {
+                    "model": m or "(unattributed)",
+                    "avg_score": round(sum(e["scores"]) / len(e["scores"]), 1),
+                    "run_count": e["count"],
+                }
+                for m, e in model_scores.items()
+                if e["scores"]
+            ]
+            model_comparison.sort(key=lambda x: -x["avg_score"])
+            if len(model_comparison) > 1 or (
+                model_comparison and model_comparison[0]["model"] != "(unattributed)"
+            ):
+                result["model_comparison"] = model_comparison
+        except Exception as e:
+            logger.warning(
+                "Model comparison lookup failed for %s/%s: %s", item_kind, item_uuid, e,
+            )
     else:
         result["score"] = None
         result["last_validated_at"] = None
@@ -2846,6 +2883,7 @@ async def run_validation(
     extraction_set_uuid: str,
     num_runs: int = 3,
     test_case_uuids: Optional[list[str]] = None,
+    model: Optional[str] = None,
     confirmed: bool = False,
 ) -> dict:
     """Run validation on an extraction set's test cases. Measures accuracy and consistency.
@@ -2866,6 +2904,13 @@ async def run_validation(
     exactly what validation does.</reasoning>
     </example>
     <example>
+    User: "How well does the local Llama model do on this template?"
+    → run_validation with model set to that model's configured name.
+    <reasoning>An explicit model request runs the validation under that model
+    and labels the run with it — afterwards get_quality_info's
+    model_comparison can answer which model does best here.</reasoning>
+    </example>
+    <example>
     User: "Check whether this contract meets our requirements."
     → check_compliance, NOT run_validation.
     <reasoning>Judging one DOCUMENT against rules is compliance; validation
@@ -2877,6 +2922,7 @@ async def run_validation(
         extraction_set_uuid: UUID of the extraction template to validate.
         num_runs: How many times to run extraction per test case (3+ recommended for consistency measurement). Default 3.
         test_case_uuids: Optional — validate only these test cases. If omitted, validates all.
+        model: Optional — validate under this specific configured model (name or tag). Only pass when the user asked to measure a particular model; otherwise the template's own configuration decides.
         confirmed: Must be true to execute. If false, returns a preview.
     """
     from app.services import extraction_validation_service as val_svc
@@ -2906,6 +2952,26 @@ async def run_validation(
             "error": "No test cases found for this extraction set. Use propose_test_case first to add ground truth.",
         }
 
+    # Resolve an explicitly requested model against the configured list before
+    # burning any LLM calls — an unknown name would otherwise fail mid-run.
+    requested_model: Optional[str] = None
+    if model:
+        from app.models.system_config import SystemConfig
+        sys_cfg = await SystemConfig.get_config()
+        available = (sys_cfg.available_models if sys_cfg else None) or []
+        match = next(
+            (m for m in available if m.get("name") == model or m.get("tag") == model),
+            None,
+        )
+        if not match:
+            names = [m.get("name") for m in available if m.get("name")]
+            return _err(
+                f"Model '{model}' is not configured on this deployment.",
+                hint=f"Configured models: {', '.join(names) or 'none'}. Retry with one of these names.",
+            )
+        requested_model = match.get("name")
+
+    model_note = f' under model "{requested_model}"' if requested_model else ""
     gate = await _confirm_gate(
         context,
         tool_name="run_validation",
@@ -2913,12 +2979,13 @@ async def run_validation(
             "extraction_set_uuid": extraction_set_uuid,
             "num_runs": num_runs,
             "test_case_uuids": sorted(test_case_uuids) if test_case_uuids else None,
+            "model": requested_model,
         },
         preview={
             "action": "run_validation",
             "preview": (
                 f"Validate \"{ss.title}\" with {effective_count} test case(s), "
-                f"running extraction {num_runs} time(s) each."
+                f"running extraction {num_runs} time(s) each{model_note}."
             ),
             "needs_confirmation": True,
             "num_test_cases": effective_count,
@@ -2930,12 +2997,16 @@ async def run_validation(
         return gate
 
     try:
+        # Only an explicit user request is passed as the model: the service
+        # treats a passed model as a forced override of the template's own
+        # configuration (including an optimizer-applied model), so the chat
+        # session's model must not be smuggled in as one.
         result = await val_svc.run_validation(
             search_set_uuid=extraction_set_uuid,
             user_id=user_id,
             test_case_uuids=test_case_uuids,
             num_runs=num_runs,
-            model=context.deps.model_name or None,
+            model=requested_model,
         )
     except ValueError as e:
         return {"error": str(e)}
@@ -2952,6 +3023,10 @@ async def run_validation(
         "extraction_set_uuid": extraction_set_uuid,
         "num_test_cases": effective_count,
         "num_runs": num_runs,
+        # What was asked for, and what the run was actually labeled with —
+        # None model means the template's own configuration decided.
+        "model_requested": requested_model,
+        "model": latest.model if latest else requested_model,
         "accuracy": result.get("aggregate_accuracy"),
         "consistency": result.get("aggregate_consistency"),
         "score": score,

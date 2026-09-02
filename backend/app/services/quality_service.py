@@ -540,6 +540,10 @@ async def get_quality_summary() -> dict:
     """Aggregate stats: avg score, total runs, validated vs unvalidated items."""
     # Use aggregation to avoid loading all runs into memory
     pipeline = [
+        # The onboarding demo seeds a fabricated run (source="demo_seed") so
+        # quality signals appear during the walkthrough — invented numbers
+        # that must never average into fleet-wide reporting.
+        {"$match": {"source": {"$ne": "demo_seed"}}},
         {"$group": {
             "_id": {"item_kind": "$item_kind", "item_id": "$item_id"},
             "latest_score": {"$last": "$score"},
@@ -593,7 +597,11 @@ async def get_quality_timeline(
     """Aggregate ValidationRun by date for timeline charts."""
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
 
-    query_filters = [ValidationRun.created_at >= cutoff]
+    query_filters = [
+        ValidationRun.created_at >= cutoff,
+        # Exclude the onboarding demo's fabricated run — see get_quality_summary.
+        ValidationRun.source != "demo_seed",
+    ]
     if item_kind:
         query_filters.append(ValidationRun.item_kind == item_kind)
     if item_id:

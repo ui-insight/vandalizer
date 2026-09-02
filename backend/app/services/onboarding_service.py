@@ -251,6 +251,10 @@ async def provision_onboarding_sample(user: User) -> Optional[OnboardingContext]
                 checks_passed=total_checks - 2,
                 checks_failed=2,
                 user_id="system",
+                # These numbers are invented for the demo, not measured.
+                # The tag keeps them out of fleet-wide quality aggregates —
+                # a fabricated 92 must never average into real reporting.
+                source="demo_seed",
                 created_at=datetime.datetime.now(tz=datetime.timezone.utc),
             )
             await validation_run.insert()
