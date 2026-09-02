@@ -26,8 +26,8 @@ function ForgotPasswordForm() {
   if (submitted) {
     return (
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#f1b300]/20">
-          <svg className="h-6 w-6 text-[#f1b300]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-highlight/20">
+          <svg className="h-6 w-6 text-highlight-on-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
@@ -35,7 +35,7 @@ function ForgotPasswordForm() {
         <p className="mt-2 text-sm text-gray-400">
           If an account exists for <strong className="text-white">{email}</strong>, we've sent a password reset link.
         </p>
-        <Link to="/login" className="mt-6 inline-block text-sm font-bold text-[#f1b300] hover:text-[#d49e00]">
+        <Link to="/login" className="mt-6 inline-block text-sm font-bold text-highlight-on-dark hover:text-[#d49e00]">
           Back to sign in
         </Link>
       </div>
@@ -60,17 +60,17 @@ function ForgotPasswordForm() {
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {loading ? 'Sending...' : 'Send Reset Link'}
       </button>
       <p className="text-center text-sm text-gray-500">
-        <Link to="/login" className="text-gray-400 hover:text-[#f1b300]">
+        <Link to="/login" className="text-gray-400 hover:text-highlight-on-dark">
           Back to sign in
         </Link>
       </p>
@@ -117,7 +117,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         <p className="mt-2 text-sm text-gray-400">Your password has been updated. You can now sign in.</p>
         <Link
           to="/login"
-          className="mt-6 inline-block rounded-lg bg-[#f1b300] px-6 py-3 font-bold text-black transition-all hover:bg-[#d49e00]"
+          className="mt-6 inline-block rounded-lg bg-highlight px-6 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover"
         >
           Sign In
         </Link>
@@ -140,7 +140,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="password"
@@ -150,7 +150,7 @@ function ResetPasswordForm({ token }: { token: string }) {
         required
         value={confirm}
         onChange={(e) => setConfirm(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <p className="text-xs text-gray-500">
         Must be at least 8 characters with uppercase, lowercase, and a digit.
@@ -158,7 +158,7 @@ function ResetPasswordForm({ token }: { token: string }) {
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {loading ? 'Resetting...' : 'Reset Password'}
       </button>

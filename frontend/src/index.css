@@ -10,6 +10,7 @@ html {
   --color-highlight-complement: var(--highlight-complement, #154cf7);
   --color-highlight-hover: var(--highlight-hover, #d49e00);
   --color-highlight-on-light: var(--highlight-on-light, #806600);
+  --color-highlight-on-dark: var(--highlight-on-dark, #f1b300);
   --color-panel-dark: #191919;
   --color-panel-bg: #EEEEEE;
   --radius-ui: var(--ui-radius, 12px);
@@ -23,6 +24,10 @@ html {
   /* Accessible variant of the brand color for text/icons on light backgrounds
      (≥4.5:1 on white). Recomputed from the live highlight at runtime. */
   --highlight-on-light: #806600;
+  /* Accessible variant of the brand color for text/icons on the near-black
+     auth/footer surfaces (#0a0a0a). The default is the gold those surfaces
+     already hardcode, so an unbranded deployment is unchanged. */
+  --highlight-on-dark: #f1b300;
   --ui-radius: 12px;
   --rail-w: 220px;
   /* "Public Sans Variable" is the family name shipped by

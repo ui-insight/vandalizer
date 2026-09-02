@@ -44,7 +44,7 @@ export function LoginForm() {
         aria-describedby={error ? 'login-error' : undefined}
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <label htmlFor="login-password" className="sr-only">Password</label>
       <input
@@ -57,23 +57,23 @@ export function LoginForm() {
         aria-describedby={error ? 'login-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <button
         type="submit"
         disabled={loading}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {loading ? 'Signing in...' : 'SIGN IN'}
       </button>
       <p className="text-center text-sm">
-        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-[#f1b300] transition-colors">
+        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-highlight-on-dark transition-colors">
           Forgot password?
         </Link>
       </p>
       <p className="text-center text-sm text-gray-400">
         Don&apos;t have an account?{' '}
-        <Link to="/register" className="font-bold text-white hover:text-[#f1b300]">
+        <Link to="/register" className="font-bold text-white hover:text-highlight-on-dark">
           Create one
         </Link>
       </p>

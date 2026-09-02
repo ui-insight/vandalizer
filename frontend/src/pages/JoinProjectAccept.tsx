@@ -82,7 +82,7 @@ export default function JoinProjectAccept() {
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#171717] p-8 text-center shadow-xl">
         {(status === 'loading' || status === 'accepting') && (
           <>
-            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#f1b300] border-t-transparent" />
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-highlight border-t-transparent" />
             <p className="mt-4 text-gray-300">
               {status === 'accepting' ? `Joining ${info?.project_title}…` : 'Loading invite…'}
             </p>
@@ -92,7 +92,7 @@ export default function JoinProjectAccept() {
         {status === 'needsAuth' && info && (
           <>
             <h1 className="text-xl font-bold text-white">
-              Join <span className="text-[#f1b300]">{info.project_title}</span>
+              Join <span className="text-highlight-on-dark">{info.project_title}</span>
             </h1>
             <p className="mt-2 text-sm text-gray-400">
               {info.inviter_name ? `${info.inviter_name} invited you` : 'You were invited'} to view and chat with this project.
@@ -100,7 +100,7 @@ export default function JoinProjectAccept() {
             <p className="mt-4 text-sm text-gray-400">Sign in or create an account, then re-open this link to join.</p>
             <a
               href="/landing"
-              className="mt-6 inline-block rounded-lg bg-[#f1b300] px-4 py-2 text-sm font-bold text-black hover:bg-[#d49e00]"
+              className="mt-6 inline-block rounded-lg bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:bg-highlight-hover"
             >
               Sign in
             </a>

@@ -121,7 +121,7 @@ export default function InviteAccept() {
               },
             })
           }
-          className="mt-6 rounded-lg bg-[#f1b300] px-4 py-2 text-sm font-bold text-black hover:bg-[#d49e00]"
+          className="mt-6 rounded-lg bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:bg-highlight-hover"
         >
           Continue
         </button>
@@ -152,13 +152,13 @@ export default function InviteAccept() {
     <div className="flex min-h-screen items-center justify-center bg-[#0a0a0a] p-4">
       <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#171717] p-8 shadow-xl">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#f1b300]/10 text-[#f1b300]">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-highlight/10 text-highlight-on-dark">
             <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87M16 3.13a4 4 0 010 7.75M8 11a4 4 0 100-8 4 4 0 000 8z" />
             </svg>
           </div>
           <h1 className="text-2xl font-bold text-white">
-            You're invited to <span className="text-[#f1b300]">{info.team_name}</span>
+            You're invited to <span className="text-highlight-on-dark">{info.team_name}</span>
           </h1>
           {info.inviter_name && (
             <p className="mt-2 text-sm text-gray-400">
@@ -232,7 +232,7 @@ function InviteAuthTabs({
         <a
           href="/api/auth/saml/login"
           onClick={stashTokenForOAuth}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00]"
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover"
         >
           {samlProvider.display_name || 'Sign in with University SSO'} & join
         </a>
@@ -255,7 +255,7 @@ function InviteAuthTabs({
             <button
               onClick={() => setMode('register')}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                mode === 'register' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
+                mode === 'register' ? 'bg-highlight text-highlight-text' : 'text-gray-400 hover:text-white'
               }`}
             >
               Create account
@@ -263,7 +263,7 @@ function InviteAuthTabs({
             <button
               onClick={() => setMode('login')}
               className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-                mode === 'login' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
+                mode === 'login' ? 'bg-highlight text-highlight-text' : 'text-gray-400 hover:text-white'
               }`}
             >
               Sign in
@@ -336,7 +336,7 @@ function InviteRegisterForm({
         autoComplete="name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="password"
@@ -345,7 +345,7 @@ function InviteRegisterForm({
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <p className="text-xs text-gray-500">
         8+ characters with uppercase, lowercase, and a digit.
@@ -353,7 +353,7 @@ function InviteRegisterForm({
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {submitting ? 'Creating account...' : `Join ${info.team_name}`}
       </button>
@@ -402,7 +402,7 @@ function InviteLoginForm({
         autoComplete="email"
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="password"
@@ -411,12 +411,12 @@ function InviteLoginForm({
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {submitting ? 'Signing in...' : 'Sign in & join'}
       </button>
@@ -436,7 +436,7 @@ function CenteredCard({ children }: { children: React.ReactNode }) {
 
 function Spinner() {
   return (
-    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#f1b300] border-t-transparent" />
+    <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-highlight border-t-transparent" />
   )
 }
 

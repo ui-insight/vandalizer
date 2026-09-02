@@ -73,4 +73,16 @@ describe('LoginForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
     await waitFor(() => expect(screen.queryByText('Bad credentials')).not.toBeInTheDocument())
   })
+
+  // The sign-in page is the first thing a white-labeled deployment shows, so the
+  // primary button has to follow the configured brand — background and the
+  // runtime-computed contrast colour for the label on it — not Vandalizer's gold.
+  it('paints the submit button from the brand tokens, not a hardcoded hex', () => {
+    render(<LoginForm />)
+    const submit = screen.getByRole('button', { name: /sign in/i })
+
+    expect(submit).toHaveClass('bg-highlight')
+    expect(submit).toHaveClass('text-highlight-text')
+    expect(submit.className).not.toMatch(/#[0-9a-f]{6}/i)
+  })
 })

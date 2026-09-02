@@ -84,6 +84,24 @@ export function getAccessibleOnLight(hex: string, bg = '#ffffff', target = 4.5):
   return '#1a1a1a'
 }
 
+/** Lighten a color (preserving hue/saturation) until it meets the target WCAG
+ *  contrast ratio against a dark background — for using the brand color as
+ *  *text/icons on near-black*, where a dark brand (e.g. #163A64 ≈ 1.6:1 on
+ *  #0a0a0a) is illegible. Returns the original color if it already passes. */
+export function getAccessibleOnDark(hex: string, bg = '#0a0a0a', target = 4.5): string {
+  if (contrastRatio(hex, bg) >= target) return hex
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s } = rgbToHsl(r, g, b)
+  let { l } = rgbToHsl(r, g, b)
+  // Step lightness up until contrast is met (or we top out near white).
+  for (let i = 0; i < 100 && l < 1; i++) {
+    l = Math.min(1, l + 0.02)
+    const candidate = hslToHex(h, s, l)
+    if (contrastRatio(candidate, bg) >= target) return candidate
+  }
+  return '#f5f5f5'
+}
+
 /** Derive a deep, rich gradient partner by shifting hue slightly and darkening.
  *  Produces a harmonious gradient without the ugly midtones of a true complement. */
 export function getComplementaryColor(hex: string): string {
