@@ -1161,6 +1161,10 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
                 "sources": merged_sources,
                 "cross_field": cross_field,
                 "cross_field_sets": cross_field_sets,
+                # Stored with the values, for the same reason the cross-field
+                # verdict is: a run reopened from the rail without its caveats
+                # looks exactly like a run over documents read whole.
+                "document_warnings": document_warnings,
                 "document_uuids": document_uuids,
                 "search_set_uuid": req.search_set_uuid,
             },

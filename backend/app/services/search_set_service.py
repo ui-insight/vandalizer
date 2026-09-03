@@ -571,6 +571,40 @@ def merge_combined_context(
     }
 
 
+def _flag_no_extractable_text(
+    document_warnings: list[dict] | None, doc_uuid: str | None, title: str | None,
+) -> None:
+    """Upsert a per-document ``no_extractable_text`` warning entry.
+
+    One writer for the three disclosure points (nothing-readable pre-flight,
+    combined-context merge, engine-skipped documents) so the entry shape and
+    dedupe rule cannot drift between them.
+    """
+    if document_warnings is None:
+        return
+    from app.services import document_service
+
+    entry = next(
+        (w for w in document_warnings if w.get("document_uuid") == doc_uuid),
+        None,
+    )
+    if entry is not None:
+        if "no_extractable_text" not in entry["codes"]:
+            entry["codes"].append("no_extractable_text")
+            # Recompose: the strip renders `text`, so leaving it stale told
+            # the user the document was merely thin when it in fact
+            # contributed nothing — the severer caveat rendering as the
+            # milder one.
+            entry["text"] = document_service.warning_text_for_codes(entry["codes"])
+        return
+    document_warnings.append({
+        "document_uuid": doc_uuid,
+        "title": title or doc_uuid,
+        "codes": ["no_extractable_text"],
+        "text": document_service.warning_text_for_codes(["no_extractable_text"]),
+    })
+
+
 async def run_extraction_sync(
     search_set_uuid: str,
     document_uuids: list[str],
@@ -589,8 +623,10 @@ async def run_extraction_sync(
 
     ``document_warnings``, when given, collects one entry per input document
     whose stored text is known to be degraded — garbled, or only part of the
-    document. Chat already warned about these; extraction did not, which is the
-    surface where being quietly wrong costs the most. Passed as an out-list
+    document — or that contributed nothing to the run at all (code
+    ``no_extractable_text``: no stored text and no loadable file). Chat
+    already warned about these; extraction did not, which is the surface
+    where being quietly wrong costs the most. Passed as an out-list
     rather than returned so the historical ``list[entity]`` return stands.
     """
     keys = await get_extraction_keys(search_set_uuid)
@@ -640,7 +676,15 @@ async def run_extraction_sync(
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
         if doc is not None and document_warnings is not None:
-            codes = list(document_service.ingestion_warnings(doc))
+            # Completeness codes only. hidden_text_unchecked is the INVERSE
+            # risk — extra unvetted content, not missing content — and the
+            # strip headlines these as "not read in full"; chat keeps the two
+            # apart for the same reason (see document_service's
+            # COMPLETENESS_WARNING_CODES).
+            codes = [
+                c for c in document_service.ingestion_warnings(doc)
+                if c in document_service.COMPLETENESS_WARNING_CODES
+            ]
             if document_service.is_extraction_low_quality(doc):
                 codes.append("low_quality_text")
             if codes:
@@ -648,6 +692,7 @@ async def run_extraction_sync(
                     "document_uuid": doc_uuid,
                     "title": doc.title or doc_uuid,
                     "codes": codes,
+                    "text": document_service.warning_text_for_codes(codes),
                 })
         doc_metadata.append({
             "uuid": doc_uuid,
@@ -676,10 +721,26 @@ async def run_extraction_sync(
         )
 
     if not any(doc_texts) and not any(doc_file_paths):
+        # Nothing readable at all. The empty result used to be
+        # indistinguishable from "ran fine, zero matches" — record every
+        # input document as contributing nothing so the run says so.
+        for meta in doc_metadata:
+            _flag_no_extractable_text(
+                document_warnings, meta.get("uuid"), meta.get("title"),
+            )
         return []
 
     # Combined context: merge all documents into a single text for extraction.
     if combined_context and len(doc_texts) > 1:
+        # Combined mode reads text only (image mode unsupported below), so a
+        # document with no stored text contributes nothing to the merge —
+        # flag it here, because the post-run engine check cannot: the merge
+        # collapses everything to one text and drops per-document indices.
+        for text, meta in zip(doc_texts, doc_metadata):
+            if not (text or "").strip():
+                _flag_no_extractable_text(
+                    document_warnings, meta.get("uuid"), meta.get("title"),
+                )
         merged_text, merged_meta = merge_combined_context(doc_texts, doc_metadata)
         doc_texts = [merged_text]
         doc_metadata = [merged_meta]
@@ -717,4 +778,20 @@ async def run_extraction_sync(
         capture_sources=capture_sources,
         doc_metadata=doc_metadata,
     )
+
+    # A document the engine skipped entirely (unloadable file and/or no
+    # extracted text) contributed zero entities; without an entry here the
+    # run reads as "completed, this document just had no matches" — the
+    # silent-green path #805 names. Indices are only meaningful for the
+    # per-document run (combined context collapses to one merged text whose
+    # emptiness the pre-flight above already handles).
+    if not (combined_context and len(document_uuids) > 1):
+        for idx in engine.skipped_doc_indices:
+            if idx >= len(document_uuids):
+                continue
+            meta = doc_metadata[idx] if idx < len(doc_metadata) else {}
+            _flag_no_extractable_text(
+                document_warnings, document_uuids[idx], meta.get("title"),
+            )
+
     return result

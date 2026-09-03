@@ -40,10 +40,16 @@ _PDF_INSPECTOR_MIN_CONFIDENCE = 0.8
 _BLANK_PAGE_INK_THRESHOLD = 250
 
 
+# A table cell that is exactly the pandas/openpyxl NaN sentinel, and nothing
+# else. Anchored to cell boundaries so real words survive: a blind
+# str.replace("NaN", "") corrupted a PI surname (Nanjing, NaNoparticle) and
+# any prose that happened to contain the letters.
+_NAN_CELL_RE = re.compile(r"(?<=\|)(\s*)(?:NaN|nan|NAN)(\s*)(?=\|)")
+
+
 def clean_markdown_nans(markdown_content: str) -> str:
-    """Remove NaN values from markdown content."""
-    cleaned = markdown_content.replace("| NaN |", "| |")
-    cleaned = cleaned.replace("NaN", "")
+    """Blank out NaN-only table cells in markdown content."""
+    cleaned = _NAN_CELL_RE.sub(r"\1\2", markdown_content)
 
     lines = cleaned.split("\n")
     filtered_lines = []
@@ -67,10 +73,14 @@ def convert_to_markdown(doc_path: str, keep_data_uris: bool = True) -> str:
     return clean_markdown_nans(result.text_content)
 
 
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from a PDF using PyMuPDF. See _pymupdf_extract_with_pages for the page-aware variant."""
+def extract_text_from_pdf(pdf_path: str, report: dict | None = None) -> str:
+    """Extract text from a PDF using PyMuPDF. See _pymupdf_extract_with_pages for the page-aware variant.
+
+    ``report``, when given, receives ``{"hidden_text_unchecked": True}`` if the
+    hidden-text scrub could not inspect the file (see pdf_hidden_text).
+    """
     text, _ = _pymupdf_extract_with_pages(pdf_path)
-    scrubbed, _ = pdf_hidden_text.scrub_pdf(pdf_path, text)
+    scrubbed, _ = pdf_hidden_text.scrub_pdf(pdf_path, text, report=report)
     return scrubbed
 
 
@@ -234,6 +244,52 @@ def ocr_extract_text_from_pdf(
     return ""
 
 
+def _apply_percent_format(value: object, number_format: object) -> object:
+    """Render a percent-formatted number the way the sheet shows it.
+
+    Excel stores 47.5% as 0.475 and carries the "%" in the cell's display
+    format, which the text extraction dropped — so a fringe rate the sheet
+    shows as "47.5%" reached the model as "0.475", a different number by two
+    orders of magnitude. Currency and thousands separators are deliberately
+    NOT reconstructed: "$150,000" and "150000" are the same quantity, and
+    stripping the symbols keeps the value machine-readable.
+    """
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return value
+    if not isinstance(number_format, str) or not _has_percent_operator(number_format):
+        return value
+    scaled = value * 100
+    # 10 places, not 4: a rate displayed to more than four decimals was being
+    # silently rounded, and a genuinely tiny one (1e-7) collapsed to "0%" —
+    # a real value reaching the model as zero.
+    text = f"{scaled:.10f}".rstrip("0").rstrip(".")
+    return f"{text or '0'}%"
+
+
+def _has_percent_operator(number_format: str) -> bool:
+    """Whether a `%` in the format is Excel's scale-by-100 operator.
+
+    A `%` inside quotes or after a backslash is a literal suffix: `0"%"` and
+    `0.0" %"` mean "show a percent sign", and such cells already hold 47.5,
+    not 0.475. Treating those as the operator multiplied them by 100 — the
+    same two-orders-of-magnitude error this function exists to prevent, in
+    the other direction.
+    """
+    in_quotes = False
+    i = 0
+    while i < len(number_format):
+        ch = number_format[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == '"':
+            in_quotes = not in_quotes
+        elif ch == "%" and not in_quotes:
+            return True
+        i += 1
+    return False
+
+
 def _stringify_cell_value(value: object) -> str:
     """Render an openpyxl cell value as a plain display string."""
     if value is None:
@@ -375,10 +431,33 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
                 if cached is None and isinstance(formula, str) and formula.startswith("="):
                     coord = cell_v.coordinate.upper()
                     evaluated = computed.get((sheet_key, coord))
-                    row.append(evaluated if evaluated is not None else formula)
+                    value = evaluated if evaluated is not None else formula
                 else:
-                    row.append(cached)
+                    value = cached
+                row.append(_apply_percent_format(value, cell_v.number_format))
             grid.append(row)
+
+        # Spread a merged range's value across every cell it covers. openpyxl
+        # stores it only in the top-left cell, so a "TOTAL DIRECT COSTS"
+        # header merged across B2:E2 arrived as one labelled cell followed by
+        # blanks — the columns under it read as unlabelled. The merge is still
+        # listed in the extras below; this makes the grid itself readable.
+        for rng in ws_v.merged_cells.ranges:
+            anchor = grid[rng.min_row - 1][rng.min_col - 1] if (
+                rng.min_row - 1 < len(grid) and rng.min_col - 1 < max_col
+            ) else None
+            if anchor in (None, ""):
+                continue
+            # Labels only. Spreading a merged NUMBER invents quantities: a
+            # total of 485,000 merged across B10:E10 would render four times
+            # and a model summing the row reads 1,940,000 — worse than the
+            # unlabelled columns this fix exists to correct.
+            if isinstance(anchor, (int, float)) and not isinstance(anchor, bool):
+                continue
+            for r in range(rng.min_row, min(rng.max_row, max_row) + 1):
+                for c in range(rng.min_col, min(rng.max_col, max_col) + 1):
+                    if grid[r - 1][c - 1] in (None, ""):
+                        grid[r - 1][c - 1] = anchor
 
         kept_rows = [row for row in grid if any(v not in (None, "") for v in row)]
         if not kept_rows:
@@ -784,13 +863,21 @@ def _interpolate_page_markers(text: str, num_pages: int) -> list[dict]:
 
 
 def pdf_page_count(pdf_path: str) -> int:
-    """Cheap page-count read via PyMuPDF. Returns 0 if it can't open the file."""
+    """Cheap page-count read via PyMuPDF. Returns 0 if it can't open the file.
+
+    0 means "unknown", not "no pages" — callers that gate on a page count
+    (sparse-text detection) must treat it as absent rather than as a real
+    measurement, which is why the failure is logged at warning here.
+    """
     try:
         import pymupdf
         with pymupdf.open(pdf_path) as doc:
             return doc.page_count
     except Exception as e:
-        logger.warning("Could not read PDF page count for %s: %s", pdf_path, e)
+        logger.warning(
+            "Could not read PDF page count for %s (%s) — sparse-text "
+            "detection is disabled for this document", pdf_path, e,
+        )
         return 0
 
 
@@ -917,7 +1004,7 @@ def _extract_pdf_text_and_markers(
     defended against separately in each prompt downstream.
     """
     text, markers = _read_pdf_text_and_markers(file_path, report=report)
-    return pdf_hidden_text.scrub_pdf(file_path, text, markers)
+    return pdf_hidden_text.scrub_pdf(file_path, text, markers, report=report)
 
 
 def _read_pdf_text_and_markers(
