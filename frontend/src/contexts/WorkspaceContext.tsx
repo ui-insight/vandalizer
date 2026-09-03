@@ -141,6 +141,8 @@ interface UIStateContextValue {
   setSelectedDocNames: (names: Record<string, string>) => void
   selectedFolderUuids: string[]
   setSelectedFolderUuids: (uuids: string[]) => void
+  selectedFolderNames: Record<string, string>
+  setSelectedFolderNames: (names: Record<string, string>) => void
   railDocked: boolean
   toggleRailDocked: () => void
   panelSplit: number
@@ -323,6 +325,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
   const [selectedDocNames, setSelectedDocNames] = useState<Record<string, string>>({})
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
+  const [selectedFolderNames, setSelectedFolderNames] = useState<Record<string, string>>({})
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
@@ -811,6 +814,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     selectedDocUuids, setSelectedDocUuids,
     selectedDocNames, setSelectedDocNames,
     selectedFolderUuids, setSelectedFolderUuids,
+    selectedFolderNames, setSelectedFolderNames,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
@@ -818,7 +822,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     openDocumentUuid, setOpenDocumentUuid,
   }), [
-    selectedDocUuids, selectedDocNames, selectedFolderUuids,
+    selectedDocUuids, selectedDocNames, selectedFolderUuids, selectedFolderNames,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,

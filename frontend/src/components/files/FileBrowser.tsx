@@ -53,6 +53,7 @@ interface FileBrowserProps {
   onSelectionChange?: (docUuids: string[]) => void
   onDocNamesChange?: (names: Record<string, string>) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
+  onFolderNamesChange?: (names: Record<string, string>) => void
   // Emits the subset of selected docs that are still being processed
   // (text extraction, OCR, indexing, etc.). Used by the chat banner to
   // avoid the false "ready for analysis" claim.
@@ -90,7 +91,7 @@ async function collectUsage(docUuids: string[]): Promise<UsageGroups | undefined
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -175,9 +176,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   // Sync selected folder UUIDs to parent
   useEffect(() => {
     if (!onFolderSelectionChange) return
-    const folderUuids = [...selectedUuids].filter(u => folders.some(f => f.uuid === u))
-    onFolderSelectionChange(folderUuids)
-  }, [selectedUuids, folders, onFolderSelectionChange])
+    const selectedFolders = folders.filter(f => selectedUuids.has(f.uuid))
+    onFolderSelectionChange(selectedFolders.map(f => f.uuid))
+    // Names too, so the chat can title the folder chips (mirrors onDocNamesChange)
+    const names: Record<string, string> = {}
+    for (const f of selectedFolders) names[f.uuid] = f.title
+    onFolderNamesChange?.(names)
+  }, [selectedUuids, folders, onFolderSelectionChange, onFolderNamesChange])
 
   // Clear selection when navigating folders
   useEffect(() => {

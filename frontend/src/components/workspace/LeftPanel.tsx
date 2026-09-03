@@ -15,7 +15,7 @@ import { addDocumentsToKB } from '../../api/knowledge'
 import type { Folder } from '../../types/document'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest, focusChat, openWorkflow, openExtraction, activateKB, activeProjectRootFolder, activeProjectTitle, activeProjectTeamId, workspaceMode, setOpenDocumentUuid } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest, focusChat, openWorkflow, openExtraction, activateKB, activeProjectRootFolder, activeProjectTitle, activeProjectTeamId, workspaceMode, setOpenDocumentUuid } = useWorkspace()
   const { toast } = useToast()
   // Folder targeted by the workflow / KB picker modals (null = closed).
   const [workflowPickerFolder, setWorkflowPickerFolder] = useState<Folder | null>(null)
@@ -60,15 +60,20 @@ export function LeftPanel() {
     if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
   }, [setSelectedFolderUuids])
 
+  const handleFolderNamesChange = useCallback((names: Record<string, string>) => {
+    if (!viewingDocRef.current) setSelectedFolderNames(names)
+  }, [setSelectedFolderNames])
+
   // "Ask about folder": scope the chat to just this folder, drop any
   // doc-level selection, and pull focus into the composer so the user can
   // immediately type a question. Backend chat already resolves folder_uuids.
-  const handleAskAboutFolder = useCallback((folder: { uuid: string }) => {
+  const handleAskAboutFolder = useCallback((folder: { uuid: string; title?: string }) => {
     setSelectedDocUuids([])
     setSelectedDocNames({})
     setSelectedFolderUuids([folder.uuid])
+    setSelectedFolderNames(folder.title ? { [folder.uuid]: folder.title } : {})
     focusChat()
-  }, [setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, focusChat])
+  }, [setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames, focusChat])
 
   // Pick a workflow, then run it over every document in the folder (batch:
   // one run per document). Backend expands folder_uuids -> docs.
@@ -379,6 +384,7 @@ export function LeftPanel() {
             onSelectionChange={handleSelectionChange}
             onDocNamesChange={handleDocNamesChange}
             onFolderSelectionChange={handleFolderSelectionChange}
+            onFolderNamesChange={handleFolderNamesChange}
             onSelectionProcessingChange={handleSelectionProcessingChange}
             onAskAboutFolder={handleAskAboutFolder}
             onRunWorkflowOnFolder={setWorkflowPickerFolder}
