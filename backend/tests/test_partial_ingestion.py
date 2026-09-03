@@ -257,3 +257,87 @@ class TestEveryRunPathDiscloses:
             "these run paths extract from a possibly half-read document and "
             f"report nothing about it: {missing}"
         )
+
+
+class TestNoExtractableTextFlagging:
+    """One writer for the per-document no_extractable_text disclosure, so the
+    entry shape and dedupe rule cannot drift between the nothing-readable
+    pre-flight, the combined-context merge, and the engine-skipped loop."""
+
+    def test_creates_and_dedupes_entries(self):
+        from app.services.search_set_service import _flag_no_extractable_text
+
+        warnings: list[dict] = []
+        _flag_no_extractable_text(warnings, "d1", "Award letter")
+        _flag_no_extractable_text(warnings, "d1", "Award letter")
+        assert len(warnings) == 1
+        entry = warnings[0]
+        assert entry["document_uuid"] == "d1"
+        assert entry["title"] == "Award letter"
+        assert entry["codes"] == ["no_extractable_text"]
+        # The human sentence rides along so the frontend never needs its own
+        # copy of the code→text map (#803).
+        assert "could not be read" in entry["text"]
+
+    def test_merges_into_an_existing_documents_entry(self):
+        from app.services.search_set_service import _flag_no_extractable_text
+
+        warnings = [{"document_uuid": "d1", "title": "T", "codes": ["partial_ocr"]}]
+        _flag_no_extractable_text(warnings, "d1", "T")
+        assert warnings[0]["codes"] == ["partial_ocr", "no_extractable_text"]
+
+    def test_none_out_list_is_a_no_op(self):
+        from app.services.search_set_service import _flag_no_extractable_text
+
+        _flag_no_extractable_text(None, "d1", "T")  # must not raise
+
+    def test_code_has_a_label_registered_for_the_renderer(self):
+        """The registry's own comment records how low_quality_text once
+        rendered as nothing for lack of an entry here."""
+        from app.services.document_service import INGESTION_WARNING_LABELS
+
+        assert "no_extractable_text" in INGESTION_WARNING_LABELS
+
+
+class TestWarningTextReachesEveryDocumentSurface:
+    """The caveat icon keys on `ingestion_warning_text`. Serving it from only
+    one endpoint left the file browser — the screen #803 is actually about —
+    rendering a clean row, and the component tests couldn't catch it because
+    they hand-build the prop."""
+
+    def test_every_document_payload_builder_emits_the_text(self):
+        import inspect
+
+        from app.services import document_service
+
+        # The two builders that feed a document row: the folder listing (the
+        # file browser) and the post-upload poll.
+        for fn in (document_service.list_contents, document_service.poll_status):
+            source = inspect.getsource(fn)
+            assert '"ingestion_warnings"' in source, f"{fn.__name__} lost the codes"
+            assert '"ingestion_warning_text"' in source, (
+                f"{fn.__name__} serves warning codes without the words the UI "
+                "renders — the caveat will not appear"
+            )
+
+    def test_completeness_codes_only_reach_the_not_read_in_full_headline(self):
+        """hidden_text_unchecked is the INVERSE risk (extra unvetted content,
+        not missing content); announcing it as 'not read in full' asserts the
+        opposite of what happened."""
+        from app.services.document_service import COMPLETENESS_WARNING_CODES
+
+        assert "hidden_text_unchecked" not in COMPLETENESS_WARNING_CODES
+        assert "partial_ocr" in COMPLETENESS_WARNING_CODES
+
+    def test_merging_a_severer_code_recomposes_the_text(self):
+        from app.services.search_set_service import _flag_no_extractable_text
+
+        warnings = [{
+            "document_uuid": "d1", "title": "T",
+            "codes": ["sparse_text"],
+            "text": "far less text than its page count suggests",
+        }]
+        _flag_no_extractable_text(warnings, "d1", "T")
+        # The strip renders `text`; a stale one reported the milder caveat.
+        assert "could not be read" in warnings[0]["text"]
+        assert warnings[0]["codes"] == ["sparse_text", "no_extractable_text"]

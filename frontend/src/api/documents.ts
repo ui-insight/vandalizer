@@ -34,6 +34,8 @@ export interface SearchResult {
   folder: string | null
   token_count: number
   extraction_low_quality?: boolean
+  ingestion_warnings?: string[]
+  ingestion_warning_text?: string
 }
 
 export function searchDocuments(query: string = '', limit: number = 20, folder?: string | null) {

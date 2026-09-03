@@ -24,7 +24,11 @@ FAILURE_KINDS = frozenset({
     "workflow_failed",
     "extraction_failed",
     "document_failed",
+    "document_unsearchable",
     "automation_failed",
+    "delivery_failed",
+    "kb_source_failed",
+    "project_kb_sync_failed",
 })
 
 

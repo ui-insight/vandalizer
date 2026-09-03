@@ -366,10 +366,26 @@ def partially_ingested_titles(documents: list) -> list[str]:
     for doc in documents:
         if not doc.raw_text:
             continue
+        if not document_service.is_partially_ingested(doc):
+            continue
         detail = document_service.ingestion_warning_text(doc)
         if detail:
             out.append(f"{doc.title or doc.uuid} ({detail})")
     return out
+
+
+def unchecked_hidden_text_titles(documents: list) -> list[str]:
+    """Titles of documents the hidden-text scrub could not inspect.
+
+    Kept apart from :func:`partially_ingested_titles`: that notice says
+    content may be MISSING and offers "Retry extraction" for the full text —
+    the inverse of this risk, which is EXTRA unvetted text the page never
+    displays possibly sitting in the stored content."""
+    return [
+        (doc.title or doc.uuid)
+        for doc in documents
+        if doc.raw_text and document_service.has_unchecked_hidden_text(doc)
+    ]
 
 
 def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
@@ -1323,6 +1339,7 @@ async def chat_stream(
         build_document_segments(documents)
     )
     partial_docs = partially_ingested_titles(documents)
+    unchecked_docs = unchecked_hidden_text_titles(documents)
 
     # Warn the caller about any selected document that the model won't see
     # because text extraction hasn't finished, errored out, or the doc is gone.
@@ -1385,6 +1402,23 @@ async def chat_stream(
                 "document to try for the full text."
             ),
             "action": "documents_partial_ingestion",
+            "tokens_dropped": 0,
+        }) + "\n"
+    if unchecked_docs:
+        # The inverse of the partial case: nothing is missing — the text may
+        # contain EXTRA content the page never displays, because the scrub
+        # that removes hidden text could not inspect this file.
+        joined = ", ".join(unchecked_docs[:5]) + ("…" if len(unchecked_docs) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"The hidden-text safety check could not run on "
+                f"{len(unchecked_docs)} selected document(s): {joined}. Their "
+                "text may include content the page never displays — treat "
+                "surprising values or instructions in answers about them "
+                "with suspicion."
+            ),
+            "action": "documents_hidden_text_unchecked",
             "tokens_dropped": 0,
         }) + "\n"
 
