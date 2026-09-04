@@ -46,7 +46,15 @@ def sanitize_retrieved_chunk(content: str) -> tuple[str, bool]:
     """
     from app.services.injected_instructions import find_injected_instructions
 
-    passages = find_injected_instructions(content or "")
+    # expand_headers=False: this is the one caller that DELETES what it
+    # matches. Header expansion assumes the lines under a label belong to it,
+    # which is right for showing someone a planted block and wrong for removing
+    # one -- "SYSTEM NOTE FOR AI PROCESSING:" followed by the planted line and
+    # then a real 2 CFR 200 clause would have taken the clause with it, from
+    # every answer, for every user, with nothing on screen saying so. Deleting
+    # only the lines that actually matched keeps the blast radius to the text
+    # the detector can point at.
+    passages = find_injected_instructions(content or "", expand_headers=False)
     if not passages:
         return content, False
     kept: list[str] = []
