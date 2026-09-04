@@ -11,7 +11,7 @@ from typing import Any, Optional
 import chromadb
 from chromadb.config import Settings as ChromaSettings
 
-from app.services.page_locator import span_meta
+from app.services.page_locator import span_meta, with_marker_provenance
 
 logger = logging.getLogger(__name__)
 
@@ -315,8 +315,11 @@ class DocumentManager:
             return 0
 
         collection = self.get_user_collection(user_id)
+        # with_marker_provenance restores the `approximate` flag on markers
+        # interpolated before the flag existed, so re-ingesting a legacy
+        # scanned document writes hedged page metadata instead of exact.
         markers = sorted(
-            (m for m in (text_markers or []) if isinstance(m, dict)),
+            (m for m in (with_marker_provenance(text_markers) or []) if isinstance(m, dict)),
             key=lambda m: m.get("char_offset", 0),
         )
 
@@ -442,8 +445,9 @@ class DocumentManager:
             return 0
 
         collection = self.get_kb_collection(kb_uuid)
+        # Same legacy-marker normalization as add_document above.
         markers = sorted(
-            (m for m in (text_markers or []) if isinstance(m, dict)),
+            (m for m in (with_marker_provenance(text_markers) or []) if isinstance(m, dict)),
             key=lambda m: m.get("char_offset", 0),
         )
 

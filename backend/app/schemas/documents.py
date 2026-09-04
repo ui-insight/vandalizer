@@ -24,6 +24,7 @@ class DocumentResponse(BaseModel):
     #: Codes from document_service.INGESTION_WARNING_LABELS — the extraction
     #: succeeded but is not the whole document.
     ingestion_warnings: list[str] = []
+    ingestion_warning_text: str = ""
 
 
 class FolderResponse(BaseModel):
@@ -52,6 +53,7 @@ class PollStatusResponse(BaseModel):
     path: Optional[str] = None
     extraction_low_quality: bool = False
     ingestion_warnings: list[str] = []
+    ingestion_warning_text: str = ""
 
 
 class CreateFolderRequest(BaseModel):

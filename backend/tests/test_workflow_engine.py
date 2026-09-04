@@ -240,10 +240,18 @@ class TestAddDocumentNode:
         assert result["output"] == "Hello\nWorld"
         assert result["step_name"] == "AddDocument"
 
-    def test_empty_texts(self):
+    def test_empty_texts_is_a_step_error(self):
+        """The same guard Add Website carries: a document-attachment step with
+        nothing to attach used to return "" and let the run finish Completed."""
         node = AddDocumentNode({})
         result = node.process({"output": None})
         assert result["output"] == ""
+        assert "no document text" in result["error"]
+
+    def test_whitespace_only_texts_are_a_step_error(self):
+        node = AddDocumentNode({"doc_texts": ["  ", "\n"]})
+        result = node.process({"output": None})
+        assert "no document text" in result["error"]
 
 
 class TestDataExportNode:

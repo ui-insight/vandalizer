@@ -133,7 +133,16 @@ class VerifiedItemMetadata(Document):
 
     # Last drift check (Phase E)
     last_drift_check_at: Optional[datetime.datetime] = None
-    last_drift_score: Optional[float] = None  # the score the live config achieved on the pinned baseline
+    # Score used for the last drift check. With baseline re-execution enabled
+    # (quality_config.monitoring.baseline_reexecution) this is the score the
+    # live config achieved re-running the pinned baseline's test cases; when
+    # disabled — the default — it is a copy of the item's latest validation
+    # score, a cheap proxy that never re-runs the frozen baseline.
+    last_drift_score: Optional[float] = None
+    # Which of the two the last check actually measured:
+    # "baseline_reexecution" | "latest_validation_proxy". None before the
+    # first check (and for checks recorded before this field existed).
+    last_drift_basis: Optional[str] = None
 
     updated_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)

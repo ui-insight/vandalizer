@@ -42,6 +42,7 @@ async def persist_validation_run(
     user_id: str,
     model: Optional[str] = None,
     extraction_config: Optional[dict] = None,
+    model_settings: Optional[dict] = None,
 ) -> ValidationRun:
     """Create a ValidationRun from a validation result dict and update quality metadata."""
     # Compute unified score
@@ -135,6 +136,7 @@ async def persist_validation_run(
         score=score,
         score_breakdown=score_breakdown,
         model=model,
+        model_settings=model_settings,
         num_runs=result.get("num_runs", 1),
         num_test_cases=num_test_cases,
         num_checks=num_checks,
@@ -621,26 +623,162 @@ async def get_quality_timeline(
     ]
 
 
+async def reexecute_official_baseline(meta) -> Optional[dict]:
+    """Run the pinned official_baseline's test cases against the current config.
+
+    Extraction (search_set) only — the one kind whose frozen baseline can be
+    mechanically re-executed: a workflow baseline grades historical executions
+    and a KB baseline needs the KB's live index, so neither can be replayed
+    from the frozen dict alone. Returns the v2 validation result dict, or
+    None when there is nothing executable (wrong kind, no baseline, or no
+    baseline case with both a source text and expected values).
+    """
+    if getattr(meta, "item_kind", None) != "search_set" or not meta.official_baseline:
+        return None
+
+    from app.models.extraction_test_case import ExtractionTestCase
+    from app.models.search_set import SearchSet
+    from app.services.extraction_validation_service import run_validation_v2
+
+    try:
+        ss = await SearchSet.get(meta.item_id)
+    except Exception:
+        ss = None
+    if not ss:
+        return None
+
+    baseline = meta.official_baseline
+    sources: list[dict] = []
+    for entry in baseline.get("test_cases") or []:
+        if not isinstance(entry, dict):
+            continue
+        # Examiner-added cases carry expected_values inline; cases frozen from
+        # a validation snapshot carry per-field result rows instead.
+        expected = entry.get("expected_values")
+        if not expected:
+            expected = {
+                f["field_name"]: f["expected"]
+                for f in entry.get("fields") or []
+                if isinstance(f, dict) and f.get("field_name")
+                and f.get("expected") not in (None, "")
+            }
+        source_text = entry.get("source_text")
+        if not source_text and entry.get("test_case_uuid"):
+            tc = await ExtractionTestCase.find_one(
+                ExtractionTestCase.uuid == entry["test_case_uuid"]
+            )
+            if tc and tc.source_text:
+                source_text = tc.source_text
+        if not source_text or not expected:
+            continue
+        sources.append({
+            "label": entry.get("label") or "Baseline case",
+            "source_type": "text",
+            "source_text": source_text,
+            "expected_values": {k: str(v) for k, v in expected.items()},
+        })
+
+    if not sources:
+        return None
+
+    # Replicate the baseline's own run count so the sample-size discount
+    # matches — re-running with fewer replicates would read as false drift.
+    num_runs = int(baseline.get("num_runs") or 3)
+    return await run_validation_v2(ss.uuid, "system", sources, num_runs=num_runs)
+
+
+async def get_quality_by_model(days: int = 90) -> list[dict]:
+    """Fleet-wide validation quality grouped by the model that ran.
+
+    The per-item version of this (``model_comparison`` in
+    ``get_quality_item_detail``) answers "which model is best for THIS item";
+    this answers "how does each model do across everything we measured".
+    Runs with ``model=None`` are reported under their own row rather than
+    dropped — pre-attribution history and workflow runs graded over mixed
+    models are a visible coverage gap, not something to hide.
+    """
+    cutoff = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(days=days)
+    runs = await ValidationRun.find(ValidationRun.created_at >= cutoff).to_list()
+
+    by_model: dict[Optional[str], dict] = {}
+    for r in runs:
+        entry = by_model.setdefault(r.model, {
+            "scores": [], "items": set(), "kinds": {}, "last_run_at": None,
+        })
+        entry["scores"].append(r.score)
+        entry["items"].add((r.item_kind, r.item_id))
+        kind_entry = entry["kinds"].setdefault(r.item_kind, {"scores": []})
+        kind_entry["scores"].append(r.score)
+        if entry["last_run_at"] is None or (r.created_at and r.created_at > entry["last_run_at"]):
+            entry["last_run_at"] = r.created_at
+
+    rows = []
+    for model_name, e in by_model.items():
+        rows.append({
+            "model": model_name,
+            "run_count": len(e["scores"]),
+            "items_validated": len(e["items"]),
+            "avg_score": round(sum(e["scores"]) / len(e["scores"]), 1),
+            "kinds": {
+                kind: {
+                    "run_count": len(k["scores"]),
+                    "avg_score": round(sum(k["scores"]) / len(k["scores"]), 1),
+                }
+                for kind, k in e["kinds"].items()
+            },
+            "last_run_at": e["last_run_at"].isoformat() if e["last_run_at"] else None,
+        })
+    # Attributed models first, best average first; the unattributed bucket last.
+    rows.sort(key=lambda r: (r["model"] is None, -(r["avg_score"] or 0)))
+    return rows
+
+
 async def run_regression_suite(
     user_id: str,
     model: Optional[str] = None,
+    suite_run=None,
 ) -> dict:
-    """Run validation on all verified items and return summary."""
+    """Run validation on all verified items and return summary.
+
+    ``model`` is forwarded to every item kind that can execute under an
+    explicit model (extraction and KB validation; workflow validation grades
+    historical executions, so a model cannot be forced onto it).
+
+    ``suite_run`` is an optional RegressionSuiteRun document — when given,
+    progress and per-item results are written onto it as the sweep advances,
+    so a watcher sees a live count instead of silence until the end.
+    """
     from app.models.library import LibraryItem
     from app.services import extraction_validation_service
     from app.services import workflow_service
 
     items = await LibraryItem.find({"verified": True}).to_list()
 
-    results = []
+    # The same underlying item can appear as several LibraryItem rows (one
+    # per user who added it). Validate each (kind, item_id) once.
+    seen: set[tuple[str, str]] = set()
+    unique_items = []
     for item in items:
-        item_id_str = str(item.item_id)
         kind = item.kind.value if hasattr(item.kind, "value") else str(item.kind)
+        key = (kind, str(item.item_id))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique_items.append((item, kind))
+
+    if suite_run is not None:
+        suite_run.total_items = len(unique_items)
+        await suite_run.save()
+
+    results = []
+    for item, kind in unique_items:
+        item_id_str = str(item.item_id)
 
         # Get previous score for delta
         prev = await get_latest_validation(kind, item_id_str)
         prev_score = prev["score"] if prev else None
 
+        name = item_id_str
         try:
             if kind == "search_set":
                 # Need the search_set uuid from the SearchSet document
@@ -648,6 +786,7 @@ async def run_regression_suite(
                 ss = await SearchSet.get(item.item_id)
                 if not ss:
                     continue
+                name = ss.title or item_id_str
                 result = await extraction_validation_service.run_validation(
                     search_set_uuid=ss.uuid,
                     user_id=user_id,
@@ -656,6 +795,10 @@ async def run_regression_suite(
                 current_score = result.get("aggregate_accuracy", 0) or 0
                 current_score = min(100.0, max(0.0, current_score * 60 + (result.get("aggregate_consistency", 0) or 0) * 40))
             elif kind == "workflow":
+                from app.models.workflow import Workflow
+                wf = await Workflow.get(item.item_id)
+                if wf is not None:
+                    name = getattr(wf, "name", "") or item_id_str
                 result = await workflow_service.validate_workflow(item_id_str)
                 # Prefer continuous score from new multi-run system
                 result_score = result.get("score")
@@ -669,10 +812,12 @@ async def run_regression_suite(
                 kb = await KB.get(item.item_id)
                 if not kb:
                     continue
+                name = kb.title or item_id_str
                 from app.services import kb_validation_service
                 result = await kb_validation_service.run_kb_validation(
                     kb_uuid=kb.uuid,
                     user_id=user_id,
+                    model=model,
                 )
                 current_score = float(result.get("raw_score", 0))
             else:
@@ -682,7 +827,7 @@ async def run_regression_suite(
             results.append({
                 "item_id": item_id_str,
                 "kind": kind,
-                "name": getattr(item, "name", item_id_str),
+                "name": name,
                 "score": round(current_score, 1),
                 "grade": result.get("grade"),
                 "prev_score": round(prev_score, 1) if prev_score is not None else None,
@@ -693,7 +838,7 @@ async def run_regression_suite(
             results.append({
                 "item_id": item_id_str,
                 "kind": kind,
-                "name": getattr(item, "name", item_id_str),
+                "name": name,
                 "score": None,
                 "grade": None,
                 "prev_score": round(prev_score, 1) if prev_score is not None else None,
@@ -701,10 +846,22 @@ async def run_regression_suite(
                 "status": f"error: {e}",
             })
 
+        if suite_run is not None:
+            suite_run.completed_items = len(results)
+            suite_run.succeeded = sum(1 for r in results if r["status"] == "ok")
+            suite_run.failed = sum(1 for r in results if r["status"] != "ok")
+            suite_run.results = results
+            await suite_run.save()
+
+    scores = [r["score"] for r in results if r["status"] == "ok" and r["score"] is not None]
+    mean_score = round(sum(scores) / len(scores), 1) if scores else None
+
     return {
         "total_items": len(results),
         "succeeded": sum(1 for r in results if r["status"] == "ok"),
         "failed": sum(1 for r in results if r["status"] != "ok"),
+        "mean_score": mean_score,
+        "model": model,
         "results": results,
     }
 

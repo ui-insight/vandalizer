@@ -154,6 +154,12 @@ class ExtractionEngine:
         self._domain = domain
         self.tokens_in = 0
         self.tokens_out = 0
+        # Indices (into doc_file_paths/doc_texts) of documents that
+        # contributed NOTHING to the last extract() call because their file
+        # could not be loaded and no text fallback existed. Callers surface
+        # these — a document silently yielding zero entities on a run marked
+        # completed was indistinguishable from "the document has no matches".
+        self.skipped_doc_indices: list[int] = []
         self._usage_lock = threading.Lock()
 
     def _record_usage(self, result) -> None:
@@ -188,7 +194,10 @@ class ExtractionEngine:
         Args:
             extract_keys: Fields to extract (list or comma-separated string).
             document_uuids: Not used directly  - caller should pass doc_texts.
-            model: Model name override.
+            model: Fallback model name — a model pinned in the system or
+                per-set extraction config wins over it. A caller that must run
+                a specific model has to pin it in extraction_config_override
+                (see extraction_validation_service._force_model_config).
             full_text: Single document text (shortcut for doc_texts=[full_text]).
             extraction_config_override: Per-extraction config overrides.
             doc_texts: Pre-loaded document texts.
@@ -212,6 +221,7 @@ class ExtractionEngine:
         key_chunks = self._resolve_key_chunks(fields_to_extract, extraction_cfg)
         use_repetition = extraction_cfg.get("repetition", {}).get("enabled", False)
         use_images = extraction_cfg.get("use_images", False)
+        self.skipped_doc_indices = []
 
         # Build metadata map
         meta_map: dict[str, dict] = {}
@@ -233,7 +243,7 @@ class ExtractionEngine:
                     # Fallback to OCR text if file can't be loaded for images
                     doc_results = []
                     texts = doc_texts or []
-                    if idx < len(texts) and texts[idx]:
+                    if idx < len(texts) and (texts[idx] or "").strip():
                         logger.warning(
                             "Image loading failed for %s, falling back to text", file_path
                         )
@@ -241,6 +251,16 @@ class ExtractionEngine:
                             texts[idx], key_chunks, model, extraction_cfg, use_repetition, meta_map,
                             capture_sources=capture_sources,
                         )
+                    else:
+                        # No file content AND no text fallback: this document
+                        # contributes zero entities. Recorded so the run can
+                        # say so instead of completing green.
+                        logger.warning(
+                            "Document %d (%s) skipped entirely — file could "
+                            "not be loaded and no extracted text exists",
+                            idx, file_path,
+                        )
+                        self.skipped_doc_indices.append(idx)
                 if doc_results and capture_sources:
                     # Verify quotes against the doc's extracted text even in
                     # image mode — an unverifiable quote stays verified=False.
@@ -263,6 +283,12 @@ class ExtractionEngine:
 
         all_results = []
         for idx, doc_text in enumerate(texts):
+            if not (doc_text or "").strip():
+                # An empty text contributes zero entities and used to do so
+                # silently (and still spent a model call). Record and skip.
+                logger.warning("Document %d skipped — no extracted text", idx)
+                self.skipped_doc_indices.append(idx)
+                continue
             doc_results = self._extract_document(
                 doc_text, key_chunks, model, extraction_cfg, use_repetition, meta_map,
                 capture_sources=capture_sources,
@@ -355,6 +381,43 @@ class ExtractionEngine:
         if models:
             return models[0].get("name", "")
         return ""
+
+    def effective_model_info(
+        self,
+        extraction_config_override: dict | None = None,
+        fallback_model: str | None = None,
+    ) -> dict:
+        """Resolve which model ``extract()`` will actually run, without running it.
+
+        Returns ``{"model", "source", "temperature", "pass_models"?}`` where
+        ``source`` is ``"config"`` (pinned in system or per-set config),
+        ``"caller_default"`` (the fallback_model argument), or
+        ``"system_default"`` (first available model). Validation persists this
+        so a run is labeled with the model that executed, not the one that was
+        merely requested.
+        """
+        cfg = self._resolve_config(extraction_config_override)
+        config_model = cfg.get("model", "")
+        if config_model:
+            resolved, source = config_model, "config"
+        elif fallback_model:
+            resolved, source = fallback_model, "caller_default"
+        else:
+            models = self._sys_cfg.get("available_models", [])
+            resolved = models[0].get("name", "") if models else ""
+            source = "system_default"
+        info = {
+            "model": resolved,
+            "source": source,
+            "temperature": self._get_model_config(resolved).get("temperature"),
+        }
+        if cfg.get("mode", "two_pass") == "two_pass":
+            two_pass = cfg.get("two_pass", {})
+            info["pass_models"] = {
+                "pass_1": two_pass.get("pass_1", {}).get("model", "") or resolved,
+                "pass_2": two_pass.get("pass_2", {}).get("model", "") or resolved,
+            }
+        return info
 
     def _get_model_config(self, model_name: str) -> dict:
         """Look up a model's config dict from available_models."""

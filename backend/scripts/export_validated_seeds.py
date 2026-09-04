@@ -63,6 +63,16 @@ async def export_validated_seeds():
         else:
             print(f"  {meta.get('display_name', seed_id)}: no validation data yet")
 
+        # Ship the pinned baseline too, when one exists — a receiving
+        # deployment then gets drift-checkable evaluation data instead of
+        # only a hand-asserted tier (seed_catalog pins it as "catalog-seed").
+        if vm and vm.official_baseline:
+            meta["official_baseline"] = vm.official_baseline
+            meta["official_baseline_score"] = vm.official_baseline_score
+            print(f"    + official baseline "
+                  f"({len(vm.official_baseline.get('test_cases', []))} case(s), "
+                  f"score={vm.official_baseline_score})")
+
         # Export current items (in case fields were added/modified)
         items_db = await ss.get_items()
         if ss.item_order:
