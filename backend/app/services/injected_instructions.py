@@ -264,12 +264,19 @@ def _merge(spans: list[dict]) -> list[dict]:
     return merged
 
 
-def find_injected_instructions(text: str) -> list[dict]:
+def find_injected_instructions(text: str, *, expand_headers: bool = True) -> list[dict]:
     """Passages of *text* that instruct the model instead of stating facts.
 
     Returns ``[{"start", "end", "text", "reason"}]`` with character offsets
     into *text*, merged where they overlap and ordered by position. Empty for
     an ordinary document — which is nearly all of them, so this stays cheap.
+
+    ``expand_headers`` extends a match ending in ":" over the lines beneath it,
+    because "SYSTEM NOTE FOR AI PROCESSING:" is a label and the instruction is
+    underneath. That is right for *showing* someone the planted block and wrong
+    for *deleting* it: the lines under a label are not all part of it, so a
+    caller that removes what it matches would take real content with it. Pass
+    ``expand_headers=False`` to get only the lines that actually matched.
     """
     if not text:
         return []
@@ -292,7 +299,7 @@ def find_injected_instructions(text: str) -> list[dict]:
             span_end = end
             # "SYSTEM NOTE FOR AI PROCESSING:" is the label; the instruction
             # is on the lines under it.
-            if line.rstrip().endswith(":"):
+            if expand_headers and line.rstrip().endswith(":"):
                 for j in range(i + 1, min(i + 1 + _HEADER_LINES, len(lines))):
                     following = text[lines[j][0]:lines[j][1]]
                     if not following.strip() or _DATA_ROW.match(following):
