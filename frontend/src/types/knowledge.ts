@@ -105,6 +105,12 @@ export interface KnowledgeBaseSource {
   // URL source whose extracted text was cut off at the fetcher size cap:
   // "ready" but incomplete, so the UI warns instead of showing a clean check.
   truncated?: boolean
+  // Document source whose document the pipeline recorded as only partly
+  // converted: the same "ready but incomplete" shape as `truncated`.
+  // `ingestion_warning_text` is the readable clause, e.g. "only part of this
+  // document could be converted".
+  ingestion_warnings?: string[]
+  ingestion_warning_text?: string | null
   created_at: string
   // When the text was last fetched/ingested (null while pending).
   processed_at?: string | null
@@ -113,6 +119,10 @@ export interface KnowledgeBaseSource {
 
 export interface KnowledgeBaseSourceDetail extends KnowledgeBaseSource {
   content?: string | null
+  // Whether *this viewer* can open the original file behind a document
+  // source. The text is shown either way; this decides whether the File view
+  // is offered, instead of a viewer that answers `{"detail":"File not found"}`.
+  document_file?: 'available' | 'no_access' | 'missing' | null
   crawl_enabled: boolean
   max_crawl_pages: number
   parent_source_uuid?: string | null

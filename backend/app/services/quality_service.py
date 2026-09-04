@@ -995,11 +995,17 @@ def _build_kb_suggestion_prompt(result: dict) -> str:
         "",
     ]
     # Unhealthy sources
-    unhealthy = [d for d in health.get("details", []) if d.get("status") == "unhealthy"]
+    # "partial" counts against the health ratio exactly as "unhealthy" does, so
+    # it has to appear in the list too. Filtering on the one string reported
+    # "Source Health: 1/2 (50%)" above a section naming zero sources -- the
+    # optimizer was told the score and not the reason for it.
+    NOT_HEALTHY = ("unhealthy", "partial")
+    unhealthy = [d for d in health.get("details", []) if d.get("status") in NOT_HEALTHY]
     if unhealthy:
-        lines.append("### Unhealthy Sources:")
+        lines.append("### Sources Not Counted Healthy:")
         for s in unhealthy:
-            lines.append(f"  - {s['name']}: {s.get('error', 'Unknown error')}")
+            label = "partly converted" if s.get("status") == "partial" else "unhealthy"
+            lines.append(f"  - {s['name']} ({label}): {s.get('error', 'Unknown error')}")
         lines.append("")
 
     # Low precision queries
@@ -1159,7 +1165,10 @@ async def check_verification_readiness(
             # Check source health from latest validation
             source_health = result.get("source_health", {})
             if source_health and source_health.get("ratio", 1.0) < 0.8:
-                issues.append(f"Source health is {source_health['ratio'] * 100:.0f}%. Fix unhealthy sources before submitting.")
+                issues.append(
+                    f"Source health is {source_health['ratio'] * 100:.0f}%. Fix the "
+                    "sources that are unreachable or only partly converted before submitting."
+                )
 
     ready = len(issues) == 0
     return {"ready": ready, "issues": issues, "recommendations": recommendations}
