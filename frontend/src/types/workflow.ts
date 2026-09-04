@@ -85,6 +85,9 @@ export interface Workflow {
     trigger_type?: string;
     // Pre-assigned documents the run loader merges into every run (Input tab).
     fixed_documents?: { uuid: string; title: string }[];
+    // Workflow-level default model applied to every step without its own
+    // override (set via the canvas "Model — all steps" selector).
+    default_model?: string;
   };
   output_config?: { storage?: SaveOutputConfig; [key: string]: unknown };
   can_manage?: boolean;

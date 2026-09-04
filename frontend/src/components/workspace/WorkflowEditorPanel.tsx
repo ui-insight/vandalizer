@@ -9,6 +9,7 @@ import {
   Circle, MinusCircle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
+  Cpu,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -605,12 +606,16 @@ export function WorkflowEditorPanel() {
   const handleRun = async () => {
     if (!openWorkflowId || !hasSteps || unfinishedSteps.length > 0) return
 
+    // The workflow-level model (canvas selector). Empty → backend picks the
+    // system default. The engine applies it to steps without their own model.
+    const runModel = (workflow?.input_config?.default_model as string) || undefined
+
     try {
       if (isNoInput) {
         // Run with no documents and no text — the steps generate/fetch their
         // own content (e.g. API calls, KB queries, static prompts).
         setActiveTab('design')
-        await runner.start(openWorkflowId, [], undefined, false)
+        await runner.start(openWorkflowId, [], runModel, false)
       } else if (isTextInput) {
         if (!textInput.trim()) return
         // Convert text to temp document, then combine with any selected docs
@@ -619,7 +624,7 @@ export function WorkflowEditorPanel() {
         ])
         const allUuids = [...textUuids, ...selectedDocUuids]
         setActiveTab('design')
-        await runner.start(openWorkflowId, allUuids, undefined, false)
+        await runner.start(openWorkflowId, allUuids, runModel, false)
       } else {
         // Default to the whole project when nothing is explicitly selected;
         // failing that, the fixed documents alone (the run loader merges them
@@ -637,7 +642,7 @@ export function WorkflowEditorPanel() {
           }
         }
         setActiveTab('design')
-        await runner.start(openWorkflowId, uuids, undefined, batchMode)
+        await runner.start(openWorkflowId, uuids, runModel, batchMode)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to run workflow'
@@ -652,6 +657,20 @@ export function WorkflowEditorPanel() {
 
   const canManage = workflow?.can_manage !== false
   const [duplicating, setDuplicating] = useState(false)
+
+  // Persist the workflow-level default model (applied to every step that has no
+  // model of its own). Optimistic: reflect the choice immediately, then save.
+  const handleSetDefaultModel = async (model: string) => {
+    if (!openWorkflowId || !workflow) return
+    const nextInputConfig = { ...(workflow.input_config || {}), default_model: model }
+    setWorkflow({ ...workflow, input_config: nextInputConfig })
+    try {
+      await updateWorkflow(openWorkflowId, { input_config: nextInputConfig })
+    } catch {
+      toast('Failed to save model', 'error')
+      refresh()
+    }
+  }
 
   const handleMakeCopy = async () => {
     if (!openWorkflowId || duplicating) return
@@ -945,6 +964,8 @@ export function WorkflowEditorPanel() {
               onMoveStep={handleMoveStep}
               onDropStep={handleDropStep}
               canManage={canManage}
+              defaultModel={(workflow.input_config?.default_model as string) || ''}
+              onSetDefaultModel={handleSetDefaultModel}
             />
             {/* Quality Pulse card */}
             {qualityStatus && openWorkflowId && (
@@ -1401,6 +1422,8 @@ function DesignCanvas({
   onMoveStep,
   onDropStep,
   canManage,
+  defaultModel,
+  onSetDefaultModel,
 }: {
   workflow: Workflow
   selectedDocCount: number
@@ -1417,10 +1440,17 @@ function DesignCanvas({
   onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
   onDropStep: (dragId: string, targetId: string, position: 'before' | 'after') => void
   canManage: boolean
+  defaultModel: string
+  onSetDefaultModel: (model: string) => void
 }) {
   const [draggingStepId, setDraggingStepId] = useState<string | null>(null)
   const [dropTarget, setDropTarget] = useState<{ stepId: string; position: 'before' | 'after' } | null>(null)
   const canDrag = canManage && !runnerRunning
+  const [models, setModels] = useState<ModelInfo[]>([])
+
+  useEffect(() => {
+    getModels().then(setModels).catch(() => {})
+  }, [])
 
   return (
     <div style={{
@@ -1479,6 +1509,47 @@ function DesignCanvas({
             </div>
           </>
         )}
+      </div>
+
+      <ConnectionLine />
+
+      {/* Workflow-level model — the default every step runs on. A step with its
+          own Model Override still wins (see the task editor). */}
+      <div style={{
+        backgroundColor: '#fff', border: '1px solid #e5e7eb',
+        borderRadius: 'var(--ui-radius, 8px)', padding: 15,
+        boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
+      }}>
+        <label htmlFor="workflow-default-model" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6,
+        }}>
+          <Cpu style={{ width: 15, height: 15, color: 'var(--highlight-color, #eab308)' }} />
+          Model
+          <span style={{ fontWeight: 400, color: '#6b7280' }}>— all steps</span>
+        </label>
+        <select
+          id="workflow-default-model"
+          aria-label="Workflow model for all steps"
+          value={defaultModel}
+          disabled={!canManage}
+          onChange={e => onSetDefaultModel(e.target.value)}
+          style={{
+            width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 6,
+            border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+            cursor: canManage ? 'pointer' : 'not-allowed',
+          }}
+        >
+          <option value="">Automatic (system default)</option>
+          {models.map(m => {
+            const hints = [m.speed, m.tier ? `${m.tier} tier` : ''].filter(Boolean).join(', ')
+            const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` - ${hints}` : '')
+            return <option key={m.name} value={m.name}>{label}</option>
+          })}
+        </select>
+        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+          Runs every step on this model. A step with its own model override keeps it.
+        </div>
       </div>
 
       {/* Step cards — filter out empty "Document" trigger steps (auto-prepended at execution time) */}
@@ -3212,6 +3283,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         task_name: task.name,
         task_data: taskData,
         document_uuids: testInput.docUuids,
+        // So a step set to "Use workflow default" is tested on that default.
+        workflow_id: workflow?.id,
       })
 
       // Poll for test result

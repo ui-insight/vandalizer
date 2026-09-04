@@ -140,4 +140,33 @@ describe('FileRow', () => {
     expect(screen.getByTitle(/Could not index this document/)).toBeTruthy()
     expect(screen.queryByTitle(/Text extracted poorly/)).toBeNull()
   })
+
+  // #803: these warnings were computed, stored and API-served but never
+  // rendered — a 400-page package whose OCR gave up at page 30 showed as a
+  // clean, unmarked row.
+  it('shows an ingestion caveat when the backend reports one', () => {
+    renderFileRow({
+      doc: makeDoc({
+        ingestion_warnings: ['partial_ocr'],
+        ingestion_warning_text: 'only part of this document could be converted',
+      }),
+    })
+    expect(screen.getByTitle(/only part of this document could be converted/)).toBeTruthy()
+  })
+
+  it('says nothing for a document ingested whole', () => {
+    renderFileRow({ doc: makeDoc({ ingestion_warnings: [], ingestion_warning_text: '' }) })
+    expect(screen.queryByTitle(/ingested with a caveat/)).toBeNull()
+  })
+
+  it('a hard failure outranks the ingestion caveat (one icon slot)', () => {
+    renderFileRow({
+      doc: makeDoc({
+        task_status: 'error',
+        ingestion_warning_text: 'only part of this document could be converted',
+      }),
+    })
+    expect(screen.getByTitle(/Text extraction failed/)).toBeTruthy()
+    expect(screen.queryByTitle(/ingested with a caveat/)).toBeNull()
+  })
 })

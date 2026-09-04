@@ -56,7 +56,17 @@ COPY --from=builder /app/.venv /app/.venv
 # failed launch and a warning per qualifying fetch -- hence the runtime default.
 ARG INSTALL_BROWSER=true
 ENV WEB_FETCHER_BROWSER_ENABLED=${INSTALL_BROWSER}
-RUN if [ "$INSTALL_BROWSER" = "true" ]; then \
+# The install below tests for the literal string "true", while the ENV above
+# takes the raw value and pydantic reads 1/yes/on/TRUE as true. Any spelling
+# but the two literals therefore splits them: no Chromium in the image, and an
+# app configured to launch one -- a failed launch and a warning per qualifying
+# fetch. compose.yaml routes operator environment into this arg, so "1" is a
+# reachable thing to type. Reject it here rather than ship the split.
+RUN case "$INSTALL_BROWSER" in \
+      true|false) ;; \
+      *) echo "INSTALL_BROWSER must be exactly 'true' or 'false' (got '$INSTALL_BROWSER')" >&2; exit 1 ;; \
+    esac; \
+    if [ "$INSTALL_BROWSER" = "true" ]; then \
         playwright install --with-deps chromium && \
         chmod -R a+rx /opt/ms-playwright; \
     fi

@@ -197,6 +197,8 @@ async def upsert_verified_metadata(
     item_kind: str, item_id: str, display_name: str, description: str,
     quality_tier: str | None = None, quality_score: float | None = None,
     quality_grade: str | None = None, credit: dict | None = None,
+    official_baseline: dict | None = None,
+    official_baseline_score: float | None = None,
 ):
     """Create or refresh VerifiedItemMetadata.
 
@@ -205,6 +207,12 @@ async def upsert_verified_metadata(
     description are refreshed from the seed; existing quality fields are only
     overwritten when the caller passes new values (so previously validated
     records don't lose their scores to a later unvalidated seed run).
+
+    ``official_baseline`` lets a catalog release ship a measured, pinned
+    baseline (produced by scripts/export_validated_seeds.py) so a receiving
+    deployment gets drift-checkable evaluation data instead of only a
+    hand-asserted tier. It never overwrites a baseline an examiner pinned
+    locally — local pins carry a user id, seed pins carry "catalog-seed".
     """
     existing = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == item_kind,
@@ -223,6 +231,14 @@ async def upsert_verified_metadata(
         if credit and credit.get("name"):
             existing.credit_name = credit["name"]
             existing.credit_org = credit.get("org")
+        if official_baseline and (
+            not existing.official_baseline
+            or existing.official_baseline_pinned_by_user_id == "catalog-seed"
+        ):
+            existing.official_baseline = official_baseline
+            existing.official_baseline_score = official_baseline_score
+            existing.official_baseline_pinned_at = now
+            existing.official_baseline_pinned_by_user_id = "catalog-seed"
         existing.updated_at = now
         await existing.save()
         return existing
@@ -234,6 +250,10 @@ async def upsert_verified_metadata(
         quality_tier=quality_tier,
         quality_grade=quality_grade,
         quality_score=quality_score,
+        official_baseline=official_baseline or {},
+        official_baseline_score=official_baseline_score,
+        official_baseline_pinned_at=now if official_baseline else None,
+        official_baseline_pinned_by_user_id="catalog-seed" if official_baseline else None,
         organization_ids=[],  # empty = globally visible
         credit_name=(credit or {}).get("name"),
         credit_org=(credit or {}).get("org"),
@@ -379,6 +399,8 @@ async def seed_workflow(
             credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
+            official_baseline=meta.get("official_baseline"),
+            official_baseline_score=meta.get("official_baseline_score"),
         )
         for slug in meta.get("collections", []):
             col = slug_to_collection.get(slug)
@@ -463,6 +485,8 @@ async def seed_workflow(
         credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
+        official_baseline=meta.get("official_baseline"),
+        official_baseline_score=meta.get("official_baseline_score"),
     )
 
     # Add to collections
@@ -565,6 +589,8 @@ async def _refresh_search_set(
         credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
+        official_baseline=meta.get("official_baseline"),
+        official_baseline_score=meta.get("official_baseline_score"),
     )
     for slug in meta.get("collections", []):
         col = slug_to_collection.get(slug)
@@ -641,6 +667,8 @@ async def seed_search_set(
         credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
+        official_baseline=meta.get("official_baseline"),
+        official_baseline_score=meta.get("official_baseline_score"),
     )
 
     # Add to collections
@@ -825,6 +853,8 @@ async def seed_knowledge_base(
             credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
+            official_baseline=meta.get("official_baseline"),
+            official_baseline_score=meta.get("official_baseline_score"),
         )
         for slug in meta.get("collections", []):
             col = slug_to_collection.get(slug)
@@ -885,6 +915,8 @@ async def seed_knowledge_base(
         credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
+        official_baseline=meta.get("official_baseline"),
+        official_baseline_score=meta.get("official_baseline_score"),
     )
 
     # Add to collections

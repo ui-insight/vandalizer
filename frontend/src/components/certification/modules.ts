@@ -274,7 +274,7 @@ export const MODULES: ModuleDefinition[] = [
     objectives: [
       'Add the sample NIH R01 proposal to your workspace',
       'Create an Extraction with 15+ fields covering all document sections',
-      'Extract budget categories, personnel, aims, and compliance fields',
+      'Extract each budget category as its own field, plus personnel, aims, and compliance fields',
     ],
     tips: [
       'The NIH R01 has clearly structured sections: budget, key personnel, specific aims, vertebrate animals',

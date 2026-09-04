@@ -78,7 +78,7 @@
     "instructions": [
       "Click **Set Up Lab** to add the sample NIH R01 proposal to your workspace.",
       "Create a new Extraction with 15+ fields covering all sections of the NIH proposal.",
-      "Include fields for: PI, institution, grant number, budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.",
+      "Include fields for: PI, institution, grant number, specific aims, human subjects, vertebrate animals, and key personnel \u2014 plus each budget category as its own field (Personnel Costs, Equipment Costs, Travel Costs, Supplies Costs, Indirect Costs). Extraction has no grouping: a single \u201cbudget categories\u201d field would extract nothing.",
       "Create a workflow with an Extraction task using your comprehensive Extraction.",
       "Run the workflow against **nih-r01-neuroscience.pdf**.",
       "Review the results — verify PI Name = James Park, Total Budget = $1,250,000."
@@ -100,7 +100,7 @@
     },
     "star_criteria": {
       "1": "Extract 15+ fields from the NIH proposal",
-      "2": "Extract 20+ fields including all budget categories",
+      "2": "Extract 20+ fields, with each budget category as its own field (Personnel Costs, Equipment Costs, Travel Costs, Supplies Costs, Indirect Costs)",
       "3": "Extract 25+ fields, using Allowed values to constrain categorical fields and marking situational fields as optional"
     }
   },

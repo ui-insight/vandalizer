@@ -12,6 +12,7 @@ from uuid import uuid4
 
 from bson import ObjectId
 
+from app.exceptions import TrialSpendBlockedError
 from app.celery_app import celery_app
 from app.services.form_fill import DOC_META_TASKS, document_meta
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
@@ -535,9 +536,17 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                 "tasks": tasks,
             })
 
-        # Resolve model
+        # Resolve model. The canvas says a workflow's default model "runs every
+        # step on this model" without qualifying it to interactive runs, so an
+        # automated run has to honour it too -- otherwise the same workflow uses
+        # one model when a person clicks Run and another when the schedule
+        # fires, with nothing in the UI saying so. Falling back to the first
+        # configured model stays the last resort.
         models = sys_config.get("available_models", [])
-        model = models[0]["name"] if models else "gpt-4o-mini"
+        model = (
+            (workflow.get("input_config") or {}).get("default_model")
+            or (models[0]["name"] if models else "gpt-4o-mini")
+        )
 
         # Check if the workflow owner is an admin (gates code execution)
         wf_user_id = workflow.get("user_id")
@@ -552,9 +561,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
+        def _check_budget() -> None:
+            # Between-steps budget gate, same as the manual run path (#808).
+            from app.services.trial_budget import check_sync
+
+            check_sync(wf_user_id)
+
         from app.services.metering import metered
         with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
-            final_output, data = engine.execute()
+            final_output, data = engine.execute(check_budget=_check_budget)
 
         # Update result
         completed_at = datetime.now(timezone.utc)
@@ -662,7 +677,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         max_retries = retry_cfg.get("max_retries", 3)
         attempt = event.get("attempt_number", 1)
 
-        if not isinstance(e, WorkflowStepError) and attempt < max_retries:
+        # A budget/spend block is deterministic in the same way a step error
+        # is: retrying restarts a passive run at step 0 (no resume index),
+        # re-spending everything the first pass completed, and cannot succeed
+        # until the budget changes. Treated as terminal for the same reason
+        # (#808).
+        _deterministic = isinstance(e, (WorkflowStepError, TrialSpendBlockedError))
+        if not _deterministic and attempt < max_retries:
             retry_delay = retry_cfg.get("retry_delay_seconds", 300)
             next_retry = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
             db.workflow_trigger_event.update_one(
