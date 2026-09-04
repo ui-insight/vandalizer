@@ -376,7 +376,7 @@ export default function Landing() {
     <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen relative">
       {/* Page-level heading for assistive tech / document outline (the visual
           hero uses section headings). */}
-      <h1 className="sr-only">{branding.orgName} — AI document intelligence for research administration</h1>
+      <h1 className="sr-only">{branding.appName} — AI document intelligence for research administration</h1>
       {/* Fixed top nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">

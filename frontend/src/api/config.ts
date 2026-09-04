@@ -24,6 +24,7 @@ export interface ThemeConfig {
   highlight_complement: string
   ui_radius: string
   org_name: string
+  app_name: string
   logo_data_url: string
   icon_data_url: string
   icon_hide_in_nav?: boolean
@@ -49,6 +50,7 @@ export function updateThemeConfig(data: {
   highlight_color?: string
   ui_radius?: string
   org_name?: string
+  app_name?: string
   logo_data_url?: string
   icon_data_url?: string
   icon_hide_in_nav?: boolean

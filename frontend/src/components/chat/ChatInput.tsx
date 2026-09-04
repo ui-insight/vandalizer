@@ -159,7 +159,7 @@ export function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasDocuments ? "Ask anything about this document..." : `Ask ${branding.orgName} anything...`}
+            placeholder={hasDocuments ? "Ask anything about this document..." : `Ask ${branding.appName} anything...`}
             aria-label="Message input"
             rows={1}
             className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"

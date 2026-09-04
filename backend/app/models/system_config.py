@@ -210,6 +210,11 @@ class SystemConfig(Document):
     # separate storage. logo_data_url is the wordmark; icon_data_url is the small
     # square mascot/icon shown beside it (replaces the default Joe Vandal mark).
     org_name: str = ""
+    # Conversational name of the tool itself ("Ask <app_name> anything..."),
+    # kept separate from org_name because org_name is an institutional claim
+    # (creator credits, exports) rather than a product name. Empty falls back
+    # to org_name, so an existing deployment reads exactly as it did before.
+    app_name: str = ""
     logo_data_url: str = ""
     icon_data_url: str = ""
     # When true, the icon is still used as the favicon and chat avatar but is

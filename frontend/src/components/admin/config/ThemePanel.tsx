@@ -31,6 +31,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
   const [themeColor, setThemeColor] = useState(initialColor)
   const [themeRadius, setThemeRadius] = useState(initialRadius)
   const [themeOrgName, setThemeOrgName] = useState('')
+  const [themeAppName, setThemeAppName] = useState('')
   const [themeLogo, setThemeLogo] = useState('')
   const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
   const [themeIcon, setThemeIcon] = useState('')
@@ -45,6 +46,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
       setThemeOrgName(t.org_name || '')
+      setThemeAppName(t.app_name || '')
       setThemeLogo(t.logo_data_url || '')
       setThemeIcon(t.icon_data_url || '')
       setThemeIconHideInNav(!!t.icon_hide_in_nav)
@@ -60,6 +62,7 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
         highlight_color: themeColor,
         ui_radius: `${themeRadius}px`,
         org_name: themeOrgName.trim(),
+        app_name: themeAppName.trim(),
         logo_data_url: themeLogo,
         icon_data_url: themeIcon,
         icon_hide_in_nav: themeIconHideInNav,
@@ -153,7 +156,22 @@ export function ThemePanel({ initialColor, initialRadius }: ThemePanelProps) {
               style={inputStyle}
             />
             <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
-              Shown in the header, login page, browser tab, and chat greeting. Leave blank to keep "Vandalizer".
+              The institution behind this deployment. Shown in the header, login page and footer, and credited on anything
+              exported from here. Leave blank to keep "Vandalizer".
+            </div>
+          </div>
+          <div>
+            <label style={labelStyle}>Assistant Name</label>
+            <input
+              type="text"
+              value={themeAppName}
+              onChange={e => setThemeAppName(e.target.value)}
+              placeholder={themeOrgName.trim() || DEFAULT_ORG_NAME}
+              style={inputStyle}
+            />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+              What the tool calls itself when it speaks &mdash; "Ask <em>name</em> anything...", the chat greeting, the
+              browser tab. Leave blank to use the organization name.
             </div>
           </div>
           <div>

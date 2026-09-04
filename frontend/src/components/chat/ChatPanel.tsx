@@ -171,7 +171,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setMessages([{
         role: 'assistant',
         content:
-          `Hi, I'm your ${branding.orgName} assistant. Before I show you around, I'd love to ` +
+          `Hi, I'm your ${branding.appName} assistant. Before I show you around, I'd love to ` +
           "know a bit about your work.\n\n" +
           "What kind of documents do you spend the most time processing? " +
           "Grant proposals, compliance reviews, progress reports, or something else entirely?",
@@ -578,7 +578,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 )}
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    Welcome to {branding.orgName}
+                    Welcome to {branding.appName}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     AI-powered document intelligence for research administration

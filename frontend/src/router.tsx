@@ -88,12 +88,12 @@ const ROUTE_TITLES: Array<[string, string]> = [
 ]
 
 function RouteTitle() {
-  const { orgName } = useBranding()
+  const { appName } = useBranding()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   useEffect(() => {
     const match = ROUTE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'))
-    document.title = match ? `${match[1]} — ${orgName}` : orgName
-  }, [pathname, orgName])
+    document.title = match ? `${match[1]} — ${appName}` : appName
+  }, [pathname, appName])
   return null
 }
 

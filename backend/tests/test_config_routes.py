@@ -195,6 +195,7 @@ class TestThemeRoute:
             highlight_color="#eab308",
             ui_radius="12px",
             org_name="Acme",
+            app_name="",
             logo_data_url="",
             icon_data_url="data:image/png;base64,AAAA",
             icon_hide_in_nav=True,
@@ -215,6 +216,7 @@ class TestThemeRoute:
             highlight_color="#eab308",
             ui_radius="12px",
             org_name="",
+            app_name="",
             logo_data_url="",
             icon_data_url="",
             icon_hide_in_nav=False,
@@ -242,6 +244,166 @@ class TestThemeRoute:
         assert resp.json()["icon_hide_in_nav"] is True
         assert cfg.icon_hide_in_nav is True
         cfg.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_theme_returns_app_name(self, client):
+        """The tool's own name rides alongside the institution's name."""
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Roger Williams University",
+            app_name="Vandalizer",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+        )
+        with patch("app.routers.config.SystemConfig") as MockSC:
+            MockSC.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/config/theme")
+
+        assert resp.status_code == 200
+        assert resp.json()["app_name"] == "Vandalizer"
+        assert resp.json()["org_name"] == "Roger Williams University"
+
+    @pytest.mark.asyncio
+    async def test_get_theme_app_name_defaults_to_empty(self, client):
+        """An install that never set app_name reads it back empty, not as org_name.
+
+        The fallback belongs to the client (app_name or org_name or "Vandalizer");
+        the endpoint reports what is actually stored.
+        """
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Roger Williams University",
+            app_name="",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+        )
+        with patch("app.routers.config.SystemConfig") as MockSC:
+            MockSC.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/config/theme")
+
+        assert resp.status_code == 200
+        assert resp.json()["app_name"] == ""
+        assert resp.json()["org_name"] == "Roger Williams University"
+
+    @pytest.mark.asyncio
+    async def test_update_theme_round_trips_app_name(self, client):
+        """Set it, read it back — and stripped, like org_name."""
+        admin = _make_user("admin")
+        admin.is_admin = True
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Roger Williams University",
+            app_name="",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+            updated_at=None,
+            updated_by=None,
+        )
+        cfg.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockSC,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockSC.get_config = AsyncMock(return_value=cfg)
+
+            resp = await client.put(
+                "/api/config/theme",
+                json={"app_name": "  Vandalizer  "},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["app_name"] == "Vandalizer"
+        assert cfg.app_name == "Vandalizer"
+        # The institution's name is untouched by naming the tool.
+        assert cfg.org_name == "Roger Williams University"
+        cfg.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_theme_omitting_app_name_leaves_it_alone(self, client):
+        """A field left out of the request must stay distinct from one cleared."""
+        admin = _make_user("admin")
+        admin.is_admin = True
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Roger Williams University",
+            app_name="Vandalizer",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+            updated_at=None,
+            updated_by=None,
+        )
+        cfg.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockSC,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockSC.get_config = AsyncMock(return_value=cfg)
+
+            resp = await client.put(
+                "/api/config/theme",
+                json={"highlight_color": "#123456"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert cfg.app_name == "Vandalizer"
+        assert resp.json()["app_name"] == "Vandalizer"
+
+    @pytest.mark.asyncio
+    async def test_update_theme_can_clear_app_name(self, client):
+        """An explicit empty string clears it, restoring the org_name fallback."""
+        admin = _make_user("admin")
+        admin.is_admin = True
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Roger Williams University",
+            app_name="Vandalizer",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+            updated_at=None,
+            updated_by=None,
+        )
+        cfg.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockSC,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockSC.get_config = AsyncMock(return_value=cfg)
+
+            resp = await client.put(
+                "/api/config/theme",
+                json={"app_name": ""},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert cfg.app_name == ""
 
     @pytest.mark.asyncio
     async def test_update_theme_requires_admin(self, client):

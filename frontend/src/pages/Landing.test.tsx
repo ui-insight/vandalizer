@@ -29,7 +29,7 @@ vi.mock('../hooks/useAuth', () => ({
 }))
 
 vi.mock('../contexts/BrandingContext', () => ({
-  useBranding: () => ({ orgName: 'Vandalizer', logoDarkUrl: '/logo.svg' }),
+  useBranding: () => ({ orgName: 'Vandalizer', appName: 'Vandalizer', logoDarkUrl: '/logo.svg' }),
 }))
 
 vi.mock('../api/auth', () => ({

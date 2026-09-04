@@ -30,8 +30,14 @@ function writeCachedTheme(theme: ThemeConfig): void {
 }
 
 export interface Branding {
-  /** Display name for this deployment. Always non-empty (falls back to "Vandalizer"). */
+  /** The institution behind this deployment. Always non-empty (falls back to "Vandalizer"). */
   orgName: string
+  /**
+   * What the tool calls itself when it speaks ("Ask X anything...", the tab
+   * title, the chat greeting). Falls back to orgName, which falls back to
+   * "Vandalizer" — so a deployment that only set an org name reads unchanged.
+   */
+  appName: string
   /** Logo for light backgrounds. */
   logoUrl: string
   /** Logo for dark backgrounds (auth pages, footer). Same as logoUrl when admin uploads a custom one. */
@@ -46,7 +52,7 @@ export interface Branding {
   iconUrl: string | null
   /** When true, hide the icon from the nav header (still used as favicon + chat avatar). */
   hideIconInNav: boolean
-  /** True when the admin has overridden the default name. Used to surface "Powered by Vandalizer" attribution. */
+  /** True when the admin has overridden either default name, or uploaded a logo. Used to surface "Powered by Vandalizer" attribution. */
   isCustomized: boolean
   /** Re-fetch from server (called by admin after saving theme). */
   refresh: () => Promise<void>
@@ -68,11 +74,16 @@ function applyTheme(theme: ThemeConfig) {
 
 function resolve(theme: ThemeConfig | null): Omit<Branding, 'refresh'> {
   const orgName = (theme?.org_name || '').trim() || DEFAULT_ORG_NAME
+  const appName = (theme?.app_name || '').trim() || orgName
   const customLogo = (theme?.logo_data_url || '').trim()
   const customIcon = (theme?.icon_data_url || '').trim()
-  const isCustomized = orgName !== DEFAULT_ORG_NAME || !!customLogo
+  // Renaming the assistant alone is still a rebrand: appName has to count here,
+  // or a deployment could relabel every conversational surface and quietly drop
+  // the "Powered by Vandalizer" credit and the NSF acknowledgement (GPL v3).
+  const isCustomized = orgName !== DEFAULT_ORG_NAME || appName !== DEFAULT_ORG_NAME || !!customLogo
   return {
     orgName,
+    appName,
     logoUrl: customLogo || DEFAULT_LOGO_URL,
     logoDarkUrl: customLogo || DEFAULT_LOGO_DARK_URL,
     iconUrl: customIcon || (isCustomized ? null : DEFAULT_ICON_URL),
@@ -122,7 +133,7 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
   }, [load])
 
   // Note: the document title is managed per-route by RouteTitle in router.tsx
-  // (WCAG 2.4.2), which falls back to the bare org name on the workspace root.
+  // (WCAG 2.4.2), which falls back to the bare app name on the workspace root.
 
   return (
     <BrandingContext.Provider value={{ ...state, refresh: load }}>
@@ -137,6 +148,7 @@ export function useBranding(): Branding {
     // Render-safe fallback so components used outside the provider (tests, storybook) still work.
     return {
       orgName: DEFAULT_ORG_NAME,
+      appName: DEFAULT_ORG_NAME,
       logoUrl: DEFAULT_LOGO_URL,
       logoDarkUrl: DEFAULT_LOGO_DARK_URL,
       iconUrl: DEFAULT_ICON_URL,
