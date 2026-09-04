@@ -7,7 +7,7 @@ import random
 import weakref
 from email.utils import parsedate_to_datetime
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, replace as dataclass_replace
 from typing import Iterator, Optional
 
 import httpx
@@ -325,10 +325,30 @@ class VLLMProvider(OpenRouterProvider):
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            return OpenAIModelProfile(
+            base = OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
-        return super().model_profile(model_name)
+        else:
+            base = super().model_profile(model_name)
+        if base is None:
+            return base
+        # JSON-schema output is a property of the *server*, not the model
+        # family. vLLM enforces `response_format: {"type": "json_schema"}` via
+        # guided decoding for every model it serves, but the profile inherited
+        # above answers for the family's own hosted API instead: a slash-named
+        # model ("Qwen/Qwen3-32B") falls through to OpenRouter's family map to
+        # `qwen_model_profile`, whose ModelProfile leaves
+        # `supports_json_schema_output` at its False default. pydantic-ai then
+        # refuses NativeOutput with "Native structured output is not supported
+        # by this model.", so every extraction against a vLLM model registered
+        # under its HuggingFace repo name failed while the same weights
+        # registered under a bare name worked (prod incident 2026-09-03).
+        # Bare names already resolved to True here, so this only widens.
+        return dataclass_replace(
+            base,
+            supports_json_schema_output=True,
+            supports_json_object_output=True,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -387,6 +407,62 @@ def get_model_api_protocol(model_name: str, system_config_doc: dict | None = Non
     """Public helper to determine API protocol for a model."""
     model_config = _get_model_config_sync(model_name, system_config_doc)
     return detect_api_protocol(model_name, model_config)
+
+
+def model_supports_structured_output(
+    model_name: str, system_config_doc: dict | None = None,
+) -> bool:
+    """Whether the admin's per-model "supports structured output" toggle is on.
+
+    The flag was written by the model editor and read by nothing on the
+    extraction path, so switching it off did not change how extraction asked
+    for structured output — it only reshaped the tuning candidate list. It is
+    the escape hatch an admin reaches for when a server rejects schema-enforced
+    output, so it has to gate the request itself. Defaults to True for models
+    saved before the flag existed.
+    """
+    model_config = _get_model_config_sync(model_name, system_config_doc)
+    if not model_config:
+        return True
+    return model_config.get("supports_structured", True) is not False
+
+
+def use_native_structured_output(
+    model_name: str, system_config_doc: dict | None = None,
+) -> bool:
+    """Whether an agent for this model should ask for schema-enforced output.
+
+    The single source of truth for that decision. The extraction engine makes
+    the call for real work and the admin "Test" button makes it to probe, and
+    those two must not drift: a diagnostic that reimplements the rule can go
+    green on a configuration the engine then fails on, which is exactly the
+    failure this function exists to prevent.
+    """
+    return (
+        get_model_api_protocol(model_name, system_config_doc) == "vllm"
+        and model_supports_structured_output(model_name, system_config_doc)
+    )
+
+
+def unwrap_model_base_url(model) -> Optional[str]:
+    """The base URL a built model will actually dial, through our wrappers.
+
+    ``Model.base_url`` is a property that defaults to None on the base class,
+    so it resolves on ``MeteredModel``/``RetryingModel`` themselves rather than
+    falling through ``WrapperModel.__getattr__`` to the provider underneath —
+    reading it off the wrapper reports None, not the URL. Unwrap first.
+
+    Worth surfacing because the stored endpoint is not the dialed one: the
+    vLLM and Ollama providers append "/v1" when it is missing and the
+    OpenAI/InsightAI provider uses the value verbatim, so the same saved
+    endpoint means different URLs depending on the protocol dropdown.
+    """
+    seen = 0
+    while getattr(model, "wrapped", None) is not None and seen < 10:
+        model = model.wrapped
+        seen += 1
+    url = getattr(model, "base_url", None)
+    return str(url) if url else None
 
 
 def resolve_thinking_enabled(
@@ -787,7 +863,13 @@ def _build_agent_model(
         if endpoint:
             client_kwargs["base_url"] = endpoint
         client = AsyncOpenAI(**client_kwargs)
-        return OpenAIModel(model_name=model_name, openai_client=client)
+        # Wrapped in a provider rather than passed as `openai_client=`:
+        # OpenAIChatModel takes `provider`, `profile` and `settings` only, so
+        # the old call raised TypeError before a single request was made —
+        # every model added through the "OpenAI" or "Custom" wizard preset
+        # (both set external + the openai protocol) failed to build.
+        from pydantic_ai.providers.openai import OpenAIProvider
+        return OpenAIModel(model_name=model_name, provider=OpenAIProvider(openai_client=client))
 
     # Use the per-event-loop httpx client instead of pydantic-ai's process-wide
     # cached_async_http_client. The cached client is shared across the workflow

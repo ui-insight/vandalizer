@@ -27,7 +27,7 @@ from app.services.llm_service import (
     build_thinking_model_settings,
     create_chat_agent,
     get_agent_model,
-    get_model_api_protocol,
+    use_native_structured_output,
 )
 
 logger = logging.getLogger(__name__)
@@ -976,7 +976,7 @@ class ExtractionEngine:
                     return {"entities": [value]}
                 return value
 
-        api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
+        native_structured = use_native_structured_output(model_name, self._sys_cfg)
         structured_retries = 3
 
         source_label = self._describe_content(content)
@@ -1008,10 +1008,12 @@ class ExtractionEngine:
             # previous approach injected vLLM's proprietary
             # ``structured_outputs`` extra-body field, which gateways drop
             # silently, quietly losing schema enforcement.
+            # Shared with the admin "Test" button so the diagnostic probes the
+            # mode this run will actually request — including the per-model
+            # "supports structured output" toggle, the escape hatch for a
+            # server that rejects schema-enforced output.
             output_type = (
-                NativeOutput(ExtractionModel)
-                if api_protocol == "vllm"
-                else ExtractionModel
+                NativeOutput(ExtractionModel) if native_structured else ExtractionModel
             )
 
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)

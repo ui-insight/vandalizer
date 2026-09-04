@@ -3,9 +3,9 @@
 Two jobs:
 
 * ``diagnose_model`` runs a real round-trip against a configured LLM and
-  reports *each step* (config found → protocol → endpoint → key → live call)
-  plus, on failure, a classified error with a plain-English "why" and a
-  suggested fix. On success it explains why the hook-up is healthy (protocol,
+  reports *each step* (config found → protocol → endpoint → key → live call →
+  structured output) plus, on failure, a classified error with a plain-English
+  "why" and a suggested fix. On success it explains why the hook-up is healthy (protocol,
   endpoint, latency, tokens, and the actual reply). This is what powers the
   admin "Test" button — admins should never be left guessing whether a model
   is wired up correctly.
@@ -18,13 +18,17 @@ Two jobs:
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Any, Optional
+
+from pydantic import BaseModel
 
 from app.models.system_config import SystemConfig
 from app.services.llm_service import (
     _get_model_endpoint_sync,
     detect_api_protocol,
     get_agent_model,
+    unwrap_model_base_url,
+    use_native_structured_output,
 )
 from app.utils.encryption import decrypt_value
 
@@ -48,6 +52,18 @@ def _classify_error(exc: Exception) -> dict[str, str]:
     def has(*needles: str) -> bool:
         return any(n in msg or n in name for n in needles)
 
+    # Checked first: pydantic-ai raises these as a plain UserError whose text
+    # ("Native structured output is not supported by this model.") matches none
+    # of the transport categories below, so it used to land in "unknown" —
+    # "read the raw error" — for a failure with a precise, actionable remedy.
+    if has("is not supported by this model", "output is not supported"):
+        return {
+            "category": "capability",
+            "title": "Model cannot do what was asked of it",
+            "why": "The endpoint is reachable and the credentials work, but this model/protocol pairing does not support the output mode the request used — most often schema-enforced (structured) output, which every extraction and workflow depends on.",
+            "fix": "Turn off 'Supports structured output' for this model to fall back to tool-based output, or switch the API protocol to one whose server enforces schemas. Chat will keep working either way; extraction will not until this is resolved.",
+            "raw": raw,
+        }
     if has("authentication", "unauthorized", "401", "403", "invalid api key", "invalid_api_key", "api key"):
         return {
             "category": "auth",
@@ -98,11 +114,19 @@ def _classify_error(exc: Exception) -> dict[str, str]:
 
 
 async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
-    """Run a real completion against ``available_models[index]`` and explain it.
+    """Run a real round-trip against ``available_models[index]`` and explain it.
 
     Returns a structured diagnostic (never raises for model-side failures):
     a per-step ``checks`` list, resolved protocol/endpoint, latency, tokens,
     the actual reply on success, and a classified ``error`` on failure.
+
+    Two round trips, because a plain completion is not proof the model can do
+    the work. Step 5 asks for free text — that covers chat. Step 6 asks for a
+    schema-constrained object using the same mode the extraction engine will
+    request, which is what extraction and every workflow depend on. A model can
+    pass 5 and fail 6, and when it does ``ok`` is False: "connected" is not the
+    same claim as "usable", and reporting the first as the second is what let a
+    production deployment sit broken behind a green badge.
     """
     if index < 0 or index >= len(cfg.available_models):
         return {
@@ -124,6 +148,17 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
     config_doc = cfg.model_dump()
 
     checks: list[dict[str, Any]] = []
+
+    # Built up front so the Endpoint step can report the URL that will actually
+    # be dialed rather than the one stored. A build failure is not raised here:
+    # it is re-raised inside the live-call step below so it still gets
+    # classified and reported as that step failing.
+    model = None
+    model_build_error: Exception | None = None
+    try:
+        model = get_agent_model(model_name, system_config_doc=config_doc)
+    except Exception as exc:  # noqa: BLE001 — surfaced by the live-call step
+        model_build_error = exc
 
     # Step 1 — configuration present
     checks.append({
@@ -147,15 +182,30 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
     # Hosted providers ship a default base URL, so a blank endpoint is fine
     # for them; self-hosted protocols need one.
     endpoint_ok = bool(endpoint) or protocol in _HOSTED_PROTOCOLS
+    # The stored endpoint and the dialed one are not the same string: the vLLM
+    # and Ollama providers append "/v1" when it is missing, the OpenAI/InsightAI
+    # provider does not. Showing only what was typed means switching the
+    # protocol dropdown silently changes the URL with nothing in the UI saying
+    # so — reported as a connection failure with no visible cause.
+    dialed = unwrap_model_base_url(model) if model is not None else None
+    if endpoint and dialed and dialed.rstrip("/") != endpoint.rstrip("/"):
+        endpoint_detail = f"{endpoint} → dialing {dialed}"
+    elif dialed:
+        endpoint_detail = dialed if endpoint else f"Using the built-in {protocol} default: {dialed}"
+    elif endpoint:
+        endpoint_detail = endpoint
+    elif endpoint_ok:
+        endpoint_detail = f"Using the built-in {protocol} default URL."
+    else:
+        endpoint_detail = f"No endpoint set — {protocol} needs an explicit endpoint URL."
     checks.append({
         "label": "Endpoint",
         "ok": endpoint_ok,
-        "detail": (
-            endpoint if endpoint
-            else (f"Using the built-in {protocol} default URL." if endpoint_ok
-                  else f"No endpoint set — {protocol} needs an explicit endpoint URL.")
-        ),
+        "detail": endpoint_detail,
     })
+    # The success chip should name the URL that was actually called, not the
+    # one that was typed — same reason as the step detail above.
+    endpoint_label = dialed or endpoint_label
 
     # Step 4 — credential presence
     raw_key = (model_cfg.get("api_key") or "")
@@ -176,7 +226,8 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
     try:
         from pydantic_ai import Agent
 
-        model = get_agent_model(model_name, system_config_doc=config_doc)
+        if model_build_error is not None:
+            raise model_build_error
         agent = Agent(model, system_prompt="You are a connectivity probe. Reply with exactly: ok")
         from app.services.metering import metered_async
         async with metered_async("diagnostics"):
@@ -194,22 +245,6 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
             "ok": True,
             "detail": f"Replied in {elapsed_ms} ms: \"{reply[:120]}\"",
         })
-        return {
-            "ok": True,
-            "model": model_name,
-            "tag": tag,
-            "protocol": protocol,
-            "endpoint": endpoint_label,
-            "checks": checks,
-            "latency_ms": elapsed_ms,
-            "tokens": tokens,
-            "response_preview": reply[:300],
-            "error": None,
-            "summary": (
-                f"Connected. '{model_name}' answered over {protocol} in {elapsed_ms} ms"
-                + (f" ({tokens['total']} tokens)." if tokens.get("total") else ".")
-            ),
-        }
     except Exception as exc:  # noqa: BLE001 — provider errors are diverse; classify below
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         error = _classify_error(exc)
@@ -231,6 +266,88 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
             "error": error,
             "summary": f"{error['title']} — {model_name} did not respond correctly.",
         }
+
+    # Step 6 — structured output (source of truth for extraction/workflows)
+    #
+    # A plain completion proves reachability, credentials and the model name,
+    # and nothing else. Extraction and every workflow ask for a schema-enforced
+    # answer, so a model can pass step 5 and still fail 100% of real work —
+    # which is precisely what a production deployment did while this button
+    # reported it healthy. Probe the mode the engine will actually request.
+    structured_error = await _probe_structured_output(model, model_name, config_doc, checks)
+
+    ok = structured_error is None
+    return {
+        "ok": ok,
+        "model": model_name,
+        "tag": tag,
+        "protocol": protocol,
+        "endpoint": endpoint_label,
+        "checks": checks,
+        "latency_ms": elapsed_ms,
+        "tokens": tokens,
+        "response_preview": reply[:300],
+        "error": structured_error,
+        "summary": (
+            (
+                f"Connected. '{model_name}' answered over {protocol} in {elapsed_ms} ms"
+                + (f" ({tokens['total']} tokens)." if tokens.get("total") else ".")
+            )
+            if ok else
+            f"Connected, but structured output failed — chat will work, extraction "
+            f"and workflows will not. {structured_error['title']}."
+        ),
+    }
+
+
+class _StructuredProbe(BaseModel):
+    """Smallest schema that still proves the server enforced one."""
+
+    answer: str
+
+
+async def _probe_structured_output(
+    model: Any, model_name: str, config_doc: dict, checks: list[dict[str, Any]],
+) -> Optional[dict[str, str]]:
+    """Run one schema-constrained round trip; return a classified error or None.
+
+    The output mode comes from ``use_native_structured_output`` — the same
+    call the extraction engine makes — so this probes what a real run will
+    request rather than a diagnostic-only approximation that could pass while
+    extraction fails.
+    """
+    from pydantic_ai import Agent, NativeOutput
+
+    from app.services.metering import metered_async
+
+    started = time.perf_counter()
+    try:
+        native = use_native_structured_output(model_name, config_doc)
+        output_type = NativeOutput(_StructuredProbe) if native else _StructuredProbe
+        agent = Agent(
+            model,
+            system_prompt="You are a structured-output probe. Fill the schema.",
+            output_type=output_type,
+        )
+        async with metered_async("diagnostics"):
+            result = await agent.run("Set answer to the word: ok")
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        mode = "schema-enforced (native)" if native else "tool-based"
+        checks.append({
+            "label": "Structured output",
+            "ok": True,
+            "detail": f"Returned a valid {mode} object in {elapsed_ms} ms "
+                      f"(answer: \"{result.output.answer[:40]}\").",
+        })
+        return None
+    except Exception as exc:  # noqa: BLE001 — classified like every other step
+        error = _classify_error(exc)
+        checks.append({
+            "label": "Structured output",
+            "ok": False,
+            "detail": f"{error['title']} — extraction and workflows will fail on this model.",
+        })
+        return error
 
 
 def build_readiness(cfg: SystemConfig) -> dict[str, Any]:

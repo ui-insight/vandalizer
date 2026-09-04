@@ -1433,12 +1433,18 @@ class TestTestModelAddressedById:
     @staticmethod
     def _patched_diagnostics():
         """Patch the pieces diagnose_model calls out to so it runs its real
-        addressing/step logic without making a live model call."""
-        fake_run = MagicMock()
-        fake_run.output = "ok"
-        fake_run.usage = lambda: SimpleNamespace(request_tokens=1, response_tokens=1, total_tokens=2)
+        addressing/step logic without making a live model call.
+
+        Two round trips, in order: a free-text completion, then the
+        schema-constrained probe that decides whether extraction and workflows
+        can actually run on this model."""
+        text_run = MagicMock()
+        text_run.output = "ok"
+        text_run.usage = lambda: SimpleNamespace(request_tokens=1, response_tokens=1, total_tokens=2)
+        struct_run = MagicMock()
+        struct_run.output = SimpleNamespace(answer="ok")
         fake_agent = MagicMock()
-        fake_agent.run = AsyncMock(return_value=fake_run)
+        fake_agent.run = AsyncMock(side_effect=[text_run, struct_run])
         return (
             patch("app.services.system_diagnostics.get_agent_model", return_value=MagicMock()),
             patch("pydantic_ai.Agent", return_value=fake_agent),
