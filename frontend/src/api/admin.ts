@@ -652,20 +652,33 @@ export interface QualityTimelinePoint {
   items_validated: number
 }
 
-export interface RegressionResult {
+export interface RegressionItemResult {
+  item_id: string
+  kind: string
+  name: string
+  score: number | null
+  grade: string | null
+  prev_score: number | null
+  delta: number | null
+  status: string
+}
+
+export interface RegressionSuiteRunSummary {
+  run_uuid: string
+  status: 'running' | 'completed' | 'failed'
+  model: string | null
   total_items: number
+  completed_items: number
   succeeded: number
   failed: number
-  results: {
-    item_id: string
-    kind: string
-    name: string
-    score: number | null
-    grade: string | null
-    prev_score: number | null
-    delta: number | null
-    status: string
-  }[]
+  mean_score: number | null
+  error: string | null
+  started_at: string | null
+  finished_at: string | null
+}
+
+export interface RegressionSuiteRunDetail extends RegressionSuiteRunSummary {
+  results: RegressionItemResult[]
 }
 
 export function getQualitySummary() {
@@ -680,7 +693,18 @@ export function getQualityTimeline(days = 90, itemKind?: string) {
 
 export function runRegressionSuite(model?: string) {
   const params = model ? `?model=${encodeURIComponent(model)}` : ''
-  return apiFetch<RegressionResult>(`/api/admin/quality/regression-suite${params}`, { method: 'POST' })
+  return apiFetch<{ run_uuid: string; status: string }>(
+    `/api/admin/quality/regression-suite${params}`, { method: 'POST' })
+}
+
+export function getRegressionSuiteRuns(limit = 20) {
+  return apiFetch<{ runs: RegressionSuiteRunSummary[] }>(
+    `/api/admin/quality/regression-suite/runs?limit=${limit}`)
+}
+
+export function getRegressionSuiteRun(runUuid: string) {
+  return apiFetch<RegressionSuiteRunDetail>(
+    `/api/admin/quality/regression-suite/runs/${encodeURIComponent(runUuid)}`)
 }
 
 // Quality Alerts

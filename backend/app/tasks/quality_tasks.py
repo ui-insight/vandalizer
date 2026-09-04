@@ -491,3 +491,50 @@ async def _auto_validate_workflow_async(workflow_id):
         await workflow_service.validate_workflow(str(wf.id))
 
 
+
+
+@celery.task(
+    name="tasks.passive.regression_suite",
+    bind=True,
+    # No autoretry: a partial re-run would re-validate items that already
+    # completed, double-spending LLM calls. The failure is recorded on the
+    # RegressionSuiteRun document instead.
+    max_retries=0,
+)
+def regression_suite_task(self, suite_uuid: str):
+    """Run the admin regression suite (all verified items) in the background."""
+    _run_async(_regression_suite_async(suite_uuid))
+
+
+async def _regression_suite_async(suite_uuid: str):
+    from app.config import Settings
+    from app.database import init_db
+
+    settings = Settings()
+    await init_db(settings)
+
+    from app.models.regression_suite_run import RegressionSuiteRun
+    from app.services.quality_service import run_regression_suite
+
+    suite = await RegressionSuiteRun.find_one(RegressionSuiteRun.uuid == suite_uuid)
+    if suite is None:
+        logger.warning("Regression suite %s not found; nothing to run", suite_uuid)
+        return
+
+    try:
+        summary = await run_regression_suite(
+            suite.user_id, suite.model, suite_run=suite,
+        )
+        suite.status = "completed"
+        suite.total_items = summary["total_items"]
+        suite.completed_items = summary["total_items"]
+        suite.succeeded = summary["succeeded"]
+        suite.failed = summary["failed"]
+        suite.mean_score = summary["mean_score"]
+        suite.results = summary["results"]
+    except Exception as e:
+        logger.exception("Regression suite %s failed", suite_uuid)
+        suite.status = "failed"
+        suite.error = str(e)
+    suite.finished_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await suite.save()
