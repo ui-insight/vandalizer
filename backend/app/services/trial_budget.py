@@ -288,8 +288,16 @@ async def check_async(user_id: str | None) -> None:
         raise TrialBudgetExceededError(FLEET_PAUSED_MESSAGE)
 
 
-def check_sync(user_id: str | None) -> None:
-    """Sync twin of check_async, for Celery-side metering scopes."""
+def check_sync(user_id: str | None, *, extra_used: int = 0) -> None:
+    """Sync twin of check_async, for Celery-side metering scopes.
+
+    ``extra_used`` is spend that has happened but is not in the ledger yet.
+    The ledger row for a scope is written by ``metering.flush_sync`` when the
+    scope EXITS, so a long multi-step run's own tokens are invisible to this
+    query while it is still running — a between-steps gate that re-read the
+    ledger alone would see the same total at every boundary and never trip
+    (#808). Callers polling mid-run pass the live scope's tokens here.
+    """
     if not _trial_system_on() or not user_id:
         return
     try:
@@ -313,6 +321,7 @@ def check_sync(user_id: str | None) -> None:
                 )
             )
             used = int(rows[0]["total"]) if rows else 0
+            used += max(0, int(extra_used or 0))
         over_budget = bool(budget) and used >= budget
         fleet_paused = False if over_budget else _fleet_paused_sync()
     except TrialSpendBlockedError:

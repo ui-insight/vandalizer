@@ -577,8 +577,11 @@ async def run_workflow(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    # No explicit model → fall back to the workflow's own default (set via the
+    # canvas model selector), then to the user's configured default. The engine
+    # applies this as the per-step default; steps with their own model win.
     if not model:
-        model = await get_user_model_name(user_id)
+        model = await resolve_run_model(wf.input_config, user_id)
 
     session_id = str(uuid_mod.uuid4())[:8]
     # Generate the Celery task id up front so we can persist it before the task
@@ -663,6 +666,10 @@ async def get_workflow_status(
         "approval_request_id": result.approval_request_id,
         "error": result.error,
         "error_payload": result.error_payload,
+        # Outputs that failed to deliver after completion (#810) — without
+        # this the field was write-only and the status poll showed a clean
+        # "completed" for a run whose deliverable never left the building.
+        "delivery_failures": getattr(result, "delivery_failures", None) or [],
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
         "document_title": result.document_title,
@@ -802,8 +809,11 @@ async def run_workflow_batch(
             "This workflow has no steps yet — add at least one step before running it.",
         )
 
+    # No explicit model → fall back to the workflow's own default (set via the
+    # canvas model selector), then to the user's configured default. The engine
+    # applies this as the per-step default; steps with their own model win.
     if not model:
-        model = await get_user_model_name(user_id)
+        model = await resolve_run_model(wf.input_config, user_id)
 
     batch_id = str(uuid_mod.uuid4())[:8]
 
@@ -1051,10 +1061,39 @@ async def _expire_approvals_for(workflow_result_ids: list) -> None:
         )
 
 
-async def test_step(task_name: str, task_data: dict, document_uuids: list[str], user_id: str, model: str | None = None) -> str:
-    """Test a single step. Returns Celery task_id for polling."""
+async def resolve_run_model(workflow_input_config: dict | None, user_id: str) -> str:
+    """The run model for a workflow, in the order the canvas promises.
+
+    Explicit request > the workflow's own default (canvas model selector) >
+    the user's configured default. The engine applies the result as the
+    per-step default, so a step with its own Model Override still wins.
+
+    This lives in one place because the canvas states it without qualification
+    ("Runs every step on this model"). Every path that executes a workflow has
+    to agree with that sentence, and the resolution was already duplicated
+    across the interactive and batch run paths before the automated,
+    optimizer and single-step paths were considered at all.
+    """
+    return (workflow_input_config or {}).get("default_model") or await get_user_model_name(user_id)
+
+
+async def test_step(
+    task_name: str,
+    task_data: dict,
+    document_uuids: list[str],
+    user_id: str,
+    model: str | None = None,
+    workflow_input_config: dict | None = None,
+) -> str:
+    """Test a single step. Returns Celery task_id for polling.
+
+    Takes the workflow's input_config so a step whose selector reads "Use
+    workflow default" is tested on that default. Without it the step was tuned
+    against one model and run against another, and the selector's label was
+    simply untrue.
+    """
     if not model:
-        model = await get_user_model_name(user_id)
+        model = await resolve_run_model(workflow_input_config, user_id)
 
     task_data["model"] = model
     task_data["user_id"] = user_id
@@ -2730,6 +2769,14 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         WorkflowResult.status == "completed",
     ).sort("-_id").limit(max(num_runs, 1)).to_list()
 
+    # Which models produced the executions being graded. Workflow validation
+    # scores historical runs, so the honest attribution is the models those
+    # runs snapshotted at dispatch — a single unambiguous model when all runs
+    # agree, otherwise no single label.
+    models_used = sorted({
+        wr.model for wr in last_results if getattr(wr, "model", None)
+    })
+
     # Static diagnostics — these run independent of the validation plan and
     # the LLM judge. Computed once up-front so the no-results path can still
     # surface dangling refs / prompt-field mismatches.
@@ -2826,6 +2873,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         per_step_variance=per_step_variance,
         static_diagnostics=static_diagnostics,
         plan_stale=plan_stale,
+        models_used=models_used,
     )
 
 
@@ -3267,8 +3315,10 @@ async def _build_result(
     per_step_variance: dict[str, float] | None = None,
     static_diagnostics: list[dict] | None = None,
     plan_stale: bool = False,
+    models_used: list[str] | None = None,
 ) -> dict:
     """Compute separate quality / stability scores, combined score, grade, and persist."""
+    models_used = models_used or []
     statuses = [c["status"] for c in checks]
     fail_count = statuses.count("FAIL")
     warn_count = statuses.count("WARN")
@@ -3411,6 +3461,7 @@ async def _build_result(
         "judge_variance": judge_variance,
         "static_diagnostics": static_diagnostics or [],
         "plan_stale": plan_stale,
+        "models_used": models_used,
     }
 
     from app.services.quality_service import persist_validation_run
@@ -3421,6 +3472,8 @@ async def _build_result(
         run_type="workflow",
         result=result_dict,
         user_id=(wf_data or {}).get("user_id", ""),
+        model=models_used[0] if len(models_used) == 1 else None,
+        model_settings={"models_used": models_used} if models_used else None,
     )
 
     return result_dict

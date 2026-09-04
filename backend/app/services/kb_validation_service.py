@@ -885,6 +885,7 @@ async def judge_test_queries(
     mode: str = "judge",
     concurrency: int = 4,
     judge_model: str | None = None,
+    answer_config: "RAGConfig | None" = None,
     early_stop_callback: "Callable[[list[float]], bool] | None" = None,
 ) -> dict:
     """Run RAG (and optionally baseline) + judge per query in parallel.
@@ -896,6 +897,11 @@ async def judge_test_queries(
     When None (legacy default) the judge uses ``model_name`` — same as before.
     The KB optimizer passes a pinned judge model so that sweeping ``cfg.model``
     across trials doesn't let each trial judge itself (self-confirmation bias).
+
+    ``answer_config`` pins the RAG config (including the answer model) for
+    both the KB answer and the no-KB baseline — used by "validate under model
+    X" runs so a KB-level config override can't silently swap the model being
+    measured. When None, per-answer resolution applies as before.
 
     ``early_stop_callback`` is invoked after each per-query judgement completes
     with the partial list of scores so far. Return True to cancel remaining
@@ -924,7 +930,7 @@ async def judge_test_queries(
                 # not of the KB, and the row has to say so.
                 with capture_truncation() as kb_truncations:
                     kb_result = await _generate_kb_answer(
-                        kb_uuid, tq.query, model_name
+                        kb_uuid, tq.query, model_name, config=answer_config
                     )
                 # Backward-compat: callers/mocks may return 2-tuple (legacy).
                 if len(kb_result) == 3:
@@ -948,8 +954,15 @@ async def judge_test_queries(
                 lift = None
                 baseline_truncations: list[dict] = []
                 if include_baseline:
+                    # The baseline must use the same answer model as the KB
+                    # answer, or the lift measures a model swap, not the KB.
+                    baseline_model = (
+                        answer_config.model
+                        if answer_config and answer_config.model
+                        else model_name
+                    )
                     with capture_truncation() as baseline_truncations:
-                        bl = await _generate_baseline_answer(tq.query, model_name)
+                        bl = await _generate_baseline_answer(tq.query, baseline_model)
                     if isinstance(bl, tuple):
                         baseline_answer, baseline_tokens = bl
                     else:  # legacy mock returning bare string
@@ -1602,6 +1615,7 @@ async def run_kb_validation(
     *,
     mode: str = "judge",
     skip_judge: bool = False,
+    model: Optional[str] = None,
 ) -> dict:
     """Run full validation on a knowledge base.
 
@@ -1617,6 +1631,12 @@ async def run_kb_validation(
 
     ``skip_judge=True`` short-circuits the judge entirely (still fixes the
     bug-free retrieval-precision substring match) — used for cheap re-runs.
+
+    ``model`` explicitly picks the answer-generation model for this run — it
+    wins over a KB-level ``rag_config_override`` model and over the user's
+    default, so "validate this KB under model X" actually measures model X.
+    The judge model is unaffected. When None, legacy resolution applies
+    (applied config model, else the user's model).
     """
     kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
     if not kb:
@@ -1640,6 +1660,10 @@ async def run_kb_validation(
     judge_payload: dict | None = None
     judge_model_used: str | None = None
     judge_variance: float | None = None
+    # The model that generated the graded answers — set only when the judge
+    # actually ran; a retrieval-only run has no task model to attribute.
+    effective_answer_model: str | None = None
+    answer_cfg: RAGConfig | None = None
     if test_queries and not skip_judge and any(getattr(q, "expected_answer", None) for q in test_queries):
         try:
             # Resolve the judge model. get_user_model_name validates the user's
@@ -1649,8 +1673,15 @@ async def run_kb_validation(
             from app.services.config_service import get_user_model_name
             judge_model_used = await get_user_model_name(user_id)
             if judge_model_used:
+                # Resolve the answer config once so the persisted run can
+                # state which model actually generated the graded answers.
+                answer_cfg = await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
+                if model:
+                    answer_cfg = answer_cfg.with_overrides(model=model)
+                effective_answer_model = answer_cfg.model or judge_model_used
                 judge_payload = await judge_test_queries(
                     kb_uuid, test_queries, judge_model_used, mode=mode,
+                    answer_config=answer_cfg if model else None,
                 )
                 # First-run variance sample: only when no prior ValidationRun exists for this KB.
                 from app.models.validation_run import ValidationRun
@@ -1762,6 +1793,18 @@ async def run_kb_validation(
         run_type="kb_validation",
         result=result,
         user_id=user_id,
+        # Attribute the task model only when the judge actually graded
+        # LLM-generated answers; a retrieval-only run has no task model.
+        model=effective_answer_model if judge_payload else None,
+        model_settings=(
+            {
+                "requested_model": model,
+                "judge_model": judge_model_used,
+                "answer_temperature": answer_cfg.answer_temperature if answer_cfg else None,
+            }
+            if judge_payload
+            else None
+        ),
     )
 
     # Surface the *certified* score (raw score after the low-sample-size

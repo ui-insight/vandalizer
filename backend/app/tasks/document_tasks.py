@@ -7,11 +7,11 @@ Uses pymongo (sync) for DB access — same pattern as workflow_tasks.py.
 import datetime
 import logging
 import os
-import re
 import uuid
 from pathlib import Path
 
 from app.celery_app import celery_app
+from app.services.document_readers import DocumentReadError
 from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
@@ -38,17 +38,42 @@ def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
     return db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
 
 
-def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
+def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
     """Best-effort: add a freshly-ingested document to its Project's implicit KB.
 
     Walks the document's folder ancestry to find the owning project, then mirrors
     the chunks into the project's KB collection (the same path KBs use) so
     "chat with this project" sees the file. Sync — runs inside the Celery task.
+
+    Returns True when the document is (or already was) in the project's KB,
+    False when the mirror failed — a failure is logged and belled here, never
+    raised, so callers only need the return value for honest counting.
     """
     project = _find_project_for_folder(db, doc.get("folder"))
     if not project or not project.get("kb_uuid"):
-        return
+        return True
 
+    try:
+        _mirror_into_project_kb(db, dm, doc, project, text)
+        return True
+    except Exception as e:
+        # Best-effort by design, but never silently: the user just watched
+        # this file land in the project, and "chat with this project" cannot
+        # see it. Callers keep their own guards (project RESOLUTION above can
+        # still raise); the bell rides here so every entry point (fresh
+        # ingest, file move, folder move) discloses. Returns False so the
+        # folder-move task's synced count cannot report failed mirrors as
+        # successes.
+        logger.exception(
+            "Failed to mirror %s into project %s KB", doc.get("uuid"), project.get("uuid"),
+        )
+        from app.services.failure_notifications import notify_project_kb_sync_failed
+
+        notify_project_kb_sync_failed(db, doc=doc, project=project, error=e)
+        return False
+
+
+def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None:
     kb_uuid = project["kb_uuid"]
     doc_uuid = doc["uuid"]
     # Dedupe — never add the same document to a project KB twice.
@@ -237,8 +262,10 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
             text = doc.get("raw_text", "") or ""
             if text:
                 try:
-                    _ingest_into_project_kb(db, dm, doc, text)
-                    synced += 1
+                    # Counted only on success: a Chroma outage mirroring zero
+                    # of 40 documents must not log "re-synced 40".
+                    if _ingest_into_project_kb(db, dm, doc, text):
+                        synced += 1
                 except Exception:
                     logger.exception(
                         "Failed to add %s to new project KB on folder move",
@@ -249,18 +276,6 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
         folder_uuid, synced, new_uuid,
     )
     return synced
-
-
-def _remove_images_from_markdown(markdown_text: str) -> str:
-    """Remove all image references from markdown text."""
-    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", "", markdown_text)
-    text = re.sub(r"!\[([^\]]*)\]\[[^\]]*\]", "", text)
-    text = re.sub(r'\{[^}]*(?:width|height)\s*=\s*"[^"]*"[^}]*\}', "", text)
-    text = re.sub(r'\{[^{}]*="[^"]*"[^{}]*\}', "", text)
-    text = re.sub(r"^\s*\[[^\]]+\]:\s*[^\s]+.*$", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
-    text = re.sub(r"^\s+$", "", text, flags=re.MULTILINE)
-    return text.strip()
 
 
 def _notify_document_processing_failed(db, document_uuid: str, message: str) -> None:
@@ -302,9 +317,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
     """
     from app.services.document_readers import (
         convert_to_markdown,
-        extract_docx_extras,
         extract_text_from_file,
-        remove_images_from_markdown,
     )
 
     db = get_sync_db()
@@ -345,19 +358,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         elif extension == "xls":
             raw_text = convert_to_markdown(str(absolute_path))
 
-        elif extension in ("docx", "doc"):
-            try:
-                import pypandoc
-
-                raw_text = pypandoc.convert_file(str(absolute_path), "markdown")
-                raw_text = remove_images_from_markdown(raw_text)
-            except Exception:
-                raw_text = convert_to_markdown(str(absolute_path), keep_data_uris=False)
-
-            if extension == "docx":
-                extras = extract_docx_extras(str(absolute_path))
-                if extras:
-                    raw_text = (raw_text or "").rstrip() + "\n\n" + extras
+        # docx/doc deliberately have no branch here: they fall through to
+        # extract_text_from_file below, whose docx branch is the ONE assembly
+        # site (read_docx_markdown + extras). A local copy of that assembly
+        # is exactly how upload and chat-attachment text drifted apart before.
 
         elif extension == "pdf":
             from app.services.document_readers import (
@@ -393,6 +397,12 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         ingestion_warnings: list[str] = []
         if ocr_report.get("partial"):
             ingestion_warnings.append("partial_ocr")
+        if ocr_report.get("hidden_text_unchecked"):
+            # The prompt-injection scrub could not inspect this PDF, so its
+            # text may include content the page never displays. Stored as a
+            # warning rather than failing the document: an inspection hiccup
+            # on an honest PDF must stay usable, but never silently.
+            ingestion_warnings.append("hidden_text_unchecked")
         if extension == "pdf" and raw_text and is_sparse_extraction(raw_text, num_pages):
             ingestion_warnings.append("sparse_text")
         if ingestion_warnings:
@@ -511,6 +521,30 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             "retry once the service is back, or contact your administrator if "
             "it keeps happening."
         )
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {
+                "$set": {
+                    "raw_text": "",
+                    "processing": False,
+                    "extraction_nonletter_ratio": None,
+                    "ingestion_warnings": [],
+                    "task_status": "error",
+                    "error_message": message,
+                }
+            },
+        )
+        _notify_document_processing_failed(db, document_uuid, message)
+        return ""
+
+    except DocumentReadError as e:
+        # Expected, user-actionable refusal (a binary upload, an unreadable
+        # file) — the same error-state writes as the generic handler below,
+        # but logged at warning without a traceback: a user dragging a folder
+        # of .zip/.exe files into the uploader must not page Sentry once per
+        # file, the way FileNotFoundError and OCR outages already don't.
+        logger.warning("Document %s is not readable text: %s", document_uuid, e)
+        message = str(e)
         db.smart_document.update_one(
             {"uuid": document_uuid},
             {
@@ -713,45 +747,83 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
         if not action_id:
             continue
 
-        # Check file type filters from trigger_config
-        trigger_config = auto.get("trigger_config") or {}
-        allowed_types = trigger_config.get("file_types", [])
-        if allowed_types and doc.get("extension") not in allowed_types:
-            logger.info(
-                "Skipping automation %s: doc type '%s' not in %s",
-                auto.get("name"), doc.get("extension"), allowed_types,
+        # Filters run inside their own per-automation guard: a malformed
+        # trigger_config (e.g. exclude_patterns stored as a list) used to
+        # raise BEFORE the dispatch try below, aborting every remaining
+        # automation for this document via the caller's silent catch-all.
+        try:
+            trigger_config = auto.get("trigger_config") or {}
+            allowed_types = trigger_config.get("file_types", [])
+            if allowed_types and doc.get("extension") not in allowed_types:
+                logger.info(
+                    "Skipping automation %s: doc type '%s' not in %s",
+                    auto.get("name"), doc.get("extension"), allowed_types,
+                )
+                continue
+
+            exclude_patterns = trigger_config.get("exclude_patterns", "")
+            if isinstance(exclude_patterns, list):
+                # Tolerated elsewhere (automation_run_now); normalize here too.
+                exclude_patterns = ",".join(str(p) for p in exclude_patterns)
+            if exclude_patterns:
+                import fnmatch
+                patterns = [p.strip() for p in exclude_patterns.split(",") if p.strip()]
+                if any(fnmatch.fnmatch(doc.get("title", ""), pat) for pat in patterns):
+                    logger.info("Skipping automation %s: doc matches exclude pattern", auto.get("name"))
+                    continue
+        except Exception as e:
+            logger.error("Automation '%s' has a malformed trigger_config: %s", auto.get("name"), e)
+            from app.services.failure_notifications import notify_automation_failed
+
+            notify_automation_failed(
+                db, automation=auto, error=e,
+                detail="This automation's trigger configuration is malformed and it was skipped.",
             )
             continue
-
-        # Check exclude patterns
-        exclude_patterns = trigger_config.get("exclude_patterns", "")
-        if exclude_patterns:
-            import fnmatch
-            patterns = [p.strip() for p in exclude_patterns.split(",") if p.strip()]
-            if any(fnmatch.fnmatch(doc.get("title", ""), pat) for pat in patterns):
-                logger.info("Skipping automation %s: doc matches exclude pattern", auto.get("name"))
-                continue
 
         if action_type == "workflow":
             # Create a pending WorkflowTriggerEvent — the beat task
             # (process_pending_triggers) will apply budget/throttle checks
-            # and dispatch execution.
-            workflow_doc = db.workflow.find_one({"_id": ObjectId(action_id)})
-            if not workflow_doc:
-                logger.warning("Workflow %s not found for automation '%s'", action_id, auto.get("name"))
-                continue
+            # and dispatch execution. Isolated per automation and belled on
+            # failure, like the extraction branch below: one broken
+            # automation used to abort this loop for its siblings and vanish
+            # into the caller's catch-all — silent forever.
+            try:
+                workflow_doc = db.workflow.find_one({"_id": ObjectId(action_id)})
+                if not workflow_doc:
+                    # The workflow this automation runs was deleted; without a
+                    # bell the automation shows enabled forever and never fires.
+                    logger.warning("Workflow %s not found for automation '%s'", action_id, auto.get("name"))
+                    from app.services.failure_notifications import notify_automation_failed
 
-            from app.services.passive_triggers import create_folder_watch_trigger
-            event = create_folder_watch_trigger(
-                workflow_doc,
-                doc,
-                automation_id=str(auto["_id"]),
-                automation_name=auto.get("name", ""),
-            )
-            logger.info(
-                "Created folder watch trigger %s for automation '%s' (workflow %s)",
-                event["_id"], auto.get("name"), action_id,
-            )
+                    notify_automation_failed(
+                        db, automation=auto,
+                        error="the workflow this automation runs no longer exists",
+                        detail="Disable the automation, or point it at an existing workflow.",
+                    )
+                    continue
+
+                from app.services.passive_triggers import create_folder_watch_trigger
+                event = create_folder_watch_trigger(
+                    workflow_doc,
+                    doc,
+                    automation_id=str(auto["_id"]),
+                    automation_name=auto.get("name", ""),
+                )
+                logger.info(
+                    "Created folder watch trigger %s for automation '%s' (workflow %s)",
+                    event["_id"], auto.get("name"), action_id,
+                )
+            except Exception as e:
+                logger.error("Workflow automation '%s' failed to dispatch: %s", auto.get("name"), e)
+                from app.services.failure_notifications import notify_automation_failed
+
+                notify_automation_failed(
+                    db,
+                    automation=auto,
+                    error=e,
+                    detail=f'Could not start the workflow for "{doc.get("title") or "a document"}".',
+                )
 
         elif action_type == "extraction":
             # Run extraction inline (sync) since we're in a Celery worker
@@ -880,6 +952,12 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
         "final_output": {"output": results},
     }
 
+    # Each output is attempted independently (one failed webhook must not
+    # block storage), but failures are COLLECTED, not swallowed: the
+    # automation used to report success with its deliverables never leaving
+    # the building (#810).
+    delivery_failures: list[str] = []
+
     # 1. Storage
     storage_cfg = output_config.get("storage", {})
     if storage_cfg.get("enabled"):
@@ -888,6 +966,7 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
             logger.info("Extraction results saved to %s", path)
         except Exception as e:
             logger.error("Failed to save extraction results: %s", e)
+            delivery_failures.append(f"library save failed: {str(e)[:200]}")
 
     # 2. Notifications
     for notification in output_config.get("notifications", []):
@@ -896,6 +975,9 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
                 send_workflow_notification(result_doc, notification)
         except Exception as e:
             logger.error("Failed to send extraction notification: %s", e)
+            delivery_failures.append(
+                f"notification ({notification.get('channel') or 'configured'}) failed: {str(e)[:200]}"
+            )
 
     # 3. Webhooks
     for webhook_cfg in output_config.get("webhooks", []):
@@ -903,6 +985,25 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
             call_webhook(result_doc, webhook_cfg)
         except Exception as e:
             logger.error("Failed to call extraction webhook: %s", e)
+            delivery_failures.append(
+                f"webhook ({webhook_cfg.get('url') or 'configured'}) failed: {str(e)[:200]}"
+            )
+
+    if delivery_failures:
+        # delivery_failed, not automation_failed: the extraction RAN and its
+        # results exist — and coalescing onto the automation_failed key would
+        # overwrite an unread genuine dispatch failure's detail.
+        from app.services.failure_notifications import notify_delivery_failed
+
+        notify_delivery_failed(
+            db,
+            automation=automation,
+            detail=(
+                "The extraction ran, but "
+                f"{len(delivery_failures)} configured output(s) failed to "
+                "deliver: " + "; ".join(delivery_failures)
+            ),
+        )
 
 
 @celery_app.task(
@@ -1000,6 +1101,16 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
                 "ingest_error": str(e)[:500],
             },
         )
+        # The amber icon on the file row was the only signal; the owner of a
+        # 50-file upload never sees row 37's icon. Bell once retries are
+        # exhausted — the document is saved, but search/chat cannot see it.
+        from app.services.failure_notifications import (
+            is_final_attempt,
+            notify_document_not_searchable,
+        )
+
+        if is_final_attempt(self, e):
+            notify_document_not_searchable(db, doc=doc, error=e)
         raise
 
     _record_ingestion_result(

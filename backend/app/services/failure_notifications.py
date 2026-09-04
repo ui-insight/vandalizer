@@ -175,6 +175,174 @@ def notify_document_failed(db, *, doc: dict | None, error: Any) -> None:
         logger.exception("Failed to emit document failure notification")
 
 
+def notify_delivery_failed(
+    db,
+    *,
+    workflow_doc: dict | None = None,
+    automation: dict | None = None,
+    detail: str,
+    error: Any = None,
+    user_id: str | None = None,
+) -> None:
+    """Notify the owner that a run COMPLETED but a configured output did not
+    deliver (library write, notification, webhook).
+
+    Deliberately not notify_workflow_failed / notify_automation_failed: the
+    run's results exist and are viewable — "failed" would be wrong twice over,
+    and coalescing onto the genuine-failure key would overwrite an unread real
+    failure's detail. But a run whose configured deliverable never left the
+    building is not done either, and until now the only trace was a log line.
+
+    Pass ``workflow_doc`` for a manual run, ``automation`` for an automation's
+    outputs; ``error`` (optional) is appended via the module's shared snippet
+    rule so bell bodies stay readable.
+    """
+    try:
+        workflow_doc = workflow_doc or {}
+        automation = automation or {}
+        recipient = user_id or workflow_doc.get("user_id") or automation.get("user_id")
+        if not recipient:
+            return
+        if automation:
+            subject_id = str(automation.get("_id") or "")
+            name = automation.get("name") or "Automation"
+            link = (
+                f"/?mode=automations&automation={subject_id}"
+                if subject_id else "/?mode=automations"
+            )
+            item_kind = "automation"
+        else:
+            subject_id = str(workflow_doc.get("_id") or "")
+            name = workflow_doc.get("name") or "Workflow"
+            link = f"/?workflow={subject_id}" if subject_id else "/"
+            item_kind = "workflow"
+        body = f"{detail} {_snippet(error)}" if error else detail
+
+        create_notification_sync(
+            db,
+            user_id=recipient,
+            kind="delivery_failed",
+            title=f"Output not delivered: {name}",
+            body=body,
+            link=link,
+            item_kind=item_kind,
+            item_id=subject_id or None,
+            item_name=name,
+            coalesce_key=f"delivery_failed:{subject_id or name}",
+            group_title=f"Outputs not delivered {{count}}×: {name}",
+        )
+    except Exception:
+        logger.exception("Failed to emit delivery-failure notification")
+
+
+def notify_document_not_searchable(db, *, doc: dict | None, error: Any) -> None:
+    """Notify the owner that a document was SAVED but search indexing failed.
+
+    Deliberately not notify_document_failed: that title ("failed to process")
+    and per-user coalesce key would merge this with genuine processing
+    failures and contradict the body — the document exists and is readable,
+    chat/knowledge search just cannot see it.
+    """
+    try:
+        doc = doc or {}
+        recipient = doc.get("user_id")
+        if not recipient:
+            return
+        title_doc = doc.get("title") or doc.get("uuid") or "A document"
+
+        create_notification_sync(
+            db,
+            user_id=recipient,
+            kind="document_unsearchable",
+            title="Document saved, but not searchable",
+            body=(
+                f"\u201c{title_doc}\u201d was saved, but search indexing failed — "
+                f"chat and knowledge search will not see it. {_snippet(error)}"
+            ),
+            link="/?mode=files",
+            item_kind="document",
+            item_id=doc.get("uuid"),
+            item_name=title_doc,
+            coalesce_key=f"document_unsearchable:{recipient}",
+            group_title="{count} documents saved but not searchable",
+        )
+    except Exception:
+        logger.exception("Failed to emit document-unsearchable notification")
+
+
+def notify_kb_source_failed(db, *, kb_uuid: str, source_name: str | None, error: Any) -> None:
+    """Notify the KB owner that a source could not be ingested.
+
+    Without this, a knowledge base with quietly errored sources answered
+    questions while looking perfectly healthy — the only trace was a status
+    field on a row nobody was told to look at.
+    """
+    try:
+        kb = db.knowledge_bases.find_one({"uuid": kb_uuid}, {"title": 1, "user_id": 1}) or {}
+        recipient = kb.get("user_id")
+        if not recipient:
+            return
+        kb_title = kb.get("title") or "Knowledge base"
+        name = source_name or "A source"
+
+        create_notification_sync(
+            db,
+            user_id=recipient,
+            kind="kb_source_failed",
+            title=f"Knowledge base source failed: {kb_title}",
+            body=f"\u201c{name}\u201d could not be ingested. {_snippet(error)}",
+            # /?kb= would be force-routed into chat mode by the frontend's
+            # kb-param handler; plain mode=knowledge lands on the knowledge
+            # screen where the errored source row lives.
+            link="/?mode=knowledge",
+            item_kind="knowledge_base",
+            item_id=kb_uuid,
+            item_name=kb_title,
+            coalesce_key=f"kb_source_failed:{kb_uuid}",
+            group_title=f"{{count}} sources failed in knowledge base: {kb_title}",
+        )
+    except Exception:
+        logger.exception("Failed to emit KB source failure notification")
+
+
+def notify_project_kb_sync_failed(db, *, doc: dict | None, project: dict | None, error: Any) -> None:
+    """Notify the owner that a document never reached its project's KB.
+
+    The mirror into a project's implicit knowledge base is best-effort by
+    design, but its failure means "chat with this project" silently cannot
+    see a file the user just watched land in the project — worth a bell.
+    """
+    try:
+        doc = doc or {}
+        project = project or {}
+        recipient = doc.get("user_id") or project.get("owner_user_id")
+        if not recipient:
+            return
+        doc_title = doc.get("title") or doc.get("uuid") or "A document"
+        project_title = project.get("title") or "your project"
+        project_uuid = project.get("uuid") or ""
+
+        create_notification_sync(
+            db,
+            user_id=recipient,
+            kind="project_kb_sync_failed",
+            title=f"Document not searchable in project: {project_title}",
+            body=(
+                f"\u201c{doc_title}\u201d was saved, but could not be added to the "
+                "project's knowledge base \u2014 chatting with this project will not "
+                f"see it. {_snippet(error)}"
+            ),
+            link=f"/?project={project_uuid}" if project_uuid else "/",
+            item_kind="project",
+            item_id=project_uuid or None,
+            item_name=project_title,
+            coalesce_key=f"project_kb_sync_failed:{project_uuid}",
+            group_title=f"{{count}} documents not searchable in project: {project_title}",
+        )
+    except Exception:
+        logger.exception("Failed to emit project KB sync failure notification")
+
+
 def notify_automation_failed(
     db,
     *,

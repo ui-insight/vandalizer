@@ -1,6 +1,6 @@
 """Tests for app.tasks.document_tasks — document extraction, update, cleanup, and semantic ingestion.
 
-Covers: _remove_images_from_markdown, perform_extraction_and_update,
+Covers: perform_extraction_and_update,
 update_document_fields, _check_folder_watch_automations, cleanup_document,
 perform_semantic_ingestion.
 """
@@ -35,62 +35,6 @@ def _status_sequence(db):
     ]
 
 
-# ---------------------------------------------------------------------------
-# _remove_images_from_markdown
-# ---------------------------------------------------------------------------
-
-
-class TestRemoveImagesFromMarkdown:
-    def test_removes_inline_images(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = "Hello ![alt](image.png) world"
-        result = _remove_images_from_markdown(text)
-        assert "image.png" not in result
-        assert "Hello" in result
-        assert "world" in result
-
-    def test_removes_reference_images(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = "Hello ![alt][ref] world\n[ref]: http://img.png"
-        result = _remove_images_from_markdown(text)
-        assert "http://img.png" not in result
-
-    def test_removes_width_height_attributes(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = 'Text {width="100" height="200"} more'
-        result = _remove_images_from_markdown(text)
-        assert 'width="100"' not in result
-
-    def test_collapses_multiple_blank_lines(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = "Line 1\n\n\n\n\nLine 2"
-        result = _remove_images_from_markdown(text)
-        assert "\n\n\n" not in result
-
-    def test_strips_whitespace_only_lines(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = "Line 1\n   \nLine 2"
-        result = _remove_images_from_markdown(text)
-        assert "   " not in result
-
-    def test_returns_empty_on_empty_input(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        assert _remove_images_from_markdown("") == ""
-
-    def test_preserves_non_image_markdown(self):
-        from app.tasks.document_tasks import _remove_images_from_markdown
-
-        text = "# Heading\n\n**bold** and [link](url)"
-        result = _remove_images_from_markdown(text)
-        assert "# Heading" in result
-        assert "**bold**" in result
-        assert "[link](url)" in result
 
 
 # ---------------------------------------------------------------------------

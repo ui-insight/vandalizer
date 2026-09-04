@@ -584,6 +584,10 @@ async def get_library_items(
                 deref["quality_score"] = meta.quality_score
                 deref["last_validated_at"] = meta.last_validated_at.isoformat() if meta.last_validated_at else None
                 deref["regression_pending_review"] = meta.regression_pending_review
+                # A tier with no measured score behind it is an assertion
+                # (hand-typed in the catalog seed), not a measurement — the
+                # badge has to say which one it is showing.
+                deref["quality_asserted"] = bool(meta.quality_tier) and meta.quality_score is None
             else:
                 # Fall back to latest ValidationRun
                 latest = await get_latest_validation(item.kind.value, quality_lookup_id)
@@ -593,6 +597,7 @@ async def get_library_items(
                     sys_cfg = await SystemConfig.get_config()
                     deref["quality_tier"] = compute_quality_tier(score, sys_cfg.get_quality_config())
                     deref["last_validated_at"] = latest.get("created_at")
+                    deref["quality_asserted"] = False
                     # Stated, not left absent. A flagged item always has a
                     # metadata row so this branch cannot currently carry a
                     # regression, but the extraction and workflow routers say

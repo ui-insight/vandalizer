@@ -125,8 +125,11 @@ frontend-test:
 frontend-build:
 	cd $(FRONTEND_DIR) && npm run build
 
+# Fails on a critical advisory; warns and passes when the registry is
+# unreachable. `npm audit` cannot tell those apart by exit code, and this
+# target gates the release. See the script's header.
 frontend-audit:
-	cd $(FRONTEND_DIR) && npm audit --audit-level=critical
+	./scripts/npm_audit_gate.sh
 
 frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
 

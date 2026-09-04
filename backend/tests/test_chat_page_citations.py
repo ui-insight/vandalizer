@@ -23,9 +23,11 @@ def _markers(*offsets: int) -> list[dict]:
 
 class TestAnnotatePages:
     def test_inserts_a_marker_at_each_page_boundary(self):
-        text = "AAAABBBBCCCC"
-        out = annotate_pages(text, _markers(0, 4, 8))
-        assert out == "[p. 1]\nAAAA[p. 2]\nBBBB[p. 3]\nCCCC"
+        # Irregular page lengths on purpose: uniform spacing is the
+        # interpolator's signature and would (correctly) hedge these as ~.
+        text = "AAAABBBBBCCC"
+        out = annotate_pages(text, _markers(0, 4, 9))
+        assert out == "[p. 1]\nAAAA[p. 2]\nBBBBB[p. 3]\nCCC"
 
     def test_text_content_is_preserved_exactly(self):
         """Stripping the inserted markers must give back the original text —

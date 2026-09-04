@@ -1,6 +1,7 @@
 /**
  * ModelEffortPicker — displays the system-configured models as a radio-button
- * list with Intelligence / Speed / Privacy characteristic bars.
+ * list with Tier / Speed / Privacy characteristic bars (configured settings,
+ * not measured capability).
  *
  * Also exports:
  *   ModelCharacterBars   — standalone mini bars for use in admin model list rows
@@ -11,7 +12,11 @@ import type { ModelInfo } from '../types/workflow'
 // Scoring helpers
 // ---------------------------------------------------------------------------
 
-function getIntelligenceScore(m: ModelInfo): number {
+// Renders the admin's configured tier/thinking settings as a bar. This is
+// self-report, not measurement — it must never be labeled as intelligence
+// or capability, which readers take for an evaluated figure. Measured
+// per-model quality lives in Admin → Quality → Model Performance.
+function getTierScore(m: ModelInfo): number {
   let v = m.tier === 'high' ? 0.85 : m.tier === 'standard' ? 0.60 : m.tier === 'basic' ? 0.35 : 0.50
   if (m.thinking) v = Math.min(1, v + 0.15)
   return v
@@ -30,14 +35,14 @@ function getPrivacyScore(m: ModelInfo): number {
 // ---------------------------------------------------------------------------
 
 const BAR_COLORS = {
-  intelligence: '#8b5cf6',
-  speed:        '#f59e0b',
-  privacy:      '#10b981',
+  tier:    '#8b5cf6',
+  speed:   '#f59e0b',
+  privacy: '#10b981',
 }
 
-function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
+function StatBar({ label, value, color, title }: { label: string; value: number; color: string; title?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div title={title} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ fontSize: 10.5, color: '#6b7280', width: 74, flexShrink: 0, fontWeight: 500 }}>{label}</span>
       <div style={{ flex: 1, height: 5, backgroundColor: '#efefef', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{
@@ -60,7 +65,12 @@ function StatBar({ label, value, color }: { label: string; value: number; color:
 export function ModelCharacterBars({ model }: { model: ModelInfo }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 170 }}>
-      <StatBar label="Intelligence" value={getIntelligenceScore(model)} color={BAR_COLORS.intelligence} />
+      <StatBar
+        label="Tier"
+        value={getTierScore(model)}
+        color={BAR_COLORS.tier}
+        title="Reflects the configured tier and thinking settings for this model — not a measured capability. Admin → Quality → Model Performance has measured scores."
+      />
       <StatBar label="Speed"        value={getSpeedScore(model)}        color={BAR_COLORS.speed} />
       <StatBar label="Privacy"      value={getPrivacyScore(model)}      color={BAR_COLORS.privacy} />
     </div>
@@ -132,7 +142,12 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
 
             {/* Row 2: characteristic bars */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 25 }}>
-              <StatBar label="Intelligence" value={getIntelligenceScore(model)} color={BAR_COLORS.intelligence} />
+              <StatBar
+        label="Tier"
+        value={getTierScore(model)}
+        color={BAR_COLORS.tier}
+        title="Reflects the configured tier and thinking settings for this model — not a measured capability. Admin → Quality → Model Performance has measured scores."
+      />
               <StatBar label="Speed"        value={getSpeedScore(model)}        color={BAR_COLORS.speed} />
               <StatBar label="Privacy"      value={getPrivacyScore(model)}      color={BAR_COLORS.privacy} />
             </div>
