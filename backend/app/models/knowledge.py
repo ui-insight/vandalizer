@@ -57,6 +57,10 @@ class KnowledgeBaseSource(Document):
     content_hash: Optional[str] = None  # sha256 of the text handed to the indexer
     last_refresh_outcome: Optional[str] = None  # refreshed | unchanged | retrieval_failed | ingestion_failed
     last_refresh_error: Optional[str] = None
+    # sha256 of a fetch refused by the collapse gate. If the next refresh
+    # returns the same bytes, the page really is that short now and the gate
+    # steps aside -- a transient shell does not come back identical twice.
+    last_collapsed_hash: Optional[str] = None
 
     class Settings:
         name = "knowledge_base_sources"

@@ -1675,20 +1675,35 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
 _REFRESH_COLLAPSE_RATIO = 0.25
 
 
-def _reject_collapsed_refresh(previous_text: str | None, new_text: str) -> str | None:
+def _reject_collapsed_refresh(
+    previous_text: str | None, new_text: str, last_collapsed_hash: str | None = None,
+) -> str | None:
     """Why a refreshed page must not replace what it fetched over, or None.
 
     Compares the fetched text against the retained snapshot. Only meaningful
     on a refresh — first ingest has nothing to compare to.
+
+    A page genuinely can shrink below the ratio: a policy rescinded down to
+    "This policy has been rescinded — see APM 45.15", or a page whose body
+    moves to subpages leaving a table of contents. Refusing those forever
+    would serve the superseded text indefinitely, which is the failure this
+    whole area exists to prevent. So the refusal is not permanent: the refused
+    text's hash is remembered, and if the next refresh returns exactly the same
+    bytes the gate steps aside. A site shell or an error page does not come
+    back byte-identical on the next attempt; a page that really is short now
+    does.
     """
     previous_len = len((previous_text or "").strip())
     new_len = len(new_text.strip())
     if not previous_len or new_len >= previous_len * _REFRESH_COLLAPSE_RATIO:
         return None
+    if last_collapsed_hash and currency.content_fingerprint(new_text) == last_collapsed_hash:
+        return None
     return (
         f"Page returned {new_len:,} characters where the indexed text has "
         f"{previous_len:,} — this looks like the site's shell or an error page, "
-        "not the content"
+        "not the content. If the page really is this short now, refresh again "
+        "and the same text will be accepted"
     )
 
 
@@ -1732,8 +1747,16 @@ async def refresh_url_source(
 
         result = await fetch_url(source.url)
         reason = _reject_fetched_page(result)
-        if reason is None and previous_status == "ready" and source.chunk_count:
-            reason = _reject_collapsed_refresh(source.content, result.text)
+        if reason is None:
+            reason = _reject_collapsed_refresh(
+                source.content, result.text,
+                # getattr: rows written before this field existed, and the
+                # hand-built source stubs several test suites use.
+                getattr(source, "last_collapsed_hash", None),
+            )
+            source.last_collapsed_hash = (
+                currency.content_fingerprint(result.text) if reason else None
+            )
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]

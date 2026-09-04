@@ -31,6 +31,10 @@ def _source(**overrides):
         chunk_count=3,
         truncated=False,
         processed_at=None,
+        # The collapse gate remembers what it refused so a page that really did
+        # shrink gets in on its second attempt; a fresh source has refused
+        # nothing.
+        last_collapsed_hash=None,
     )
     for k, v in overrides.items():
         setattr(src, k, v)
@@ -274,3 +278,52 @@ def test_collapse_gate_boundary():
     assert gate("", "y") is None
     assert gate("   ", "y") is None
     assert "1,000" in gate(previous, "y" * 10)
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_really_did_shrink_gets_in_on_the_second_refresh():
+    """The gate must not be a permanent refusal.
+
+    A policy rescinded down to "This policy has been rescinded — see APM 45.15"
+    is a legitimate shrink well under the ratio. Refusing it forever would keep
+    the knowledge base answering from the rescinded text, which is the exact
+    failure this area exists to prevent. A site shell does not come back
+    byte-identical on the next attempt; a page that is genuinely this short
+    now does.
+    """
+    short = "This policy has been rescinded — see APM 45.15."
+    # A real indexed policy page, so the rescission notice is genuinely a
+    # collapse against it rather than an arithmetic near-miss.
+    src = _source(content="A. Overview. " + ("Prior approval is required. " * 60))
+    dm = _dm()
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(short))), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        first = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+        assert first is not None, "first attempt should still be refused"
+        assert src.last_collapsed_hash, "the refused text must be remembered"
+        dm.add_to_kb.assert_not_called()
+
+        second = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert second is None, (
+        "the same short text returning twice is a real page, not a shell — "
+        "refusing it a second time serves the superseded content indefinitely"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_shell_that_differs_between_attempts_stays_refused():
+    """The hatch is keyed to identical bytes, so a flaky error page that varies
+    between attempts never gets in."""
+    src = _source(content="A. Overview. " + ("Prior approval is required. " * 60))
+    dm = _dm()
+
+    with patch.object(knowledge_service, "_get_dm", return_value=dm):
+        with patch("app.services.web_fetcher.fetch_url",
+                   AsyncMock(return_value=_result("Error 502 (a)"))):
+            assert await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1")) is not None
+        with patch("app.services.web_fetcher.fetch_url",
+                   AsyncMock(return_value=_result("Error 502 (b)"))):
+            assert await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1")) is not None
+    dm.add_to_kb.assert_not_called()
