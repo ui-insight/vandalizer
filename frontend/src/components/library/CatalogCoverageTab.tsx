@@ -174,6 +174,14 @@ export function CatalogCoverageTab() {
                           {driftDelta != null && (
                             <div className={`text-[10px] ${driftDelta >= 10 ? 'text-red-600' : driftDelta >= 5 ? 'text-amber-600' : 'text-gray-500'}`}>
                               {driftDelta > 0 ? `-${driftDelta.toFixed(1)} pts` : 'stable'}
+                              {it.last_drift_basis !== 'baseline_reexecution' && (
+                                <span
+                                  title="Compared against the item's latest validation score — the frozen baseline was not re-run. Enable monitoring.baseline_reexecution to re-execute extraction baselines."
+                                  className="ml-1 text-gray-400"
+                                >
+                                  (proxy)
+                                </span>
+                              )}
                             </div>
                           )}
                         </div>

@@ -57,6 +57,24 @@ def _recalculate_kb(db, kb_uuid: str) -> None:
     )
 
 
+def _source_label(source: dict, doc: dict | None = None) -> str:
+    """Human name for a KB source, matching knowledge_service's precedence.
+
+    document_title is only written on a successful prior ingest, so a
+    first-ever failure must fall back to the live document's title before it
+    falls back to a raw UUID nobody recognizes.
+    """
+    return (
+        source.get("custom_name")
+        or (doc or {}).get("title")
+        or source.get("document_title")
+        or source.get("url_title")
+        or source.get("url")
+        or source.get("uuid")
+        or "A source"
+    )
+
+
 @celery_app.task(
     name="tasks.documents.kb_ingest_document",
     bind=True,
@@ -90,6 +108,12 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 {"$set": {"status": "error", "error_message": "Document not found"}},
             )
             _recalculate_kb(db, kb_uuid)
+            from app.services.failure_notifications import notify_kb_source_failed
+
+            notify_kb_source_failed(
+                db, kb_uuid=kb_uuid, source_name=_source_label(source),
+                error="the document behind this source no longer exists",
+            )
             return
 
         raw_text = doc.get("raw_text", "")
@@ -126,6 +150,12 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 },
             )
             _recalculate_kb(db, kb_uuid)
+            from app.services.failure_notifications import notify_kb_source_failed
+
+            notify_kb_source_failed(
+                db, kb_uuid=kb_uuid, source_name=_source_label(source, doc),
+                error=doc.get("error_message") or "the document has no extractable text",
+            )
             return
 
         dm = get_document_manager()
@@ -160,6 +190,20 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             {"uuid": source_uuid},
             {"$set": {"status": "error", "error_message": str(e)[:2000]}},
         )
+        # Bell the KB owner — but only once Celery is done retrying, so a
+        # transient blip that succeeds on retry rings nothing.
+        from app.services.failure_notifications import (
+            is_final_attempt,
+            notify_kb_source_failed,
+        )
+
+        if is_final_attempt(self, e):
+            notify_kb_source_failed(
+                db,
+                kb_uuid=kb_uuid,
+                source_name=_source_label(source, locals().get("doc")),
+                error=e,
+            )
         raise
 
     finally:
@@ -281,6 +325,13 @@ def kb_reingest(self, kb_uuid: str) -> None:
                 {"uuid": source_uuid},
                 {"$set": {"status": "error", "error_message": str(e)[:2000]}},
             )
+            # Per-source, not per-task: one broken source in a reingest sweep
+            # must not stay silent just because its 40 siblings succeeded.
+            from app.services.failure_notifications import notify_kb_source_failed
+
+            notify_kb_source_failed(
+                db, kb_uuid=kb_uuid, source_name=_source_label(source), error=e,
+            )
 
     _recalculate_kb(db, kb_uuid)
 
@@ -310,6 +361,13 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         {"$set": {"status": "processing"}},
     )
 
+    def _bell(error) -> None:
+        from app.services.failure_notifications import notify_kb_source_failed
+
+        notify_kb_source_failed(
+            db, kb_uuid=kb_uuid, source_name=_source_label(source), error=error,
+        )
+
     try:
         url = source.get("url", "")
         if not url:
@@ -318,6 +376,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 {"$set": {"status": "error", "error_message": "No URL specified"}},
             )
             _recalculate_kb(db, kb_uuid)
+            _bell("no URL is configured on this source")
             return
 
         # Fetch URL content via the shared web_fetcher (trafilatura + Playwright
@@ -334,6 +393,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 {"$set": {"status": "error", "error_message": describe_empty_fetch(result.status_code)}},
             )
             _recalculate_kb(db, kb_uuid)
+            _bell(describe_empty_fetch(result.status_code))
             return
 
         from app.utils.bot_challenge import looks_like_bot_challenge
@@ -349,6 +409,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 }},
             )
             _recalculate_kb(db, kb_uuid)
+            _bell("blocked by the site's bot protection")
             return
 
         # Store extracted content on source
@@ -392,12 +453,18 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 {"uuid": source_uuid},
                 {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
             )
+            # No re-raise: this failure is terminal right now.
+            _bell(describe_fetch_error(e))
         else:
             logger.error("Error ingesting URL source %s: %s", source_uuid, e)
             db.knowledge_base_sources.update_one(
                 {"uuid": source_uuid},
                 {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
             )
+            from app.services.failure_notifications import is_final_attempt
+
+            if is_final_attempt(self, e):
+                _bell(describe_fetch_error(e))
             raise
     except (ValueError, httpx.RequestError) as e:
         logger.warning("URL source %s unreachable: %s", source_uuid, e)
@@ -405,12 +472,17 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             {"uuid": source_uuid},
             {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
         )
+        _bell(describe_fetch_error(e))
     except Exception as e:
         logger.error("Error ingesting URL source %s: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
             {"$set": {"status": "error", "error_message": describe_fetch_error(e)[:2000]}},
         )
+        from app.services.failure_notifications import is_final_attempt
+
+        if is_final_attempt(self, e):
+            _bell(describe_fetch_error(e))
         raise
 
     finally:

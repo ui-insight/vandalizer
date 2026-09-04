@@ -27,6 +27,8 @@ export interface QualityHistoryItem {
   num_test_cases?: number
   num_checks?: number
   mode?: string
+  /** The model that executed the run (task model) — distinct from the judge. */
+  model?: string | null
   judge_model?: string | null
   judge_variance?: number | null
   judge_variance_meta?: { sigma: number | null; n: number; sampled_query_uuids?: string[] } | null
@@ -163,6 +165,13 @@ export function QualityTimeline({
   const judgeModels = new Set(ordered.map(i => i.judge_model || '').filter(Boolean))
   const judgeModelChanged = judgeModels.size > 1
 
+  // Same trap as a judge swap, on the other side of the measurement: a score
+  // dip caused by switching the model under test must not read as a content
+  // regression. Runs without attribution (legacy, mixed-model workflows)
+  // don't count toward "changed" — absence is a coverage gap, not a change.
+  const taskModels = new Set(ordered.map(i => i.model || '').filter(Boolean))
+  const taskModelChanged = taskModels.size > 1
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
@@ -180,6 +189,19 @@ export function QualityTimeline({
             }}
           >
             judge model changed
+          </span>
+        )}
+        {taskModelChanged && (
+          <span
+            title={`Model under test changed across this window: ${[...taskModels].join(', ')} — score changes may reflect the model swap, not the content`}
+            style={{
+              fontSize: 9, fontWeight: 600,
+              padding: '1px 6px', borderRadius: 4,
+              color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.1)',
+              border: '1px solid rgba(245, 158, 11, 0.3)',
+            }}
+          >
+            model changed
           </span>
         )}
       </div>

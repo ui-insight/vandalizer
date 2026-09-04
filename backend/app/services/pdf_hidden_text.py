@@ -29,6 +29,14 @@ Two deliberate limits:
 import logging
 import re
 
+
+class HiddenTextInspectionError(RuntimeError):
+    """The hidden-text inspection itself failed (reader crash, odd PDF).
+
+    Distinct from "inspected and found nothing": a caller that treats the
+    two the same silently disables the prompt-injection defense.
+    """
+
 logger = logging.getLogger(__name__)
 
 # Below this, text is unreadable at any zoom the viewer offers.
@@ -96,8 +104,10 @@ def _span_is_unpainted(span: dict) -> bool:
 def hidden_text_fragments(pdf_path: str) -> list[str]:
     """Normalized text fragments *pdf_path* renders invisibly.
 
-    Never raises: a PDF we cannot inspect yields no fragments, which leaves
-    the extracted text exactly as the reader produced it.
+    Raises :class:`HiddenTextInspectionError` for a PDF it cannot inspect —
+    "no hidden text" and "could not look" must be distinct answers, or a
+    reader crash silently disables the scrub (see #811). ``scrub_pdf`` is the
+    catcher: it passes the text through unchanged and reports the failure.
     """
     try:
         import pymupdf
@@ -143,8 +153,13 @@ def hidden_text_fragments(pdf_path: str) -> list[str]:
                 hidden.extend(page_hidden)
                 visible.extend(page_visible)
     except Exception as e:
-        logger.warning("Hidden-text inspection failed for %s: %s", pdf_path, e)
-        return []
+        # Raised, not swallowed: returning [] here was indistinguishable from
+        # "inspected and clean", which silently disabled this module's whole
+        # purpose — the unscrubbed text, hidden content included, flowed
+        # straight through to chat, extraction and Deep Analysis.
+        raise HiddenTextInspectionError(
+            f"Hidden-text inspection failed for {pdf_path}: {e}"
+        ) from e
 
     visible_blob = " ".join(visible)
     fragments: list[str] = []
@@ -261,13 +276,27 @@ def scrub(
 
 
 def scrub_pdf(
-    pdf_path: str, text: str, markers: list[dict] | None = None
+    pdf_path: str, text: str, markers: list[dict] | None = None,
+    report: dict | None = None,
 ) -> tuple[str, list[dict]]:
-    """Strip whatever *pdf_path* hides from the text a reader extracted."""
+    """Strip whatever *pdf_path* hides from the text a reader extracted.
+
+    When the inspection itself fails, the text is returned unchanged — a
+    reader hiccup must not fail every odd-but-honest PDF — but the failure
+    is recorded in *report* as ``{"hidden_text_unchecked": True}`` so the
+    ingestion layer can mark the document instead of silently shipping text
+    the defense never looked at.
+    """
     markers = markers or []
     if not text:
         return text, markers
-    fragments = hidden_text_fragments(pdf_path)
+    try:
+        fragments = hidden_text_fragments(pdf_path)
+    except HiddenTextInspectionError as e:
+        logger.warning("%s — text passed through UNSCRUBBED", e)
+        if report is not None:
+            report["hidden_text_unchecked"] = True
+        return text, markers
     if not fragments:
         return text, markers
     scrubbed, adjusted = scrub(text, fragments, markers)

@@ -441,6 +441,7 @@ export function VerifiedCatalog() {
                       lastValidatedAt={item.last_validated_at}
                       isStale={item.last_validated_at ? (Date.now() - new Date(item.last_validated_at).getTime()) > 14 * 86400000 : false}
                       monitored={true}
+                      asserted={item.quality_asserted}
                     />
                     {item.created_at && (
                       <span className="text-xs text-gray-500">
