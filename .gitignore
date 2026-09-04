@@ -21,6 +21,11 @@ certs/
 env/
 venv/
 .venv/
+# Without the bare forms, a .venv *symlink* is not matched by the trailing-slash
+# rules above -- which is how an absolute symlink to one developer's checkout
+# got committed and would have landed a dangling path in every other clone.
+venv
+.venv
 dist/
 build/
 *.egg
