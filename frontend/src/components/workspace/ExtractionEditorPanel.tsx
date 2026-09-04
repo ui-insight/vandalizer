@@ -1352,9 +1352,10 @@ const SUPPORT_BADGES: Record<
   planted: {
     label: () => '⚠ planted text',
     title:
-      'This value was taken from text inside the document written as an instruction to the AI, ' +
-      'not from the document\'s own content — the technique used to plant a false value. ' +
-      'Click to read the passage, and check the value against the document itself',
+      'This value was quoted from a passage whose wording matches how instructions to ' +
+      'an AI are written — the technique used to plant a false value. That match is a ' +
+      'heuristic and legitimate text can trip it, so this is a prompt to check rather ' +
+      'than a verdict. Click to read the passage and compare it with the document',
     color: '#991b1b',
     background: '#fef2f2',
   },
@@ -1634,13 +1635,15 @@ function DesignTab({
           }}>
             <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} aria-hidden="true" />
             {plantedDocs.length === 1
-              ? 'This document contains instructions aimed at the AI'
-              : `${plantedDocs.length} of these documents contain instructions aimed at the AI`}
+              ? 'Wording in this document reads like instructions to an AI'
+              : `Wording in ${plantedDocs.length} of these documents reads like instructions to an AI`}
           </div>
           <div style={{ fontSize: 12, color: '#b91c1c', lineHeight: 1.5 }}>
-            {plantedDocs.join(', ')} carr{plantedDocs.length === 1 ? 'ies' : 'y'} text
-            written as instructions to the AI rather than as document content — the
-            technique used to plant a false value. Extraction reads a document as data
+            {plantedDocs.join(', ')} contain{plantedDocs.length === 1 ? 's' : ''} passages
+            worded the way instructions to an AI are worded rather than as document
+            content — the technique used to plant a false value. The match is a
+            heuristic: legitimate wording can trip it, so read the passage before
+            treating it as an attack. Extraction reads a document as data
             and does not follow instructions inside it, and a value drawn from such a
             passage is badged rather than cited, but check these results against the
             documents themselves.
