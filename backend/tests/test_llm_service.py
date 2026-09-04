@@ -231,6 +231,129 @@ class TestGoogleModelBuild:
         assert model.model_name == "gemini-2.5-pro"
 
 
+class TestVllmModelProfile:
+    """A vLLM-served model must be reported as supporting JSON-schema output
+    whatever it is named.
+
+    vLLM enforces ``response_format: {"type": "json_schema"}`` server-side via
+    guided decoding for every model it serves, so the capability belongs to the
+    server. The profile inherited from OpenRouter answers for the model
+    family's *own* hosted API instead: a HuggingFace-style name like
+    "Qwen/Qwen3-32B" routes to ``qwen_model_profile``, which leaves
+    ``supports_json_schema_output`` at its False default, and pydantic-ai then
+    refuses NativeOutput with "Native structured output is not supported by
+    this model." — every extraction against that model failed while the same
+    weights registered under the bare name "qwen3-32b" worked.
+    """
+
+    @pytest.mark.parametrize("model_name", [
+        "Qwen/Qwen3-32B",           # HuggingFace repo id, capitalised org
+        "qwen/qwen3-32b",           # lowercase — matches OpenRouter's family map
+        "RedHatAI/Qwen3-32B-FP8",   # quantised republish
+        "meta-llama/Llama-3.3-70B-Instruct",
+        "mistralai/Mistral-Small",
+        "qwen3-32b",                # bare name — worked before, must keep working
+        "gpt-oss-120b",
+    ])
+    def test_slash_named_models_support_json_schema_output(self, model_name):
+        provider = llm_service.VLLMProvider(
+            api_key="k", endpoint="http://inference.local:8000",
+        )
+        profile = provider.model_profile(model_name)
+        assert profile is not None
+        assert profile.supports_json_schema_output is True
+
+    def test_family_specific_profile_bits_survive(self):
+        """Overriding the capability flags must not discard the family's own
+        schema transformer — Qwen needs InlineDefs, not the OpenAI one."""
+        from pydantic_ai._json_schema import InlineDefsJsonSchemaTransformer
+
+        provider = llm_service.VLLMProvider(
+            api_key="k", endpoint="http://inference.local:8000",
+        )
+        profile = provider.model_profile("qwen/qwen3-32b")
+        assert profile.json_schema_transformer is InlineDefsJsonSchemaTransformer
+
+
+class TestModelSupportsStructuredOutput:
+    """The admin's per-model "supports structured output" toggle."""
+
+    def test_defaults_to_true_when_flag_absent(self):
+        cfg = _cfg(name="m")
+        assert llm_service.model_supports_structured_output("m", cfg) is True
+
+    def test_defaults_to_true_for_an_unknown_model(self):
+        cfg = _cfg(name="m")
+        assert llm_service.model_supports_structured_output("other", cfg) is True
+
+    def test_false_when_admin_turned_it_off(self):
+        cfg = _cfg(name="m", supports_structured=False)
+        assert llm_service.model_supports_structured_output("m", cfg) is False
+
+
+class TestUseNativeStructuredOutput:
+    """One decision, shared by the extraction engine and the admin Test button.
+
+    They must not drift: a diagnostic that reimplements the rule can pass on
+    exactly the configuration a real run fails on, which is how a broken
+    production model sat behind a green badge.
+    """
+
+    def _cfg_for(self, **fields):
+        fields.setdefault("name", "qwen3-32b")
+        fields.setdefault("endpoint", "http://inference.local:8000")
+        return {"available_models": [fields]}
+
+    def test_vllm_asks_for_native_output(self):
+        cfg = self._cfg_for(api_protocol="vllm")
+        assert llm_service.use_native_structured_output("qwen3-32b", cfg) is True
+
+    def test_other_protocols_do_not(self):
+        cfg = self._cfg_for(api_protocol="ollama")
+        assert llm_service.use_native_structured_output("qwen3-32b", cfg) is False
+
+    def test_admin_toggle_turns_it_off(self):
+        cfg = self._cfg_for(api_protocol="vllm", supports_structured=False)
+        assert llm_service.use_native_structured_output("qwen3-32b", cfg) is False
+
+
+class TestUnwrapModelBaseUrl:
+    """The URL an agent will actually dial, which is not the stored endpoint."""
+
+    def _cfg(self, **fields):
+        return {"available_models": [fields]}
+
+    def test_reading_base_url_off_the_wrapper_returns_nothing(self):
+        """Why the helper exists: ``base_url`` resolves as a property on the
+        wrapper classes themselves (defaulting to None on ``Model``) instead of
+        falling through ``WrapperModel.__getattr__`` to the provider."""
+        cfg = self._cfg(name="qwen3-32b", api_protocol="vllm",
+                        endpoint="http://inference.local:8000")
+        model = llm_service.get_agent_model("qwen3-32b", system_config_doc=cfg)
+        assert getattr(model, "base_url", None) is None
+
+    def test_vllm_appends_v1_to_the_stored_endpoint(self):
+        cfg = self._cfg(name="qwen3-32b", api_protocol="vllm",
+                        endpoint="http://inference.local:8000")
+        model = llm_service.get_agent_model("qwen3-32b", system_config_doc=cfg)
+        assert llm_service.unwrap_model_base_url(model).startswith(
+            "http://inference.local:8000/v1"
+        )
+
+    def test_external_openai_model_builds_and_reports_its_url(self):
+        """The "OpenAI" and "Custom" wizard presets both save external + the
+        openai protocol. That branch passed ``openai_client=`` to
+        ``OpenAIChatModel``, which takes only ``provider``/``profile``/
+        ``settings`` — so it raised TypeError before any request was made and
+        no test built a model to notice."""
+        cfg = self._cfg(name="gpt-4o", api_protocol="openai", external=True,
+                        endpoint="https://api.openai.com/v1")
+        model = llm_service.get_agent_model("gpt-4o", system_config_doc=cfg)
+        assert llm_service.unwrap_model_base_url(model).startswith(
+            "https://api.openai.com/v1"
+        )
+
+
 def test_supported_protocols_contains_all_branches():
     """Guard against the enum drifting away from the routing branches."""
     assert set(SUPPORTED_PROTOCOLS) == {"openai", "anthropic", "openrouter", "ollama", "vllm", "google"}

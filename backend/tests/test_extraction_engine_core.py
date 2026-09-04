@@ -824,6 +824,28 @@ class TestVllmStructuredOutputMode:
         assert not isinstance(output_type, NativeOutput)
         assert isinstance(output_type, type)
 
+    @patch("app.services.extraction_engine.Agent")
+    @patch("app.services.extraction_engine.get_agent_model")
+    def test_supports_structured_off_downgrades_native_output(self, mock_get_model, mock_agent_cls):
+        """The model editor's "supports structured output" toggle is the escape
+        hatch for a server that rejects schema-enforced output. It was written
+        by the editor and read by nothing here, so switching it off changed
+        nothing about the request — the run failed exactly as before."""
+        from pydantic_ai import NativeOutput
+
+        cfg = self._config("vllm")
+        cfg["available_models"][0]["supports_structured"] = False
+
+        mock_get_model.return_value = MagicMock()
+        mock_agent = MagicMock()
+        mock_agent.run_sync.return_value = _make_structured_result([{"Name": "Alice"}])
+        mock_agent_cls.return_value = mock_agent
+
+        engine = ExtractionEngine(system_config_doc=cfg)
+        engine.extract(extract_keys=["Name"], full_text="Alice.", model="local-model")
+
+        output_type = mock_agent_cls.call_args.kwargs["output_type"]
+        assert not isinstance(output_type, NativeOutput)
 
 class TestSkippedDocumentTracking:
     """A document that contributes zero entities because its content could not
