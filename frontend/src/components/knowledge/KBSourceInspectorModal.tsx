@@ -77,7 +77,15 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
   // can open it and it is still in storage. Before, the File view was offered
   // on existence alone and then rendered `{"detail":"File not found"}`.
   const fileStatus = docDeleted ? null : (detail?.document_file ?? null)
+  // A definite 'no_access' or 'missing' hides the toggle and says why. An
+  // *unknown* status does not: if the detail request is still in flight or
+  // failed, hiding the File view would take away a file that renders perfectly
+  // well — DocumentViewer fetches it independently and reports its own error.
+  // Hiding on absence would turn a slow or failed detail call into "this file
+  // does not exist", which is the failure this block is meant to prevent, in
+  // the other direction.
   const fileAvailable = fileStatus === 'available'
+    || (fileStatus === null && !docDeleted && isDoc && !!source.document_uuid)
   const fileUnavailableNote = fileStatus === 'no_access'
     ? 'the original file isn’t shared with you — the text below is what’s indexed'
     : fileStatus === 'missing'
