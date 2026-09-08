@@ -13,10 +13,12 @@ on 2026-05-07 are captured there and in `~/.claude/projects/.../memory/project_k
   surfaces an aggregate `tokens_used` consumed by `kb_optimizer` for accurate
   budget enforcement. Falls back to estimate when `usage()` is unavailable
   (e.g. test mocks). 7 new tests in `test_kb_validation_service.py`.
-- ✅ **Orphan-run janitor** — `tasks.passive.kb_optimization_janitor` beat-
-  scheduled hourly; reaps `KBOptimizationRun` docs in `queued`/`running`
-  status older than 3 hours (2× the optimizer's soft time limit). 5 new tests
-  in `test_kb_optimization_janitor.py`.
+- ✅ **Orphan-run janitor** — now `tasks.passive.optimization_janitor` (renamed
+  when generalized over all three optimizer run types), beat-scheduled hourly;
+  reaps `KBOptimizationRun` docs in `queued`/`running` status older than
+  3 hours (2× the optimizer's soft time limit), and delegates extraction and
+  workflow runs to their own `reap_one`. Tests in
+  `test_optimization_janitor.py`.
 - ✅ **Route integration tests for /optimize endpoints** — 13 new tests in
   `test_kb_optimization_routes.py` covering the 5 routes including the
   409 active-run conflict, budget validation, cross-KB 404, cancel idempotency,

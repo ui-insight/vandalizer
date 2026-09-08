@@ -706,30 +706,37 @@ class TestBuildWorkflowEngine:
             assert len(order) == 2, f"Failed for task type: {task_name}"
             assert len(order[1].tasks) == 1, f"No task created for: {task_name}"
 
-    def test_code_node_rejected_when_not_admin(self):
-        """CodeNode tasks are skipped when allow_code_execution is False."""
+    def test_code_node_rejected_when_not_admin_fails_the_build(self):
+        """A skipped CodeNode left an empty pass-through node and a run that
+        finished Completed minus a step the author asked for. The builder now
+        refuses so the run fails naming the step."""
+        from app.services.workflow_engine import WorkflowStepError
+
         steps = [
             {"name": "Document", "data": {"doc_uuids": ["u1"]}, "tasks": []},
             {"name": "Step", "data": {}, "tasks": [
                 {"name": "CodeNode", "data": {}}
             ]},
         ]
-        engine = build_workflow_engine(steps, model="gpt-4o", allow_code_execution=False)
-        order = engine.get_topological_order()
-        assert len(order) == 2
-        assert len(order[1].tasks) == 0  # CodeNode was rejected
+        with pytest.raises(WorkflowStepError) as exc:
+            build_workflow_engine(steps, model="gpt-4o", allow_code_execution=False)
+        assert "administrators" in str(exc.value)
+        assert "Step" in str(exc.value)
 
-    def test_unknown_task_type_skipped(self):
+    def test_unknown_task_type_fails_the_build(self):
+        """Same silent-green shape as the CodeNode skip: an unknown name means
+        a newer-version or corrupted definition, and must fail loudly."""
+        from app.services.workflow_engine import WorkflowStepError
+
         steps = [
             {"name": "Document", "data": {"doc_uuids": ["u1"]}, "tasks": []},
             {"name": "Step", "data": {}, "tasks": [
                 {"name": "NonexistentTaskType", "data": {}}
             ]},
         ]
-        engine = build_workflow_engine(steps, model="gpt-4o")
-        order = engine.get_topological_order()
-        assert len(order) == 2
-        assert len(order[1].tasks) == 0  # unknown task was skipped
+        with pytest.raises(WorkflowStepError) as exc:
+            build_workflow_engine(steps, model="gpt-4o")
+        assert "NonexistentTaskType" in str(exc.value)
 
     def test_model_propagated_to_tasks(self):
         steps = [
@@ -1111,3 +1118,150 @@ def test_truncation_in_one_task_does_not_taint_its_siblings():
 
     assert "warning" in truncated
     assert "warning" not in clean
+
+
+class TestBrowserTaskNameAlias:
+    def test_the_editors_browser_name_builds_the_automation_node(self):
+        """The editor's palette persists this task as 'Browser'; the builder
+        only knew 'BrowserAutomation', so every saved Browser Automation task
+        was silently skipped — and the new unknown-name refusal would have
+        turned those workflows into hard failures the editor cannot fix by
+        re-saving. Both names must build the node."""
+        from app.services.workflow_engine import BrowserAutomationNode
+
+        for name in ("Browser", "BrowserAutomation"):
+            steps = [
+                {"name": "Document", "data": {"doc_uuids": ["u1"]}, "tasks": []},
+                {"name": "Step", "data": {}, "tasks": [{"name": name, "data": {}}]},
+            ]
+            engine = build_workflow_engine(steps, model="gpt-4o")
+            order = engine.get_topological_order()
+            assert len(order[1].tasks) == 1, f"failed for {name}"
+            assert isinstance(order[1].tasks[0], BrowserAutomationNode)
+
+
+class TestFallbackRetrySkipsErroredSteps:
+    def test_error_shaped_output_is_not_retried(self):
+        """A step that REPORTED an error is deterministic — the engine is
+        about to halt the run on it; retrying with a fallback model re-ran
+        the node (paid calls included) to fail with the same message."""
+        from app.services.workflow_engine import _should_retry_with_fallback
+
+        node = MagicMock()
+        task = MagicMock()
+        task.data = {"_retry_on_empty": True, "_fallback_model": "other", "model": "m1"}
+        node.tasks = [task]
+        errored = {"output": "", "error": "Knowledge base lookup failed: down"}
+        assert _should_retry_with_fallback(node, errored) is False
+
+    def test_empty_output_still_retries(self):
+        from app.services.workflow_engine import _should_retry_with_fallback
+
+        node = MagicMock()
+        task = MagicMock()
+        task.data = {"_retry_on_empty": True, "_fallback_model": "other", "model": "m1"}
+        node.tasks = [task]
+        assert _should_retry_with_fallback(node, {"output": ""}) is True
+
+
+class TestBetweenStepsBudgetGate:
+    """#808: the budget gate ran only before the run started, so a workflow
+    beginning with one token of headroom executed every step and overran
+    arbitrarily. The engine now polls check_budget at step boundaries."""
+
+    def _two_step_engine(self):
+        steps = [
+            {"name": "Document", "data": {"doc_uuids": ["u1"]}, "tasks": []},
+            {"name": "StepA", "data": {}, "tasks": [{"name": "Prompt", "data": {"prompt": "a"}}]},
+            {"name": "StepB", "data": {}, "tasks": [{"name": "Prompt", "data": {"prompt": "b"}}]},
+        ]
+        return build_workflow_engine(steps, model="gpt-4o")
+
+    def test_budget_exception_stops_at_a_step_boundary(self):
+        from unittest.mock import patch
+
+        from app.exceptions import TrialBudgetExceededError
+
+        engine = self._two_step_engine()
+        calls = {"n": 0}
+
+        def check_budget():
+            calls["n"] += 1
+            raise TrialBudgetExceededError("trial budget exhausted")
+
+        with patch("app.services.workflow_engine.llm_chat_model", return_value="out"), \
+             pytest.raises(TrialBudgetExceededError):
+            engine.execute(check_budget=check_budget)
+        # The gate fired between steps — after the Document step ran, before
+        # a later step spent anything.
+        assert calls["n"] == 1
+
+    def test_gate_is_not_polled_before_the_first_step_of_a_pass(self):
+        """Entry-time checks (metered) already cover the first step; polling
+        again immediately would double-charge the same moment."""
+        from unittest.mock import MagicMock, patch
+
+        engine = self._two_step_engine()
+        check_budget = MagicMock()
+        with patch("app.services.workflow_engine.llm_chat_model", return_value="out"):
+            engine.execute(check_budget=check_budget)
+        # Three nodes -> polled for the 2nd and 3rd only.
+        assert check_budget.call_count == 2
+
+    def test_no_gate_means_no_calls(self):
+        from unittest.mock import patch
+
+        engine = self._two_step_engine()
+        with patch("app.services.workflow_engine.llm_chat_model", return_value="out"):
+            engine.execute()  # must not raise without check_budget
+
+
+class TestBudgetGateSeesInFlightSpend:
+    """The gate must count the RUN'S OWN spend. A scope's ledger row is
+    written by metering.flush_sync when the scope exits, so mid-run the
+    llm_usage aggregation still shows the pre-run total — a gate that
+    re-read only the ledger would see an unchanged number at every step
+    boundary and never trip, leaving #808 unfixed.
+    """
+
+    def _db(self, ledger_total, budget=1000):
+        from unittest.mock import MagicMock
+
+        db = MagicMock()
+        db.user.find_one.return_value = {
+            "is_demo_user": True, "email_verified": True,
+            "trial_token_budget": budget,
+        }
+        db.llm_usage.aggregate.return_value = [{"total": ledger_total}]
+        return db
+
+    def test_in_flight_tokens_push_the_run_over(self):
+        from unittest.mock import patch
+
+        from app.exceptions import TrialBudgetExceededError
+        from app.services import trial_budget
+
+        db = self._db(ledger_total=900, budget=1000)
+        # _budget() is the deployment default; it gates effective_budget, and
+        # is 0 (unenforced) in the test environment.
+        with patch.object(trial_budget, "_trial_system_on", return_value=True), \
+             patch.object(trial_budget, "_budget", return_value=1000), \
+             patch("app.tasks.get_sync_db", return_value=db), \
+             patch.object(trial_budget, "_fleet_paused_sync", return_value=False):
+            # Ledger alone is under budget — the old gate passed here forever.
+            trial_budget.check_sync("u1")
+            # With the run's own 150 in-flight tokens it is over.
+            with pytest.raises(TrialBudgetExceededError):
+                trial_budget.check_sync("u1", extra_used=150)
+
+    def test_extra_used_is_ignored_when_no_budget_is_set(self):
+        from unittest.mock import patch
+
+        from app.services import trial_budget
+
+        db = self._db(ledger_total=0, budget=0)
+        with patch.object(trial_budget, "_trial_system_on", return_value=True), \
+             patch.object(trial_budget, "_budget", return_value=0), \
+             patch("app.tasks.get_sync_db", return_value=db), \
+             patch.object(trial_budget, "_fleet_paused_sync", return_value=False):
+            trial_budget.check_sync("u1", extra_used=10**9)  # must not raise

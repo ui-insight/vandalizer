@@ -48,6 +48,9 @@ def _mock_db(
 
     db.workflow.find_one.return_value = workflow_doc
     db.workflow_result.find_one.side_effect = lambda *a, **kw: result_doc
+    # The pickup's delivery counter ($inc + read-back). A real int matters:
+    # it is compared against MAX_DELIVERY_ATTEMPTS.
+    db.workflow_result.find_one_and_update.return_value = {"delivery_attempts": 1}
     db.system_config.find_one.return_value = sys_config or {}
     db.approval_request.find_one.return_value = approval_doc
 
@@ -1679,3 +1682,273 @@ class TestBuildStepsDataFormFiller:
         _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
         mock_preload.assert_called_once()
         assert mock_preload.call_args.args[1]["template_document_uuid"] == "T"
+
+
+class TestBuildRefusalFailsTheRun:
+    """The builder now raises WorkflowStepError for definitions it cannot
+    honor (unknown task type, Code Execution for a non-admin) instead of
+    silently skipping the step. The build sits outside the main try, so the
+    task must catch the refusal and mark the run failed — otherwise the row
+    strands at "running" for the reaper (#805).
+    """
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_execute_marks_run_failed_with_the_builders_message(
+        self, mock_build, mock_get_db,
+    ):
+        from app.services.workflow_engine import WorkflowStepError
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "MysteryTask", "data": {}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_get_db.return_value = db
+        mock_build.side_effect = WorkflowStepError(
+            "Step1", "Step 'Step1' contains an unknown task type 'MysteryTask'.",
+        )
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": ["uuid1"]},
+            model="gpt-4o",
+        )
+
+        assert result["status"] == "error"
+        error_writes = [
+            c[0][1]["$set"] for c in db.workflow_result.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("status") == "error"
+        ]
+        assert error_writes, "run was not marked failed"
+        assert "MysteryTask" in error_writes[0]["error"]
+
+
+class TestLibrarySaveDeliveryFailure:
+    """#810: the finalize block swallowed a failed library write with a log
+    line — the run reported completed with its configured deliverable never
+    written. It must record the failure on the run and bell the launcher."""
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_completed_run_records_and_bells_the_undelivered_output(
+        self, mock_build, mock_get_db,
+    ):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+
+        workflow_doc = _make_workflow_doc(wf_id=wf_id, step_ids=[step_id])
+        workflow_doc["output_config"] = {
+            "storage": {"enabled": True, "destination_folder": "f-1"},
+        }
+        db = _mock_db(
+            workflow_doc=workflow_doc,
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "test"}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("Final output", [{"name": "Doc", "output": ["uuid1"]}])
+        mock_engine.usage = MagicMock(tokens_in=10, tokens_out=5)
+        mock_build.return_value = mock_engine
+
+        db.activity_event.find_one.return_value = {"user_id": "launcher-1"}
+        activity_id = str(_fake_oid())
+
+        with patch(
+            "app.services.output_handlers.save_results_to_folder",
+            side_effect=RuntimeError("destination folder deleted"),
+        ), patch(
+            "app.services.failure_notifications.notify_delivery_failed"
+        ) as notify, patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            result = execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+                activity_id=activity_id,
+            )
+
+        # The run still completes — results exist and are viewable...
+        assert result["status"] == "completed"
+        # ...but the failure is recorded on the run...
+        pushes = [
+            c for c in db.workflow_result.update_one.call_args_list
+            if "$push" in c[0][1] and "delivery_failures" in c[0][1]["$push"]
+        ]
+        assert pushes, "delivery failure was not recorded on the run"
+        assert "destination folder deleted" in pushes[0][0][1]["$push"]["delivery_failures"]
+        # ...and the bell goes to the LAUNCHER resolved from the activity
+        # rail, not just the workflow owner.
+        notify.assert_called_once()
+        assert "could not be saved" in notify.call_args.kwargs["detail"]
+        assert notify.call_args.kwargs["user_id"] == "launcher-1"
+
+
+class TestMidRunBudgetStop:
+    """#808: a TrialSpendBlockedError raised by the between-steps gate must
+    mark the run failed with the budget_exhausted payload — a clean stop, not
+    a retried crash."""
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_budget_stop_marks_run_error_with_payload(self, mock_build, mock_get_db):
+        from app.exceptions import TrialBudgetExceededError
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "test"}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.side_effect = TrialBudgetExceededError(
+            "Your trial's token budget is exhausted.",
+        )
+        mock_engine.usage = MagicMock(tokens_in=10, tokens_out=5)
+        mock_build.return_value = mock_engine
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": ["uuid1"]},
+            model="gpt-4o",
+        )
+
+        # Clean stop, no re-raise (no Celery retry of a budget error).
+        assert result["status"] == "error"
+        error_writes = [
+            c[0][1]["$set"] for c in db.workflow_result.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("status") == "error"
+        ]
+        assert error_writes
+        assert error_writes[0].get("error_payload", {}).get("code") == "budget_exhausted"
+        assert "budget" in error_writes[0]["error"]
+
+    def test_engine_receives_the_budget_hook(self):
+        """The wiring itself: execute() must be handed check_budget."""
+        from unittest.mock import MagicMock, patch
+
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "test"}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("out", [{"name": "Doc", "output": ["uuid1"]}])
+        mock_engine.usage = MagicMock(tokens_in=1, tokens_out=1)
+
+        with patch("app.tasks.workflow_tasks._get_db", return_value=db), \
+             patch("app.services.workflow_engine.build_workflow_engine", return_value=mock_engine), \
+             patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+            )
+        assert mock_engine.execute.call_args.kwargs.get("check_budget") is not None
+
+
+class TestBudgetHookPassesInFlightSpend:
+    """The hook the task hands the engine must report the live scope's
+    not-yet-flushed tokens; without that the ledger read is stale and the
+    gate never trips (the #808 bug, one layer down)."""
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_hook_reports_live_scope_tokens(self, mock_build, mock_get_db):
+        from unittest.mock import MagicMock, patch as _patch
+
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id = _fake_oid()
+        result_id = _fake_oid()
+        step_id = _fake_oid()
+        task_id = _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "Step1", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "t"}}],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
+        )
+        mock_get_db.return_value = db
+
+        captured = {}
+
+        def fake_execute(**kwargs):
+            # Simulate mid-run spend, then invoke the hook the way the engine
+            # does at a step boundary.
+            from app.services.metering import current_scope
+
+            scope = current_scope()
+            scope.tokens_in += 700
+            scope.tokens_out += 200
+            kwargs["check_budget"]()
+            return ("out", [{"name": "Doc", "output": ["uuid1"]}])
+
+        mock_engine = MagicMock()
+        mock_engine.execute.side_effect = fake_execute
+        mock_engine.usage = MagicMock(tokens_in=700, tokens_out=200)
+        mock_build.return_value = mock_engine
+
+        def fake_check_sync(user_id, *, extra_used=0):
+            captured["user_id"] = user_id
+            captured["extra_used"] = extra_used
+
+        with _patch("app.services.trial_budget.check_sync", side_effect=fake_check_sync), \
+             _patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             _patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+            )
+
+        assert captured["extra_used"] == 900, "hook did not report in-flight spend"
+
+    def test_unverified_account_gets_its_own_code(self):
+        """budget_exhausted was hardcoded for the whole TrialSpendBlockedError
+        family, offering a top-up for a problem a confirmation link solves."""
+        from app.exceptions import TrialBudgetExceededError, TrialUnverifiedError
+        from app.tasks.workflow_tasks import _spend_block_code
+
+        assert _spend_block_code(TrialUnverifiedError("confirm")) == "email_unverified"
+        assert _spend_block_code(TrialBudgetExceededError("spent")) == "budget_exhausted"

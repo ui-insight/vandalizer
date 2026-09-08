@@ -44,6 +44,12 @@ class WorkflowOptimizationRun(Document):
 
     cancel_requested: bool = False
 
+    # Celery task id of the optimize job, captured at enqueue so the reaper
+    # can revoke a still-queued task instead of letting it resurrect a doc
+    # already finalized as abandoned. Mirrors ExtractionOptimizationRun.
+    # None for runs created before this field existed.
+    celery_task_id: Optional[str] = None
+
     phase: str = "queued"
     progress_message: str = ""
     current_trial_index: int = 0

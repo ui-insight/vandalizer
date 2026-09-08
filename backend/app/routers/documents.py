@@ -113,6 +113,11 @@ async def search_documents(
             "token_count": doc.token_count,
             "extraction_low_quality": document_service.is_extraction_low_quality(doc),
             "ingestion_warnings": document_service.ingestion_warnings(doc),
+            # The human sentence, composed by the same registry that owns the
+            # codes. Serving it keeps the words in one place — a second copy
+            # of the map in TypeScript is exactly the drift the registry's
+            # own comment warns about (#803).
+            "ingestion_warning_text": document_service.ingestion_warning_text(doc),
         })
 
     return {"items": items, "total": len(items)}

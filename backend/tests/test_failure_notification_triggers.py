@@ -315,3 +315,264 @@ class TestProcessOutputsOnFailedRun:
 
         save.assert_called_once()
         chain.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Delivery failures (#810): a completed run whose outputs never left the
+# building must record and disclose that, not report clean success.
+# ---------------------------------------------------------------------------
+
+
+class TestExtractionOutputDeliveryFailures:
+    def _run(self, *, storage_fails=False, webhook_fails=False, notification_fails=False):
+        import app.tasks.document_tasks as dt
+
+        db = MagicMock()
+        automation = {
+            "_id": ObjectId(), "name": "Nightly extract", "user_id": "owner",
+            "trigger_type": "folder_watch",
+            "output_config": {
+                "storage": {"enabled": True},
+                "notifications": [{"channel": "teams", "recipients": ["x"]}],
+                "webhooks": [{"url": "https://example.org/hook"}],
+            },
+        }
+        with patch(
+            "app.services.output_handlers.save_extraction_results_to_folder",
+            side_effect=RuntimeError("folder gone") if storage_fails else MagicMock(),
+        ), patch(
+            "app.services.output_handlers.call_webhook",
+            side_effect=RuntimeError("410 Gone") if webhook_fails else MagicMock(),
+        ), patch(
+            "app.services.output_handlers.should_send_notification",
+            return_value=True,
+        ), patch(
+            "app.services.output_handlers.send_workflow_notification",
+            side_effect=RuntimeError("teams 403") if notification_fails else MagicMock(),
+        ), patch(
+            "app.services.failure_notifications.notify_delivery_failed"
+        ) as notify:
+            dt._process_extraction_outputs(db, automation, {"F": "v"})
+        return notify
+
+    def test_all_outputs_delivering_rings_nothing(self):
+        notify = self._run()
+        notify.assert_not_called()
+
+    def test_failed_outputs_are_collected_and_belled_once_as_delivery(self):
+        """delivery_failed, not automation_failed: the extraction RAN, and
+        coalescing onto the genuine-failure key would overwrite an unread
+        real dispatch failure's detail."""
+        notify = self._run(storage_fails=True, webhook_fails=True)
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        assert kwargs["automation"]["name"] == "Nightly extract"
+        assert "2 configured output(s)" in kwargs["detail"]
+        assert "folder gone" in kwargs["detail"]
+        assert "410 Gone" in kwargs["detail"]
+
+    def test_notification_failures_name_the_channel(self):
+        """The config key is 'channel' (what the editor writes); reading a
+        nonexistent 'type' key rendered every line as '(configured)'."""
+        notify = self._run(notification_fails=True)
+        assert "notification (teams)" in notify.call_args.kwargs["detail"]
+
+    def test_one_failed_output_does_not_block_the_others(self):
+        """Storage failing must not stop the webhook attempt (and vice versa) —
+        collection, not early exit."""
+        import app.tasks.document_tasks as dt
+
+        db = MagicMock()
+        automation = {
+            "_id": ObjectId(), "name": "A", "user_id": "owner",
+            "output_config": {
+                "storage": {"enabled": True},
+                "webhooks": [{"url": "https://example.org/hook"}],
+            },
+        }
+        webhook = MagicMock()
+        with patch(
+            "app.services.output_handlers.save_extraction_results_to_folder",
+            side_effect=RuntimeError("boom"),
+        ), patch("app.services.output_handlers.call_webhook", webhook), \
+             patch("app.services.output_handlers.should_send_notification", return_value=False), \
+             patch("app.services.failure_notifications.notify_automation_failed"):
+            dt._process_extraction_outputs(db, automation, {"F": "v"})
+        webhook.assert_called_once()
+
+
+class TestNotifyDeliveryFailed:
+    def test_emitter_contract(self):
+        from app.services.failure_notifications import notify_delivery_failed
+
+        db = MagicMock()
+        workflow_doc = {"_id": ObjectId(), "name": "WF", "user_id": "owner"}
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_delivery_failed(
+                db, workflow_doc=workflow_doc,
+                detail="The output could not be saved", user_id="runner",
+            )
+        kwargs = create.call_args.kwargs
+        assert kwargs["user_id"] == "runner"  # launcher wins over owner
+        assert kwargs["kind"] == "delivery_failed"
+        assert "Output not delivered" in kwargs["title"]
+        assert "could not be saved" in kwargs["body"]
+
+    def test_falls_back_to_the_workflow_owner(self):
+        from app.services.failure_notifications import notify_delivery_failed
+
+        db = MagicMock()
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_delivery_failed(
+                db, workflow_doc={"_id": ObjectId(), "name": "W", "user_id": "owner"},
+                detail="d",
+            )
+        assert create.call_args.kwargs["user_id"] == "owner"
+
+# The four notify-nobody paths from #809
+# ---------------------------------------------------------------------------
+
+
+class TestKbSourceIngestFailure:
+    def _run(self, exc):
+        """Finality is controlled by the error type: a non-transient error is
+        final on the first attempt; a transient one with retry budget left is
+        mid-retry (the direct call runs with retries=0)."""
+        from celery.exceptions import Retry
+
+        import app.tasks.knowledge_base_tasks as kbt
+
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = {
+            "uuid": "src-1", "knowledge_base_uuid": "kb-1",
+            "source_type": "document", "document_uuid": "d1",
+            "custom_name": "Award letter",
+        }
+        db.smart_document.find_one.return_value = {
+            "uuid": "d1", "raw_text": "text", "processing": False,
+            "task_status": "complete", "title": "Award letter",
+        }
+        with patch.object(kbt, "_get_db", return_value=db), \
+             patch("app.services.document_manager.get_document_manager") as dm, \
+             patch("app.services.failure_notifications.notify_kb_source_failed") as notify:
+            dm.return_value.add_to_kb.side_effect = exc
+            try:
+                kbt.kb_ingest_document("src-1")
+            except (type(exc), Retry):
+                pass
+        return db, notify
+
+    def test_owner_is_belled_on_a_final_failure(self):
+        db, notify = self._run(RuntimeError("chroma exploded"))
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        assert kwargs["kb_uuid"] == "kb-1"
+        assert kwargs["source_name"] == "Award letter"
+        # The source is still marked errored.
+        err_writes = [
+            c for c in db.knowledge_base_sources.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("status") == "error"
+        ]
+        assert err_writes
+
+    def test_mid_retry_transient_failure_rings_nothing(self):
+        _, notify = self._run(ConnectionError("redis blip"))
+        notify.assert_not_called()
+
+
+class TestSemanticIngestionFailure:
+    def _run(self, exc):
+        from celery.exceptions import Retry
+
+        import app.tasks.document_tasks as dt
+
+        db = MagicMock()
+        doc = {"uuid": "d1", "title": "Budget.xlsx", "user_id": "u1",
+               "path": "p", "text_markers": []}
+        db.smart_document.find_one.return_value = doc
+        with patch.object(dt, "get_sync_db", return_value=db), \
+             patch("app.services.document_manager.DocumentManager") as dm_cls, \
+             patch("app.services.failure_notifications.notify_document_not_searchable") as notify:
+            dm_cls.return_value.add_document.side_effect = exc
+            try:
+                dt.perform_semantic_ingestion("text", "d1", "u1")
+            except (type(exc), Retry):
+                pass
+        return notify
+
+    def test_owner_is_belled_on_a_final_failure(self):
+        notify = self._run(RuntimeError("chroma down"))
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["doc"]["uuid"] == "d1"
+
+    def test_mid_retry_transient_failure_rings_nothing(self):
+        notify = self._run(ConnectionError("chroma blip"))
+        notify.assert_not_called()
+
+
+class TestFolderWatchWorkflowDispatchFailure:
+    def test_owner_is_belled_and_siblings_still_run(self):
+        import app.tasks.document_tasks as dt
+
+        db = MagicMock()
+        db.smart_document.find_one.return_value = {
+            "uuid": "d1", "folder": "f1", "title": "Doc", "extension": "pdf",
+        }
+        broken = {"_id": ObjectId(), "name": "Broken", "enabled": True,
+                  "action_type": "workflow", "action_id": str(ObjectId()),
+                  "trigger_config": {}, "user_id": "auto-owner"}
+        healthy = {"_id": ObjectId(), "name": "Healthy", "enabled": True,
+                   "action_type": "workflow", "action_id": str(ObjectId()),
+                   "trigger_config": {}, "user_id": "auto-owner"}
+        db.automation.find.return_value = [broken, healthy]
+        db.workflow.find_one.return_value = {"_id": ObjectId(), "user_id": "u"}
+
+        calls = []
+
+        def trigger(workflow_doc, doc, automation_id, automation_name):
+            if automation_name == "Broken":
+                raise RuntimeError("trigger table down")
+            calls.append(automation_name)
+            return {"_id": ObjectId()}
+
+        with patch(
+            "app.services.passive_triggers.create_folder_watch_trigger",
+            side_effect=trigger,
+        ), patch(
+            "app.services.failure_notifications.notify_automation_failed"
+        ) as notify:
+            dt._check_folder_watch_automations(db, "d1")
+
+        # The broken automation belled its owner...
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["automation"]["name"] == "Broken"
+        # ...and did not stop its sibling from dispatching.
+        assert calls == ["Healthy"]
+
+
+class TestProjectKbMirrorFailure:
+    def test_owner_is_belled_and_nothing_raises(self):
+        import app.tasks.document_tasks as dt
+
+        db = MagicMock()
+        dm = MagicMock()
+        dm.add_to_kb.side_effect = RuntimeError("chroma collection gone")
+        db.knowledge_base_sources.find_one.return_value = None  # not deduped
+        with patch.object(dt, "_find_project_for_folder", return_value={
+            "uuid": "p1", "title": "NSF Renewal",
+            "owner_user_id": "p-owner", "kb_uuid": "kb-p1",
+        }), patch(
+            "app.services.failure_notifications.notify_project_kb_sync_failed"
+        ) as notify:
+            # Must not raise — best-effort by design, but never silently.
+            dt._ingest_into_project_kb(
+                db, dm, {"uuid": "d1", "title": "Doc", "user_id": "u1", "folder": "f1"},
+                "text",
+            )
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["project"]["uuid"] == "p1"
+        assert notify.call_args.kwargs["doc"]["uuid"] == "d1"

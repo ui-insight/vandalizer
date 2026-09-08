@@ -270,13 +270,17 @@ async def _optimize_kb_async(
 # ---------------------------------------------------------------------------
 # Orphan-run janitor
 #
-# If a worker crashes mid-run, the KBOptimizationRun document is left in
-# status="running" forever — which both confuses the UI (perpetual progress
-# spinner) and blocks new optimizations on the same KB (POST /optimize returns
-# 409 because an "active" run already exists). This task scans for
-# stuck-in-running docs and marks them failed.
+# If a worker crashes mid-run (or is SIGKILLed at the hard time limit), an
+# optimization run document is left in status="running" forever — which both
+# confuses the UI (perpetual progress spinner) and blocks new optimizations on
+# the same subject (the start paths return 409 because an "active" run already
+# exists). This task sweeps all three optimizer run collections — KB,
+# workflow, extraction — and marks stuck docs failed. Extraction also reaps
+# on start and from its read endpoints, and workflow reaps on start; the
+# janitor adds the time dimension so a run nobody polls or restarts still
+# heals instead of spinning until someone edits the database.
 #
-# 2× the optimize_kb_task soft_time_limit (5400s) is the cutoff. Anything
+# 2× the optimizer tasks' soft_time_limit (5400s) is the cutoff. Anything
 # older than that hasn't legitimately been running this whole time — the
 # worker would have raised SoftTimeLimitExceeded and we'd see status="failed"
 # already. So 3h is a safe floor.
@@ -288,17 +292,17 @@ ORPHAN_RUN_AGE_SECONDS = 5400 * 2  # 3 hours
 
 @celery.task(
     bind=True,
-    name="tasks.passive.kb_optimization_janitor",
+    name="tasks.passive.optimization_janitor",
     autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,
     max_retries=2,
 )
-def kb_optimization_janitor(self):
-    """Hourly: mark abandoned KB optimization runs as failed."""
-    return _run_async(_kb_optimization_janitor_async())
+def optimization_janitor(self):
+    """Hourly: mark abandoned KB/workflow/extraction optimization runs failed."""
+    return _run_async(_optimization_janitor_async())
 
 
-async def _kb_optimization_janitor_async() -> dict:
+async def _optimization_janitor_async() -> dict:
     import datetime as _dt
     from app.config import Settings
     from app.database import init_db
@@ -306,22 +310,27 @@ async def _kb_optimization_janitor_async() -> dict:
     await init_db(Settings())
 
     from app.models.kb_optimization_run import KBOptimizationRun
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
 
     cutoff = _dt.datetime.now(tz=_dt.timezone.utc) - _dt.timedelta(seconds=ORPHAN_RUN_AGE_SECONDS)
-    # Find runs that look stuck. We match status in {queued, running} so a
-    # never-picked-up run (broker dropped the task) is also recovered.
+    reaped = 0
+    scanned = 0
+
+    # KB runs are finalized inline: no Celery task id on the doc to revoke,
+    # so finalizing it is the whole job. The query matches status in
+    # {queued, running} so a never-picked-up run (broker dropped the task)
+    # is also recovered.
     stuck = await KBOptimizationRun.find(
         {"status": {"$in": ["queued", "running"]}, "started_at": {"$lt": cutoff}},
     ).to_list()
-
-    reaped = 0
+    scanned += len(stuck)
     for run in stuck:
         run.status = "failed"
         run.phase = "failed"
         run.error_message = (
             "Optimization run abandoned — worker crashed or exceeded the "
             f"{ORPHAN_RUN_AGE_SECONDS // 60}-minute soft cap. Run was reaped "
-            "by tasks.passive.kb_optimization_janitor."
+            "by tasks.passive.optimization_janitor."
         )
         run.completed_at = _dt.datetime.now(tz=_dt.timezone.utc)
         try:
@@ -329,9 +338,34 @@ async def _kb_optimization_janitor_async() -> dict:
             reaped += 1
         except Exception as e:  # pragma: no cover — defensive
             logger.warning("Janitor could not save run %s: %s", run.uuid, e)
+
+    # Extraction and workflow runs each have their own reap_one — both revoke
+    # the run's Celery task (so a still-queued copy can't resurrect the doc)
+    # and honor a user-requested cancel — so delegate rather than duplicate
+    # the finalization write in a second place. reap_one no-ops on a run
+    # young enough to still be legitimately executing.
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services import extraction_optimizer, workflow_optimizer
+
+    for model_cls, reap_one in (
+        (ExtractionOptimizationRun, extraction_optimizer.reap_one),
+        (WorkflowOptimizationRun, workflow_optimizer.reap_one),
+    ):
+        candidates = await model_cls.find(
+            {"status": {"$in": ["queued", "running"]}},
+        ).to_list()
+        scanned += len(candidates)
+        for run in candidates:
+            try:
+                updated = await reap_one(run)
+                if updated is not None and updated.status not in ("queued", "running"):
+                    reaped += 1
+            except Exception as e:  # pragma: no cover — defensive
+                logger.warning("Janitor could not reap run %s: %s", run.uuid, e)
+
     if reaped:
-        logger.info("KB optimization janitor reaped %d orphan run(s)", reaped)
-    return {"reaped": reaped, "scanned": len(stuck)}
+        logger.info("Optimization janitor reaped %d orphan run(s)", reaped)
+    return {"reaped": reaped, "scanned": scanned}
 
 
 # ---------------------------------------------------------------------------

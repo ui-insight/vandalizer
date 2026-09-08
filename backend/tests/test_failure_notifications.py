@@ -242,3 +242,95 @@ class TestNotifyAutomationFailed:
             )
 
         assert create.call_args.kwargs["body"] == "No error detail was recorded."
+
+
+# ---------------------------------------------------------------------------
+# notify_kb_source_failed / notify_project_kb_sync_failed (#809)
+# ---------------------------------------------------------------------------
+
+
+class TestNotifyKbSourceFailed:
+    def test_notifies_the_kb_owner_with_a_deep_link(self):
+        from app.services.failure_notifications import notify_kb_source_failed
+
+        db = MagicMock()
+        db.knowledge_bases.find_one.return_value = {"title": "PAPPG", "user_id": "owner-1"}
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_kb_source_failed(
+                db, kb_uuid="kb-1", source_name="nsf.gov/pappg",
+                error=RuntimeError("embed service down"),
+            )
+        kwargs = create.call_args.kwargs
+        assert kwargs["user_id"] == "owner-1"
+        assert kwargs["kind"] == "kb_source_failed"
+        assert "PAPPG" in kwargs["title"]
+        assert "nsf.gov/pappg" in kwargs["body"]
+        # NOT /?kb=… — the frontend's kb-param handler force-routes that
+        # into chat mode; plain mode=knowledge lands on the knowledge screen.
+        assert kwargs["link"] == "/?mode=knowledge"
+        assert kwargs["coalesce_key"] == "kb_source_failed:kb-1"
+
+    def test_missing_kb_or_owner_means_no_notification(self):
+        from app.services.failure_notifications import notify_kb_source_failed
+
+        db = MagicMock()
+        db.knowledge_bases.find_one.return_value = None
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_kb_source_failed(db, kb_uuid="gone", source_name="x", error="e")
+        create.assert_not_called()
+
+    def test_never_raises_when_the_lookup_fails(self):
+        from app.services.failure_notifications import notify_kb_source_failed
+
+        db = MagicMock()
+        db.knowledge_bases.find_one.side_effect = RuntimeError("db down")
+        notify_kb_source_failed(db, kb_uuid="kb-1", source_name="x", error="e")
+
+
+class TestNotifyProjectKbSyncFailed:
+    def test_notifies_the_document_owner_naming_both_sides(self):
+        from app.services.failure_notifications import notify_project_kb_sync_failed
+
+        db = MagicMock()
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_project_kb_sync_failed(
+                db,
+                doc={"uuid": "d1", "title": "Budget.xlsx", "user_id": "u1"},
+                project={"uuid": "p1", "title": "NSF Renewal", "owner_user_id": "p-owner"},
+                error=RuntimeError("chroma down"),
+            )
+        kwargs = create.call_args.kwargs
+        assert kwargs["user_id"] == "u1"  # doc owner wins
+        assert "NSF Renewal" in kwargs["title"]
+        assert "Budget.xlsx" in kwargs["body"]
+        assert "will not" in kwargs["body"]
+
+    def test_falls_back_to_the_project_owner(self):
+        from app.services.failure_notifications import notify_project_kb_sync_failed
+
+        db = MagicMock()
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_project_kb_sync_failed(
+                db, doc={"uuid": "d1"},
+                project={"uuid": "p1", "title": "P", "owner_user_id": "p-owner"},
+                error="e",
+            )
+        assert create.call_args.kwargs["user_id"] == "p-owner"
+
+    def test_no_recipient_means_no_notification(self):
+        from app.services.failure_notifications import notify_project_kb_sync_failed
+
+        db = MagicMock()
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_project_kb_sync_failed(db, doc={}, project={}, error="e")
+        create.assert_not_called()

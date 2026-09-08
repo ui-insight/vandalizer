@@ -226,6 +226,11 @@ class TestCeleryEagerDispatch:
             "_id": wr_oid,
             "status": "running",
         }
+        # The pickup's delivery counter ($inc + read-back) needs a real int —
+        # it is compared against MAX_DELIVERY_ATTEMPTS.
+        mock_db.workflow_result.find_one_and_update.return_value = {
+            "delivery_attempts": 1,
+        }
         mock_db.system_config.find_one.return_value = {}
 
         mock_engine = MagicMock()

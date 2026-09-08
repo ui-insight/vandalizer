@@ -171,10 +171,18 @@ async def start_workflow_optimization(
 ) -> WorkflowOptimizationRun:
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
 
+    from app.services.workflow_optimizer import reap_stale_runs
+
     if token_budget < 0:
         raise OptimizationActionError("bad_budget", "token_budget must be >= 0")
     if max_candidates < 1 or max_candidates > 50:
         raise OptimizationActionError("bad_candidates", "max_candidates must be in [1, 50]")
+
+    # Recover any orphaned run first so a dead worker's "running" doc can't
+    # permanently block new runs via the active check below - the same sweep
+    # start_extraction_optimization does. Lives here (not only in the router)
+    # so every caller of this service gets it.
+    await reap_stale_runs(workflow_id)
 
     active = await WorkflowOptimizationRun.find_one(
         WorkflowOptimizationRun.workflow_id == workflow_id,
@@ -202,10 +210,14 @@ async def start_workflow_optimization(
     await run.insert()
 
     from app.tasks.workflow_optimization_tasks import optimize_workflow_task
-    optimize_workflow_task.delay(
+    async_result = optimize_workflow_task.delay(
         workflow_id, user_id, run.uuid,
         token_budget, apply_on_finish, max_candidates, include_judge,
     )
+    # Stored so the reaper can revoke a still-queued task rather than let it
+    # resurrect a doc already finalized as abandoned (same as extraction).
+    run.celery_task_id = async_result.id
+    await run.save()
     return run
 
 

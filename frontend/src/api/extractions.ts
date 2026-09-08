@@ -177,6 +177,15 @@ export interface CrossFieldRunReport {
   summary: CrossFieldSummary
 }
 
+/** A caveat about one document the run read. `text` is the human sentence,
+ * composed backend-side from `codes` by the registry that owns them. */
+export interface DocumentWarning {
+  document_uuid: string
+  title: string
+  codes: string[]
+  text?: string
+}
+
 export function runExtractionSync(data: {
   search_set_uuid: string
   document_uuids: string[]
@@ -197,6 +206,10 @@ export function runExtractionSync(data: {
      * is the merged-values report, which on a multi-document run describes the
      * last document only — read this instead when showing one set. */
     cross_field_sets?: (CrossFieldRunReport | null)[]
+    /** Per-document caveats about the INPUT this run read: text that is
+     * partial, garbled, or absent entirely. Empty means every selected
+     * document was read whole — never "not checked". */
+    document_warnings?: DocumentWarning[]
     error?: string
   }>('/api/extractions/run-sync', {
     method: 'POST',

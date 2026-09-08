@@ -125,6 +125,19 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             >
               <AlertCircle className="h-4 w-4 text-amber-500" />
             </span>
+          ) : doc.ingestion_warning_text ? (
+            // Computed, stored and API-served since partial-OCR disclosure
+            // shipped, but never rendered: a 400-page package whose OCR gave
+            // up at page 30 showed as a clean, unmarked row (#803). The words
+            // come from the backend so the code→text map lives in one place.
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label={`This document was ingested with a caveat: ${doc.ingestion_warning_text}. Answers about it may be incomplete.`}
+              title={`This document was ingested with a caveat: ${doc.ingestion_warning_text}. Answers about it may be incomplete.`}
+            >
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+            </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
