@@ -32,4 +32,16 @@ describe('QualityBadge', () => {
     render(<QualityBadge tier="excellent" score={92.7} />)
     expect(screen.getByText('Quality: Excellent (93%)')).toBeTruthy()
   })
+
+  it('replaces the tier with the pending-review state after a regression', () => {
+    render(<QualityBadge tier="excellent" score={95} regressionPending />)
+    expect(screen.getByText('Regression pending review')).toBeTruthy()
+    expect(screen.queryByText('Quality: Excellent (95%)')).toBeNull()
+  })
+
+  it('explains the pending-review state on hover', () => {
+    render(<QualityBadge tier="good" score={70} regressionPending title="ignored" />)
+    const badge = screen.getByText('Regression pending review')
+    expect(badge.getAttribute('title')).toContain('no longer applies')
+  })
 })

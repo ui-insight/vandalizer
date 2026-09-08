@@ -290,6 +290,7 @@ def _mock_source(**overrides):
     s.uuid = overrides.get("uuid", "src-uuid-1")
     s.source_type = overrides.get("source_type", "document")
     s.document_uuid = overrides.get("document_uuid", "doc-1")
+    s.document_title = overrides.get("document_title", None)
     s.url = overrides.get("url", None)
     s.url_title = overrides.get("url_title", None)
     s.custom_name = overrides.get("custom_name", None)
@@ -2029,6 +2030,7 @@ def _make_source(uuid="s1", source_type="document"):
     s.uuid = uuid
     s.source_type = source_type
     s.document_uuid = "doc1" if source_type == "document" else None
+    s.document_title = None
     s.url = None if source_type == "document" else "https://www.uidaho.edu/apm/45"
     s.url_title = None
     s.custom_name = "My label"

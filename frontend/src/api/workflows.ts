@@ -675,6 +675,8 @@ export interface WorkflowQualityStatus {
   stale: boolean
   config_changed: boolean
   last_validated_at: string | null
+  /** Monitoring found a regression here and nobody has reviewed it yet. */
+  regression_pending_review?: boolean
 }
 
 export function getWorkflowQualityStatus(workflowId: string) {

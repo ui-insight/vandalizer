@@ -14,9 +14,22 @@ from pydantic_ai import Agent
 from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.services.document_manager import DocumentManager, get_document_manager
+from app.services.extraction_judge import JUDGE_UNAVAILABLE
 from app.services.llm_service import RAG_SYSTEM_PROMPT, capture_truncation, get_agent_model
 
 logger = logging.getLogger(__name__)
+
+
+def _judge_measured(judge: dict | None) -> bool:
+    """True when a judge block carries a real measurement.
+
+    A judge outage, a per-query failure and an early-stopped trial all produce
+    a judge block with no score. Averaging those as 0.0 is how a provider blip
+    read as "every answer in this knowledge base is wrong" — and, once quality
+    regressions notify their owner, how it would have emailed every one of them.
+    Absence of a measurement is not a measurement of zero.
+    """
+    return bool(judge) and judge.get("score") is not None
 
 
 # Module-level agent cache. Key: (purpose, model_name); value: (event_loop, agent).
@@ -823,9 +836,13 @@ async def _judge_answer(
         tokens = _usage_tokens(run)
     except Exception as e:
         logger.exception("KB judge call failed: %s", e)
+        # Not a measurement saying the answer is bad — a measurement that could
+        # not be taken. Scored 0.0 it averaged into the knowledge base's quality
+        # score, so one provider outage read as "every answer is wrong" and
+        # collapsed the score of every KB validated while it lasted.
         return {
-            "score": 0.0,
-            "verdict": "WARN",
+            "score": None,
+            "verdict": JUDGE_UNAVAILABLE,
             "confidence": 0.0,
             "reasoning": f"judge error: {str(e)[:200]}",
             "evidence": "",
@@ -941,11 +958,12 @@ async def judge_test_queries(
                         retrieved_context=None,
                         category=getattr(tq, "category", None),
                     )
-                    lift = with_judge["score"] - baseline_judge["score"]
+                    if _judge_measured(with_judge) and _judge_measured(baseline_judge):
+                        lift = with_judge["score"] - baseline_judge["score"]
 
                 discrimination = _classify_discrimination(
-                    with_judge["score"],
-                    baseline_judge["score"] if baseline_judge else None,
+                    with_judge["score"] if _judge_measured(with_judge) else None,
+                    baseline_judge["score"] if _judge_measured(baseline_judge) else None,
                 )
 
                 tokens_used = (
@@ -990,7 +1008,11 @@ async def judge_test_queries(
                     "actual_answer": "",
                     "baseline_answer": None,
                     "judge": {
-                        "score": 0.0,
+                        # Keeps the accurate label — this catches a retrieval
+                        # failure as readily as a judge one — while the missing
+                        # score keeps it out of every average. Whichever half
+                        # broke, we did not measure this query.
+                        "score": None,
                         "verdict": "SKIPPED",
                         "confidence": 0.0,
                         "reasoning": f"per-query failure: {str(e)[:200]}",
@@ -1031,7 +1053,8 @@ async def judge_test_queries(
                 pending.discard(getattr(result, "_task", None))  # best-effort
                 partial_scores = [
                     r["judge"]["score"] for r in judged_results
-                    if r.get("judge") and r["judge"].get("verdict") != "SKIPPED"
+                    if _judge_measured(r.get("judge"))
+                    and r["judge"].get("verdict") != "SKIPPED"
                 ]
                 try:
                     should_stop = bool(early_stop_callback(partial_scores))
@@ -1065,7 +1088,7 @@ async def judge_test_queries(
                     "actual_answer": "",
                     "baseline_answer": None,
                     "judge": {
-                        "score": 0.0,
+                        "score": None,
                         "verdict": "SKIPPED",
                         "confidence": 0.0,
                         "reasoning": "early-stop: trial cancelled below baseline",
@@ -1087,7 +1110,9 @@ async def judge_test_queries(
     by_uuid = {r.get("query_uuid"): r for r in judged_results}
     for tq in judgeable:
         jr = by_uuid.get(getattr(tq, "uuid", ""))
-        if not jr or not jr.get("judge") or jr["judge"].get("verdict") == "SKIPPED":
+        if not _judge_measured(jr.get("judge") if jr else None):
+            continue
+        if jr["judge"].get("verdict") == "SKIPPED":
             continue
         try:
             tq.last_judged_score = float(jr["judge"]["score"])
@@ -1112,10 +1137,12 @@ async def judge_test_queries(
         })
 
     # Aggregates.
-    judged_scores = [r["judge"]["score"] for r in judged_results if r["judge"] is not None]
+    judged_scores = [
+        r["judge"]["score"] for r in judged_results if _judge_measured(r["judge"])
+    ]
     baseline_scores = [
         r["baseline_judge"]["score"] for r in judged_results
-        if r["baseline_judge"] is not None
+        if _judge_measured(r["baseline_judge"])
     ]
     avg_judge_score = sum(judged_scores) / len(judged_scores) if judged_scores else None
     avg_baseline_score = sum(baseline_scores) / len(baseline_scores) if baseline_scores else None
@@ -1206,7 +1233,10 @@ async def judge_baselines_only(
                 }
 
     results = await asyncio.gather(*(one(tq) for tq in judgeable))
-    scores = [r["baseline_judge"]["score"] for r in results if r["baseline_judge"] is not None]
+    scores = [
+        r["baseline_judge"]["score"] for r in results
+        if _judge_measured(r["baseline_judge"])
+    ]
     avg = sum(scores) / len(scores) if scores else None
     return {
         "avg_baseline_score": avg,
@@ -1262,7 +1292,9 @@ async def _sample_judge_variance_detailed(
     # can't re-judge (no judge result, SKIPPED, no expected_answer).
     samples: list[tuple[dict, object]] = []
     for d in judged_details:
-        if not d.get("judge") or d["judge"].get("verdict") == "SKIPPED":
+        if not _judge_measured(d.get("judge")):
+            continue
+        if d["judge"].get("verdict") == "SKIPPED":
             continue
         tq = test_queries_by_uuid.get(d["query_uuid"])
         if not tq or not getattr(tq, "expected_answer", None):
@@ -1278,6 +1310,8 @@ async def _sample_judge_variance_detailed(
             model_name=model_name,
             retrieved_context=None,
         )
+        if not _judge_measured(replay):
+            raise RuntimeError("judge unavailable during variance replay")
         return float(replay["score"]), int(replay.get("tokens_used", 0) or 0)
 
     return await sample_judge_variance_detailed(

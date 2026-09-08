@@ -433,6 +433,37 @@ def test_looks_anaphoric_table():
         assert chat_service._looks_anaphoric(message) is expected, message
 
 
+def test_short_message_naming_its_own_subject_is_not_a_followup():
+    """A new question that names its own subject must not be condensed against
+    the previous turn — that answered question 2 on question 1's subject."""
+    standalone = [
+        "SCARLET ALBATROSS CLOSEOUT 9928",     # shouted phrase
+        "What does section SPC-0500 say?",     # identifier
+        'Find "closeout obligations" please',  # quoted phrase
+        "What does § 200.1 require?",          # section citation
+    ]
+    for message in standalone:
+        assert chat_service._looks_anaphoric(message) is False, message
+
+    # Still elliptical: a short question whose subject only exists in the
+    # conversation. The inferred "what is …" noun phrase is not a subject.
+    for message in ("What is the amount?", "and the deadline?", "why not?"):
+        assert chat_service._looks_anaphoric(message) is True, message
+
+
+def test_keep_own_terms_reattaches_a_dropped_identifier():
+    # Condenser resolved the referent but lost what the user actually typed.
+    assert chat_service._keep_own_terms(
+        "what does it say about SPC-0500?", "the closeout policy document",
+    ) == "the closeout policy document SPC-0500"
+
+    # Nothing missing → untouched; nothing condensed → nothing to repair.
+    assert chat_service._keep_own_terms(
+        "what about SPC-0500?", "closeout policy SPC-0500",
+    ) == "closeout policy SPC-0500"
+    assert chat_service._keep_own_terms("anything", None) is None
+
+
 def test_recent_turns_flattens_history():
     from pydantic_ai.messages import (
         ModelRequest, ModelResponse, SystemPromptPart, TextPart, UserPromptPart,
@@ -530,6 +561,34 @@ async def test_build_kb_segment_condenses_anaphoric_followups():
     assert retrieve.await_args.kwargs["retrieval_query"] == "IRB expiration date year 2"
     # The raw message stays the primary query (answer prompt + rerank target).
     assert retrieve.await_args.args[1] == "what about year 2?"
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_does_not_condense_a_new_subject():
+    """The reported bug: question 2 was answered on question 1's subject."""
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
+    cfg = RAGConfig(k=4)
+    history = [
+        ModelRequest(parts=[UserPromptPart(content="What does section SPC-0500 say?")]),
+        ModelResponse(parts=[TextPart(content="SPC-0500 covers closeout.")]),
+    ]
+    retrieve = AsyncMock(return_value=([_chunk(0)], cfg, 0))
+    condense = AsyncMock(return_value=("SPC-0500 SCARLET ALBATROSS CLOSEOUT 9928", 0))
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks", new=retrieve), \
+         patch.object(kb_validation_service, "condense_retrieval_query", new=condense), \
+         patch.object(chat_service, "_retrieve_pinned_chunks",
+                      new=AsyncMock(return_value=[])):
+        await chat_service._build_kb_segment(
+            "kb-1", "SCARLET ALBATROSS CLOSEOUT 9928", "test-model", history=history,
+        )
+
+    condense.assert_not_awaited()
+    assert retrieve.await_args.kwargs.get("retrieval_query") is None
+    assert retrieve.await_args.args[1] == "SCARLET ALBATROSS CLOSEOUT 9928"
 
 
 # ---------------------------------------------------------------------------

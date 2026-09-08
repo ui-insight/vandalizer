@@ -1800,28 +1800,41 @@ async def update_model(
         new_api_key = encrypt_value(new_api_key)
 
     prev_name = cfg.available_models[index].get("name", "")
-    cfg.available_models[index] = {
+    # MERGE onto the stored entry, and only for fields the client actually
+    # sent. A whole-dict assignment destroyed every key this form does not
+    # manage — including the three the context budget reads (tokenizer_path,
+    # tokenizer_cache_root, token_safety_margin), so editing a model's
+    # display tier silently reset how its tokens are counted back to the
+    # guessed 1.5× margin (#817).
+    #
+    # `model_fields_set` is what makes this total rather than a fixed
+    # allowlist: a field the form omits keeps its stored value instead of
+    # being overwritten with the schema default. That matters today for
+    # cost_per_1m_input/cost_per_1m_output — declared on the request but
+    # never sent by ModelEditor, so writing them unconditionally reset
+    # out-of-band cost rates to None and silently dropped KB Autovalidate's
+    # dollar estimates back to tokens-only. Sending a field explicitly as
+    # null still clears it, which is the behaviour a form control needs.
+    sent = body.model_fields_set
+    merged = dict(cfg.available_models[index])
+    merged.update({
         "id": model_id,
         "name": body.name,
         "tag": body.tag,
-        "external": body.external,
-        "thinking": body.thinking,
-        "endpoint": body.endpoint or "",
-        "api_protocol": body.api_protocol or "",
         "api_key": new_api_key,
-        "speed": body.speed or "",
-        "tier": body.tier or "",
-        "privacy": body.privacy or "",
-        "supports_structured": body.supports_structured,
-        "multimodal": body.multimodal,
-        "supports_pdf": body.supports_pdf,
-        "context_window": body.context_window,
-        "request_timeout_seconds": body.request_timeout_seconds,
-        "response_reserve_tokens": body.response_reserve_tokens,
-        "temperature": body.temperature,
-        "cost_per_1m_input": body.cost_per_1m_input,
-        "cost_per_1m_output": body.cost_per_1m_output,
-    }
+    })
+    _blank_to_empty = {"endpoint", "api_protocol", "speed", "tier", "privacy"}
+    for field in (
+        "external", "thinking", "endpoint", "api_protocol", "speed", "tier",
+        "privacy", "supports_structured", "multimodal", "supports_pdf",
+        "context_window", "request_timeout_seconds", "response_reserve_tokens",
+        "temperature", "cost_per_1m_input", "cost_per_1m_output",
+    ):
+        if field not in sent:
+            continue
+        value = getattr(body, field)
+        merged[field] = (value or "") if field in _blank_to_empty else value
+    cfg.available_models[index] = merged
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
         cfg.default_model = body.name
@@ -2177,6 +2190,46 @@ async def get_quality_alerts(
     }
 
 
+@router.get("/quality/judge-calibration")
+async def get_judge_calibration(user: User = Depends(get_current_user)):
+    """Per-surface judge agreement, honest about what this deployment measured.
+
+    The published κ floors were established against the model the project's
+    weekly tier-3 job runs on. A deployment judging with a local 8B has no
+    claim on that number, and inheriting it is how a quality figure becomes
+    fiction. So each of this deployment's available models is reported as
+    calibrated or not *for that model*, and an uncalibrated one carries no κ
+    at all rather than borrowing one.
+
+    ``drift_detectable`` says whether the regression check can fire, counted
+    per model rather than over the ledger as a whole: the check never compares
+    one model's κ against another's, so a ledger holding a single run each for
+    three models has no baseline for any of them.
+    """
+    await _require_admin(user)
+    from app.services import judge_contract, judge_drift
+
+    sys_cfg = await SystemConfig.get_config()
+    available = [
+        m.get("name") for m in ((sys_cfg.available_models if sys_cfg else None) or [])
+        if isinstance(m, dict) and m.get("name")
+    ]
+
+    surfaces = []
+    for surface in judge_contract.all_surfaces():
+        gate = surface.calibration
+        status = judge_drift.calibration_status(
+            surface.name,
+            available,
+            published_floor=gate.min_kappa if gate else None,
+        )
+        status["min_accuracy"] = gate.min_accuracy if gate else None
+        status["fixture_path"] = gate.fixture_path if gate else None
+        surfaces.append(status)
+
+    return {"surfaces": surfaces, "available_models": available}
+
+
 @router.post("/quality/alerts/{uuid}/acknowledge")
 async def acknowledge_alert(
     uuid: str,
@@ -2192,6 +2245,30 @@ async def acknowledge_alert(
     alert.acknowledged_by = user.user_id
     alert.acknowledged_at = datetime.datetime.now(datetime.timezone.utc)
     await alert.save()
+
+    # Acknowledging a regression IS the review the item was waiting on, so the
+    # "regression pending review" state must lift with it — otherwise the badge
+    # stays flagged forever and the signal stops meaning anything.
+    if alert.alert_type == "regression":
+        # Regression alerts have no unacknowledged-dedup (unlike stale and
+        # config_changed), so an item can carry several. Clearing the flag on
+        # any one of them un-flags an item that a newer, worse, still-open
+        # alert covers — and takes the recovery baseline with it.
+        still_open = await QualityAlert.find_one(
+            QualityAlert.alert_type == "regression",
+            QualityAlert.item_kind == alert.item_kind,
+            QualityAlert.item_id == alert.item_id,
+            QualityAlert.acknowledged == False,  # noqa: E712
+        )
+        if still_open is None:
+            from app.services.quality_service import clear_regression_review
+            await clear_regression_review(alert.item_kind, alert.item_id)
+        else:
+            logger.info(
+                "Not clearing regression review for %s %s — alert %s is still open",
+                alert.item_kind, alert.item_id, still_open.uuid,
+            )
+
     await _audit(user, "acknowledge_alert", f"Acknowledged quality alert: {uuid}")
     return {"ok": True}
 

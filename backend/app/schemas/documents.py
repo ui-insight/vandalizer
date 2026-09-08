@@ -21,6 +21,10 @@ class DocumentResponse(BaseModel):
     chunk_count: int = 0
     ingest_error: Optional[str] = None
     extraction_low_quality: bool = False
+    #: Codes from document_service.INGESTION_WARNING_LABELS — the extraction
+    #: succeeded but is not the whole document.
+    ingestion_warnings: list[str] = []
+    ingestion_warning_text: str = ""
 
 
 class FolderResponse(BaseModel):
@@ -48,6 +52,8 @@ class PollStatusResponse(BaseModel):
     valid: bool = True
     path: Optional[str] = None
     extraction_low_quality: bool = False
+    ingestion_warnings: list[str] = []
+    ingestion_warning_text: str = ""
 
 
 class CreateFolderRequest(BaseModel):

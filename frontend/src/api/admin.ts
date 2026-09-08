@@ -712,6 +712,42 @@ export function getQualityAlerts(limit = 50, acknowledged = false) {
   return apiFetch<{ alerts: QualityAlert[] }>(`/api/admin/quality/alerts?limit=${limit}&acknowledged=${acknowledged}`)
 }
 
+// Judge calibration
+
+export interface JudgeModelCalibration {
+  judge_model: string
+  calibrated: boolean
+  kappa: number | null
+  accuracy: number | null
+  measured_at: string | null
+  n_runs: number
+  /** Whether THIS model has the 3 runs a trailing median needs. The drift
+   * check is scoped to one model, so a pooled count would report a ledger of
+   * one run each for three models as detectable when it can never fire. */
+  drift_detectable: boolean
+}
+
+export interface JudgeSurfaceCalibration {
+  surface: string
+  /** The κ floor this surface publishes. Measured on the project's CI model. */
+  published_floor: number | null
+  min_accuracy: number | null
+  fixture_path: string | null
+  models: JudgeModelCalibration[]
+  measured_models: string[]
+  ledger_entries: number
+  /** True when at least one model has enough of its own history for a
+   * regression to be detectable. Not a count over the whole ledger: the check
+   * never compares one model's κ against another's. */
+  drift_detectable: boolean
+}
+
+export function getJudgeCalibration() {
+  return apiFetch<{ surfaces: JudgeSurfaceCalibration[]; available_models: string[] }>(
+    '/api/admin/quality/judge-calibration',
+  )
+}
+
 export function acknowledgeAlert(uuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/admin/quality/alerts/${uuid}/acknowledge`, { method: 'POST' })
 }

@@ -1,5 +1,44 @@
 import { AlertCircle, Info, Sparkles } from 'lucide-react'
 
+/**
+ * Banner palettes.
+ *
+ * These banners were written against a dark surface: a translucent tint for
+ * the background and near-white text on top of it. Rendered on the light
+ * panels they actually live on — the extraction and knowledge-base Validate
+ * tabs — the tint washed out to pale pink and the text all but vanished
+ * ("Optimization failed — No extraction fields defined" was unreadable, the
+ * support ticket behind this). The banners are handed around and dropped into
+ * whatever container a caller has, so they cannot borrow a background: each
+ * one paints an opaque surface of its own and puts text on it that meets
+ * WCAG AA (≥ 4.5:1) against that surface, wherever it is rendered. The values
+ * are the app's existing light-theme alert colors (see ToastContext).
+ */
+const RED = {
+  surface: '#fef2f2',
+  border: '#fecaca',
+  strong: '#991b1b',
+  text: '#b91c1c',
+  icon: '#dc2626',
+}
+
+const VIOLET = {
+  surface: '#f5f3ff',
+  border: '#ddd6fe',
+  text: '#5b21b6',
+  icon: '#7c3aed',
+}
+
+const NEUTRAL = {
+  surface: '#f9fafb',
+  border: '#e5e7eb',
+  strong: '#111827',
+  text: '#4b5563',
+  // Quiet, but still AA against the red surface it sits on in FailedBanner —
+  // #6b7280 lands at 4.42:1 there, just under.
+  muted: '#5b6472',
+}
+
 interface ErrorBannerProps {
   message: string
 }
@@ -8,8 +47,8 @@ export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div role="alert" style={{
       padding: 10, marginBottom: 10, fontSize: 12,
-      color: '#fca5a5', backgroundColor: 'rgba(239, 68, 68, 0.1)',
-      border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 6,
+      color: RED.text, backgroundColor: RED.surface,
+      border: `1px solid ${RED.border}`, borderRadius: 6,
     }}>
       {message}
     </div>
@@ -27,11 +66,11 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 10,
       padding: '8px 12px',
-      backgroundColor: 'rgba(124, 58, 237, 0.10)',
-      border: '1px solid rgba(124, 58, 237, 0.35)', borderRadius: 6,
-      fontSize: 12, color: '#e5e5e5',
+      backgroundColor: VIOLET.surface,
+      border: `1px solid ${VIOLET.border}`, borderRadius: 6,
+      fontSize: 12, color: VIOLET.text,
     }}>
-      <Sparkles size={13} style={{ color: '#a78bfa', flexShrink: 0 }} />
+      <Sparkles size={13} style={{ color: VIOLET.icon, flexShrink: 0 }} />
       <span style={{ flex: 1 }}>
         Viewing past run from <b>{when}</b> (read-only).
       </span>
@@ -39,8 +78,8 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
         onClick={onExit}
         style={{
           padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-          color: '#e5e5e5', background: 'transparent',
-          border: '1px solid rgba(124, 58, 237, 0.4)', borderRadius: 5,
+          color: VIOLET.text, background: '#fff',
+          border: `1px solid ${VIOLET.border}`, borderRadius: 5,
           cursor: 'pointer',
         }}
       >
@@ -102,37 +141,37 @@ export function FailedBanner({
   const remediation = errorCode ? REMEDIATIONS[errorCode] : null
   return (
     <div role="alert" style={{
-      padding: 14, backgroundColor: 'rgba(239, 68, 68, 0.08)',
-      border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 8,
+      padding: 14, backgroundColor: RED.surface,
+      border: `1px solid ${RED.border}`, borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <AlertCircle size={16} style={{ color: '#ef4444' }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{title}</span>
+        <AlertCircle size={16} style={{ color: RED.icon }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: RED.strong }}>{title}</span>
       </div>
       {remediation ? (
         <>
-          <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 6 }}>
+          <div style={{ fontSize: 12, color: RED.text, marginBottom: 6 }}>
             {remediation.what}
           </div>
           <div style={{
             padding: '8px 10px', marginBottom: 10,
-            fontSize: 12, color: '#e5e5e5', lineHeight: 1.5,
-            backgroundColor: 'rgba(255,255,255,0.04)', border: '1px solid #2a2a2a',
+            fontSize: 12, color: NEUTRAL.text, lineHeight: 1.5,
+            backgroundColor: '#fff', border: `1px solid ${RED.border}`,
             borderRadius: 6,
           }}>
-            <strong style={{ color: '#fff' }}>What to do:</strong> {remediation.how}
+            <strong style={{ color: NEUTRAL.strong }}>What to do:</strong> {remediation.how}
           </div>
           <details style={{ marginBottom: 10 }}>
-            <summary style={{ fontSize: 11, color: '#888', cursor: 'pointer' }}>
+            <summary style={{ fontSize: 11, color: NEUTRAL.muted, cursor: 'pointer' }}>
               Raw error message
             </summary>
-            <div style={{ marginTop: 6, fontSize: 11, color: '#aaa', fontFamily: 'monospace' }}>
+            <div style={{ marginTop: 6, fontSize: 11, color: NEUTRAL.text, fontFamily: 'monospace' }}>
               {message}
             </div>
           </details>
         </>
       ) : (
-        <div style={{ fontSize: 12, color: '#fca5a5', marginBottom: 10 }}>{message}</div>
+        <div style={{ fontSize: 12, color: RED.text, marginBottom: 10 }}>{message}</div>
       )}
       <button onClick={onRunAgain} style={{
         padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -155,14 +194,14 @@ interface CancelledBannerProps {
 export function CancelledBanner({ completedTrials, onRunAgain, title = 'Optimization cancelled', retryLabel = 'Run again' }: CancelledBannerProps) {
   return (
     <div role="status" style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #333', borderRadius: 8,
+      padding: 14, backgroundColor: NEUTRAL.surface,
+      border: `1px solid ${NEUTRAL.border}`, borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Info size={16} style={{ color: '#888' }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>{title}</span>
+        <Info size={16} style={{ color: NEUTRAL.muted }} />
+        <span style={{ fontSize: 14, fontWeight: 600, color: NEUTRAL.strong }}>{title}</span>
       </div>
-      <div style={{ fontSize: 12, color: '#aaa', marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: NEUTRAL.text, marginBottom: 10 }}>
         {completedTrials} trial{completedTrials !== 1 ? 's' : ''} completed before you cancelled.
       </div>
       <button onClick={onRunAgain} style={{

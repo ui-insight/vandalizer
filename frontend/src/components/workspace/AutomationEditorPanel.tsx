@@ -11,6 +11,7 @@ import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
+import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
@@ -527,10 +528,13 @@ function TriggerConfigCard({ automation, onSave }: { automation: Automation; onS
   return null
 }
 
+// Sensible starting filter for a new watch — the common document types.
+const DEFAULT_FILE_TYPES = ['pdf', 'docx', 'xlsx']
+
 function FolderWatchConfig({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
   const config = (automation.trigger_config || {}) as Record<string, unknown>
   const watchedFolder = (config.folder_id as string | undefined) || ''
-  const fileTypes = (config.file_types as string[] | undefined) || ['pdf', 'docx', 'xlsx', 'html']
+  const fileTypes = (config.file_types as string[] | undefined) || DEFAULT_FILE_TYPES
   const excludePatterns = (config.exclude_patterns as string | undefined) || ''
   const batchMode = (config.batch_mode as boolean | undefined) || false
 
@@ -554,7 +558,12 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
     }
   }, [activeProjectRootFolder, watchedFolder]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
+  // The options are exactly the extensions the uploader accepts — a filter for
+  // anything else can never match a file. Saved automations may still carry a
+  // dead type (`html` was offered here for a while), so keep those on screen
+  // and flag them rather than hiding config the user can't then clear.
+  const staleTypes = fileTypes.filter(t => !SUPPORTED_EXTENSIONS.includes(t))
+  const FILE_TYPE_OPTIONS = [...SUPPORTED_EXTENSIONS, ...staleTypes]
 
   const handleFileTypeToggle = (type: string) => {
     const next = fileTypes.includes(type)
@@ -588,22 +597,39 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         File Types
       </label>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
-        {FILE_TYPE_OPTIONS.map(type => (
-          <button
-            key={type}
-            onClick={() => handleFileTypeToggle(type)}
-            style={{
-              padding: '4px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 14, cursor: 'pointer',
-              backgroundColor: fileTypes.includes(type) ? '#dbeafe' : '#f3f4f6',
-              color: fileTypes.includes(type) ? '#1d4ed8' : '#6b7280',
-              border: fileTypes.includes(type) ? '1px solid #93c5fd' : '1px solid #e5e7eb',
-            }}
-          >
-            .{type}
-          </button>
-        ))}
+        {FILE_TYPE_OPTIONS.map(type => {
+          const selected = fileTypes.includes(type)
+          const stale = !SUPPORTED_EXTENSIONS.includes(type)
+          return (
+            <button
+              key={type}
+              onClick={() => handleFileTypeToggle(type)}
+              title={stale
+                ? `.${type} files can't be uploaded, so this filter never matches — click to remove it`
+                : undefined}
+              style={{
+                padding: '4px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                borderRadius: 14, cursor: 'pointer',
+                backgroundColor: stale ? '#fef2f2' : selected ? '#dbeafe' : '#f3f4f6',
+                color: stale ? '#b3261e' : selected ? '#1d4ed8' : '#6b7280',
+                border: stale
+                  ? '1px solid #fecaca'
+                  : selected ? '1px solid #93c5fd' : '1px solid #e5e7eb',
+                textDecoration: stale ? 'line-through' : undefined,
+              }}
+            >
+              .{type}
+            </button>
+          )
+        })}
       </div>
+      {staleTypes.length > 0 && (
+        <p style={{ fontSize: 12, color: '#b3261e', margin: '-8px 0 16px' }}>
+          {staleTypes.map(t => `.${t}`).join(', ')} can't be uploaded, so
+          {staleTypes.length > 1 ? ' those filters ' : ' that filter '}
+          never matches a file. Click to remove.
+        </p>
+      )}
 
       <label htmlFor="automation-exclude-patterns" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         Exclude Patterns

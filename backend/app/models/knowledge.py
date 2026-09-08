@@ -18,6 +18,10 @@ class KnowledgeBaseSource(Document):
     url: Optional[str] = None
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; overrides auto-derived title
+    # The document's filename, captured when its text was ingested. The KB
+    # keeps answering from the indexed chunks after the document is deleted
+    # from Files, and without this the row has nothing to show but its UUID.
+    document_title: Optional[str] = None
     source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
     content: Optional[str] = None
     # "skipped" is transient: the crawler marks a navigation page skipped and

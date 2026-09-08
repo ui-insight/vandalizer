@@ -10,6 +10,7 @@ import {
   listItems,
   updateItem,
   deleteItem,
+  fieldSupportState,
 } from './extractions'
 
 const mockFetch = vi.fn()
@@ -111,5 +112,41 @@ describe('SearchSet Items', () => {
     const call = mockFetch.mock.calls[0]
     expect(call[0]).toBe('/api/extractions/items/item-1')
     expect(call[1].method).toBe('DELETE')
+  })
+})
+
+describe('fieldSupportState — unrecognised stored states', () => {
+  // `support` arrives from stored snapshots cast with `as ExtractionSourceMap`,
+  // so TypeScript enforces nothing at runtime. Falling through to `undefined`
+  // rendered NO badge at all — the silent over-trust this work removes.
+  it('falls back to deriving when the stored state is not one we know', () => {
+    const src = {
+      quote: 'The award is $4,200,000.',
+      verified: true,
+      value_supported: false,
+      support: 'some_future_state',
+    } as unknown as Parameters<typeof fieldSupportState>[0]
+    expect(fieldSupportState(src)).toBe('quote_unsupported')
+  })
+
+  it('still prefers a recognised stored state over deriving', () => {
+    const src = {
+      verified: true,
+      value_supported: false,
+      support: 'unassessed',
+    } as unknown as Parameters<typeof fieldSupportState>[0]
+    expect(fieldSupportState(src)).toBe('unassessed')
+  })
+
+  it('never promotes an unmeasured legacy sidecar to supported', () => {
+    const src = { quote: 'x', verified: true } as unknown as Parameters<
+      typeof fieldSupportState
+    >[0]
+    expect(fieldSupportState(src)).toBe('unassessed')
+  })
+
+  it('reads a missing entry as unverified, not as an absent badge', () => {
+    expect(fieldSupportState(undefined)).toBe('unverified')
+    expect(fieldSupportState(null)).toBe('unverified')
   })
 })

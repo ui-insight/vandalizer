@@ -10,13 +10,54 @@ tracked in #609, on exactly the scanned uploads research admin deals in.
 
 Both helpers live here rather than in each consumer so KB chat, workflow
 citations, extraction sources and chunk metadata hedge identically. Markers
-persisted before the ``approximate`` flag existed carry no key and read as
-exact, which matches the behaviour those documents have today.
+persisted before the ``approximate`` flag existed carry no key; consumers run
+them through :func:`with_marker_provenance`, which recognizes the
+interpolator's uniform-spacing signature and restores the flag, so those
+documents hedge instead of rendering a confident ``p. 234`` off a guess.
 """
 
 import json
 import re
 from typing import Optional
+
+
+def with_marker_provenance(markers: Optional[list[dict]]) -> Optional[list[dict]]:
+    """Restore the ``approximate`` flag on legacy interpolated page markers.
+
+    ``_interpolate_page_markers`` has always placed page N at exactly
+    ``N * (len(text) // num_pages)`` — perfectly uniform spacing. Markers it
+    persisted before the ``approximate`` flag existed carry that signature but
+    no key, and read as exact, so a scanned 400-page package rendered
+    confident ``p. 234`` citations off evenly-spread guesses.
+
+    Measured boundaries (PyMuPDF, the local fast path) essentially never
+    produce three or more pages of *identical* character length, so uniform
+    spacing across >= 3 page markers identifies the interpolator's output.
+    The cost of a false positive is only an unnecessary ``~`` hedge; the cost
+    of a false negative is invented precision — the asymmetry the threshold
+    leans on. Two-page documents are left as they are: one delta proves
+    nothing either way.
+
+    Returns a new list with the flag set when the signature matches;
+    otherwise the input, untouched.
+    """
+    pages = [
+        m for m in (markers or [])
+        if isinstance(m, dict) and m.get("kind") == "page"
+    ]
+    if len(pages) < 3 or any(m.get("approximate") for m in pages):
+        return markers
+    offsets = [m.get("char_offset") for m in pages]
+    if not all(isinstance(o, int) and not isinstance(o, bool) for o in offsets):
+        return markers
+    deltas = {b - a for a, b in zip(offsets, offsets[1:])}
+    if len(deltas) != 1 or deltas == {0}:
+        return markers
+    return [
+        {**m, "approximate": True}
+        if isinstance(m, dict) and m.get("kind") == "page" else m
+        for m in markers
+    ]
 
 
 def location_meta(location: dict) -> dict:

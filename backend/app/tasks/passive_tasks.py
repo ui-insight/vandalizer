@@ -12,8 +12,9 @@ from uuid import uuid4
 
 from bson import ObjectId
 
+from app.exceptions import TrialSpendBlockedError
 from app.celery_app import celery_app
-from app.services.form_fill import document_meta
+from app.services.form_fill import DOC_META_TASKS, document_meta
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
@@ -500,8 +501,27 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                                 doc_texts.append(doc["raw_text"])
                                 doc_metas.append(document_meta(doc))
                         task_data["doc_texts"] = doc_texts
-                        if task_doc.get("name") == "FormFiller":
+                        if task_doc.get("name") in DOC_META_TASKS:
                             task_data["doc_metas"] = doc_metas
+
+                    # The other two hydration sites load this; the automation
+                    # path never did, so a step configured with "Selected
+                    # Document" as its input ran with no text at all under
+                    # folder-watch — an empty answer produced on schedule, with
+                    # nothing saying the input was missing.
+                    from app.tasks.workflow_tasks import _wants_selected_document
+
+                    if (
+                        _wants_selected_document(task_data)
+                        and task_data.get("selected_document_uuid")
+                    ):
+                        sel_doc = db.smart_document.find_one(
+                            {"uuid": task_data["selected_document_uuid"]},
+                        )
+                        if sel_doc and sel_doc.get("raw_text"):
+                            task_data["selected_doc_text"] = sel_doc["raw_text"]
+                            if task_doc.get("name") in DOC_META_TASKS:
+                                task_data["selected_doc_meta"] = document_meta(sel_doc)
 
                     if task_doc.get("name") == "FormFiller":
                         from app.tasks.workflow_tasks import _preload_form_filler_template
@@ -533,9 +553,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
+        def _check_budget() -> None:
+            # Between-steps budget gate, same as the manual run path (#808).
+            from app.services.trial_budget import check_sync
+
+            check_sync(wf_user_id)
+
         from app.services.metering import metered
         with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
-            final_output, data = engine.execute()
+            final_output, data = engine.execute(check_budget=_check_budget)
 
         # Update result
         completed_at = datetime.now(timezone.utc)
@@ -643,7 +669,13 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         max_retries = retry_cfg.get("max_retries", 3)
         attempt = event.get("attempt_number", 1)
 
-        if not isinstance(e, WorkflowStepError) and attempt < max_retries:
+        # A budget/spend block is deterministic in the same way a step error
+        # is: retrying restarts a passive run at step 0 (no resume index),
+        # re-spending everything the first pass completed, and cannot succeed
+        # until the budget changes. Treated as terminal for the same reason
+        # (#808).
+        _deterministic = isinstance(e, (WorkflowStepError, TrialSpendBlockedError))
+        if not _deterministic and attempt < max_retries:
             retry_delay = retry_cfg.get("retry_delay_seconds", 300)
             next_retry = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)
             db.workflow_trigger_event.update_one(

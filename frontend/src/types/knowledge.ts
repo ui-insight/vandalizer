@@ -92,6 +92,9 @@ export interface KnowledgeBaseSource {
   source_type: 'document' | 'url'
   document_uuid?: string
   document_title?: string
+  // False when the source's document has been deleted from Files. The KB still
+  // answers from the chunks it indexed, so the source is labelled, not hidden.
+  document_exists?: boolean | null
   url?: string
   url_title?: string
   custom_name?: string | null

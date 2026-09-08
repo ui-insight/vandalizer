@@ -65,10 +65,18 @@ class OcrRequestError(RuntimeError):
         status_code: int | None = None,
         body: str = "",
         retry_after: float | None = None,
+        permanent: bool = False,
     ):
         super().__init__(message)
         self.status_code = status_code
         self.body = body
+        # Some failures carry a perfectly healthy status code and still cannot
+        # be fixed by waiting — a wrapper answering HTTP 200 with an HTML error
+        # page is misconfigured, not overloaded. Retrying those burns the
+        # in-process attempts and then minutes of Celery backoff before the
+        # document is written off, instead of falling straight through to the
+        # PyMuPDF path the caller already has.
+        self.permanent = permanent
         # Seconds the service asked us to wait, parsed from a Retry-After
         # header. Only 429 and 503 normally carry one.
         self.retry_after = retry_after
@@ -123,6 +131,8 @@ def is_retryable(exc: Exception) -> bool:
     permanent.
     """
     if isinstance(exc, _LOCAL_INPUT_ERRORS):
+        return False
+    if getattr(exc, "permanent", False):
         return False
     status = getattr(exc, "status_code", None)
     if status is None:
@@ -257,12 +267,19 @@ def validate_docling_options(options: Any) -> dict[str, Any]:
     return options
 
 
-def parse_docling_response(payload: Any) -> str:
+def parse_docling_response(payload: Any, report: dict | None = None) -> str:
     """Pull converted text out of a docling-serve convert/result payload.
 
     A ``failure`` status raises so the caller retries; ``partial_success``
-    keeps whatever text came back and logs the per-document errors, because
-    partial text still beats falling all the way back to PyMuPDF.
+    keeps whatever text came back, because partial text still beats falling
+    all the way back to PyMuPDF.
+
+    But partial text is not the whole document, and a log line is not a
+    disclosure: a 400-page package whose OCR gave up after 30 pages was stored
+    as a complete document, and every answer drawn from it was confidently
+    about a fraction of it. When ``report`` is passed, it is filled in with
+    ``{"partial": bool, "errors": [...]}`` so the ingestion layer can mark the
+    document instead of only writing to the log.
     """
     if not isinstance(payload, dict):
         raise OcrRequestError("Docling response was not a JSON object")
@@ -278,19 +295,85 @@ def parse_docling_response(payload: Any) -> str:
             f"Docling response had no document (status={status or 'unknown'})"
         )
 
+    partial = bool(errors) or status == "partial_success"
     for field in _DOCLING_CONTENT_FIELDS:
         content = document.get(field)
         if isinstance(content, str) and content.strip():
-            if errors:
+            if partial:
                 logger.warning(
                     "Docling conversion reported errors but returned %s: %s",
                     field, str(errors)[:500],
                 )
+                if report is not None:
+                    report["partial"] = True
+                    report["errors"] = [str(e)[:200] for e in errors][:10]
             return content
 
     raise OcrRequestError(
         f"Docling response carried no text content (status={status or 'unknown'})"
     )
+
+
+#: Content types a plain-text OCR service can legitimately answer with. A
+#: wrapper that answers HTTP 200 with an HTML error page is the failure mode
+#: this exists for: ``provider="raw"`` returned ``resp.text`` verbatim, so the
+#: error page became the document's text, got chunked, embedded, and answered
+#: questions from.
+#: Exact content types a plain-text OCR service can legitimately answer with.
+#: This was a `startswith` tuple ending in "text/", which accepted `text/html`
+#: — the precise thing the check exists to reject — making the whole gate a
+#: no-op and leaving only the body sniff below doing any work.
+_ACCEPTED_RAW_CONTENT_TYPES = frozenset({
+    "text/plain",
+    "text/markdown",
+    "text/x-markdown",
+    "application/json",
+})
+
+#: Markup a body must not open with even when the content type says text/plain.
+#: Checked after stripping a BOM and any leading comment, since an error page
+#: that opens with `<!-- generated -->` would otherwise slip past.
+_MARKUP_PREFIXES = ("<!doctype html", "<html", "<?xml", "<head", "<body", "<!doctype")
+
+
+def _leading_content(text: str) -> str:
+    """The start of a body, past a BOM and any leading XML/HTML comments."""
+    head = (text or "").lstrip("\ufeff").lstrip()
+    while head.startswith("<!--"):
+        end = head.find("-->")
+        if end == -1:
+            break
+        head = head[end + 3:].lstrip()
+    return head[:200].lower()
+
+
+def _reject_non_text_body(resp) -> None:
+    """Raise unless a ``raw``-provider 200 actually looks like extracted text.
+
+    Permanent, not retryable: a wrapper that answers 200 with an error page is
+    misconfigured, and waiting does not fix a misconfiguration. Retrying it
+    would burn the in-process attempts and then minutes of Celery backoff
+    before the document is written off, when the caller has a working PyMuPDF
+    fallback one exception away.
+    """
+    content_type = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    # An absent header is not grounds for rejection — plenty of small OCR
+    # wrappers send none — but a declared type must be one we accept.
+    if content_type and content_type not in _ACCEPTED_RAW_CONTENT_TYPES:
+        raise OcrRequestError(
+            f"OCR endpoint returned HTTP 200 with Content-Type {content_type!r}, "
+            "which is not extracted text",
+            status_code=resp.status_code,
+            body=resp.text[:500],
+            permanent=True,
+        )
+    if _leading_content(resp.text).startswith(_MARKUP_PREFIXES):
+        raise OcrRequestError(
+            "OCR endpoint returned HTTP 200 with a markup document, not extracted text",
+            status_code=resp.status_code,
+            body=resp.text[:500],
+            permanent=True,
+        )
 
 
 def _post_pdf(client, url: str, headers: dict, pdf_path: str, field: str, data=None):
@@ -314,6 +397,7 @@ def _await_docling_task(
     task_id: str,
     poll_interval: float,
     max_poll_seconds: float,
+    report: dict | None = None,
 ) -> str:
     """Poll an async docling task to completion and return its converted text."""
     prefix = _api_prefix(convert_url)
@@ -348,7 +432,7 @@ def _await_docling_task(
             body=result.text[:500],
             retry_after=parse_retry_after(result.headers.get("Retry-After")),
         )
-    return parse_docling_response(result.json())
+    return parse_docling_response(result.json(), report)
 
 
 def convert(
@@ -362,10 +446,15 @@ def convert(
     use_async: bool = False,
     poll_interval: float = _ASYNC_POLL_INTERVAL_SECONDS,
     max_poll_seconds: float = _ASYNC_MAX_POLL_SECONDS,
+    report: dict | None = None,
 ) -> str:
     """Run one OCR attempt against ``endpoint`` and return the extracted text.
 
     Raises ``OcrRequestError`` on a failed attempt; the caller retries.
+
+    ``report``, when given, collects what the caller cannot see in the return
+    value: whether the conversion was only partial. See
+    :func:`parse_docling_response`.
     """
     provider = normalize_provider(provider)
     headers = dict(headers or {})
@@ -379,6 +468,7 @@ def convert(
                 body=resp.text[:500],
                 retry_after=parse_retry_after(resp.headers.get("Retry-After")),
             )
+        _reject_non_text_body(resp)
         return resp.text
 
     url = normalize_endpoint(endpoint, provider, use_async=use_async)
@@ -401,11 +491,11 @@ def convert(
 
     payload = resp.json()
     if not use_async:
-        return parse_docling_response(payload)
+        return parse_docling_response(payload, report)
 
     task_id = (payload or {}).get("task_id")
     if not task_id:
         raise OcrRequestError("Docling async response carried no task_id")
     return _await_docling_task(
-        client, url, headers, str(task_id), poll_interval, max_poll_seconds
+        client, url, headers, str(task_id), poll_interval, max_poll_seconds, report,
     )

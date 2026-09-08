@@ -619,7 +619,10 @@ async def test_judge_test_queries_per_query_failure_does_not_crash():
 
     assert len(out["details"]) == 1
     assert out["details"][0]["judge"]["verdict"] == "SKIPPED"
+    assert out["details"][0]["judge"]["score"] is None
     assert "retrieval failed" in out["details"][0]["judge"]["reasoning"]
+    # And it must not drag the aggregate the KB is scored on.
+    assert out["avg_judge_score"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -996,7 +999,11 @@ async def test_judge_answer_returns_zero_tokens_on_error():
             model_name="test-model",
         )
     assert verdict["tokens_used"] == 0
-    assert verdict["verdict"] == "WARN"  # error path
+    # An outage is not a measurement of zero: scored 0.0 it averaged into the
+    # knowledge base's quality score, so one provider blip read as "every
+    # answer is wrong".
+    assert verdict["verdict"] == kb_validation_service.JUDGE_UNAVAILABLE
+    assert verdict["score"] is None
 
 
 @pytest.mark.asyncio
@@ -1316,3 +1323,50 @@ async def test_judge_baselines_only_records_truncation_flags():
     assert detail["baseline_answer"] == "cut baseline"
     assert detail["baseline_answer_truncated"] is False
     assert detail["baseline_generation_truncated"] is True
+
+
+# ---------------------------------------------------------------------------
+# A judge outage is not a knowledge base collapsing
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_a_judge_outage_does_not_score_the_kb_zero():
+    """The reason this matters beyond a wrong number: `avg_judge_score` feeds
+    `VerifiedItemMetadata.quality_score`, and a large drop there is what marks
+    a regression `critical` and emails the item's owner. Averaged as 0.0, one
+    provider outage would red-badge and email every knowledge base at once."""
+    tq = MagicMock()
+    tq.uuid = "tq-1"
+    tq.query = "Q?"
+    tq.expected_answer = "A."
+    tq.category = None
+    tq.save = AsyncMock()
+
+    async def fake_kb_answer(*a, **kw):
+        return "A.", 0
+
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(side_effect=RuntimeError("judge provider down"))
+
+    with (
+        patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer),
+        patch.object(kb_validation_service, "_get_or_build_agent", return_value=fake_agent),
+    ):
+        out = await kb_validation_service.judge_test_queries(
+            "kb-1", [tq], "test-model", mode="judge",
+        )
+
+    assert out["details"][0]["judge"]["verdict"] == kb_validation_service.JUDGE_UNAVAILABLE
+    assert out["details"][0]["judge"]["score"] is None
+    # None, not 0.0 — "we could not measure" rather than "it scored nothing".
+    assert out["avg_judge_score"] is None
+
+
+def test_judge_measured_rejects_every_non_measurement():
+    measured = kb_validation_service._judge_measured
+    assert measured({"score": 0.0}) is True  # a real zero IS a measurement
+    assert measured({"score": 0.87}) is True
+    assert measured({"score": None}) is False
+    assert measured(None) is False
+    assert measured({}) is False

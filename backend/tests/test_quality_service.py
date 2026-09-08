@@ -79,6 +79,12 @@ def _make_verified_metadata(
     m.last_validated_at = last_validated_at or datetime.datetime(2025, 6, 1, tzinfo=datetime.timezone.utc)
     m.validation_run_count = validation_run_count
     m.organization_ids = organization_ids or []
+    # Mirror the model's defaults: a bare MagicMock attribute is truthy, which
+    # would make every fixture look like it has a regression pending review.
+    m.regression_pending_review = False
+    m.regression_detected_at = None
+    m.regression_severity = None
+    m.regression_baseline_score = None
     m.save = AsyncMock()
     m.insert = AsyncMock()
     return m

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, Timer, XOctagon } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, Timer, TrendingDown, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -23,6 +23,7 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   extraction_failed: AlertTriangle,
   document_failed: FileX,
   automation_failed: Timer,
+  quality_regression: TrendingDown,
 }
 
 const kindColors: Record<string, string> = {
@@ -40,6 +41,10 @@ const kindColors: Record<string, string> = {
   extraction_failed: FAILURE_RED,
   document_failed: FAILURE_RED,
   automation_failed: FAILURE_RED,
+  // Not in FAILURE_KINDS, so a warning-severity regression (the ones that get
+  // no email by design) would otherwise fall through to a generic grey bell —
+  // indistinguishable from an informational notice.
+  quality_regression: '#d97706',
 }
 
 const SUPPORT_KINDS = new Set([

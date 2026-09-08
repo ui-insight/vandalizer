@@ -217,8 +217,16 @@ async def _run_single_config(
     # feed into ``judge_variance.sample_judge_variance``.
     judge_samples: list[dict] = []
     judge_tokens = 0
+    # Counted over comparisons that actually needed the LLM. The deterministic
+    # pre-judge resolves the majority of them without a model call, and it
+    # cannot be "unavailable" — folding those into the denominator would let a
+    # total judge outage read as 83% coverage on a set where 100 of 120
+    # comparisons short-circuit, sailing past the floor while every ambiguous
+    # field silently vanished from the score.
+    judge_attempted = 0
+    judge_unavailable = 0
     if judge_model:
-        from app.services.extraction_judge import judge_field_value
+        from app.services.extraction_judge import is_judge_unavailable, judge_field_value
         field_metadata_by_key: dict[str, dict] = {
             fm.get("key", ""): fm for fm in (field_metadata or []) if fm.get("key")
         }
@@ -249,9 +257,20 @@ async def _run_single_config(
         for key, task in judge_tasks:
             try:
                 verdict = await task
-                score = float(verdict.get("score", 0.0))
-                judge_scores[key] = score
                 judge_tokens += int(verdict.get("tokens_used", 0) or 0)
+                if verdict.get("comparator") != "deterministic":
+                    judge_attempted += 1
+                if is_judge_unavailable(verdict) or verdict.get("score") is None:
+                    # The judge was unreachable for this field. Recording it as
+                    # 0.0 would report a provider outage as a wrong extraction;
+                    # leaving it out means the field is measured on the runs
+                    # that did get judged, or not measured at all.
+                    judge_unavailable += 1
+                    logger.warning("Judge unavailable for %s: %s", key,
+                                   verdict.get("reasoning", ""))
+                    continue
+                score = float(verdict["score"])
+                judge_scores[key] = score
                 tc_uuid, field_name, run_idx = key
                 tc = tc_lookup.get(tc_uuid)
                 run_result = run_lookup.get((tc_uuid, run_idx), {})
@@ -267,8 +286,13 @@ async def _run_single_config(
                         "field_metadata": field_metadata_by_key.get(field_name),
                     })
             except Exception as e:
+                # Same fact as an unavailable verdict, arriving as a raised
+                # exception instead of a returned one. A task that raised never
+                # reported a comparator, and a deterministic pre-judge does not
+                # raise, so it counts as an attempted LLM judgement.
+                judge_attempted += 1
+                judge_unavailable += 1
                 logger.warning("Judge failed for %s: %s", key, e)
-                judge_scores[key] = 0.0
 
     # Phase 3: compute per-field accuracy/consistency
     # Aggregate per field-name across all test cases — drives field_breakdown
@@ -293,11 +317,20 @@ async def _run_single_config(
 
             # Accuracy: judge mode = avg of per-run judge scores; strict mode = match count / runs.
             if judge_model:
+                # Only the runs the judge actually scored. A field the judge
+                # could not reach on any run is left unmeasured below rather
+                # than averaged in as zero.
                 per_run_scores = [
-                    judge_scores.get((tc.uuid, field_name, i), 0.0)
+                    judge_scores[(tc.uuid, field_name, i)]
                     for i in range(len(extracted_values))
+                    if (tc.uuid, field_name, i) in judge_scores
                 ]
-                accuracy = sum(per_run_scores) / len(per_run_scores) if per_run_scores else 0.0
+                if not per_run_scores:
+                    # No run of this field was judged — the field goes
+                    # unmeasured for this trial (accuracy *and* consistency)
+                    # rather than contributing a fabricated zero.
+                    continue
+                accuracy = sum(per_run_scores) / len(per_run_scores)
                 # For the strict-match-style "match_count" we count >=0.7 as a pass
                 match_count = sum(1 for s in per_run_scores if s >= 0.7)
             else:
@@ -312,7 +345,9 @@ async def _run_single_config(
 
             all_field_accuracies.append(accuracy)
             total_correct += match_count
-            total_evaluated += len(extracted_values)
+            # N for the downstream standard-error computation: the number of
+            # comparisons that produced a score, not the number attempted.
+            total_evaluated += len(per_run_scores) if judge_model else len(extracted_values)
 
             # Consistency: most common value frequency (always strict-match-based)
             from collections import Counter
@@ -390,6 +425,14 @@ async def _run_single_config(
         "total_comparisons": total_evaluated,
         "judge_used": bool(judge_model),
         "judge_tokens": judge_tokens if judge_model else 0,
+        # Fraction of attempted judgements that produced a score. Below
+        # MIN_JUDGE_COVERAGE the trial's numbers describe the judge's uptime
+        # more than the config's quality, and the optimizer discards them.
+        "judge_coverage": (
+            round((judge_attempted - judge_unavailable) / judge_attempted, 4)
+            if judge_attempted else 1.0
+        ),
+        "judge_unavailable": judge_unavailable,
         "judge_samples": judge_samples,
         "field_breakdown": field_breakdown,
     }

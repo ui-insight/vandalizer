@@ -45,7 +45,11 @@ async def _quality_monitor_async():
     from app.models.system_config import SystemConfig
     from app.models.validation_run import ValidationRun
     from app.models.verification import VerificationRequest, VerificationStatus, VerifiedItemMetadata
-    from app.services.quality_service import compute_config_hash, detect_stale_items
+    from app.services.quality_service import (
+        compute_config_hash,
+        detect_stale_items,
+        flag_quality_regression,
+    )
     from beanie import PydanticObjectId
 
     sys_cfg = await SystemConfig.get_config()
@@ -148,6 +152,13 @@ async def _quality_monitor_async():
                                 current_tier=meta.quality_tier,
                                 created_at=now,
                             ).insert()
+                            await flag_quality_regression(
+                                meta=meta,
+                                severity="critical" if delta >= 20 else "warning",
+                                previous_score=prev_score,
+                                current_score=meta.quality_score,
+                                detected_at=now,
+                            )
                             # Phase 6: auto-enqueue a shadow KB optimizer so the
                             # candidate fix lands in the inbox alongside the alert.
                             try:
@@ -210,6 +221,13 @@ async def _quality_monitor_async():
                                 current_tier=meta.quality_tier,
                                 created_at=now,
                             ).insert()
+                            await flag_quality_regression(
+                                meta=meta,
+                                severity="critical" if delta >= 20 else "warning",
+                                previous_score=prev_score,
+                                current_score=meta.quality_score,
+                                detected_at=now,
+                            )
 
                             # Phase 6: shadow workflow optimizer.
                             try:
@@ -282,6 +300,13 @@ async def _quality_monitor_async():
                             current_tier=meta.quality_tier,
                             created_at=now,
                         ).insert()
+                        await flag_quality_regression(
+                            meta=meta,
+                            severity="critical" if delta >= 20 else "warning",
+                            previous_score=prev_score,
+                            current_score=meta.quality_score,
+                            detected_at=now,
+                        )
 
                         # Phase 6: shadow extraction optimizer.
                         try:

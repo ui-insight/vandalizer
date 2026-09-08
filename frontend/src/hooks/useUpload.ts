@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { uploadFile } from '../api/files'
+import { SUPPORTED_EXTENSIONS } from '../utils/fileTypes'
 
 export interface UploadProgress {
   id: number
@@ -10,8 +11,8 @@ export interface UploadProgress {
   uuid?: string
 }
 
-// Keep in sync with the accept list in UploadZone / FileBrowser file inputs.
-export const SUPPORTED_EXTENSIONS = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md']
+// Re-exported for the existing import sites; `utils/fileTypes` is the source.
+export { SUPPORTED_EXTENSIONS }
 
 let nextUploadId = 0
 

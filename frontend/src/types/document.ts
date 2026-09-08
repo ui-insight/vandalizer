@@ -23,6 +23,12 @@ export interface Document {
   ingest_error?: string | null
   error_message?: string | null
   extraction_low_quality?: boolean
+  /** Stored ingestion-warning codes: the text is real but not the whole
+   * document, or the hidden-text safety check could not run. */
+  ingestion_warnings?: string[]
+  /** The codes as one readable clause, composed by the backend so the words
+   * live in exactly one place. */
+  ingestion_warning_text?: string
 }
 
 export interface Folder {

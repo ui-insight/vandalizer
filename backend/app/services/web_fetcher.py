@@ -162,7 +162,16 @@ def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str, list[str]
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
             tmp.write(content)
             tmp_path = tmp.name
-        text = extract_text_from_pdf(tmp_path)
+        scrub_report: dict = {}
+        text = extract_text_from_pdf(tmp_path, report=scrub_report)
+        if scrub_report.get("hidden_text_unchecked"):
+            # This path feeds KB/RAG content directly; there is no per-source
+            # warning surface for it yet (tracked on the ingestion follow-ups
+            # issue), so at minimum say it loudly with the URL attached.
+            logger.warning(
+                "Hidden-text safety check could not run on fetched PDF %s — "
+                "its text may include content the page never displays", url,
+            )
         title = _pdf_title(tmp_path) or filename
         links = _pdf_uri_links(tmp_path)
         return _normalize_whitespace(text or ""), title, links

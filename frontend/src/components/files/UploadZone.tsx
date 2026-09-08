@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react'
 import { CloudUpload } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
 interface UploadZoneProps {
   onFilesSelected: (files: FileList) => void
@@ -71,7 +72,7 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         type="file"
         multiple
         aria-label="Upload files"
-        accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
+        accept={SUPPORTED_ACCEPT_ATTR}
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onFilesSelected(e.target.files)

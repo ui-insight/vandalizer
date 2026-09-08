@@ -182,7 +182,12 @@ function KBCatalogCard({
           <BookOpen size={11} />
           Knowledge Base
         </span>
-        <QualityBadge tier={item.quality_tier} score={item.quality_score} title={KB_QUALITY_SCORE_HOVER} />
+        <QualityBadge
+          tier={item.quality_tier}
+          score={item.quality_score}
+          title={KB_QUALITY_SCORE_HOVER}
+          regressionPending={item.regression_pending_review}
+        />
         {item.validation_run_count > 0 && (
           <span style={{ fontSize: 10, color: C.textFaint }}>
             {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}

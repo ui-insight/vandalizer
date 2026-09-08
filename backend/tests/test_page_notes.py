@@ -24,9 +24,16 @@ These tests pin the shape of the instruction. They cannot make a model obey it;
 from app.services.chat_service import page_note_for
 
 
+# Measured fixtures use irregular offsets: real pages never have identical
+# character counts, and perfectly uniform spacing is the interpolator's
+# signature — with_marker_provenance would (correctly) hedge a uniform list.
+_MEASURED_OFFSETS = [0, 1893, 3121, 5210, 6890, 9012]
+
+
 def _pages(*, approximate: bool = False, count: int = 3):
     return [
-        {"kind": "page", "value": n, "char_offset": n * 100,
+        {"kind": "page", "value": n,
+         "char_offset": n * 100 if approximate else _MEASURED_OFFSETS[n - 1],
          **({"approximate": True} if approximate else {})}
         for n in range(1, count + 1)
     ]
@@ -104,13 +111,24 @@ class TestMixedMarkers:
         note = page_note_for(markers, annotated=True)
         assert "[p. ~N]" in note
 
-    def test_markers_written_before_the_flag_existed_are_treated_as_measured(self):
+    def test_pre_flag_uniform_markers_are_detected_and_hedged(self):
         """`approximate` is absent on documents ingested before it was added.
 
-        Those are overwhelmingly digital PDFs with real measured boundaries, so
-        absence reads as measured. Documented because it is a real
-        false-negative source: the NOAA proposal's 79 interpolated markers
-        predate the flag and will not hedge.
+        The interpolator has always placed page N at exactly N * step, so
+        uniform spacing across >= 3 markers is its signature — the NOAA
+        proposal's 79 evenly-spread pre-flag markers now hedge instead of
+        rendering confident exact pages (the false-negative source the
+        previous version of this test documented as accepted).
         """
+        legacy = [
+            {"kind": "page", "value": n, "char_offset": n * 100}
+            for n in range(1, 6)
+        ]
+        note = page_note_for(legacy, annotated=True)
+        assert "[p. ~N]" in note
+
+    def test_pre_flag_irregular_markers_still_read_as_measured(self):
+        """Non-uniform offsets are what real measured boundaries look like;
+        absence of the flag on those keeps reading as measured."""
         note = page_note_for(_pages(), annotated=True)
         assert "[p. N]" in note and "~" not in note

@@ -172,3 +172,24 @@ async def get_api_key_user(
             detail="DEMO_EXPIRED",
         )
     return user
+
+
+async def get_current_user_or_api_key(
+    access_token: str | None = Cookie(default=None),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    settings: Settings = Depends(get_settings),
+) -> User:
+    """Authenticate a browser session *or* an external API-key integration.
+
+    For endpoints the UI polls with its session cookie and scripts poll with
+    ``x-api-key`` (workflow run status, say). The cookie wins when both are
+    present so browser behavior is unchanged; the key is only consulted when
+    there is no session.
+    """
+    if access_token:
+        return await get_current_user(access_token=access_token, settings=settings)
+    if x_api_key:
+        return await get_api_key_user(x_api_key)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
+    )

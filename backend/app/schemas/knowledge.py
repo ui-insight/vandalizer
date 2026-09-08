@@ -77,7 +77,11 @@ class KBSourceResponse(BaseModel):
     uuid: str
     source_type: str
     document_uuid: Optional[str] = None
-    document_title: Optional[str] = None  # Resolved from SmartDocument for display
+    document_title: Optional[str] = None  # Live SmartDocument title, else the one kept at ingest
+    # False when the source's document has been deleted from Files. The KB
+    # still answers from the chunks it indexed, so the row stays — labelled,
+    # the way an extraction test case with a deleted source is.
+    document_exists: Optional[bool] = None
     url: Optional[str] = None
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; UI prefers this over title/url

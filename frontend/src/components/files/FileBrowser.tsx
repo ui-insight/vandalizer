@@ -22,6 +22,7 @@ import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFold
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
+import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
 
 export type SortColumn = 'name' | 'modified'
 export type SortDirection = 'asc' | 'desc'
@@ -43,6 +44,10 @@ export interface ContentMatch {
   task_status: string | null
   folder: string | null
   token_count: number
+  /** Carried through from the search endpoint so a cross-folder hit shows
+   * the same caveat the in-folder row does (#803). */
+  ingestion_warnings?: string[]
+  ingestion_warning_text?: string
 }
 
 interface FileBrowserProps {
@@ -231,6 +236,10 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             updated_at: m.updated_at,
             token_count: m.token_count,
             num_pages: m.num_pages,
+            // Without these a cross-folder search hit renders as a clean row
+            // even when the document was only partly read (#803).
+            ingestion_warnings: m.ingestion_warnings,
+            ingestion_warning_text: m.ingestion_warning_text,
           })
         }
       }
@@ -648,7 +657,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           type="file"
           multiple
           aria-label="Upload files"
-          accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
+          accept={SUPPORTED_ACCEPT_ATTR}
           className="hidden"
           onChange={(e) => {
             if (e.target.files?.length) upload(e.target.files)

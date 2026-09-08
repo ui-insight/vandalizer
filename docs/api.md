@@ -1,6 +1,6 @@
 # Vandalizer External API
 
-For integrating Vandalizer extractions and automations into other tools. Authenticated with an API key (no session cookie or CSRF needed).
+For integrating Vandalizer extractions, workflows, and automations into other tools. Authenticated with an API key (no session cookie or CSRF needed).
 
 ## Authentication
 
@@ -147,6 +147,70 @@ Returns `status`, `started_at`, `finished_at`, `error`, `documents_touched`, and
 
 ---
 
+## `POST /api/workflows/run-integrated`
+
+Run a workflow against uploaded files. Unlike extractions, this queues the run and returns immediately — poll `GET /api/workflows/status` for the result. Rate-limited to 10 requests/minute per user.
+
+### Request
+
+`multipart/form-data`:
+
+| Field         | Required | Description |
+|---------------|----------|-------------|
+| `workflow_id` | yes      | ID of the workflow to run (from the workflow's URL or the API panel in the Workflow editor). |
+| `files`       | yes      | One or more file uploads. |
+
+### Response
+
+```json
+{
+  "status": "queued",
+  "activity_id": "...",
+  "session_id": "..."
+}
+```
+
+Keep the `session_id` — it is what you poll. `activity_id` only reports that the run is `running`/`complete`; it does not carry the workflow output.
+
+```bash
+curl -X POST "https://vandalizer.example.edu/api/workflows/run-integrated" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -F "workflow_id=YOUR_WORKFLOW_ID" \
+  -F "files=@/absolute/path/to/document.pdf"
+```
+
+---
+
+## `GET /api/workflows/status`
+
+Poll a queued workflow run and read its output.
+
+```bash
+curl "https://vandalizer.example.edu/api/workflows/status?session_id=SESSION_ID" \
+  -H "x-api-key: YOUR_API_KEY"
+```
+
+```python
+import time
+
+while True:
+    status = requests.get(
+        "https://vandalizer.example.edu/api/workflows/status",
+        headers={"x-api-key": "YOUR_API_KEY"},
+        params={"session_id": session_id},
+    ).json()
+    if status["status"] in ("completed", "error", "failed", "canceled"):
+        break
+    time.sleep(2)
+print(status["final_output"])
+```
+
+Returns `status` (`running`, `completed`, `error`, `failed`, `canceled`), `num_steps_completed` / `num_steps_total`, `current_step_name`, `final_output`, `steps_output`, and `error`. The run's result lives in `final_output`.
+
+`GET /api/workflows/status/stream` is the same data as a server-sent event stream, ending when the run reaches a terminal state.
+
+---
+
 ## Troubleshooting
 
 ### `results` is `[]`
@@ -165,6 +229,10 @@ Check the `documents` array. The combination of fields tells you why:
 
 Your client sent the file part with zero bytes. The most common cause is curl resolving `-F files=@<filename>` against the wrong working directory. Use an absolute path.
 
+### HTTP 401 — "Not authenticated"
+
+Your request reached an endpoint without credentials. Check the header name is `x-api-key` — a workflow `session_id` polled without it returns this rather than a 403.
+
 ### HTTP 404 — "SearchSet not found"
 
 Either the UUID is wrong, or your API key's user doesn't have access to that search set (e.g. it belongs to another team). Verify in the UI.
@@ -180,4 +248,4 @@ The endpoint is rate-limited to 10 requests/minute per user. Back off and retry.
 - **`POST /api/automations/{id}/trigger`** — Fire a configured automation. See the Automations editor in the UI for trigger-specific input formats.
 - **`GET /api/automations/runs/{trigger_event_id}`** — Poll an automation run for completion.
 
-The Extraction editor in the UI has copy-paste-ready snippets for the search set you have open — use those when you're integrating against a specific search set.
+The Extraction and Workflow editors in the UI have copy-paste-ready snippets for the search set or workflow you have open — use those when you're integrating against a specific one.

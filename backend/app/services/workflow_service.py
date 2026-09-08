@@ -663,6 +663,10 @@ async def get_workflow_status(
         "approval_request_id": result.approval_request_id,
         "error": result.error,
         "error_payload": result.error_payload,
+        # Outputs that failed to deliver after completion (#810) — without
+        # this the field was write-only and the status poll showed a clean
+        # "completed" for a run whose deliverable never left the building.
+        "delivery_failures": getattr(result, "delivery_failures", None) or [],
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
         "workflow_id": str(result.workflow) if result.workflow else None,

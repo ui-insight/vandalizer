@@ -31,6 +31,8 @@ export interface SearchSet {
   fillable_pdf_url?: string | null;
   quality_score?: number | null;
   quality_tier?: string | null;
+  /** Monitoring found a regression here and nobody has reviewed it yet. */
+  regression_pending_review?: boolean;
   last_validated_at?: string | null;
   validation_run_count?: number;
   validation_portability?: ValidationPortability | null;

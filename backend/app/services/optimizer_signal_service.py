@@ -11,6 +11,12 @@ Every entry point here:
   run was auto-enqueued because X" and distinguish from user-launched runs.
 - Enforces a per-item cooldown so a noisy signal can't fork hundreds of
   optimizer runs.
+- Refuses to enqueue an item that can't be tuned yet (no validation plan, no
+  test inputs / test cases with expected values). The optimizer raises on
+  those and the manual start routes reject them with a 400 before a run doc
+  exists; an auto-trigger that skipped the check spent a run document per
+  signal and filled the Tuning suggestions page with failures nobody asked
+  for and nobody could act on.
 
 Phase 6 reuses these helpers from the ``QualityAlert.insert`` hook so that
 the same alert → shadow-optimizer pipeline works for both report-only
@@ -74,6 +80,59 @@ async def _already_recent(
             },
         )
     return recent is not None
+
+
+async def _workflow_blocker(workflow_id: str) -> Optional[str]:
+    """Why a workflow can't be tuned right now, or None when it can.
+
+    The optimizer raises on these preconditions and the manual start route
+    rejects them with a 400 before any run doc exists. Auto-triggered runs
+    skipped the check entirely, so every signal on an un-testable workflow
+    created a run that was dispatched, died in the worker, and landed on the
+    Tuning suggestions page as a "Tuning failed" row — 49 of them on one
+    deployment, with nothing a user could do about any of them.
+    """
+    from beanie import PydanticObjectId
+
+    from app.models.workflow import Workflow
+
+    try:
+        wf = await Workflow.get(PydanticObjectId(workflow_id))
+    except Exception:
+        wf = None
+    if not wf:
+        return "workflow not found"
+    if not wf.validation_plan:
+        return "workflow has no validation plan"
+
+    from app.services.workflow_optimizer import _resolve_test_inputs
+
+    if not await _resolve_test_inputs(wf):
+        return "workflow has no test inputs (no run marked as expected output)"
+    return None
+
+
+async def _extraction_blocker(search_set_uuid: str) -> Optional[str]:
+    """Why an extraction set can't be tuned right now, or None when it can.
+
+    Mirrors ``_workflow_blocker`` for the preconditions
+    ``run_extraction_optimization`` raises on.
+    """
+    from app.models.extraction_test_case import ExtractionTestCase
+    from app.services.search_set_service import get_extraction_keys
+
+    if not await get_extraction_keys(search_set_uuid):
+        return "extraction set has no fields defined"
+
+    test_cases = await ExtractionTestCase.find(
+        {"search_set_uuid": search_set_uuid},
+    ).to_list()
+    if not any(
+        tc.expected_values and any(v for v in tc.expected_values.values())
+        for tc in test_cases
+    ):
+        return "extraction set has no test cases with expected values"
+    return None
 
 
 async def enqueue_kb_shadow_run(
@@ -172,6 +231,13 @@ async def enqueue_extraction_shadow_run(
         )
         return None
 
+    blocker = await _extraction_blocker(search_set_uuid)
+    if blocker:
+        logger.info(
+            "Skipping shadow extraction run for %s — %s", search_set_uuid, blocker,
+        )
+        return None
+
     run = ExtractionOptimizationRun(
         search_set_uuid=search_set_uuid,
         user_id=user_id,
@@ -227,6 +293,13 @@ async def enqueue_workflow_shadow_run(
         logger.info(
             "Skipping shadow workflow run for %s — active run %s already in flight",
             workflow_id, active.uuid,
+        )
+        return None
+
+    blocker = await _workflow_blocker(workflow_id)
+    if blocker:
+        logger.info(
+            "Skipping shadow workflow run for %s — %s", workflow_id, blocker,
         )
         return None
 

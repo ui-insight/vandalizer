@@ -535,7 +535,10 @@ export function ChatMessage({
                   </span>
                   {message.citations.map((c, i) => {
                     const locator = formatPageLocator(c.page, c.page_approximate, c.page_end) ?? (c.sheet || null)
-                    const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+                    const base = locator ? `${c.document_title} · ${locator}` : c.document_title
+                    // With several knowledge bases attached, the filename
+                    // alone doesn't say which one a claim came from.
+                    const label = c.kb_title ? `${base} · ${c.kb_title}` : base
                     const preview = c.content_preview || ''
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
                     const chipBase = {

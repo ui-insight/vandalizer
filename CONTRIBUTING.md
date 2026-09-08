@@ -143,6 +143,11 @@ hits a backend route that does not exist. If it fails, run `make endpoint-map`
 and read `scripts/ui_endpoint_map.md`: the first table lists the offending
 calls. That file is generated output and is not committed.
 
+`make review-graph` is optional and not part of any of the above: it builds a
+local code graph that answers structural questions (callers, tests-for, impact
+radius) without opening files. Nothing in CI uses it and it is not a project
+dependency — see [docs/review-graph.md](docs/review-graph.md).
+
 `make backend-backlog` runs the current backend typecheck and dependency-audit backlog without gating releases.
 
 `make release-check` runs the current release-gating checks plus the backend/frontend Docker builds that ship in releases.

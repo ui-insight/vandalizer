@@ -78,6 +78,12 @@ class SearchSetResponse(BaseModel):
     quality_tier: Optional[str] = None
     last_validated_at: Optional[str] = None
     validation_run_count: int = 0
+    # Undeclared, this was dropped by Pydantic's extra="ignore" on its way out
+    # of _attach_quality — so the extraction header badge received undefined and
+    # never showed a regression, which is this feature's headline behaviour.
+    # The Quality Pulse card kept working because it reads a separate dict
+    # endpoint, which is exactly what would hide this in manual testing.
+    regression_pending_review: bool = False
     validation_portability: Optional[ValidationPortability] = None
 
 

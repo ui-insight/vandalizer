@@ -365,22 +365,58 @@ async def _insert_source_unless_duplicate(source: KnowledgeBaseSource) -> bool:
 
 
 async def resolve_document_titles(sources) -> dict[str, str]:
-    """Batch-load SmartDocument titles for the given KB sources.
+    """Batch-load display titles for the given KB sources, by document uuid.
+
+    Prefers the live SmartDocument title. When the document has been deleted
+    from Files the KB keeps answering from the chunks it indexed, so fall back
+    to the title ingestion recorded on the source — otherwise the only name
+    left is the document UUID, which is what a user saw after deleting a file.
 
     Title resolution is a display nicety — a lookup failure (missing collection
     in a test, a deleted document, etc.) must not break the caller.
+    """
+    doc_sources = [
+        s for s in sources if s.source_type == "document" and s.document_uuid
+    ]
+    if not doc_sources:
+        return {}
+    titles = {
+        s.document_uuid: getattr(s, "document_title", None)
+        for s in doc_sources
+        if getattr(s, "document_title", None)
+    }
+    try:
+        docs = await SmartDocument.find(
+            {"uuid": {"$in": [s.document_uuid for s in doc_sources]}},
+        ).to_list()
+    except Exception:
+        return titles
+    titles.update({d.uuid: d.title for d in docs if d.title})
+    return titles
+
+
+async def resolve_existing_documents(sources) -> set[str]:
+    """The document uuids among ``sources`` whose SmartDocument still exists.
+
+    Callers use it to mark a source whose document was deleted from Files; the
+    source itself is kept, because its chunks are still in the index and still
+    answer questions.
     """
     doc_uuids = [
         s.document_uuid for s in sources
         if s.source_type == "document" and s.document_uuid
     ]
     if not doc_uuids:
-        return {}
+        return set()
     try:
-        docs = await SmartDocument.find({"uuid": {"$in": doc_uuids}}).to_list()
+        docs = await SmartDocument.find(
+            {"uuid": {"$in": doc_uuids}, "soft_deleted": {"$ne": True}},
+        ).to_list()
     except Exception:
-        return {}
-    return {d.uuid: d.title for d in docs if d.title}
+        # Unknown beats "deleted": callers treat a missing entry as deleted, so
+        # a lookup failure must not paint every source with a red label.
+        return set(doc_uuids)
+    return {d.uuid for d in docs}
 
 
 async def resolve_openable_documents(

@@ -44,7 +44,7 @@ type SendArgs = [
   message: string,
   documentUuids?: string[],
   model?: string,
-  knowledgeBaseUuid?: string,
+  knowledgeBaseUuids?: string[],
   includeOnboardingContext?: boolean,
   folderUuids?: string[],
   isFirstSession?: boolean,
@@ -101,8 +101,8 @@ export function useChat() {
   const lastSendArgsRef = useRef<SendArgs | null>(null)
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
-      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuid, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
       setErrorDetails(null)
       setIsStreaming(true)
@@ -293,7 +293,7 @@ export function useChat() {
             }
           },
           model,
-          knowledgeBaseUuid,
+          knowledgeBaseUuids,
           includeOnboardingContext,
           folderUuids,
           isFirstSession,

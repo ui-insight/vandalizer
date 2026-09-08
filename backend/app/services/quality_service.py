@@ -288,6 +288,15 @@ async def update_quality_metadata(item_kind: str, item_id: str, item_name: str |
         meta.validation_run_count = run_count
         if item_name and not meta.display_name:
             meta.display_name = item_name
+        # A run that recovers the pre-regression score clears the review flag
+        # on its own — a transient dip shouldn't need a human to un-flag it.
+        if (
+            meta.regression_pending_review
+            and meta.regression_baseline_score is not None
+            and latest.score is not None
+            and latest.score >= meta.regression_baseline_score
+        ):
+            _reset_regression_state(meta)
         await meta.save()
     else:
         meta = VerifiedItemMetadata(
@@ -301,6 +310,180 @@ async def update_quality_metadata(item_kind: str, item_id: str, item_name: str |
             validation_run_count=run_count,
         )
         await meta.insert()
+
+
+# ---------------------------------------------------------------------------
+# Regression review state
+# ---------------------------------------------------------------------------
+
+def _reset_regression_state(meta: VerifiedItemMetadata) -> None:
+    """Clear the pending-review flag and everything that explains it."""
+    meta.regression_pending_review = False
+    meta.regression_detected_at = None
+    meta.regression_severity = None
+    meta.regression_baseline_score = None
+
+
+async def clear_regression_review(item_kind: str, item_id: str) -> bool:
+    """A human looked at it. Returns True when a flag was actually cleared."""
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == item_kind,
+        VerifiedItemMetadata.item_id == item_id,
+    )
+    if not meta or not meta.regression_pending_review:
+        return False
+    _reset_regression_state(meta)
+    await meta.save()
+    return True
+
+
+async def _item_owner_user_id(item_kind: str, item_id: str) -> Optional[str]:
+    """The user who owns the item behind a quality alert.
+
+    ``item_id`` is the uuid for search sets and knowledge bases but the
+    ObjectId string for workflows — that asymmetry is baked into the rest of
+    the monitoring loop, so it is handled here rather than pushed onto callers.
+    """
+    try:
+        if item_kind == "search_set":
+            from app.models.search_set import SearchSet
+            obj = await SearchSet.find_one(SearchSet.uuid == item_id)
+            return getattr(obj, "user_id", None) if obj else None
+        if item_kind == "knowledge_base":
+            from app.models.knowledge import KnowledgeBase
+            obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+            return getattr(obj, "user_id", None) if obj else None
+        if item_kind == "workflow":
+            from beanie import PydanticObjectId
+
+            from app.models.workflow import Workflow
+            obj = await Workflow.get(PydanticObjectId(item_id))
+            return getattr(obj, "user_id", None) if obj else None
+    except Exception:
+        logger.warning(
+            "Owner lookup failed for %s %s", item_kind, item_id, exc_info=True,
+        )
+    return None
+
+
+async def flag_quality_regression(
+    *,
+    meta: VerifiedItemMetadata,
+    severity: str,
+    previous_score: float,
+    current_score: float,
+    detected_at: datetime.datetime,
+) -> None:
+    """Give a detected regression teeth and a route to a human.
+
+    A regression used to write a ``QualityAlert`` — a row only the admin
+    Quality tab renders — enqueue a shadow optimizer run, and leave the item
+    advertising the tier it held before. The person who owns the item, and who
+    will use it again tomorrow, was told nothing at all.
+
+    Now: the item is flagged ``regression_pending_review`` so every surface
+    that shows its quality shows that instead of a clean tier, the owner gets a
+    notification, and a ``critical`` drop also gets an email — the difference
+    between "there is a record of this somewhere" and "someone was told".
+
+    Best-effort throughout: monitoring runs nightly in Celery and must not
+    fail a whole pass because one owner has no email address.
+    """
+    meta.regression_pending_review = True
+    meta.regression_detected_at = detected_at
+    meta.regression_severity = severity
+    # Only raise the bar, never lower it: a second, smaller drop while a review
+    # is already pending must not make recovery easier than it was.
+    if (
+        meta.regression_baseline_score is None
+        or previous_score > meta.regression_baseline_score
+    ):
+        meta.regression_baseline_score = previous_score
+    await meta.save()
+
+    try:
+        await _notify_regression_owner(
+            meta=meta, severity=severity,
+            previous_score=previous_score, current_score=current_score,
+        )
+    except Exception:
+        logger.warning(
+            "Regression owner notification failed for %s %s",
+            meta.item_kind, meta.item_id, exc_info=True,
+        )
+
+
+#: Deep links matching the ones ``failure_notifications`` already emits, so the
+#: bell opens the item itself rather than a list the user has to search.
+_ITEM_LINKS = {
+    "search_set": "/?extraction={item_id}",
+    "workflow": "/?workflow={item_id}",
+    "knowledge_base": "/?kb={item_id}",
+}
+
+
+async def _notify_regression_owner(
+    *,
+    meta: VerifiedItemMetadata,
+    severity: str,
+    previous_score: float,
+    current_score: float,
+) -> None:
+    owner_id = await _item_owner_user_id(meta.item_kind, meta.item_id)
+    if not owner_id:
+        logger.info(
+            "No owner found for %s %s — regression stays admin-only",
+            meta.item_kind, meta.item_id,
+        )
+        return
+
+    from app.services import notification_service
+
+    item_name = meta.display_name or meta.item_id
+    kind_label = meta.item_kind.replace("_", " ")
+    link = _ITEM_LINKS.get(meta.item_kind, "/library").format(item_id=meta.item_id)
+    drop = previous_score - current_score
+
+    await notification_service.create_notification(
+        user_id=owner_id,
+        kind="quality_regression",
+        title=f'Quality dropped on "{item_name}"',
+        body=(
+            f"{previous_score:.0f} → {current_score:.0f} "
+            f"({drop:.0f} points) on the last automatic revalidation."
+        ),
+        link=link,
+        item_kind=meta.item_kind,
+        item_id=meta.item_id,
+        item_name=item_name,
+        severity="error" if severity == "critical" else "warning",
+        # One row per item: a nightly monitor that keeps finding the same
+        # regression should keep it visible, not bury the rest of the bell.
+        coalesce_key=f"quality_regression:{meta.item_kind}:{meta.item_id}",
+        group_title=f'Quality dropped on "{item_name}" ({{count}} checks)',
+    )
+
+    if severity != "critical":
+        return
+
+    from app.models.user import User
+    owner = await User.find_one(User.user_id == owner_id)
+    if not owner or not owner.email:
+        return
+
+    from app.config import Settings
+    from app.services.email_service import quality_regression_email, send_email
+
+    settings = Settings()
+    subject, html = quality_regression_email(
+        owner_name=owner.name or owner.user_id,
+        item_name=item_name,
+        item_kind_label=kind_label,
+        previous_score=previous_score,
+        current_score=current_score,
+        item_url=f"{settings.frontend_url}{link}",
+    )
+    await send_email(owner.email, subject, html, settings, email_type="quality_regression")
 
 
 def compute_quality_tier(score: Optional[float], quality_config: dict) -> Optional[str]:

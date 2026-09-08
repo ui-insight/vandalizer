@@ -4,6 +4,7 @@ import { X, Search, FileText, Loader2, Check, Upload, FolderIcon } from 'lucide-
 import { searchDocuments, type SearchResult } from '../../api/documents'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import { uploadFile } from '../../api/files'
+import { SUPPORTED_ACCEPT_ATTR, SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 
 interface DocumentPickerModalProps {
   onSubmit: (docUuids: string[]) => void
@@ -21,9 +22,8 @@ interface UploadItem {
   error?: string
 }
 
-// Keep in sync with backend ALLOWED_EXTS in app/utils/file_validation.py
-const ALLOWED_EXTS = ['pdf', 'doc', 'docx', 'xlsx', 'xls', 'csv', 'txt', 'md']
-const ACCEPT_ATTR = ALLOWED_EXTS.map(e => `.${e}`).join(',')
+const ALLOWED_EXTS = SUPPORTED_EXTENSIONS
+const ACCEPT_ATTR = SUPPORTED_ACCEPT_ATTR
 const ALLOWED_HINT = ALLOWED_EXTS.join(', ')
 
 // Rough "this will take a while to index" thresholds. Indexing time scales with

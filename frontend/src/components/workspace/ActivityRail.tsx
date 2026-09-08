@@ -189,7 +189,28 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
         const initialSources = snapSources && typeof snapSources === 'object' && Object.keys(snapSources).length > 0
           ? snapSources
           : undefined
-        openExtraction(activity.search_set_uuid, initialResults, initialSources)
+        // The run's cross-field verdict is in the same snapshot. Restoring
+        // values without it re-opens a run that failed a budget rule looking
+        // exactly like one that passed.
+        type CFR = import('../../api/extractions').CrossFieldRunReport
+        type DW = import('../../api/extractions').DocumentWarning
+        const snap = activity.result_snapshot as {
+          cross_field?: CFR | null
+          cross_field_sets?: (CFR | null)[]
+          document_warnings?: DW[]
+        } | undefined
+        const snapCrossField = snap?.cross_field_sets
+          ?? (snap?.cross_field ? [snap.cross_field] : undefined)
+        const initialCrossField = snapCrossField?.length ? snapCrossField : undefined
+        // Same reasoning: values restored without the caveats attached to
+        // them re-open looking like values from documents read whole.
+        const initialWarnings = snap?.document_warnings?.length
+          ? snap.document_warnings
+          : undefined
+        openExtraction(
+          activity.search_set_uuid, initialResults, initialSources,
+          initialCrossField, initialWarnings,
+        )
       }
     },
     [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
