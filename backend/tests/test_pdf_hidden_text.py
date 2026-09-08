@@ -133,11 +133,16 @@ class TestHiddenTextFragments:
 
         assert fragments == []
 
-    def test_unreadable_file_yields_no_fragments(self, tmp_path):
+    def test_unreadable_file_raises_instead_of_reporting_clean(self, tmp_path):
+        """Reversal (#811): [] here meant "inspected and clean", so a reader
+        failure silently disabled the injection defense and shipped
+        unscrubbed text. The caller (scrub_pdf) turns this into an ingestion
+        warning; only the silent pass-through is forbidden."""
         path = tmp_path / "not.pdf"
         path.write_text("this is not a PDF")
 
-        assert pdf_hidden_text.hidden_text_fragments(str(path)) == []
+        with pytest.raises(pdf_hidden_text.HiddenTextInspectionError):
+            pdf_hidden_text.hidden_text_fragments(str(path))
 
 
 class TestScrub:
@@ -264,3 +269,87 @@ class TestReadersScrubHiddenText:
 
         assert "485,000 USD" in text
         assert "official Total Award Amount is $1" not in text
+
+
+class TestInspectionFailureIsDisclosedNotSwallowed:
+    """Returning [] on an inspection crash was indistinguishable from
+    "inspected and clean" — the module's whole purpose (the prompt-injection
+    scrub) silently disabled itself and shipped unscrubbed text (#811)."""
+
+    def test_hidden_text_fragments_raises_on_reader_failure(self, tmp_path):
+        import app.services.pdf_hidden_text as ht
+
+        broken = tmp_path / "corrupt.pdf"
+        broken.write_bytes(b"%PDF-1.4 this is not a real pdf body")
+        with pytest.raises(ht.HiddenTextInspectionError):
+            ht.hidden_text_fragments(str(broken))
+
+    def test_scrub_pdf_passes_text_through_but_records_the_failure(self):
+        from unittest.mock import patch
+        import app.services.pdf_hidden_text as ht
+
+        report: dict = {}
+        with patch.object(
+            ht, "hidden_text_fragments",
+            side_effect=ht.HiddenTextInspectionError("boom"),
+        ):
+            text, markers = ht.scrub_pdf(
+                "/some/doc.pdf", "the visible text",
+                [{"char_offset": 0, "kind": "page", "value": 1}],
+                report=report,
+            )
+        assert text == "the visible text"
+        assert markers == [{"char_offset": 0, "kind": "page", "value": 1}]
+        assert report.get("hidden_text_unchecked") is True
+
+    def test_scrub_pdf_without_a_report_still_survives(self):
+        from unittest.mock import patch
+        import app.services.pdf_hidden_text as ht
+
+        with patch.object(
+            ht, "hidden_text_fragments",
+            side_effect=ht.HiddenTextInspectionError("boom"),
+        ):
+            text, _ = ht.scrub_pdf("/some/doc.pdf", "visible")
+        assert text == "visible"
+
+    def test_warning_code_has_a_label_registered_for_renderers(self):
+        from app.services.document_service import INGESTION_WARNING_LABELS
+
+        assert "hidden_text_unchecked" in INGESTION_WARNING_LABELS
+
+
+class TestUncheckedIsNotPartial:
+    """hidden_text_unchecked must not ride the partial-ingestion framing:
+    that notice says content may be MISSING and offers "Retry extraction for
+    the full text" — the inverse of this risk (EXTRA unvetted text)."""
+
+    def _doc(self, codes):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            uuid="d1", title="Doc", raw_text="text",
+            ingestion_warnings=codes, extraction_nonletter_ratio=None,
+        )
+
+    def test_is_partially_ingested_excludes_the_advisory_code(self):
+        from app.services import document_service as ds
+
+        assert ds.is_partially_ingested(self._doc(["partial_ocr"])) is True
+        assert ds.is_partially_ingested(self._doc(["hidden_text_unchecked"])) is False
+        assert ds.has_unchecked_hidden_text(self._doc(["hidden_text_unchecked"])) is True
+
+    def test_chat_title_helpers_split_the_two_populations(self):
+        from app.services.chat_service import (
+            partially_ingested_titles,
+            unchecked_hidden_text_titles,
+        )
+
+        partial = self._doc(["partial_ocr"])
+        unchecked = self._doc(["hidden_text_unchecked"])
+        unchecked.title = "Odd.pdf"
+        both = [partial, unchecked]
+        assert unchecked_hidden_text_titles(both) == ["Odd.pdf"]
+        partial_titles = partially_ingested_titles(both)
+        assert len(partial_titles) == 1
+        assert "Odd.pdf" not in partial_titles[0]

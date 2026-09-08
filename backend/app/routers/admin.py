@@ -1800,28 +1800,41 @@ async def update_model(
         new_api_key = encrypt_value(new_api_key)
 
     prev_name = cfg.available_models[index].get("name", "")
-    cfg.available_models[index] = {
+    # MERGE onto the stored entry, and only for fields the client actually
+    # sent. A whole-dict assignment destroyed every key this form does not
+    # manage — including the three the context budget reads (tokenizer_path,
+    # tokenizer_cache_root, token_safety_margin), so editing a model's
+    # display tier silently reset how its tokens are counted back to the
+    # guessed 1.5× margin (#817).
+    #
+    # `model_fields_set` is what makes this total rather than a fixed
+    # allowlist: a field the form omits keeps its stored value instead of
+    # being overwritten with the schema default. That matters today for
+    # cost_per_1m_input/cost_per_1m_output — declared on the request but
+    # never sent by ModelEditor, so writing them unconditionally reset
+    # out-of-band cost rates to None and silently dropped KB Autovalidate's
+    # dollar estimates back to tokens-only. Sending a field explicitly as
+    # null still clears it, which is the behaviour a form control needs.
+    sent = body.model_fields_set
+    merged = dict(cfg.available_models[index])
+    merged.update({
         "id": model_id,
         "name": body.name,
         "tag": body.tag,
-        "external": body.external,
-        "thinking": body.thinking,
-        "endpoint": body.endpoint or "",
-        "api_protocol": body.api_protocol or "",
         "api_key": new_api_key,
-        "speed": body.speed or "",
-        "tier": body.tier or "",
-        "privacy": body.privacy or "",
-        "supports_structured": body.supports_structured,
-        "multimodal": body.multimodal,
-        "supports_pdf": body.supports_pdf,
-        "context_window": body.context_window,
-        "request_timeout_seconds": body.request_timeout_seconds,
-        "response_reserve_tokens": body.response_reserve_tokens,
-        "temperature": body.temperature,
-        "cost_per_1m_input": body.cost_per_1m_input,
-        "cost_per_1m_output": body.cost_per_1m_output,
-    }
+    })
+    _blank_to_empty = {"endpoint", "api_protocol", "speed", "tier", "privacy"}
+    for field in (
+        "external", "thinking", "endpoint", "api_protocol", "speed", "tier",
+        "privacy", "supports_structured", "multimodal", "supports_pdf",
+        "context_window", "request_timeout_seconds", "response_reserve_tokens",
+        "temperature", "cost_per_1m_input", "cost_per_1m_output",
+    ):
+        if field not in sent:
+            continue
+        value = getattr(body, field)
+        merged[field] = (value or "") if field in _blank_to_empty else value
+    cfg.available_models[index] = merged
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
         cfg.default_model = body.name

@@ -64,6 +64,11 @@ services:
         # Baked into /app/VERSION so the app self-reports its build.
         # setup.sh exports VERSION (git describe); defaults to "dev" otherwise.
         VERSION: ${VERSION:-dev}
+        # Set INSTALL_BROWSER=false to build without headless Chromium (~1 GB,
+        # 112 OS packages). Declared on both services that build this Dockerfile
+        # so one setting cannot leave the api and celery images disagreeing
+        # about whether a browser is there to launch. See DEPLOY.md.
+        INSTALL_BROWSER: ${INSTALL_BROWSER:-true}
     depends_on:
       redis:
         condition: service_healthy
@@ -105,6 +110,11 @@ services:
         # Baked into /app/VERSION so the app self-reports its build.
         # setup.sh exports VERSION (git describe); defaults to "dev" otherwise.
         VERSION: ${VERSION:-dev}
+        # Set INSTALL_BROWSER=false to build without headless Chromium (~1 GB,
+        # 112 OS packages). Declared on both services that build this Dockerfile
+        # so one setting cannot leave the api and celery images disagreeing
+        # about whether a browser is there to launch. See DEPLOY.md.
+        INSTALL_BROWSER: ${INSTALL_BROWSER:-true}
     depends_on:
       redis:
         condition: service_healthy

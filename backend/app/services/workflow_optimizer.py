@@ -1051,6 +1051,11 @@ async def _run_single_trial(
                 step_overrides=step_overrides,
                 test_input=ti,
             )
+        except OptimizationInputError:
+            # A precondition/build failure is identical for every trial and
+            # every input — let run_optimization fail the run once with the
+            # actionable message rather than recording N trial failures.
+            raise
         except Exception as e:
             logger.warning("Trial %s on input %s failed: %s", label, ti.get("id"), e)
             error = str(e)
@@ -1155,13 +1160,26 @@ async def _execute_workflow_inproc(
     can't afford the queue round-trip for every trial.
     """
     from app.models.system_config import SystemConfig
-    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
+    from app.services.workflow_engine import (
+        WorkflowStepError,
+        build_workflow_engine,
+        sanitize_step_name,
+    )
 
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
 
     # Default model: same resolution path Celery uses.
     model = await get_user_model_name(user_id)
+
+    # Code execution is gated on the OPTIMIZING user's admin status, the same
+    # rule the manual run path applies. Hardcoding False here made the
+    # builder's refusal fail every autotune of a workflow carrying a Code
+    # Execution step, admin or not.
+    from app.models.user import User as _User
+
+    _u = await _User.find_one(_User.user_id == user_id)
+    allow_code_execution = bool(_u and getattr(_u, "is_admin", False))
 
     # Build steps_data the same way execute_workflow_task does, but driven by
     # wf_data (already-expanded steps) instead of raw mongo lookups.
@@ -1172,12 +1190,17 @@ async def _execute_workflow_inproc(
     )
 
     def _run() -> tuple[Any, list, int, int]:
+        # Deliberately outside the except below: a build refusal (unknown
+        # task type, rejected Code Execution) is override-independent, so it
+        # would fail every trial identically. It propagates and is converted
+        # to OptimizationInputError so the RUN fails once, with the builder's
+        # actionable message, instead of N cryptic trial failures.
         engine = build_workflow_engine(
             steps_data=steps_data,
             model=model,
             user_id=user_id,
             system_config_doc=sys_config_doc,
-            allow_code_execution=False,
+            allow_code_execution=allow_code_execution,
             config_override={"step_overrides": step_overrides} if step_overrides else None,
         )
         # No progress updater — the optimizer reports trial-level progress, not
@@ -1188,7 +1211,10 @@ async def _execute_workflow_inproc(
             return None, [], engine.usage.tokens_in, engine.usage.tokens_out
         return final_output, data, engine.usage.tokens_in, engine.usage.tokens_out
 
-    final_output, data, tokens_in, tokens_out = await asyncio.to_thread(_run)
+    try:
+        final_output, data, tokens_in, tokens_out = await asyncio.to_thread(_run)
+    except WorkflowStepError as e:
+        raise OptimizationInputError(str(e)) from e
 
     # Recover a steps_output dict in the shape `_evaluate_checks_against_output`
     # expects (keyed by sanitized step name).

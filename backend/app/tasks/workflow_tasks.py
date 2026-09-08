@@ -8,6 +8,7 @@ import logging
 
 from app.celery_app import celery_app
 from app.services.form_fill import DOC_META_TASKS, document_meta
+from app.exceptions import TrialSpendBlockedError
 from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
@@ -769,6 +770,37 @@ def _classify_input_documents(db, workflow_doc: dict, doc_uuids: list[str]):
     return ready, processing, failed
 
 
+def _spend_block_code(exc: BaseException) -> str:
+    """Machine-readable code for a TrialSpendBlockedError.
+
+    The family has two members and they need different remedies: an
+    exhausted budget wants a top-up, an unverified account wants the
+    confirmation link. Hardcoding "budget_exhausted" for both offered the
+    wrong fix to the one a click solves.
+    """
+    from app.exceptions import TrialUnverifiedError
+
+    return "email_unverified" if isinstance(exc, TrialUnverifiedError) else "budget_exhausted"
+
+
+def _activity_owner(db, activity_id) -> str | None:
+    """The user who launched the run, from its activity-rail entry.
+
+    The rail row carries the launcher, who may differ from the workflow's
+    owner (a teammate running a shared workflow) — bells about a run should
+    reach the person who started it when known.
+    """
+    if not activity_id:
+        return None
+    from bson import ObjectId
+
+    try:
+        row = db.activity_event.find_one({"_id": ObjectId(activity_id)}, {"user_id": 1})
+        return (row or {}).get("user_id")
+    except Exception:
+        return None
+
+
 def _mark_workflow_failed(
     db, workflow_result_id, activity_id, error_msg, error_payload=None, notify=True,
 ):
@@ -1029,14 +1061,22 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         }},
     )
 
-    engine = build_workflow_engine(
-        steps_data=steps_data,
-        model=model,
-        user_id=user_id,
-        system_config_doc=sys_config,
-        allow_code_execution=is_admin,
-        config_override=workflow_doc.get("config_override"),
-    )
+    # The builder refuses definitions it cannot honor (unknown task type, a
+    # Code Execution task for a non-admin) instead of skipping the step; the
+    # build sits outside the main try, so the refusal must mark the run
+    # failed here or it would strand the row at "running" for the reaper.
+    try:
+        engine = build_workflow_engine(
+            steps_data=steps_data,
+            model=model,
+            user_id=user_id,
+            system_config_doc=sys_config,
+            allow_code_execution=is_admin,
+            config_override=workflow_doc.get("config_override"),
+        )
+    except WorkflowStepError as e:
+        _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
+        return {"status": "error", "result_id": workflow_result_id}
 
     # Any pickup resumes where a previous attempt stopped, decided from the
     # run document itself: a fresh run has no stored step output, so
@@ -1147,14 +1187,42 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # Polled by the engine between steps. The cancel endpoint flips the result
     # status to "canceled"; this lets a run that is between steps stop cleanly
     # (a mid-step stop is handled out-of-band by Celery task revocation).
+    _cancel_check_oid = ObjectId(workflow_result_id)
+
     def should_cancel() -> bool:
+        # A swallowed DB blip used to make a user's Cancel silently not take —
+        # the run kept going and kept spending. False remains the failure
+        # answer (spuriously canceling healthy runs on a blip is worse), but
+        # never quietly: the error log names the consequence. No retry here —
+        # a dead connection blocks for the full server-selection timeout, and
+        # pymongo already retries reads internally, so a second attempt only
+        # doubles the stall for the same answer.
         try:
             doc = db.workflow_result.find_one(
-                {"_id": ObjectId(workflow_result_id)}, {"status": 1},
+                {"_id": _cancel_check_oid}, {"status": 1},
             )
             return bool(doc and doc.get("status") == "canceled")
-        except Exception:
+        except Exception as e:
+            logger.error(
+                "Cancel check failed for run %s (%s) — a pending Cancel "
+                "will not take effect this step",
+                workflow_result_id, e,
+            )
             return False
+
+    def check_budget() -> None:
+        # The same gate metered() applies at run entry, re-applied between
+        # steps: a trial account that crosses its budget mid-run stops at the
+        # next step boundary instead of overrunning arbitrarily (#808).
+        # The run's own spend is still in the live MeterScope — its ledger row
+        # is not written until the scope exits — so it is passed explicitly;
+        # without it the gate would re-read an unchanged total every time.
+        from app.services.metering import current_scope
+        from app.services.trial_budget import check_sync
+
+        scope = current_scope()
+        in_flight = (scope.tokens_in + scope.tokens_out) if scope else 0
+        check_sync(user_id, extra_used=in_flight)
 
     try:
         from app.services.metering import metered
@@ -1169,6 +1237,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 start_index=start_index,
                 initial_output=initial_output,
                 should_cancel=should_cancel,
+                check_budget=check_budget,
             )
         if start_index:
             # execute() reports only the steps this pass ran. Without the
@@ -1206,6 +1275,20 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         # no re-raise, so it neither retries nor lands in Sentry as a crash.
         logger.warning("Workflow %s failed: %s", workflow_id, e)
         _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
+        return {"status": "error", "result_id": workflow_result_id}
+    except TrialSpendBlockedError as e:
+        # The between-steps budget gate tripped (#808): the trial budget ran
+        # out mid-run. A clean, honest stop at a step boundary — completed
+        # steps are preserved in steps_output, nothing truncated is presented
+        # as complete, and retrying cannot help until the budget changes.
+        logger.warning(
+            "Workflow %s stopped at a step boundary — trial budget exhausted",
+            workflow_id,
+        )
+        _mark_workflow_failed(
+            db, workflow_result_id, activity_id, str(e),
+            error_payload={"code": _spend_block_code(e)},
+        )
         return {"status": "error", "result_id": workflow_result_id}
     except Exception as e:
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
@@ -1292,7 +1375,31 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 if fresh_result:
                     save_results_to_folder(fresh_result, storage_cfg)
             except Exception as e:
+                # The run completed and its results are viewable, but the
+                # configured deliverable never left the building — recorded on
+                # the run and belled, not just logged (#810). Guarded like the
+                # rest of the finalize block: this sits after the finalized_at
+                # claim, so an escape here (e.g. a correlated Mongo failover)
+                # would strand the activity and skip num_executions on the
+                # retry that finds the claim already taken.
                 logger.exception("Failed to save workflow output to library: %s", e)
+                try:
+                    detail = "The output could not be saved to the library."
+                    db.workflow_result.update_one(
+                        {"_id": ObjectId(workflow_result_id)},
+                        {"$push": {"delivery_failures": f"{detail} {str(e)[:200]}"}},
+                    )
+                    from app.services.failure_notifications import notify_delivery_failed
+
+                    notify_delivery_failed(
+                        db, workflow_doc=workflow_doc, detail=detail, error=e,
+                        user_id=_activity_owner(db, activity_id),
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not record delivery failure for run %s",
+                        workflow_result_id,
+                    )
 
         # Increment workflow execution count
         db.workflow.update_one(
@@ -1462,7 +1569,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = DataExportNode(data=task_data)
     elif task_name == "PackageBuilder":
         process_node = PackageBuilderNode(data=task_data)
-    elif task_name == "BrowserAutomation":
+    elif task_name in ("BrowserAutomation", "Browser"):
+        # Same alias the builder accepts — the editor persists "Browser".
         process_node = BrowserAutomationNode(data=task_data)
     elif task_name == "KnowledgeBaseQuery":
         process_node = KnowledgeBaseQueryNode(data=task_data)
@@ -1604,19 +1712,33 @@ def resume_workflow_after_approval(self, approval_uuid):
     # no API key.
     model = result_doc.get("model") or _default_model_from_config(sys_config)
 
-    engine = build_workflow_engine(
-        steps_data=steps_data,
-        model=model,
-        user_id=user_id,
-        system_config_doc=sys_config,
-        allow_code_execution=is_admin,
-        config_override=workflow_doc.get("config_override"),
-    )
-
-    # Resolved before the try so the failure handler below can always reach it.
+    # Resolved before the build so its refusal handler can reach it too.
     _act = db.activity_event.find_one(
         {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
     )
+
+    # Same build-refusal handling as execute_workflow_task: an unknown task
+    # type or a rejected Code Execution task fails the run with the builder's
+    # message instead of stranding it at "running".
+    try:
+        engine = build_workflow_engine(
+            steps_data=steps_data,
+            model=model,
+            user_id=user_id,
+            system_config_doc=sys_config,
+            allow_code_execution=is_admin,
+            config_override=workflow_doc.get("config_override"),
+        )
+    except WorkflowStepError as e:
+        _mark_workflow_failed(
+            db, workflow_result_id, _act["_id"] if _act else None, str(e),
+        )
+        # Every path out of the approval wait must drop the pause marker
+        # (see _clear_pause_marker) — leaving it would show a failed run as
+        # "awaiting approval" forever and exempt it from the stale reaper.
+        if _act:
+            _clear_pause_marker(db, _act["_id"])
+        return {"status": "error", "result_id": workflow_result_id}
 
     # The run is moving again: drop the pause marker so the rail stops showing
     # "awaiting approval" and the stale reaper starts covering this row again.
@@ -1647,6 +1769,16 @@ def resume_workflow_after_approval(self, approval_uuid):
             workflow_id, self.request.retries, self.max_retries, resume_index,
         )
 
+    def check_budget() -> None:
+        # Same mid-run budget gate as execute_workflow_task (#808), including
+        # the live scope's not-yet-flushed spend.
+        from app.services.metering import current_scope
+        from app.services.trial_budget import check_sync
+
+        scope = current_scope()
+        in_flight = (scope.tokens_in + scope.tokens_out) if scope else 0
+        check_sync(user_id, extra_used=in_flight)
+
     try:
         from app.services.metering import metered
         with metered(
@@ -1659,6 +1791,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                 workflow_result_updater=update_progress,
                 start_index=resume_index,
                 initial_output=resume_output,
+                check_budget=check_budget,
             )
         # execute() reports only the steps this pass ran. Prepend the ones
         # earlier passes completed, replayed from the persisted steps_output,
@@ -1673,6 +1806,18 @@ def resume_workflow_after_approval(self, approval_uuid):
         db.workflow_result.update_one(
             {"_id": ObjectId(workflow_result_id)},
             {"$set": {"status": "error", "error": str(e)}},
+        )
+        return {"status": "error", "result_id": workflow_result_id}
+    except TrialSpendBlockedError as e:
+        # Same between-steps budget stop as execute_workflow_task (#808).
+        logger.warning(
+            "Resumed workflow %s stopped at a step boundary — trial budget exhausted",
+            workflow_id,
+        )
+        _mark_workflow_failed(
+            db, workflow_result_id,
+            str(_act["_id"]) if _act else None, str(e),
+            error_payload={"code": _spend_block_code(e)},
         )
         return {"status": "error", "result_id": workflow_result_id}
     except Exception as e:
