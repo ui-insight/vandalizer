@@ -2,7 +2,7 @@
 # Node 24 bundles npm 11, which is required to read this package-lock.json
 # (see the note above `npm ci` below). Build-stage only — the runtime image
 # is nginx, so this does not affect what is served.
-FROM node:24-alpine AS builder
+FROM docker.io/library/node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -43,7 +43,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Serve with nginx
-FROM nginx:alpine AS runtime
+FROM docker.io/library/nginx:alpine AS runtime
 
 RUN apk add --no-cache curl
 

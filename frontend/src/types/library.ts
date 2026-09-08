@@ -40,6 +40,9 @@ export interface LibraryItem {
   last_used_at: string | null
   quality_tier?: string | null
   quality_score?: number | null
+  /** True when the tier is a hand-typed catalog assertion with no measured
+   *  validation score behind it — the badge must not present it as measured. */
+  quality_asserted?: boolean
   last_validated_at?: string | null
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
@@ -115,12 +118,16 @@ export interface CatalogCoverageItem {
   coverage_order: number
   quality_score: number | null
   quality_tier: string | null
+  quality_asserted: boolean
   last_validated_at: string | null
   official_baseline_pinned_at: string | null
   official_baseline_score: number | null
   official_baseline_test_case_count: number
   last_drift_check_at: string | null
   last_drift_score: number | null
+  /** "baseline_reexecution" = the frozen baseline was actually re-run;
+   *  "latest_validation_proxy" = the item's latest validation score stood in. */
+  last_drift_basis: 'baseline_reexecution' | 'latest_validation_proxy' | null
 }
 
 export interface VerifiedItemMetadata {
@@ -162,6 +169,9 @@ export interface VerifiedCatalogItem {
   organization_ids: string[]
   quality_score: number | null
   quality_tier: string | null
+  /** True when the tier is a hand-typed catalog assertion with no measured
+   *  validation score behind it — render as a claim, not a measurement. */
+  quality_asserted?: boolean
   quality_grade: string | null
   last_validated_at: string | null
   validation_run_count: number

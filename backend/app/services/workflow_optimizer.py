@@ -1169,8 +1169,14 @@ async def _execute_workflow_inproc(
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
 
-    # Default model: same resolution path Celery uses.
-    model = await get_user_model_name(user_id)
+    # Default model: same resolution path Celery uses -- the workflow's own
+    # default first, then the user's. Measuring the workflow on a model it will
+    # not run on makes the score, and any tuning derived from it, describe a
+    # configuration that never executes.
+    model = (
+        (wf_data.get("input_config") or {}).get("default_model")
+        or await get_user_model_name(user_id)
+    )
 
     # Code execution is gated on the OPTIMIZING user's admin status, the same
     # rule the manual run path applies. Hardcoding False here made the

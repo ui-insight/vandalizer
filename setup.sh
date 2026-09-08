@@ -60,6 +60,7 @@ SYM_PULSE="${DEEP_CYAN}⟐${RESET}"
 ENV_FILE="backend/.env"
 ENV_EXAMPLE="backend/.env.example"
 COMPOSE_CMD="docker compose"
+CONTAINER_CLI="docker"
 SETUP_LOG=".setup.log"
 ERRORS=()
 
@@ -86,6 +87,60 @@ die() {
   echo -e "  ${RED}${BOLD}Fatal:${RESET} $1"
   echo ""
   exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Container-engine compatibility layer
+#
+# The compose frontend may be Docker Compose v2, docker-compose v1, or
+# podman-compose. Their `ps --format` templates differ (podman-compose
+# forwards to `podman ps`, which has no .Service/.Health fields), so all
+# container introspection goes through the engine CLI instead, keyed on the
+# com.docker.compose.* labels that every compose implementation attaches.
+# ---------------------------------------------------------------------------
+
+# Compose project name: explicit override, else the lowercased directory
+# name — the default every compose implementation derives.
+compose_project() {
+  if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
+    echo "$COMPOSE_PROJECT_NAME"
+  else
+    basename "$PWD" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g'
+  fi
+}
+
+# Name of the container backing a compose service; empty if none exists.
+compose_container() {
+  local c
+  # Prefer a running container: `ps -a` lists exited and one-off `compose run`
+  # containers too, newest first, and an exec against one of those fails with
+  # a confusing error instead of "the API container is not running".
+  for flag in "" "-a"; do
+    c=$($CONTAINER_CLI ps $flag \
+      --filter "label=com.docker.compose.project=$(compose_project)" \
+      --filter "label=com.docker.compose.service=$1" \
+      --format '{{.Names}}' 2>/dev/null | head -1)
+    [[ -n "$c" ]] && break
+  done
+  echo "$c"
+}
+
+# State (running/exited/restarting/...) of a service's container; empty if
+# the container doesn't exist.
+compose_state() {
+  local c
+  c=$(compose_container "$1")
+  [[ -n "$c" ]] || return 0
+  $CONTAINER_CLI inspect --format '{{.State.Status}}' "$c" 2>/dev/null
+}
+
+# Health (healthy/unhealthy/starting) of a service's container; empty when
+# the container doesn't exist or defines no healthcheck.
+compose_health() {
+  local c
+  c=$(compose_container "$1")
+  [[ -n "$c" ]] || return 0
+  $CONTAINER_CLI inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null
 }
 
 # Typewriter effect — prints text one character at a time
@@ -258,8 +313,7 @@ code_version_latest() {
 # reachable or no catalog_version is recorded.
 _catalog_version_from_db() {
   local container
-  container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null \
-    | awk '$1=="mongo"{print $2}' || true)
+  container=$(compose_container mongo)
   [[ -z "$container" ]] && return 1
 
   local db="vandalizer"
@@ -270,7 +324,7 @@ _catalog_version_from_db() {
   fi
 
   local v
-  v=$(docker exec "$container" mongosh --quiet --eval \
+  v=$($CONTAINER_CLI exec "$container" mongosh --quiet --eval \
     "var c = db.getSiblingDB('${db}').system_config.findOne({}, {catalog_version: 1}); print(c && c.catalog_version ? c.catalog_version : '');" \
     2>/dev/null | tr -d '[:space:]')
 
@@ -342,31 +396,39 @@ show_versions() {
 preflight() {
   section "0" "Pre-Flight Diagnostics"
 
-  # Docker
+  # Container engine (Docker, or Podman — possibly behind the docker wrapper)
   if command -v docker &>/dev/null; then
     local docker_version
     docker_version=$(docker --version 2>/dev/null | head -1)
     echo -e "  ${SYM_CHECK}  Docker detected ${DIM}(${docker_version})${RESET}"
+  elif command -v podman &>/dev/null; then
+    CONTAINER_CLI="podman"
+    local podman_version
+    podman_version=$(podman --version 2>/dev/null | head -1)
+    echo -e "  ${SYM_CHECK}  Podman detected ${DIM}(${podman_version})${RESET}"
   else
-    die "Docker is not installed. Get it at https://docs.docker.com/get-docker/"
+    die "No container engine found. Install Docker (https://docs.docker.com/get-docker/) or Podman (https://podman.io/docs/installation)."
   fi
 
-  # Docker Compose
+  # Compose frontend: docker compose v2, docker-compose v1, or podman-compose
   if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
     COMPOSE_CMD="docker-compose"
     if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
-      die "Docker Compose is not installed. Get it at https://docs.docker.com/compose/install/"
+      COMPOSE_CMD="podman-compose"
+      if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+        die "No Compose implementation found. Install Docker Compose (https://docs.docker.com/compose/install/) or podman-compose."
+      fi
     fi
   fi
   local compose_version
   compose_version=$($COMPOSE_CMD version --short 2>/dev/null || $COMPOSE_CMD version 2>/dev/null | head -1)
-  echo -e "  ${SYM_CHECK}  Docker Compose detected ${DIM}(${compose_version})${RESET}"
+  echo -e "  ${SYM_CHECK}  Compose detected ${DIM}(${COMPOSE_CMD}, ${compose_version})${RESET}"
 
-  # Docker daemon
-  if docker info &>/dev/null 2>&1; then
-    echo -e "  ${SYM_CHECK}  Docker daemon is running"
+  # Engine is usable (daemon running, or rootless podman configured)
+  if $CONTAINER_CLI info &>/dev/null 2>&1; then
+    echo -e "  ${SYM_CHECK}  Container engine is running"
   else
-    die "Docker daemon is not running. Start Docker Desktop or the Docker service."
+    die "Container engine is not responding. Start Docker Desktop / the Docker service, or check 'podman info'."
   fi
 
   # compose.yaml
@@ -712,7 +774,7 @@ launch_services() {
     # Restart any unhealthy infra containers and wait again
     for svc in redis mongo chromadb; do
       local health
-      health=$($COMPOSE_CMD ps --format '{{.Service}} {{.Health}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+      health=$(compose_health "$svc")
       if [[ "$health" != "healthy" && "$health" != "(healthy)" ]]; then
         $COMPOSE_CMD restart "$svc" >> "$SETUP_LOG" 2>&1
       fi
@@ -727,7 +789,7 @@ launch_services() {
   if [[ "$infra_ok" == false ]]; then
     echo ""
     echo -e "  ${SYM_CROSS}  ${RED}${BOLD}Infrastructure services are not healthy. Cannot start application layer.${RESET}"
-    echo -e "  ${DIM}     Check logs: docker compose logs redis mongo chromadb${RESET}"
+    echo -e "  ${DIM}     Check logs: ${COMPOSE_CMD} logs redis mongo chromadb${RESET}"
     echo -e "  ${DIM}     Then re-run: ./setup.sh --repair${RESET}"
     echo ""
     return 1
@@ -742,7 +804,7 @@ launch_services() {
   run_step "Starting frontend" $COMPOSE_CMD up -d frontend
 
   # Clean up dangling images from the build
-  docker image prune -f >> "$SETUP_LOG" 2>&1 || true
+  $CONTAINER_CLI image prune -f >> "$SETUP_LOG" 2>&1 || true
 
   echo ""
   echo -e "  ${SYM_PULSE}  ${DIM}Waiting for API to come online...${RESET}"
@@ -766,7 +828,7 @@ wait_healthy() {
 
   while [[ $elapsed -lt $timeout ]]; do
     local health
-    health=$($COMPOSE_CMD ps --format '{{.Service}} {{.Health}}' 2>/dev/null | grep "^${service} " | awk '{print $2}' || true)
+    health=$(compose_health "$service")
 
     if [[ "$health" == "healthy" || "$health" == "(healthy)" ]]; then
       printf "\r  ${SYM_CHECK}  %-20s ${GREEN}healthy${RESET}          \n" "$label"
@@ -867,7 +929,7 @@ bootstrap() {
   # Pipe credentials into the container to avoid shell expansion issues with
   # special characters in passwords (e.g. $, !, \, `)
   local container_name
-  container_name=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}')
+  container_name=$(compose_container api)
 
   local bootstrap_output=""
   local bootstrap_exit=1
@@ -875,7 +937,7 @@ bootstrap() {
   if [[ -n "$container_name" ]]; then
     # Pass credentials via stdin to Python — no shell expansion, no temp files
     bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" "$ORG_NAME" | \
-      docker exec -i "$container_name" python -c "
+      $CONTAINER_CLI exec -i "$container_name" python -c "
 import sys, os, runpy
 lines = sys.stdin.read().split('\n')
 os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
@@ -1028,7 +1090,7 @@ verify() {
 
   # Celery
   local celery_state
-  celery_state=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}}' 2>/dev/null | grep "^celery " | awk '{print $2}' || true)
+  celery_state=$(compose_state celery)
   if [[ "$celery_state" == "running" ]]; then
     echo -e "  ${SYM_CHECK}  Celery workers          ${GREEN}running${RESET}"
   else
@@ -1041,7 +1103,7 @@ verify() {
   echo ""
 
   local MONGO_CONTAINER
-  MONGO_CONTAINER=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
+  MONGO_CONTAINER=$(compose_container mongo)
 
   local MONGO_DB="vandalizer"
   if [[ -f "$ENV_FILE" ]]; then
@@ -1058,7 +1120,7 @@ verify() {
       local expected="$4"
 
       local count
-      count=$(docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+      count=$($CONTAINER_CLI exec "$MONGO_CONTAINER" mongosh --quiet --eval \
         "db.getSiblingDB('${MONGO_DB}').${collection}.countDocuments(${filter})" 2>/dev/null || echo "-1")
 
       if [[ "$count" == "-1" ]]; then
@@ -1087,7 +1149,7 @@ verify() {
   echo ""
 
   for vol in mongo-data chroma-data uploads; do
-    if docker volume inspect "vandalizer_${vol}" &>/dev/null 2>&1 || docker volume inspect "${vol}" &>/dev/null 2>&1; then
+    if $CONTAINER_CLI volume inspect "vandalizer_${vol}" &>/dev/null 2>&1 || $CONTAINER_CLI volume inspect "${vol}" &>/dev/null 2>&1; then
       echo -e "  ${SYM_CHECK}  ${vol}"
     else
       echo -e "  ${SYM_WARN}  ${vol} ${DIM}(not yet created)${RESET}"
@@ -1149,8 +1211,8 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --cron-setup${RESET}    ${DIM}Schedule auto-updates${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --reset-email${RESET}   ${DIM}Reconfigure email${RESET}        ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
-  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
-  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose down${RESET}        ${DIM}Stop everything${RESET}            ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}${COMPOSE_CMD} logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}${COMPOSE_CMD} down${RESET}        ${DIM}Stop everything${RESET}            ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}╚══════════════════════════════════════════════════════════════╝${RESET}"
 
@@ -1224,19 +1286,27 @@ repair() {
   # Determine the compose project name to find images
   local project_name
   project_name=$($COMPOSE_CMD config --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null || true)
+  [[ -z "$project_name" ]] && project_name=$(compose_project)
 
   local need_backend_build=false
   local need_frontend_build=false
 
+  # Compose v2 tags built images project-service; docker-compose v1 and
+  # podman-compose tag project_service.
+  image_exists() {
+    $CONTAINER_CLI image inspect "${project_name}-$1" &>/dev/null 2>&1 \
+      || $CONTAINER_CLI image inspect "${project_name}_$1" &>/dev/null 2>&1
+  }
+
   if [[ -n "$project_name" ]]; then
-    if docker image inspect "${project_name}-api" &>/dev/null 2>&1; then
+    if image_exists api; then
       echo -e "  ${SYM_CHECK}  Backend image exists"
     else
       echo -e "  ${SYM_CROSS}  Backend image not found"
       need_backend_build=true
     fi
 
-    if docker image inspect "${project_name}-frontend" &>/dev/null 2>&1; then
+    if image_exists frontend; then
       echo -e "  ${SYM_CHECK}  Frontend image exists"
     else
       echo -e "  ${SYM_CROSS}  Frontend image not found"
@@ -1280,8 +1350,8 @@ repair() {
     local label
     label=$(echo "$svc" | sed 's/redis/Redis/;s/mongo/MongoDB/;s/chromadb/ChromaDB/')
     local state health
-    state=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
-    health=$($COMPOSE_CMD ps --format '{{.Service}} {{.Health}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+    state=$(compose_state "$svc")
+    health=$(compose_health "$svc")
 
     if [[ "$state" == "running" && ("$health" == "healthy" || "$health" == "(healthy)") ]]; then
       echo -e "  ${SYM_CHECK}  ${label} is healthy"
@@ -1319,7 +1389,7 @@ repair() {
     esac
 
     local state
-    state=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+    state=$(compose_state "$svc")
 
     if [[ "$state" == "running" ]]; then
       echo -e "  ${SYM_CHECK}  ${label} is running"
@@ -1348,7 +1418,7 @@ repair() {
   echo ""
 
   local MONGO_CONTAINER
-  MONGO_CONTAINER=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
+  MONGO_CONTAINER=$(compose_container mongo)
 
   local MONGO_DB="vandalizer"
   if [[ -f "$ENV_FILE" ]]; then
@@ -1361,7 +1431,7 @@ repair() {
 
   if [[ -n "$MONGO_CONTAINER" ]]; then
     local admin_count
-    admin_count=$(docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+    admin_count=$($CONTAINER_CLI exec "$MONGO_CONTAINER" mongosh --quiet --eval \
       "db.getSiblingDB('${MONGO_DB}').user.countDocuments({is_admin: true})" 2>/dev/null || echo "-1")
 
     if [[ "$admin_count" == "-1" ]]; then
@@ -1374,7 +1444,7 @@ repair() {
     fi
 
     local wf_count
-    wf_count=$(docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+    wf_count=$($CONTAINER_CLI exec "$MONGO_CONTAINER" mongosh --quiet --eval \
       "db.getSiblingDB('${MONGO_DB}').workflow.countDocuments({verified: true})" 2>/dev/null || echo "-1")
 
     if [[ "$wf_count" -ge 11 ]]; then
@@ -1414,12 +1484,12 @@ repair() {
       echo ""
 
       local container_name
-      container_name=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}')
+      container_name=$(compose_container api)
 
       local bootstrap_output=""
       if [[ -n "$container_name" ]]; then
         bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" | \
-          docker exec -i "$container_name" python -c "
+          $CONTAINER_CLI exec -i "$container_name" python -c "
 import sys, os, runpy
 lines = sys.stdin.read().split('\n')
 os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
@@ -1779,8 +1849,8 @@ prompt_org_name_if_unset() {
   [[ -t 0 ]] || return 0   # non-interactive (e.g. auto-update) — skip silently
 
   local mongo_container api_container mongo_db current_org
-  mongo_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
-  api_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}' || true)
+  mongo_container=$(compose_container mongo)
+  api_container=$(compose_container api)
   [[ -n "$mongo_container" && -n "$api_container" ]] || return 0
 
   mongo_db="vandalizer"
@@ -1792,7 +1862,7 @@ prompt_org_name_if_unset() {
 
   # Read the current org name. On any query error, skip — better to stay quiet
   # than nag on a transient DB hiccup.
-  current_org=$(docker exec "$mongo_container" mongosh --quiet --eval \
+  current_org=$($CONTAINER_CLI exec "$mongo_container" mongosh --quiet --eval \
     "print(((db.getSiblingDB('${mongo_db}').system_config.findOne()||{}).org_name)||'')" 2>/dev/null | tr -d '\r' || echo "__ERR__")
   [[ "$current_org" == "__ERR__" ]] && return 0
   [[ -n "${current_org// /}" ]] && return 0   # already set — nothing to do
@@ -1813,7 +1883,7 @@ prompt_org_name_if_unset() {
   # Persist through the app's own code: get_config() creates/defaults the
   # singleton safely and never overwrites an already-set value.
   local out
-  out=$(printf '%s' "$ORG_NAME" | docker exec -i "$api_container" python -c "
+  out=$(printf '%s' "$ORG_NAME" | $CONTAINER_CLI exec -i "$api_container" python -c "
 import sys, os, asyncio
 os.environ['ORG_NAME'] = sys.stdin.read().strip()
 from app.config import Settings
@@ -1899,7 +1969,7 @@ configure_telemetry() {
   # containers that consume the telemetry setting (api for the manual check, celery
   # for the scheduled heartbeat) so a single deploy is sufficient. Infra is left
   # untouched; skipped if the stack isn't up yet.
-  if $COMPOSE_CMD ps --status running --services 2>/dev/null | grep -qx "api"; then
+  if [[ "$(compose_state api)" == "running" ]]; then
     echo -e "  ${SYM_PULSE}  ${DIM}Applying telemetry setting to running services...${RESET}"
     $COMPOSE_CMD up -d --force-recreate --no-deps api celery >> "$SETUP_LOG" 2>&1 || true
   fi
@@ -1952,7 +2022,7 @@ do_redeploy() {
   # Clean up dangling images and build cache to reclaim disk space
   echo ""
   echo -e "  ${SYM_PULSE}  ${DIM}Cleaning up old Docker images...${RESET}"
-  docker image prune -f >> "$SETUP_LOG" 2>&1 || true
+  $CONTAINER_CLI image prune -f >> "$SETUP_LOG" 2>&1 || true
 }
 
 # ---------------------------------------------------------------------------
@@ -2045,11 +2115,11 @@ update_catalog() {
 
   # Find the API container
   local container_name
-  container_name=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+  container_name=$(compose_container api)
 
   if [[ -z "$container_name" ]]; then
     echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
-    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    echo -e "  ${DIM}     Start services first: ${COMPOSE_CMD} up -d${RESET}"
     return 1
   fi
 
@@ -2071,7 +2141,7 @@ update_catalog() {
     echo -e "  ${GRAY}       ./setup.sh --upgrade${RESET}"
     return 1
   fi
-  container_catalog=$(docker exec "$container_name" cat seeds/VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
+  container_catalog=$($CONTAINER_CLI exec "$container_name" cat seeds/VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
   if [[ -n "$checkout_catalog" ]] && is_newer "$checkout_catalog" "$container_catalog"; then
     echo -e "  ${SYM_CROSS}  ${RED}${BOLD}The running container is older than your checkout.${RESET}"
     echo -e "  ${DIM}     Container catalog: ${container_catalog:-unknown}   Checkout catalog: ${checkout_catalog}${RESET}"
@@ -2085,7 +2155,7 @@ update_catalog() {
   # Dry run makes no changes; it just lists verified items whose seed_id is gone.
   local prune_flag=""
   local preview
-  if preview=$(docker exec "$container_name" python -m scripts.seed_catalog --prune --dry-run 2>&1); then
+  if preview=$($CONTAINER_CLI exec "$container_name" python -m scripts.seed_catalog --prune --dry-run 2>&1); then
     local retire_count
     retire_count=$(echo "$preview" | grep -E '^Retiring [0-9]+ item' | head -1 | sed -E 's/^Retiring ([0-9]+) item.*/\1/' || echo "0")
     if [[ -n "$retire_count" && "$retire_count" -gt 0 ]]; then
@@ -2112,7 +2182,7 @@ update_catalog() {
 
   # --- Step 2: seed (with --prune only if the user confirmed retirements) ---
   local seed_output
-  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog $prune_flag 2>&1); then
+  if seed_output=$($CONTAINER_CLI exec "$container_name" python -m scripts.seed_catalog $prune_flag 2>&1); then
     # Display the output with indentation
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"
@@ -2152,11 +2222,11 @@ reingest_knowledge_bases() {
 
   # Find the API container
   local container_name
-  container_name=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+  container_name=$(compose_container api)
 
   if [[ -z "$container_name" ]]; then
     echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
-    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    echo -e "  ${DIM}     Start services first: ${COMPOSE_CMD} up -d${RESET}"
     return 1
   fi
 
@@ -2164,7 +2234,7 @@ reingest_knowledge_bases() {
   echo ""
 
   local reingest_output
-  if reingest_output=$(docker exec "$container_name" python -m scripts.reingest_knowledge_bases 2>&1); then
+  if reingest_output=$($CONTAINER_CLI exec "$container_name" python -m scripts.reingest_knowledge_bases 2>&1); then
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"
     done <<< "$reingest_output"
@@ -2198,9 +2268,24 @@ auto_update() {
     echo "=========================================="
   } >> "$AUTO_UPDATE_LOG"
 
-  if ! command -v docker &>/dev/null; then
-    echo "[${stamp}] ERROR: docker not found in PATH" >> "$AUTO_UPDATE_LOG"
+  # Quiet engine/compose detection (this path skips preflight)
+  if command -v docker &>/dev/null; then
+    CONTAINER_CLI="docker"
+  elif command -v podman &>/dev/null; then
+    CONTAINER_CLI="podman"
+  else
+    echo "[${stamp}] ERROR: no container engine (docker or podman) found in PATH" >> "$AUTO_UPDATE_LOG"
     return 1
+  fi
+  if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+    if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+      COMPOSE_CMD="podman-compose"
+      if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+        echo "[${stamp}] ERROR: no Compose implementation found in PATH" >> "$AUTO_UPDATE_LOG"
+        return 1
+      fi
+    fi
   fi
 
   CODE_VERSION_LOCAL=$(code_version_local)
@@ -2452,7 +2537,7 @@ reset_catalog() {
   if [[ -z "$container_name" ]]; then
     echo ""
     echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
-    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    echo -e "  ${DIM}     Start services first: ${COMPOSE_CMD} up -d${RESET}"
     return 1
   fi
 
@@ -2462,7 +2547,7 @@ reset_catalog() {
   echo ""
 
   local seed_output
-  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog --reset 2>&1); then
+  if seed_output=$($CONTAINER_CLI exec "$container_name" python -m scripts.seed_catalog --reset 2>&1); then
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"
     done <<< "$seed_output"
@@ -2489,8 +2574,7 @@ reset_catalog() {
 
 # Helper — locate the running api container by service name.
 _find_api_container() {
-  $COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null \
-    | awk '$1=="api"{print $2}' | head -1
+  compose_container api
 }
 
 # ---------------------------------------------------------------------------
@@ -2760,9 +2844,11 @@ main_menu() {
 # ---------------------------------------------------------------------------
 detect_deployment() {
   # Returns 0 if there's an existing deployment (any containers from this project)
-  local running
-  running=$($COMPOSE_CMD ps --format '{{.Service}}' 2>/dev/null | head -1 || true)
-  [[ -n "$running" ]]
+  local existing
+  existing=$($CONTAINER_CLI ps -a \
+    --filter "label=com.docker.compose.project=$(compose_project)" \
+    --format '{{.Names}}' 2>/dev/null | head -1 || true)
+  [[ -n "$existing" ]]
 }
 
 # ---------------------------------------------------------------------------

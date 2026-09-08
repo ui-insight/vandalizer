@@ -75,13 +75,15 @@ case "${1:-help}" in
 
         echo "All workers started."
 
-        # In Docker, keep the script alive so the container doesn't exit.
+        # In a container, keep the script alive so the container doesn't exit.
         # Detached workers run as child processes — wait for any to exit.
-        # Detect a real container. `/.dockerenv` is Docker-specific; the cgroup
-        # check greps for container runtime markers because /proc/1/cgroup exists
-        # on every Linux host (a bare `-f` test would falsely trigger on local
-        # Linux dev machines and hang the script in the stay-alive loop below).
-        if [ -f /.dockerenv ] || grep -qaE 'docker|containerd|kubepods' /proc/1/cgroup 2>/dev/null; then
+        # Detect a real container. `/.dockerenv` is Docker-specific and
+        # `/run/.containerenv` is podman's equivalent; the cgroup check greps
+        # for container runtime markers because /proc/1/cgroup exists on every
+        # Linux host (a bare `-f` test would falsely trigger on local Linux
+        # dev machines and hang the script in the stay-alive loop below).
+        if [ -f /.dockerenv ] || [ -f /run/.containerenv ] \
+            || grep -qaE 'docker|containerd|kubepods|libpod' /proc/1/cgroup 2>/dev/null; then
             echo "Running in container — staying alive to keep container running."
             # Wait forever, monitoring worker health
             while true; do

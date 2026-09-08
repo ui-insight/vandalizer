@@ -201,7 +201,7 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
     merge (so fixed inputs vanished on resume). A resumed run must execute the
     same configuration the first pass did, so there is one builder.
     """
-    from app.services.workflow_engine import sanitize_step_name
+    from app.services.workflow_engine import apply_step_input_config, sanitize_step_name
 
     steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
 
@@ -216,6 +216,8 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
         if step_doc.get("is_output"):
             output_step_names.append(sanitize_step_name(step_doc.get("name", "")))
 
+        step_data = step_doc.get("data", {}) or {}
+
         tasks = []
         for task_id in step_doc.get("tasks", []):
             task_doc = db.workflow_step_task.find_one({"_id": task_id})
@@ -224,6 +226,12 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
 
             # Resolve extraction keys from search set
             task_data = dict(task_doc.get("data", {}))
+
+            # Input is configured on the step and shared by every task in it.
+            # Applied here, before the document preloads below, so
+            # `select_document` resolves against the step's choice rather than
+            # a stale per-task leftover.
+            apply_step_input_config(step_data, task_data)
             if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
                 ss = db.search_set.find_one({"uuid": task_data["search_set_uuid"]})
                 if ss:
@@ -312,7 +320,7 @@ def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
 
         steps_data.append({
             "name": step_doc.get("name", ""),
-            "data": step_doc.get("data", {}),
+            "data": step_data,
             "tasks": tasks,
         })
 

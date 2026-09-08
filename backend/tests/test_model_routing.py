@@ -22,6 +22,7 @@ Two things make this dangerous if built naively, and both are tested here:
 
 from app.services.model_routing import (
     PRIVACY_RANK,
+    _sized_for,
     choose_document_model,
     suggest_document_model,
 )
@@ -281,3 +282,118 @@ class TestSizingAgainstTheCandidate:
         assert suggestion is None, (
             "offered a model whose own count would not fit the request"
         )
+
+
+class TestTheCallerCanSayHowItMeasured:
+    """The margin `input_tokens` was measured with is the caller's fact.
+
+    `_sized_for` used to re-derive it from the model name and config. That
+    works only while every count comes from the same estimate-plus-default
+    path. A request counted by the provider itself carries a much tighter
+    margin, and `token_safety_margin` cannot know that happened — it still
+    answers 1.5. Dividing an already-tight number by a factor never applied
+    understates the request by ~a third exactly where the router is deciding
+    whether a candidate can hold it: the #648 "estimate reads low, so the
+    request hard-fails" defect, relocated to the routing boundary.
+    """
+
+    CURRENT = _model("hosted-small", 32768)      # derived margin 1.5
+    CANDIDATE = _model("hosted-large", 100_000)  # derived margin 1.5, budget 91,808
+
+    def test_a_natively_counted_request_is_scaled_up_for_an_estimated_candidate(self):
+        """A count taken at margin 1.0 must be inflated to the candidate's 1.5
+        ruler. Re-deriving 1.5 for the current model makes the two rulers look
+        identical and the request passes through unscaled — 33% light."""
+        sized = _sized_for(
+            10_000,
+            "hosted-small", self.CURRENT,
+            "hosted-large", self.CANDIDATE,
+            current_margin=1.0,
+        )
+        assert sized == 15_000
+
+        # Without the caller's margin the two derived rulers match, so the
+        # number is left alone. That is the understatement being prevented.
+        assert _sized_for(
+            10_000,
+            "hosted-small", self.CURRENT,
+            "hosted-large", self.CANDIDATE,
+        ) == 10_000
+
+    def test_omitting_the_margin_is_identical_to_passing_none(self):
+        """The parameter is additive: every existing caller keeps today's
+        arithmetic to the token."""
+        gpt = _model("gpt-4o", 32768)
+        pairs = [
+            (41_213, "gpt-4o", gpt, "hosted-large", self.CANDIDATE),
+            (41_213, "hosted-large", self.CANDIDATE, "gpt-4o", gpt),
+            (88_000, "gpt-4o", gpt, "hosted-small", self.CURRENT),
+            (10_000, "hosted-small", self.CURRENT, "hosted-large", self.CANDIDATE),
+        ]
+        for tokens, cur_name, cur_cfg, oth_name, oth_cfg in pairs:
+            omitted = _sized_for(tokens, cur_name, cur_cfg, oth_name, oth_cfg)
+            explicit_none = _sized_for(
+                tokens, cur_name, cur_cfg, oth_name, oth_cfg, current_margin=None,
+            )
+            assert omitted == explicit_none
+
+        # Pinned to the pre-change numbers, not just to each other.
+        assert _sized_for(41_213, "gpt-4o", gpt, "hosted-large", self.CANDIDATE) == 61_819
+        assert _sized_for(41_213, "hosted-large", self.CANDIDATE, "gpt-4o", gpt) == 41_213
+
+    def test_a_nonsense_margin_falls_back_instead_of_being_trusted(self):
+        """A margin that is zero, negative, NaN or infinite is not a
+        measurement. Trusting it either crashes (`int(x / nan)` raises) or
+        divides the request down to nothing — under-stating, which is the
+        direction that hard-fails. Refusing it, as `_configured_margin` refuses
+        a margin below 1.0, leaves the honest derivation in place."""
+        gpt = _model("gpt-4o", 32768)
+        honest = _sized_for(41_213, "gpt-4o", gpt, "hosted-large", self.CANDIDATE)
+        assert honest == 61_819
+
+        for bad in (0, 0.0, -1.0, -0.5, 0.5, float("nan"), float("inf"), None):
+            sized = _sized_for(
+                41_213,
+                "gpt-4o", gpt,
+                "hosted-large", self.CANDIDATE,
+                current_margin=bad,
+            )
+            assert sized == honest, f"margin {bad!r} changed the sizing"
+            assert sized >= honest, f"margin {bad!r} under-stated the request"
+
+    def test_choose_document_model_threads_the_margin_all_the_way_down(self):
+        """End-to-end, on the decision itself: 70,000 tokens measured on the
+        estimated ruler fits hosted-large's 91,808-token budget, but the same
+        70,000 measured natively is 105,000 on that ruler and does not. The
+        router must stay put in the second case."""
+        assert choose_document_model(
+            current_name="hosted-small", current_config=self.CURRENT,
+            candidate_name="hosted-large", candidate_config=self.CANDIDATE,
+            input_tokens=70_000,
+        ).switched is True
+
+        d = choose_document_model(
+            current_name="hosted-small", current_config=self.CURRENT,
+            candidate_name="hosted-large", candidate_config=self.CANDIDATE,
+            input_tokens=70_000,
+            current_margin=1.0,
+        )
+        assert d.switched is False, (
+            "routed a natively-counted request to a model that would reject it"
+        )
+        assert d.model_name == "hosted-small"
+        assert "does not fit" in d.reason
+
+    def test_suggest_document_model_threads_the_margin_too(self):
+        """The dialog's way out has to be sized on the same ruler as the
+        decision, or it offers a model the request would fail on."""
+        assert suggest_document_model(
+            current_name="hosted-small", current_config=self.CURRENT,
+            models=[self.CANDIDATE], input_tokens=70_000,
+        ) == self.CANDIDATE
+
+        assert suggest_document_model(
+            current_name="hosted-small", current_config=self.CURRENT,
+            models=[self.CANDIDATE], input_tokens=70_000,
+            current_margin=1.0,
+        ) is None, "offered a model whose own count would not fit the request"

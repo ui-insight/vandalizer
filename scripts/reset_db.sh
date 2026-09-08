@@ -58,9 +58,19 @@ echo ""
 # 1. Drop MongoDB database
 echo "Dropping MongoDB database '${MONGO_DB}'..."
 mongosh "${MONGO_HOST}" --quiet --eval "db.getSiblingDB('${MONGO_DB}').dropDatabase()" || {
-  # Fall back to docker if mongosh isn't installed locally
-  echo "  mongosh not found locally, trying via docker..."
-  docker compose -f "${PROJECT_DIR}/docker-compose.yml" exec -T mongo \
+  # Fall back to the containerized mongo if mongosh isn't installed locally
+  echo "  mongosh not found locally, trying via the mongo container..."
+  if docker compose version >/dev/null 2>&1; then
+    COMPOSE=(docker compose)
+  elif docker-compose version >/dev/null 2>&1; then
+    COMPOSE=(docker-compose)
+  elif podman-compose version >/dev/null 2>&1; then
+    COMPOSE=(podman-compose)
+  else
+    echo "error: no Compose implementation found" >&2
+    exit 1
+  fi
+  "${COMPOSE[@]}" -f "${PROJECT_DIR}/compose.yaml" exec -T mongo \
     mongosh --quiet --eval "db.getSiblingDB('${MONGO_DB}').dropDatabase()"
 }
 

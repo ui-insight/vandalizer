@@ -85,6 +85,8 @@ scripts/ui_endpoint_map.*
 # Per-developer AI/editor tool config, written into the repo root by tools like
 # code-review-graph's installer. Personal, not project config.
 .mcp.json
+# The graph itself (and the lock file `make review-graph` takes before building it).
+.code-review-graph/
 .cursor/
 .kiro/
 .qoder/

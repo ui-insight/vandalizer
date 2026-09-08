@@ -21,7 +21,7 @@ export function Footer() {
                   href="https://github.com/ui-insight/vandalizer"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#f1b300] transition-colors"
+                  className="hover:text-highlight-on-dark transition-colors"
                 >
                   Vandalizer
                 </a>
@@ -37,7 +37,7 @@ export function Footer() {
             <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4">Links</h4>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link to="/docs" className="hover:text-[#f1b300] transition-colors">
+                <Link to="/docs" className="hover:text-highlight-on-dark transition-colors">
                   Documentation
                 </Link>
               </li>
@@ -46,7 +46,7 @@ export function Footer() {
                   href="https://github.com/ui-insight/vandalizer"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-[#f1b300] transition-colors"
+                  className="inline-flex items-center gap-1 hover:text-highlight-on-dark transition-colors"
                 >
                   GitHub <ExternalLink className="w-3 h-3" />
                 </a>
@@ -56,7 +56,7 @@ export function Footer() {
                   href="https://github.com/ui-insight/vandalizer/issues"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-[#f1b300] transition-colors"
+                  className="inline-flex items-center gap-1 hover:text-highlight-on-dark transition-colors"
                 >
                   Issues <ExternalLink className="w-3 h-3" />
                 </a>
@@ -75,7 +75,7 @@ export function Footer() {
                 href="https://www.gnu.org/licenses/gpl-3.0.html"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-white hover:text-[#f1b300] transition-colors underline"
+                className="text-white hover:text-highlight-on-dark transition-colors underline"
               >
                 GNU General Public License v3.0
               </a>

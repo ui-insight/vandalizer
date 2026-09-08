@@ -2142,15 +2142,64 @@ async def quality_timeline(
 # 15. POST /quality/regression-suite  - Run regression on all verified items
 # ---------------------------------------------------------------------------
 
+@router.get("/quality/by-model")
+async def quality_by_model(
+    days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
+    user: User = Depends(get_current_user),
+):
+    """Validation quality grouped by the model that executed each run."""
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_by_model
+    return {"models": await get_quality_by_model(days)}
+
+
 @router.post("/quality/regression-suite")
 async def regression_suite(
     model: str | None = None,
     user: User = Depends(get_current_user),
 ):
+    """Start a regression sweep over all verified items as a background job.
+
+    A catalog-wide sweep makes one or more LLM calls per test case per item —
+    far beyond any request timeout — so this dispatches a Celery task and
+    returns the run's uuid; poll GET /quality/regression-suite/runs/{uuid}.
+    """
     await _require_admin(user)
     await _audit(user, "run_regression_suite", f"Ran regression suite (model={model})")
-    from app.services.quality_service import run_regression_suite
-    return await run_regression_suite(user.user_id, model)
+
+    from app.models.regression_suite_run import RegressionSuiteRun
+    from app.tasks.quality_tasks import regression_suite_task
+
+    suite = RegressionSuiteRun(model=model or None, user_id=user.user_id)
+    await suite.insert()
+    regression_suite_task.delay(suite.uuid)
+    return {"run_uuid": suite.uuid, "status": suite.status}
+
+
+@router.get("/quality/regression-suite/runs")
+async def list_regression_suite_runs(
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.models.regression_suite_run import RegressionSuiteRun
+
+    runs = await RegressionSuiteRun.find().sort("-started_at").limit(limit).to_list()
+    return {"runs": [r.summary_dict() for r in runs]}
+
+
+@router.get("/quality/regression-suite/runs/{run_uuid}")
+async def get_regression_suite_run(
+    run_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.models.regression_suite_run import RegressionSuiteRun
+
+    run = await RegressionSuiteRun.find_one(RegressionSuiteRun.uuid == run_uuid)
+    if not run:
+        raise HTTPException(status_code=404, detail="Regression suite run not found")
+    return {**run.summary_dict(), "results": run.results}
 
 
 # ---------------------------------------------------------------------------

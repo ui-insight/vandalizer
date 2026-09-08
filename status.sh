@@ -70,6 +70,80 @@ detail() {
 }
 
 # ---------------------------------------------------------------------------
+# Container-engine compatibility layer
+#
+# The compose frontend may be Docker Compose v2, docker-compose v1, or
+# podman-compose. Their `ps --format` templates differ (podman-compose
+# forwards to `podman ps`, which has no .Service/.Health fields), so all
+# container introspection goes through the engine CLI instead, keyed on the
+# com.docker.compose.* labels that every compose implementation attaches.
+# ---------------------------------------------------------------------------
+CONTAINER_CLI=""
+COMPOSE_CMD=""
+if command -v docker &>/dev/null; then
+  CONTAINER_CLI="docker"
+elif command -v podman &>/dev/null; then
+  CONTAINER_CLI="podman"
+fi
+if [[ -n "$CONTAINER_CLI" ]]; then
+  COMPOSE_CMD="docker compose"
+  if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+    COMPOSE_CMD="docker-compose"
+    if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+      COMPOSE_CMD="podman-compose"
+      if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
+        COMPOSE_CMD=""
+      fi
+    fi
+  fi
+fi
+
+# Compose project name: explicit override, else the lowercased directory
+# name — the default every compose implementation derives.
+compose_project() {
+  if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
+    echo "$COMPOSE_PROJECT_NAME"
+  else
+    basename "$PWD" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]//g'
+  fi
+}
+
+# Name of the container backing a compose service; empty if none exists.
+compose_container() {
+  [[ -n "$CONTAINER_CLI" ]] || return 0
+  local c
+  # Prefer a running container: `ps -a` lists exited and one-off `compose run`
+  # containers too, newest first, and an exec against one of those fails with
+  # a confusing error instead of "the API container is not running".
+  for flag in "" "-a"; do
+    c=$($CONTAINER_CLI ps $flag \
+      --filter "label=com.docker.compose.project=$(compose_project)" \
+      --filter "label=com.docker.compose.service=$1" \
+      --format '{{.Names}}' 2>/dev/null | head -1)
+    [[ -n "$c" ]] && break
+  done
+  echo "$c"
+}
+
+# State (running/exited/restarting/...) of a service's container; empty if
+# the container doesn't exist.
+compose_state() {
+  local c
+  c=$(compose_container "$1")
+  [[ -n "$c" ]] || return 0
+  $CONTAINER_CLI inspect --format '{{.State.Status}}' "$c" 2>/dev/null
+}
+
+# Health (healthy/unhealthy/starting) of a service's container; empty when
+# the container doesn't exist or defines no healthcheck.
+compose_health() {
+  local c
+  c=$(compose_container "$1")
+  [[ -n "$c" ]] || return 0
+  $CONTAINER_CLI inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null
+}
+
+# ---------------------------------------------------------------------------
 # Banner
 # ---------------------------------------------------------------------------
 echo ""
@@ -123,35 +197,34 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Docker containers
+# 2. Containers
 # ---------------------------------------------------------------------------
-header "Docker Services"
+header "Container Services"
 
-if ! command -v docker &>/dev/null; then
-  fail "Docker is not installed" "Install Docker: https://docs.docker.com/get-docker/"
+if [[ -z "$CONTAINER_CLI" ]]; then
+  fail "No container engine found" \
+    "Install Docker (https://docs.docker.com/get-docker/) or Podman (https://podman.io/docs/installation)"
+elif [[ -z "$COMPOSE_CMD" ]]; then
+  fail "No Compose implementation found" \
+    "Install Docker Compose (https://docs.docker.com/compose/install/) or podman-compose"
 else
-  COMPOSE_CMD="docker compose"
-  if ! $COMPOSE_CMD version &>/dev/null 2>&1; then
-    COMPOSE_CMD="docker-compose"
-  fi
-
   check_container() {
     local service=$1
     local label=$2
     local port=${3:-}
 
-    local status
-    status=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}} {{.Health}}' 2>/dev/null | grep "^${service} " || true)
+    local container
+    container=$(compose_container "$service")
 
-    if [[ -z "$status" ]]; then
+    if [[ -z "$container" ]]; then
       fail "${label} is not running" \
         "Run: $COMPOSE_CMD up -d ${service}"
       return
     fi
 
     local state health
-    state=$(echo "$status" | awk '{print $2}')
-    health=$(echo "$status" | awk '{print $3}')
+    state=$(compose_state "$service")
+    health=$(compose_health "$service")
 
     if [[ "$state" != "running" ]]; then
       fail "${label} is ${state}" \
@@ -181,11 +254,11 @@ fi
 # ---------------------------------------------------------------------------
 header "API Health"
 
-# Check API health via docker exec (port may not be exposed to the host)
-API_CONTAINER=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+# Check API health via exec in the container (port may not be exposed to the host)
+API_CONTAINER=$(compose_container api)
 API_HEALTH_OK=false
 if [[ -n "$API_CONTAINER" ]]; then
-  HEALTH_JSON=$(docker exec "$API_CONTAINER" python -c \
+  HEALTH_JSON=$($CONTAINER_CLI exec "$API_CONTAINER" python -c \
     "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())" \
     2>/dev/null || true)
   if [[ -n "$HEALTH_JSON" ]]; then
@@ -201,7 +274,7 @@ if [[ "$API_HEALTH_OK" == true ]]; then
     pass "Health endpoint returned ${GREEN}ok${RESET}"
   else
     warn "Health endpoint returned ${YELLOW}${API_STATUS}${RESET}" \
-      "Run: docker compose exec api python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())\" — to see details"
+      "Run: $COMPOSE_CMD exec api python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())\" — to see details"
   fi
 
   # Parse individual checks
@@ -219,7 +292,7 @@ if [[ "$API_HEALTH_OK" == true ]]; then
   rm -f /tmp/vandalizer_health.json
 else
   fail "API is not responding" \
-    "Start the stack: docker compose up -d — then: docker compose logs api"
+    "Start the stack: $COMPOSE_CMD up -d — then: $COMPOSE_CMD logs api"
   skip "MongoDB connection (API unavailable)"
   skip "Redis connection (API unavailable)"
   skip "ChromaDB connection (API unavailable)"
@@ -247,7 +320,7 @@ elif curl -sf "http://localhost:5173" -o /dev/null 2>/dev/null; then
   pass "Frontend dev server at ${CYAN}http://localhost:5173${RESET}"
 else
   fail "Frontend is not responding" \
-    "Production: docker compose up -d frontend — Dev: cd frontend && npm run dev"
+    "Production: $COMPOSE_CMD up -d frontend — Dev: cd frontend && npm run dev"
 fi
 
 # ---------------------------------------------------------------------------
@@ -255,11 +328,8 @@ fi
 # ---------------------------------------------------------------------------
 header "Bootstrap & Seed Data"
 
-# Resolve the compose project name for the mongo container
-MONGO_CONTAINER=""
-if command -v docker &>/dev/null; then
-  MONGO_CONTAINER=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
-fi
+# Resolve the mongo container by its compose labels
+MONGO_CONTAINER=$(compose_container mongo)
 
 # Read MONGO_DB from .env (default: osp)
 MONGO_DB="osp"
@@ -274,7 +344,7 @@ mongo_count() {
   # Run a countDocuments query against a collection via the mongo container
   local collection=$1
   local filter=${2:-'{}'}
-  docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+  $CONTAINER_CLI exec "$MONGO_CONTAINER" mongosh --quiet --eval \
     "db.getSiblingDB('${MONGO_DB}').${collection}.countDocuments(${filter})" 2>/dev/null || echo "-1"
 }
 
@@ -290,7 +360,7 @@ else
     pass "Admin user exists ${DIM}(${ADMIN_COUNT} admin account(s))${RESET}"
   else
     fail "No admin user found" \
-      "Run: docker compose exec -e ADMIN_EMAIL=you@example.edu -e ADMIN_PASSWORD=secret api python bootstrap_install.py"
+      "Run: $COMPOSE_CMD exec -e ADMIN_EMAIL=you@example.edu -e ADMIN_PASSWORD=secret api python bootstrap_install.py"
   fi
 
   # --- Default team ---
@@ -310,7 +380,7 @@ else
   echo -e "  ${DIM}────────────────${RESET}"
 
   SEED_PROBLEM=false
-  BOOTSTRAP_CMD="docker compose exec api python bootstrap_install.py"
+  BOOTSTRAP_CMD="$COMPOSE_CMD exec api python bootstrap_install.py"
 
   # Verified workflows
   VWF_COUNT=$(mongo_count "workflow" '{"verified": true}')
@@ -386,7 +456,7 @@ else
   # One combined recommendation if anything is missing
   if [[ "$SEED_PROBLEM" == true ]]; then
     RECOMMENDATIONS+=("Seed the verified catalog: ${BOOTSTRAP_CMD}")
-    RECOMMENDATIONS+=("Or run standalone: docker compose exec api python -m scripts.seed_catalog")
+    RECOMMENDATIONS+=("Or run standalone: $COMPOSE_CMD exec api python -m scripts.seed_catalog")
   fi
 fi
 
@@ -399,21 +469,21 @@ check_volume() {
   local volume=$1
   local label=$2
   local inspect
-  inspect=$(docker volume inspect "vandalizer_${volume}" 2>/dev/null || docker volume inspect "${volume}" 2>/dev/null || echo "")
+  inspect=$($CONTAINER_CLI volume inspect "$(compose_project)_${volume}" 2>/dev/null || $CONTAINER_CLI volume inspect "${volume}" 2>/dev/null || echo "")
   if [[ -n "$inspect" ]]; then
     pass "${label} volume exists"
   else
     warn "${label} volume not found" \
-      "Volume '${volume}' will be created on first docker compose up"
+      "Volume '${volume}' will be created on first $COMPOSE_CMD up"
   fi
 }
 
-if command -v docker &>/dev/null; then
+if [[ -n "$CONTAINER_CLI" ]]; then
   check_volume "mongo-data"  "MongoDB data"
   check_volume "chroma-data" "ChromaDB data"
   check_volume "uploads"     "Uploads"
 else
-  skip "Volume checks (Docker not available)"
+  skip "Volume checks (no container engine available)"
 fi
 
 # ---------------------------------------------------------------------------

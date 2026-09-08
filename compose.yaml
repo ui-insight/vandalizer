@@ -1,6 +1,6 @@
 services:
   redis:
-    image: redis/redis-stack:7.4.0-v3
+    image: docker.io/redis/redis-stack:7.4.0-v3
     networks:
       - vandalizer
     restart: unless-stopped
@@ -16,7 +16,7 @@ services:
       retries: 5
 
   mongo:
-    image: mongo:7.0.16
+    image: docker.io/library/mongo:7.0.16
     networks:
       - vandalizer
     volumes:
@@ -35,7 +35,7 @@ services:
       start_period: 30s
 
   chromadb:
-    image: chromadb/chroma:0.6.3
+    image: docker.io/chromadb/chroma:0.6.3
     networks:
       - vandalizer
     volumes:
@@ -96,6 +96,14 @@ services:
         soft: 65536
         hard: 65536
     restart: unless-stopped
+    # Declared here (not only in the Dockerfile) because OCI image builds
+    # (podman/buildah default) drop Dockerfile HEALTHCHECK instructions.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -176,6 +184,12 @@ services:
     networks:
       - vandalizer
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
 
 networks:
   vandalizer:

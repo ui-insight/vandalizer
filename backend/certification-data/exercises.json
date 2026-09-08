@@ -134,7 +134,7 @@
     },
     "star_criteria": {
       "1": "Extract 15+ fields from the NIH proposal",
-      "2": "Extract 20+ fields including all budget categories",
+      "2": "Extract 20+ fields, with each budget category as its own field (Personnel Costs, Equipment Costs, Travel Costs, Supplies Costs, Indirect Costs)",
       "3": "Extract 25+ fields, using Allowed values to constrain categorical fields and marking situational fields as optional"
     }
   },

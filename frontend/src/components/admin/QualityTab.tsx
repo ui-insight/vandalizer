@@ -8,13 +8,18 @@ import {
 } from 'recharts'
 
 import {
-  acknowledgeAlert, getJudgeCalibration, getQualityAlerts, getQualityItemDetail,
-  getQualityItems, getQualitySummary, getQualityTimeline, getSystemConfig,
-  runRegressionSuite,
-  type JudgeSurfaceCalibration,
+  acknowledgeAlert, getJudgeCalibration, getQualityAlerts, getQualityByModel,
+  getQualityItemDetail, getQualityItems, getQualitySummary, getQualityTimeline,
+  getRegressionSuiteRun, getRegressionSuiteRuns, runRegressionSuite,
+  type JudgeSurfaceCalibration, type ModelQualityRow,
   type QualityAlert, type QualityItem, type QualityItemDetail, type QualitySummary,
-  type QualityTimelinePoint, type RegressionResult, type SystemConfigData,
+  type QualityTimelinePoint, type RegressionItemResult, type RegressionSuiteRunDetail,
+  type RegressionSuiteRunSummary,
 } from '../../api/admin'
+import { getModels } from '../../api/config'
+import type { ModelInfo } from '../../types/workflow'
+
+type SuiteRow = RegressionItemResult & { otherScore?: number | null; compareDelta?: number | null }
 import { useToast } from '../../contexts/ToastContext'
 import { relativeTime } from '../../utils/time'
 import { downloadCSV } from './shared/format'
@@ -26,10 +31,13 @@ export function QualityTab() {
   const [timeline, setTimeline] = useState<QualityTimelinePoint[]>([])
   const [days, setDays] = useState(90)
   const [loading, setLoading] = useState(true)
-  const [regressionResult, setRegressionResult] = useState<RegressionResult | null>(null)
-  const [regressionRunning, setRegressionRunning] = useState(false)
+  const [regressionStarting, setRegressionStarting] = useState(false)
   const [regressionModel, setRegressionModel] = useState('')
-  const [cfg, setCfg] = useState<SystemConfigData | null>(null)
+  const [suiteRuns, setSuiteRuns] = useState<RegressionSuiteRunSummary[]>([])
+  const [modelRows, setModelRows] = useState<ModelQualityRow[]>([])
+  const [activeSuite, setActiveSuite] = useState<RegressionSuiteRunDetail | null>(null)
+  const [compareSuite, setCompareSuite] = useState<RegressionSuiteRunDetail | null>(null)
+  const [availableModels, setAvailableModels] = useState<ModelInfo[]>([])
   const [error, setError] = useState<string | null>(null)
 
   // Alert feed state
@@ -74,28 +82,91 @@ export function QualityTab() {
     return () => { cancelled = true }
   }, [])
 
-  // Config is fetched separately and tolerantly: it's superadmin-only
-  // (`GET /api/admin/config` calls `_require_superadmin`), so staff users
-  // reject it. It only feeds the optional model <select> in the regression
-  // panel below, which degrades to an empty/default-only list when cfg is
-  // null — it must not block the tab's real payload (the four calls above).
+  // Model list for the regression panel's <select>. Uses the same
+  // non-privileged endpoint as the chat model picker — the superadmin-only
+  // system config was used before, which left staff admins with a dropdown
+  // containing only "Default Model" and no way to target a model at all.
   useEffect(() => {
     let cancelled = false
-    getSystemConfig().then(cfg => { if (!cancelled) setCfg(cfg) }).catch(() => {})
+    getModels().then(m => { if (!cancelled) setAvailableModels(m) }).catch(() => {})
     return () => { cancelled = true }
   }, [])
 
+  const loadSuiteRuns = useCallback(() => {
+    getRegressionSuiteRuns().then(d => setSuiteRuns(d.runs)).catch(() => {})
+  }, [])
+
+  // By-model rollup. Refetched when a sweep finishes so its runs count in.
+  useEffect(() => {
+    if (activeSuite?.status === 'running') return
+    let cancelled = false
+    getQualityByModel(days).then(d => { if (!cancelled) setModelRows(d.models) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [days, activeSuite?.status])
+
+  useEffect(() => {
+    loadSuiteRuns()
+  }, [loadSuiteRuns])
+
+  // While the viewed suite is still running, poll it. The sweep runs in a
+  // Celery task; progress lands on the run document as items complete.
+  useEffect(() => {
+    if (activeSuite?.status !== 'running') return
+    const runUuid = activeSuite.run_uuid
+    const id = setInterval(() => {
+      getRegressionSuiteRun(runUuid).then(d => {
+        setActiveSuite(d)
+        if (d.status !== 'running') loadSuiteRuns()
+      }).catch(() => { /* transient — keep polling */ })
+    }, 4000)
+    return () => clearInterval(id)
+  }, [activeSuite?.status, activeSuite?.run_uuid, loadSuiteRuns])
+
   const handleRunRegression = async () => {
-    setRegressionRunning(true)
+    setRegressionStarting(true)
     try {
-      const result = await runRegressionSuite(regressionModel || undefined)
-      setRegressionResult(result)
+      const { run_uuid } = await runRegressionSuite(regressionModel || undefined)
+      setCompareSuite(null)
+      setActiveSuite(await getRegressionSuiteRun(run_uuid))
+      loadSuiteRuns()
     } catch (e) {
-      toast(`Failed to run regression suite: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+      toast(`Failed to start regression suite: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
     } finally {
-      setRegressionRunning(false)
+      setRegressionStarting(false)
     }
   }
+
+  const handleViewSuite = async (runUuid: string) => {
+    try {
+      setCompareSuite(null)
+      setActiveSuite(await getRegressionSuiteRun(runUuid))
+    } catch (e) {
+      toast(`Failed to load run: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+    }
+  }
+
+  const handleCompareSuite = async (runUuid: string) => {
+    if (!runUuid) { setCompareSuite(null); return }
+    try {
+      setCompareSuite(await getRegressionSuiteRun(runUuid))
+    } catch (e) {
+      toast(`Failed to load comparison run: ${e instanceof Error ? e.message : 'unknown error'}`, 'error')
+    }
+  }
+
+  // Join the two suites' per-item rows by (kind, item_id) so two models'
+  // sweeps line up even when item order or coverage differs.
+  const suiteComparison = useMemo(() => {
+    if (!activeSuite || !compareSuite) return null
+    const byKey = new Map(compareSuite.results.map(r => [`${r.kind}:${r.item_id}`, r]))
+    return activeSuite.results.map(r => {
+      const other = byKey.get(`${r.kind}:${r.item_id}`) ?? null
+      const delta = r.score != null && other?.score != null
+        ? Math.round((r.score - other.score) * 10) / 10
+        : null
+      return { ...r, otherScore: other?.score ?? null, compareDelta: delta }
+    })
+  }, [activeSuite, compareSuite])
 
   const handleAcknowledgeAlert = async (uuid: string) => {
     try {
@@ -296,22 +367,23 @@ export function QualityTab() {
             style={{ padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', minWidth: 200 }}
           >
             <option value="">Default Model</option>
-            {cfg?.available_models?.map((m, i) => (
+            {availableModels.map((m, i) => (
               <option key={i} value={m.name}>{m.name} ({m.tag})</option>
             ))}
           </select>
           <button
             onClick={handleRunRegression}
-            disabled={regressionRunning}
+            disabled={regressionStarting || activeSuite?.status === 'running'}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)',
               border: 'none', background: '#111827', color: '#fff',
-              fontSize: 13, fontWeight: 600, cursor: regressionRunning ? 'wait' : 'pointer',
-              opacity: regressionRunning ? 0.6 : 1,
+              fontSize: 13, fontWeight: 600,
+              cursor: (regressionStarting || activeSuite?.status === 'running') ? 'wait' : 'pointer',
+              opacity: (regressionStarting || activeSuite?.status === 'running') ? 0.6 : 1,
             }}
           >
-            {regressionRunning ? (
+            {(regressionStarting || activeSuite?.status === 'running') ? (
               <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
             ) : (
               <><Play size={14} /> Run Regression Suite</>
@@ -319,60 +391,212 @@ export function QualityTab() {
           </button>
         </div>
 
-        {regressionResult && (
+        {suiteRuns.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+            {suiteRuns.map(run => {
+              const isActive = activeSuite?.run_uuid === run.run_uuid
+              return (
+                <button
+                  key={run.run_uuid}
+                  onClick={() => handleViewSuite(run.run_uuid)}
+                  title={run.started_at ? new Date(run.started_at).toLocaleString() : undefined}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '4px 10px', borderRadius: 9999, fontSize: 12,
+                    border: isActive ? '1px solid #111827' : '1px solid #e5e7eb',
+                    background: isActive ? '#111827' : '#fff',
+                    color: isActive ? '#fff' : '#374151', cursor: 'pointer',
+                  }}
+                >
+                  <span style={{ fontWeight: 600 }}>{run.model || 'default'}</span>
+                  <span style={{ opacity: 0.75 }}>
+                    {run.status === 'running'
+                      ? `${run.completed_items}/${run.total_items || '?'}…`
+                      : run.status === 'failed'
+                        ? 'failed'
+                        : run.mean_score != null ? `${run.mean_score}%` : '—'}
+                  </span>
+                  {run.started_at && (
+                    <span style={{ opacity: 0.55 }}>{relativeTime(run.started_at)}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {activeSuite && (
           <div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
-              <span style={{ color: '#6b7280' }}>Total: <strong>{regressionResult.total_items}</strong></span>
-              <span style={{ color: '#16a34a' }}>Succeeded: <strong>{regressionResult.succeeded}</strong></span>
-              <span style={{ color: '#dc2626' }}>Failed: <strong>{regressionResult.failed}</strong></span>
+            <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 12, fontSize: 13 }}>
+              <span style={{
+                fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 9999, textTransform: 'uppercase',
+                background: activeSuite.status === 'completed' ? '#dcfce7' : activeSuite.status === 'failed' ? '#fee2e2' : '#dbeafe',
+                color: activeSuite.status === 'completed' ? '#166534' : activeSuite.status === 'failed' ? '#991b1b' : '#1e40af',
+              }}>{activeSuite.status}</span>
+              <span style={{ color: '#6b7280' }}>Model: <strong>{activeSuite.model || 'default'}</strong></span>
+              <span style={{ color: '#6b7280' }}>
+                {activeSuite.status === 'running'
+                  ? <>Progress: <strong>{activeSuite.completed_items}/{activeSuite.total_items || '?'}</strong></>
+                  : <>Total: <strong>{activeSuite.total_items}</strong></>}
+              </span>
+              <span style={{ color: '#16a34a' }}>Succeeded: <strong>{activeSuite.succeeded}</strong></span>
+              <span style={{ color: '#dc2626' }}>Failed: <strong>{activeSuite.failed}</strong></span>
+              {activeSuite.mean_score != null && (
+                <span style={{ color: '#111827', fontSize: 15 }}>
+                  Catalog mean: <strong>{activeSuite.mean_score}%</strong>
+                </span>
+              )}
+              {activeSuite.status === 'completed' && suiteRuns.some(r => r.status === 'completed' && r.run_uuid !== activeSuite.run_uuid) && (
+                <label style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, color: '#6b7280' }}>
+                  Compare with
+                  <select
+                    value={compareSuite?.run_uuid ?? ''}
+                    onChange={e => handleCompareSuite(e.target.value)}
+                    style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+                  >
+                    <option value="">—</option>
+                    {suiteRuns
+                      .filter(r => r.status === 'completed' && r.run_uuid !== activeSuite.run_uuid)
+                      .map(r => (
+                        <option key={r.run_uuid} value={r.run_uuid}>
+                          {r.model || 'default'} · {r.mean_score != null ? `${r.mean_score}%` : '—'} · {r.started_at ? relativeTime(r.started_at) : ''}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
             </div>
+            {activeSuite.status === 'failed' && activeSuite.error && (
+              <div style={{ marginBottom: 12, padding: '8px 12px', borderRadius: 8, background: '#fee2e2', color: '#991b1b', fontSize: 13 }}>
+                {activeSuite.error}
+              </div>
+            )}
+            {compareSuite && suiteComparison && (
+              <div style={{ marginBottom: 12, fontSize: 13, color: '#6b7280' }}>
+                Mean: <strong style={{ color: '#111827' }}>{activeSuite.model || 'default'} {activeSuite.mean_score != null ? `${activeSuite.mean_score}%` : '—'}</strong>
+                {' vs '}
+                <strong style={{ color: '#111827' }}>{compareSuite.model || 'default'} {compareSuite.mean_score != null ? `${compareSuite.mean_score}%` : '—'}</strong>
+              </div>
+            )}
             <div style={{ overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Name</th>
                     <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Kind</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Score</th>
-                    <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Grade</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>
+                      {compareSuite ? `Score (${activeSuite.model || 'default'})` : 'Score'}
+                    </th>
+                    {compareSuite ? (
+                      <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>
+                        Score ({compareSuite.model || 'default'})
+                      </th>
+                    ) : (
+                      <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Grade</th>
+                    )}
                     <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Delta</th>
                     <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {regressionResult.results.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
-                      <td style={{ padding: '8px 12px' }}>
-                        <span style={{
-                          fontSize: 11, padding: '1px 8px', borderRadius: 9999,
-                          background: r.kind === 'workflow' ? '#f3e8ff' : '#e0f2fe',
-                          color: r.kind === 'workflow' ? '#7c3aed' : '#0369a1',
-                        }}>{r.kind}</span>
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>
-                        {r.score != null ? `${r.score}%` : '-'}
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
-                        {r.grade || '-'}
-                      </td>
-                      <td style={{
-                        padding: '8px 12px', textAlign: 'right', fontWeight: 600,
-                        color: r.delta == null ? '#9ca3af' : r.delta > 0 ? '#16a34a' : r.delta < 0 ? '#dc2626' : '#9ca3af',
-                      }}>
-                        {r.delta == null ? '-' : r.delta > 0 ? `+${r.delta}` : r.delta}
-                      </td>
-                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
-                        {r.status === 'ok' ? (
-                          <CheckCircle2 size={16} color="#16a34a" />
+                  {((suiteComparison ?? activeSuite.results) as SuiteRow[]).map((r, i) => {
+                    const delta = suiteComparison ? r.compareDelta ?? null : r.delta
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <span style={{
+                            fontSize: 11, padding: '1px 8px', borderRadius: 9999,
+                            background: r.kind === 'workflow' ? '#f3e8ff' : '#e0f2fe',
+                            color: r.kind === 'workflow' ? '#7c3aed' : '#0369a1',
+                          }}>{r.kind}</span>
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>
+                          {r.score != null ? `${r.score}%` : '-'}
+                        </td>
+                        {suiteComparison ? (
+                          <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>
+                            {r.otherScore != null ? `${r.otherScore}%` : '-'}
+                          </td>
                         ) : (
-                          <span style={{ fontSize: 11, color: '#dc2626' }}>{r.status}</span>
+                          <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
+                            {r.grade || '-'}
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                        <td style={{
+                          padding: '8px 12px', textAlign: 'right', fontWeight: 600,
+                          color: delta == null ? '#9ca3af' : delta > 0 ? '#16a34a' : delta < 0 ? '#dc2626' : '#9ca3af',
+                        }}>
+                          {delta == null ? '-' : delta > 0 ? `+${delta}` : delta}
+                        </td>
+                        <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                          {r.status === 'ok' ? (
+                            <CheckCircle2 size={16} color="#16a34a" />
+                          ) : (
+                            <span style={{ fontSize: 11, color: '#dc2626' }}>{r.status}</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Model Performance (by-model rollup) */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 4px' }}>Model Performance</h3>
+        <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 12px' }}>
+          Validation quality over the last {days} days, grouped by the model that executed each run.
+        </p>
+        {modelRows.length === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+            No validation runs in this window yet.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Model</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Avg Score</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Runs</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Items</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>By Kind</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Last Run</th>
+                </tr>
+              </thead>
+              <tbody>
+                {modelRows.map((row, i) => {
+                  const scoreColor = row.avg_score >= 90 ? '#16a34a'
+                    : row.avg_score >= 70 ? '#2563eb'
+                    : row.avg_score >= 50 ? '#f59e0b'
+                    : '#dc2626'
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 500, color: row.model ? '#111827' : '#9ca3af' }}
+                        title={row.model ? undefined : 'Runs that recorded no task model — older history, and workflow validations graded over mixed-model executions'}>
+                        {row.model || '(unattributed)'}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace', fontWeight: 700, color: scoreColor }}>
+                        {row.avg_score}%
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>{row.run_count}</td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>{row.items_validated}</td>
+                      <td style={{ padding: '8px 12px', color: '#6b7280', fontSize: 12 }}>
+                        {Object.entries(row.kinds).map(([kind, k]) => `${kind.replace('_', ' ')}: ${k.avg_score}% (${k.run_count})`).join(' · ')}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', color: '#6b7280', fontSize: 12 }}>
+                        {row.last_run_at ? relativeTime(row.last_run_at) : '-'}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

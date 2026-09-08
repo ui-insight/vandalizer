@@ -269,7 +269,7 @@ export function streamWorkflowStatus(
   }
 }
 
-export function testStep(data: { task_name: string; task_data: Record<string, unknown>; document_uuids: string[]; model?: string }) {
+export function testStep(data: { task_name: string; task_data: Record<string, unknown>; document_uuids: string[]; model?: string; workflow_id?: string }) {
   return apiFetch<{ task_id: string }>('/api/workflows/steps/test', {
     method: 'POST',
     body: JSON.stringify(data),

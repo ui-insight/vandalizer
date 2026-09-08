@@ -14,7 +14,7 @@ import multiprocessing
 import re
 import threading
 import zipfile
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import NoReturn
 from urllib.parse import urljoin
 
@@ -157,6 +157,51 @@ INPUT_SOURCE_LABELS = {
     "select_document": "Selected Document",
     "workflow_documents": "Workflow Documents",
 }
+
+
+# Input is a property of the *step*, not of a task: every task in a step is
+# handed a byte-identical copy of the step's payload and they run in parallel
+# (see ``MultiTaskNode.process``). These keys therefore live on the step's
+# ``data``; the identically named task keys are the legacy shape, still honored
+# so workflows authored before the move keep running unchanged.
+STEP_INPUT_KEYS = ("input_sources", "input_source", "selected_document_uuid")
+
+# A task opts out of the step's input with this flag — the advanced override for
+# the rare case where one task in a step genuinely needs a different source.
+TASK_INPUT_OVERRIDE_KEY = "override_step_input"
+
+
+def step_defines_input(step_data: dict) -> bool:
+    """Whether a step has had its input configured at the step level."""
+    return isinstance(step_data, dict) and any(k in step_data for k in STEP_INPUT_KEYS)
+
+
+def apply_step_input_config(step_data: dict, task_data: dict) -> dict:
+    """Push the step's input configuration down onto one task's data, in place.
+
+    Three cases, in precedence order:
+
+    1. The task sets ``override_step_input`` — it keeps its own sources.
+    2. The step configures input — it wins, and any stale per-task keys are
+       dropped so the step's choice is unambiguous.
+    3. Neither (a workflow authored before input moved to the step) — the
+       task's own keys stand, which is exactly the old behavior.
+
+    Idempotent, so it is safe for both the run builder and the engine builder
+    to call it on the same data.
+    """
+    if not isinstance(step_data, dict) or not isinstance(task_data, dict):
+        return task_data
+    if task_data.get(TASK_INPUT_OVERRIDE_KEY):
+        return task_data
+    if not step_defines_input(step_data):
+        return task_data
+    for key in STEP_INPUT_KEYS:
+        task_data.pop(key, None)
+    for key in STEP_INPUT_KEYS:
+        if key in step_data:
+            task_data[key] = step_data[key]
+    return task_data
 
 
 def _resolve_input_sources(data: dict, prev_step_name: str | None = None) -> list[str]:
@@ -506,7 +551,13 @@ class MultiTaskNode(Node):
                 executor.submit(contextvars.copy_context().run, self.process_task, task)
                 for task in self.tasks
             ]
-            results = [future.result() for future in as_completed(task_futures)]
+            # Collected in task order, not completion order. The step's combined
+            # output is a list built from these, and the editor now tells authors
+            # the tasks combine in the order they are listed — which was not true
+            # while `as_completed` let a two-task step emit [B, A] on one run and
+            # [A, B] on the next. `future.result()` still surfaces the first
+            # exception, just deterministically.
+            results = [future.result() for future in task_futures]
 
         collected = []
         task_step_name = self.name
@@ -2751,6 +2802,11 @@ def build_workflow_engine(
             for task in step.get("tasks", []):
                 task_name = task.get("name", "")
                 task_data = task.get("data", {})
+                # Input is configured once on the step; push it down before the
+                # node reads its sources. Idempotent — the run builder has
+                # usually done this already so the document preload could see
+                # the resolved source.
+                apply_step_input_config(step_data, task_data)
                 task_data["user_id"] = user_id
                 task_data["model"] = task_data.get("model") or model
                 # Optimizer-applied per-step override (model swap + prompt variant).

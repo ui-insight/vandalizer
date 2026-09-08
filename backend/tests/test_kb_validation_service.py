@@ -495,7 +495,7 @@ async def test_judge_test_queries_judge_only_mode():
     tq_good.last_judged_at = None
     tq_good.save = AsyncMock()
 
-    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
         return ("The budget is $1.2M.", [{"content": "Budget: $1.2M", "metadata": {"source_name": "Doc"}}])
 
     async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None, category=None):
@@ -542,7 +542,7 @@ async def test_judge_test_queries_judge_plus_baseline_computes_lift_and_discrimi
     tq.last_judged_score = None
     tq.save = AsyncMock()
 
-    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
         return ("The codename is Project Gardenia.", [
             {"content": "internal codename: Project Gardenia", "metadata": {"source_name": "Memo"}},
         ])
@@ -1244,7 +1244,7 @@ async def test_judge_test_queries_stores_the_full_answer_and_judges_it():
     long_answer = "x" * 6000
     seen = {}
 
-    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
         return (long_answer, [{"content": "c", "metadata": {"source_name": "Doc"}}], 0)
 
     async def spy_judge(**kw):
@@ -1269,7 +1269,7 @@ async def test_judge_test_queries_stores_the_full_answer_and_judges_it():
 async def test_judge_test_queries_flags_a_stored_answer_that_hits_the_cap():
     huge = "y" * (kb_validation_service._STORED_ANSWER_MAX_CHARS + 10)
 
-    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
         return (huge, [], 0)
 
     with patch.object(kb_validation_service, "_generate_kb_answer", side_effect=fake_kb_answer), \
@@ -1289,7 +1289,7 @@ async def test_judge_test_queries_records_generation_truncation_per_answer():
     baseline answer, since only the one that was cut is suspect."""
     from app.services.llm_service import record_truncation
 
-    async def fake_kb_answer(kb_uuid, query, model_name, k=8):
+    async def fake_kb_answer(kb_uuid, query, model_name, k=8, config=None):
         record_truncation("test-model", 1024)
         return ("partial answer that stops mid", [], 0)
 

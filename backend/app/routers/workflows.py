@@ -1114,8 +1114,17 @@ async def test_step(request: Request, req: TestStepRequest, user: User = Depends
             ss = await get_authorized_search_set(search_set_uuid, user)
             if not ss:
                 raise HTTPException(status_code=404, detail="Search set not found")
+    # Authorize the workflow before reading anything off it, so this cannot
+    # be used to learn another tenant's configured model.
+    workflow_input_config = None
+    if req.workflow_id:
+        wf = await get_authorized_workflow(req.workflow_id, user)
+        if not wf:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+        workflow_input_config = wf.input_config
     task_id = await svc.test_step(
-        req.task_name, req.task_data, document_uuids, user.user_id, req.model
+        req.task_name, req.task_data, document_uuids, user.user_id, req.model,
+        workflow_input_config=workflow_input_config,
     )
     return {"task_id": task_id}
 

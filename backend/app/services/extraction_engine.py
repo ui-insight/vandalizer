@@ -27,7 +27,7 @@ from app.services.llm_service import (
     build_thinking_model_settings,
     create_chat_agent,
     get_agent_model,
-    get_model_api_protocol,
+    use_native_structured_output,
 )
 
 logger = logging.getLogger(__name__)
@@ -194,7 +194,10 @@ class ExtractionEngine:
         Args:
             extract_keys: Fields to extract (list or comma-separated string).
             document_uuids: Not used directly  - caller should pass doc_texts.
-            model: Model name override.
+            model: Fallback model name — a model pinned in the system or
+                per-set extraction config wins over it. A caller that must run
+                a specific model has to pin it in extraction_config_override
+                (see extraction_validation_service._force_model_config).
             full_text: Single document text (shortcut for doc_texts=[full_text]).
             extraction_config_override: Per-extraction config overrides.
             doc_texts: Pre-loaded document texts.
@@ -378,6 +381,43 @@ class ExtractionEngine:
         if models:
             return models[0].get("name", "")
         return ""
+
+    def effective_model_info(
+        self,
+        extraction_config_override: dict | None = None,
+        fallback_model: str | None = None,
+    ) -> dict:
+        """Resolve which model ``extract()`` will actually run, without running it.
+
+        Returns ``{"model", "source", "temperature", "pass_models"?}`` where
+        ``source`` is ``"config"`` (pinned in system or per-set config),
+        ``"caller_default"`` (the fallback_model argument), or
+        ``"system_default"`` (first available model). Validation persists this
+        so a run is labeled with the model that executed, not the one that was
+        merely requested.
+        """
+        cfg = self._resolve_config(extraction_config_override)
+        config_model = cfg.get("model", "")
+        if config_model:
+            resolved, source = config_model, "config"
+        elif fallback_model:
+            resolved, source = fallback_model, "caller_default"
+        else:
+            models = self._sys_cfg.get("available_models", [])
+            resolved = models[0].get("name", "") if models else ""
+            source = "system_default"
+        info = {
+            "model": resolved,
+            "source": source,
+            "temperature": self._get_model_config(resolved).get("temperature"),
+        }
+        if cfg.get("mode", "two_pass") == "two_pass":
+            two_pass = cfg.get("two_pass", {})
+            info["pass_models"] = {
+                "pass_1": two_pass.get("pass_1", {}).get("model", "") or resolved,
+                "pass_2": two_pass.get("pass_2", {}).get("model", "") or resolved,
+            }
+        return info
 
     def _get_model_config(self, model_name: str) -> dict:
         """Look up a model's config dict from available_models."""
@@ -976,7 +1016,7 @@ class ExtractionEngine:
                     return {"entities": [value]}
                 return value
 
-        api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
+        native_structured = use_native_structured_output(model_name, self._sys_cfg)
         structured_retries = 3
 
         source_label = self._describe_content(content)
@@ -1008,10 +1048,12 @@ class ExtractionEngine:
             # previous approach injected vLLM's proprietary
             # ``structured_outputs`` extra-body field, which gateways drop
             # silently, quietly losing schema enforcement.
+            # Shared with the admin "Test" button so the diagnostic probes the
+            # mode this run will actually request — including the per-model
+            # "supports structured output" toggle, the escape hatch for a
+            # server that rejects schema-enforced output.
             output_type = (
-                NativeOutput(ExtractionModel)
-                if api_protocol == "vllm"
-                else ExtractionModel
+                NativeOutput(ExtractionModel) if native_structured else ExtractionModel
             )
 
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)

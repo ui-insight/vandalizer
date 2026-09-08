@@ -8,7 +8,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
     <div className="min-h-screen bg-[#0a0a0a] text-gray-200 antialiased relative">
       {/* Background glow */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-yellow-600/10 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-highlight/10 rounded-full blur-[120px] animate-pulse" />
         <div
           className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-gray-800/30 rounded-full blur-[120px] animate-pulse"
           style={{ animationDelay: '2s' }}
@@ -30,7 +30,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
           <h1 className="mb-8 text-center text-2xl font-bold text-white">{title}</h1>
           {children}
           <p className="mt-6 text-center text-sm text-gray-500">
-            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }} className="text-gray-400 hover:text-[#f1b300] transition-colors">
+            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined, register: undefined }} className="text-gray-400 hover:text-highlight-on-dark transition-colors">
               &larr; Back to home
             </Link>
           </p>

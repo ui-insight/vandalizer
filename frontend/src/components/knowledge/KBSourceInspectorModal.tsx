@@ -73,6 +73,25 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
   const docDeleted = isDoc
     && !!source.document_uuid
     && (detail?.document_exists ?? source.document_exists) === false
+  // The original file can only be offered once the detail says this viewer
+  // can open it and it is still in storage. Before, the File view was offered
+  // on existence alone and then rendered `{"detail":"File not found"}`.
+  const fileStatus = docDeleted ? null : (detail?.document_file ?? null)
+  // A definite 'no_access' or 'missing' hides the toggle and says why. An
+  // *unknown* status does not: if the detail request is still in flight or
+  // failed, hiding the File view would take away a file that renders perfectly
+  // well — DocumentViewer fetches it independently and reports its own error.
+  // Hiding on absence would turn a slow or failed detail call into "this file
+  // does not exist", which is the failure this block is meant to prevent, in
+  // the other direction.
+  const fileAvailable = fileStatus === 'available'
+    || (fileStatus === null && !docDeleted && isDoc && !!source.document_uuid)
+  const fileUnavailableNote = fileStatus === 'no_access'
+    ? 'the original file isn’t shared with you — the text below is what’s indexed'
+    : fileStatus === 'missing'
+      ? 'the original file is missing from storage — the text below is what’s indexed'
+      : null
+  const partialText = detail?.ingestion_warning_text ?? source.ingestion_warning_text
   const displayTitle =
     source.document_title
     || source.url_title
@@ -129,9 +148,14 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
                   {' '}· source deleted — answers still come from the text below
                 </span>
               )}
+              {fileUnavailableNote && (
+                <span style={{ color: '#d97706', fontStyle: 'italic' }}>
+                  {' '}· {fileUnavailableNote}
+                </span>
+              )}
             </div>
           </div>
-          {isDoc && source.document_uuid && !docDeleted && (
+          {isDoc && source.document_uuid && fileAvailable && (
             <div style={{ display: 'inline-flex', border: '1px solid #2e2e2e', borderRadius: 5, overflow: 'hidden' }}>
               {(['text', 'file'] as const).map(mode => (
                 <button
@@ -222,7 +246,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
 
         {/* Body */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-          {isDoc && docView === 'file' && !docDeleted ? (
+          {isDoc && docView === 'file' && fileAvailable ? (
             source.document_uuid ? (
               <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                 <DocumentViewer docUuid={source.document_uuid} />
@@ -237,6 +261,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               detail={detail}
               fallbackUrl={source.url}
               isDoc={isDoc}
+              partialText={partialText}
             />
           )}
         </div>
@@ -258,13 +283,15 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SourceContentInspector({
-  loading, error, detail, fallbackUrl, isDoc = false,
+  loading, error, detail, fallbackUrl, isDoc = false, partialText = null,
 }: {
   loading: boolean
   error: string | null
   detail: KnowledgeBaseSourceDetail | null
   fallbackUrl?: string
   isDoc?: boolean
+  // The pipeline's clause for a partly converted document, when there is one.
+  partialText?: string | null
 }) {
   if (loading) {
     return (
@@ -430,6 +457,23 @@ function SourceContentInspector({
           This page was too long to ingest in full — the extracted text below was cut
           off at the size limit, and anything after the cut is not in this knowledge base.
           Answers about later sections of the page may be wrong or incomplete.
+        </div>
+      )}
+
+      {/* Partial conversion — the pipeline recorded that the document's text
+          is not the whole document, so sections are simply absent below and
+          nothing built on this source can answer about them. */}
+      {partialText && (
+        <div style={{
+          marginBottom: 10, padding: '8px 10px',
+          fontSize: 12, lineHeight: 1.5, color: '#fbbf24',
+          backgroundColor: 'rgba(217, 119, 6, 0.12)',
+          border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
+        }}>
+          This document was only partly converted — {partialText}. Sections that did
+          not convert are not in the text below and are not in this knowledge base, so
+          answers about them will come from somewhere else or be wrong. Re-extracting
+          the document (from Files) and re-adding it here is the way to fill the gap.
         </div>
       )}
 

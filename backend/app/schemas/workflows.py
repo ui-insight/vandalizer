@@ -135,6 +135,11 @@ class TestStepRequest(BaseModel):
     task_data: dict
     document_uuids: list[str]
     model: Optional[str] = None
+    # Lets Test Step honour the workflow's own default model. A step whose
+    # selector reads "Use workflow default" was otherwise tested on the user's
+    # default and run on the workflow's -- tuned against one model, run on
+    # another, with the label saying otherwise.
+    workflow_id: Optional[str] = None
 
 
 class ReorderStepsRequest(BaseModel):

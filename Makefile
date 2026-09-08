@@ -51,18 +51,37 @@ backend-audit:
 # wrongly. Hence the explicit build branch. ORIG_HEAD (set by git across a
 # pull) is the right base for a refresh; HEAD~1, the tool's default, would
 # index only the last commit of a multi-commit pull.
+#
+# --repo is passed explicitly because the tool otherwise discovers the repo
+# from the working directory, which under `git worktree` is the *worktree* --
+# so a run from one builds a second index there, holding only the files that
+# worktree has touched, and answers every query from it with status "ok". A
+# partial index returns 0 for anything it never parsed, and a true 0 looks
+# identical: `callers_of` on a live symbol reports no callers, which reads as
+# "safe to change". The first `git worktree list` entry is always the main
+# working tree, so one shared graph serves every worktree.
 review-graph:
 	@command -v code-review-graph >/dev/null 2>&1 || { \
 	  printf 'review-graph: code-review-graph is not installed.\n' >&2; \
-	  printf '  install it with: uv tool install code-review-graph\n' >&2; \
+	  printf "  install it with: uv tool install 'code-review-graph[embeddings]'\n" >&2; \
 	  printf '  it is optional -- no other make target needs it.\n' >&2; \
 	  exit 1; }
-	@if [ ! -f .code-review-graph/graph.db ]; then \
-	  code-review-graph build; \
-	else \
-	  base=$${CRG_BASE:-$$(git rev-parse --verify --quiet ORIG_HEAD || echo HEAD~1)}; \
-	  code-review-graph update --base "$$base"; \
-	fi
+	@root=$$(git worktree list --porcelain | sed -n '1s/^worktree //p'); \
+	 if [ -z "$$root" ]; then \
+	   printf 'review-graph: cannot resolve the main working tree.\n' >&2; exit 1; \
+	 fi; \
+	 mkdir -p "$$root/.code-review-graph"; \
+	 if [ -f "$$root/.code-review-graph/graph.db" ]; then \
+	   base=$${CRG_BASE:-$$(git -C "$$root" rev-parse --verify --quiet ORIG_HEAD || echo HEAD~1)}; \
+	   set -- update --repo "$$root" --base "$$base"; \
+	 else \
+	   set -- build --repo "$$root"; \
+	 fi; \
+	 if command -v flock >/dev/null 2>&1; then \
+	   flock "$$root/.code-review-graph/.lock" code-review-graph "$$@"; \
+	 else \
+	   code-review-graph "$$@"; \
+	 fi
 
 # Writes scripts/ui_endpoint_map.md and .json for reading; regenerate on demand,
 # never commit (see .gitignore).

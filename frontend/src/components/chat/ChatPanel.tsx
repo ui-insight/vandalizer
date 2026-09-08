@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Link2, Sparkles, FolderKanban } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -123,7 +123,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -519,7 +519,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleRunDemo = () => {
     demoTriggered.current = true
     send(
-      `Show me what ${branding.orgName} can do`,
+      `Show me what ${branding.appName} can do`,
       selectedDocUuids,
       selectedModel || undefined,
       undefined, // knowledgeBaseUuids
@@ -818,6 +818,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         selectedDocUuids={selectedDocUuids}
         selectedDocNames={selectedDocNames}
         processingByUuid={processingByUuid}
+        selectedFolderUuids={selectedFolderUuids}
+        selectedFolderNames={selectedFolderNames}
+        knowledgeBases={activeKBs}
+        onDetachKB={detachKB}
+        onShareKB={(kb) => shareLink('kb', kb.uuid, kb.title || undefined)}
+        onDeselectFolder={(uuid) => {
+          setSelectedFolderUuids(selectedFolderUuids.filter(u => u !== uuid))
+          const next = { ...selectedFolderNames }
+          delete next[uuid]
+          setSelectedFolderNames(next)
+        }}
         onRemoveFile={handleRemoveFile}
         onRemoveUrl={handleRemoveUrl}
         onDeselectDoc={(uuid) => {
@@ -1479,56 +1490,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       )}
 
-      {/* One row per attached knowledge base — chat searches all of them. */}
-      {activeKBs.map(kb => (
-        <div
-          key={kb.uuid}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 16px',
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--highlight-on-light, #806600)',
-            backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-            borderTop: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)',
-          }}
-        >
-          <BookOpen size={14} />
-          <span style={{ flex: 1 }}>Knowledge Base: {kb.title}</span>
-          <button
-            onClick={() => shareLink('kb', kb.uuid, kb.title || undefined)}
-            title="Copy share link"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 2,
-              display: 'flex',
-              color: 'inherit',
-              opacity: 0.7,
-            }}
-          >
-            <Link2 size={14} />
-          </button>
-          <button
-            onClick={() => detachKB(kb.uuid)}
-            aria-label={`Detach knowledge base: ${kb.title}`}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 2,
-              display: 'flex',
-              color: 'inherit',
-              opacity: 0.7,
-            }}
-          >
-            <X size={14} />
-          </button>
-        </div>
-      ))}
 
       {showAttachKB && (
         <AttachKBModal

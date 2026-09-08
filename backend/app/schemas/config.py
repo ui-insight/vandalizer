@@ -42,6 +42,7 @@ class ThemeConfigResponse(BaseModel):
     highlight_complement: str = "#154cf7"
     ui_radius: str = "12px"
     org_name: str = ""
+    app_name: str = ""
     logo_data_url: str = ""
     icon_data_url: str = ""
     icon_hide_in_nav: bool = False
@@ -51,6 +52,7 @@ class UpdateThemeConfigRequest(BaseModel):
     highlight_color: Optional[str] = None
     ui_radius: Optional[str] = None
     org_name: Optional[str] = None
+    app_name: Optional[str] = None
     logo_data_url: Optional[str] = None
     icon_data_url: Optional[str] = None
     icon_hide_in_nav: Optional[bool] = None

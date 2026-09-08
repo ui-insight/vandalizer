@@ -21,7 +21,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
       aria-label="Workspace navigation"
       style={{
         width: 48,
-        background: '#191919',
+        background: 'var(--color-panel-dark)',
         borderRight: '1px solid #333',
         display: 'flex',
         flexDirection: 'column',

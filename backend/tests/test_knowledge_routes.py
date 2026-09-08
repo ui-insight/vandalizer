@@ -1246,6 +1246,9 @@ class TestKnowledgeDocSources:
             patch("app.routers.knowledge.organization_service") as mock_org,
             patch("app.models.knowledge.KnowledgeBaseSource") as MockKBSource,
             patch("app.models.document.SmartDocument") as MockDoc,
+            # Whether the File view is offered is decided the way the download
+            # route decides it; here the viewer may open it and it is stored.
+            patch("app.routers.knowledge._document_file_status", AsyncMock(return_value="available")),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1264,6 +1267,7 @@ class TestKnowledgeDocSources:
         body = resp.json()
         assert body["content"] == doc.raw_text
         assert body["document_title"] == "My Doc"
+        assert body["document_file"] == "available"
 
     @pytest.mark.asyncio
     async def test_remove_source_success(self, client):

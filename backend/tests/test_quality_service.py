@@ -534,3 +534,69 @@ class TestCheckVerificationReadiness:
             result = await check_verification_readiness("workflow", "wf-1")
             assert result["ready"] is True
             assert len(result["issues"]) == 0
+
+
+class TestQualityByModel:
+    """Fleet-wide by-model rollup: attributed models ranked by average,
+    unattributed runs shown as their own row instead of hidden."""
+
+    def _run(self, model, score, kind="search_set", item_id="i1", created=None):
+        vr = MagicMock()
+        vr.model = model
+        vr.score = score
+        vr.item_kind = kind
+        vr.item_id = item_id
+        vr.created_at = created or datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+        return vr
+
+    @pytest.mark.asyncio
+    async def test_groups_by_model_and_ranks_unattributed_last(self):
+        runs = [
+            self._run("model-a", 90.0, "search_set", "i1"),
+            self._run("model-a", 70.0, "knowledge_base", "k1"),
+            self._run("model-b", 95.0, "search_set", "i1"),
+            self._run(None, 40.0, "workflow", "w1"),
+        ]
+        with patch("app.services.quality_service.ValidationRun") as MockVR:
+            # The class-level field expression (ValidationRun.created_at >= cutoff)
+            # needs a comparable stand-in on the mocked class.
+            MockVR.created_at.__ge__.return_value = {}
+            chain = MagicMock()
+            chain.to_list = AsyncMock(return_value=runs)
+            MockVR.find.return_value = chain
+            from app.services.quality_service import get_quality_by_model
+
+            rows = await get_quality_by_model(days=90)
+
+        assert [r["model"] for r in rows] == ["model-b", "model-a", None]
+        a = next(r for r in rows if r["model"] == "model-a")
+        assert a["run_count"] == 2
+        assert a["items_validated"] == 2
+        assert a["avg_score"] == 80.0
+        assert a["kinds"]["search_set"]["avg_score"] == 90.0
+        assert a["kinds"]["knowledge_base"]["run_count"] == 1
+        # The unattributed bucket is visible — a coverage gap, not hidden.
+        unattributed = rows[-1]
+        assert unattributed["model"] is None
+        assert unattributed["run_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_same_item_counted_once_per_model(self):
+        runs = [
+            self._run("model-a", 80.0, "search_set", "i1"),
+            self._run("model-a", 90.0, "search_set", "i1"),
+        ]
+        with patch("app.services.quality_service.ValidationRun") as MockVR:
+            # The class-level field expression (ValidationRun.created_at >= cutoff)
+            # needs a comparable stand-in on the mocked class.
+            MockVR.created_at.__ge__.return_value = {}
+            chain = MagicMock()
+            chain.to_list = AsyncMock(return_value=runs)
+            MockVR.find.return_value = chain
+            from app.services.quality_service import get_quality_by_model
+
+            rows = await get_quality_by_model(days=90)
+
+        assert rows[0]["run_count"] == 2
+        assert rows[0]["items_validated"] == 1
+        assert rows[0]["avg_score"] == 85.0

@@ -41,9 +41,13 @@ const Present = lazy(() => import('./pages/present/Present'))
 
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
-  const { openPanel } = useCertificationPanel()
+  const { openPanel, setMode } = useCertificationPanel()
   const navigate = useNavigate()
   useEffect(() => {
+    // The panel's pop-out button opens this route in a fresh window; without
+    // this it would inherit whatever docked mode the origin window last used
+    // and show the whole workspace with a floating panel instead of the course.
+    if (new URLSearchParams(window.location.search).get('panel') === 'fullscreen') setMode('fullscreen')
     openPanel()
     navigate({
       to: '/',
@@ -88,12 +92,12 @@ const ROUTE_TITLES: Array<[string, string]> = [
 ]
 
 function RouteTitle() {
-  const { orgName } = useBranding()
+  const { appName } = useBranding()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   useEffect(() => {
     const match = ROUTE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'))
-    document.title = match ? `${match[1]} — ${orgName}` : orgName
-  }, [pathname, orgName])
+    document.title = match ? `${match[1]} — ${appName}` : appName
+  }, [pathname, appName])
   return null
 }
 
