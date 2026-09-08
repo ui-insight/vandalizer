@@ -93,6 +93,7 @@ const THEME = {
   highlight_complement: '#1e40af',
   ui_radius: '12px',
   org_name: '',
+  app_name: '',
   logo_data_url: '',
   icon_data_url: '',
   icon_hide_in_nav: false,

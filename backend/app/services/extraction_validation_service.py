@@ -4,6 +4,7 @@ import asyncio
 import math
 import re
 from collections import Counter
+from copy import deepcopy
 from datetime import datetime
 from typing import Optional
 
@@ -192,6 +193,35 @@ async def create_test_cases_from_extraction(
 # Validation
 # ---------------------------------------------------------------------------
 
+def _force_model_config(override: Optional[dict], model: str) -> dict:
+    """Overlay an explicitly requested model onto a config override so the
+    engine actually runs it — a config-pinned model (including the per-pass
+    models of a two-pass config) otherwise wins over the caller's ``model``
+    argument, and the run would be labeled with a model that never executed.
+    """
+    merged: dict = deepcopy(override) if override else {}
+    merged["model"] = model
+    two_pass = merged.setdefault("two_pass", {})
+    for pass_key in ("pass_1", "pass_2"):
+        two_pass.setdefault(pass_key, {})["model"] = model
+    return merged
+
+
+def _effective_model_info(
+    sys_config_doc: dict,
+    extraction_config_override: Optional[dict],
+    fallback_model: str,
+    requested_model: Optional[str],
+) -> dict:
+    """The model (and settings) this validation will actually run under."""
+    probe = ExtractionEngine(system_config_doc=sys_config_doc)
+    info = probe.effective_model_info(extraction_config_override, fallback_model)
+    if requested_model:
+        info["source"] = "requested"
+    info["requested_model"] = requested_model
+    return info
+
+
 async def run_validation(
     search_set_uuid: str,
     user_id: str,
@@ -221,17 +251,27 @@ async def run_validation(
     if not test_cases:
         raise ValueError("No test cases found")
 
-    # Resolve model
+    # Resolve model. A model the caller explicitly requested is forced into
+    # the engine config below so it actually runs; otherwise the user's model
+    # is only a fallback and a config-pinned model wins.
+    requested_model = model
     if not model:
         model = await get_user_model_name(user_id)
 
     # Load per-searchset config
     ss = await get_search_set(search_set_uuid)
     extraction_config_override = effective_extraction_config(ss) or None
+    if requested_model:
+        extraction_config_override = _force_model_config(
+            extraction_config_override, requested_model
+        )
 
     # Pre-fetch system config
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
+    model_info = _effective_model_info(
+        sys_config_doc, extraction_config_override, model, requested_model
+    )
 
     # Fetch field metadata for optional/enum awareness
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
@@ -378,8 +418,9 @@ async def run_validation(
         run_type="extraction",
         result=result_dict,
         user_id=user_id,
-        model=model,
+        model=model_info["model"],
         extraction_config=extraction_config_override or {},
+        model_settings={k: v for k, v in model_info.items() if k != "model"},
     )
 
     # Surface the *certified* score (raw score after the low-sample-size
@@ -963,14 +1004,24 @@ async def run_validation_v2(
     if not sources:
         raise ValueError("No sources provided")
 
+    # Same explicit-model contract as run_validation: a requested model is
+    # forced into the engine config so it actually runs.
+    requested_model = model
     if not model:
         model = await get_user_model_name(user_id)
 
     ss = await get_search_set(search_set_uuid)
     extraction_config_override = effective_extraction_config(ss) or None
+    if requested_model:
+        extraction_config_override = _force_model_config(
+            extraction_config_override, requested_model
+        )
 
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
+    model_info = _effective_model_info(
+        sys_config_doc, extraction_config_override, model, requested_model
+    )
 
     # Fetch field metadata for optional/enum awareness
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
@@ -1126,8 +1177,9 @@ async def run_validation_v2(
         run_type="extraction",
         result=result_dict,
         user_id=user_id,
-        model=model,
+        model=model_info["model"],
         extraction_config=extraction_config_override or {},
+        model_settings={k: v for k, v in model_info.items() if k != "model"},
     )
 
     # Surface the *certified* score (raw score after the low-sample-size

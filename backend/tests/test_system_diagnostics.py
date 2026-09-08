@@ -46,6 +46,11 @@ def _cfg(**overrides):
         ("429 rate limit exceeded", "rate_limit"),
         ("Connection error: getaddrinfo failed", "connection"),
         ("Connection refused", "connection"),
+        # pydantic-ai's UserError for an unsupported output mode. Before it was
+        # classified it fell to "unknown" — "read the raw error" — for the one
+        # failure with a precise remedy.
+        ("Native structured output is not supported by this model.", "capability"),
+        ("Tool output is not supported by this model.", "capability"),
         ("some unexpected boom", "unknown"),
     ],
 )
@@ -104,11 +109,13 @@ def test_diagnose_model_success_reports_steps():
         available_models=[{"name": "gpt-4o", "tag": "openai", "api_protocol": "openai", "api_key": "k"}],
         default_model="gpt-4o",
     )
-    fake_run = MagicMock()
-    fake_run.output = "ok"
-    fake_run.usage = lambda: SimpleNamespace(request_tokens=3, response_tokens=1, total_tokens=4)
+    text_run = MagicMock()
+    text_run.output = "ok"
+    text_run.usage = lambda: SimpleNamespace(request_tokens=3, response_tokens=1, total_tokens=4)
+    struct_run = MagicMock()
+    struct_run.output = SimpleNamespace(answer="ok")
     fake_agent = MagicMock()
-    fake_agent.run = AsyncMock(return_value=fake_run)
+    fake_agent.run = AsyncMock(side_effect=[text_run, struct_run])
 
     import asyncio
 
@@ -120,7 +127,10 @@ def test_diagnose_model_success_reports_steps():
     assert result["ok"] is True
     assert result["tokens"]["total"] == 4
     labels = [c["label"] for c in result["checks"]]
-    assert labels == ["Model configuration", "API protocol", "Endpoint", "API key", "Live completion"]
+    assert labels == [
+        "Model configuration", "API protocol", "Endpoint", "API key",
+        "Live completion", "Structured output",
+    ]
     assert all(c["ok"] for c in result["checks"])
 
 
@@ -143,3 +153,110 @@ def test_diagnose_model_failure_is_classified():
     # The live-completion step should be the one that failed.
     assert result["checks"][-1]["label"] == "Live completion"
     assert result["checks"][-1]["ok"] is False
+
+
+# --- structured output: the capability the features actually need ---------
+
+
+def test_diagnose_model_structured_output_failure_is_not_ok():
+    """A model that chats but cannot return a schema-constrained object is
+    broken for extraction and every workflow, so the test must go red.
+
+    This is the exact production shape: the endpoint was reachable, the
+    credentials were good, the model answered "ok" — and every extraction
+    failed. Reporting that model as healthy is what kept the real cause
+    invisible until a user filed a ticket.
+    """
+    cfg = _cfg(
+        available_models=[{"name": "Qwen/Qwen3-32B", "api_protocol": "vllm",
+                           "endpoint": "http://inference.local:8000"}],
+    )
+    text_run = MagicMock()
+    text_run.output = "ok"
+    text_run.usage = lambda: SimpleNamespace(request_tokens=3, response_tokens=1, total_tokens=4)
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(side_effect=[
+        text_run,
+        Exception("Native structured output is not supported by this model."),
+    ])
+
+    import asyncio
+
+    with patch("app.services.system_diagnostics.get_agent_model", return_value=MagicMock()), \
+         patch("pydantic_ai.Agent", return_value=fake_agent), \
+         patch("app.services.system_diagnostics.decrypt_value", return_value=""):
+        result = asyncio.run(diagnose_model(cfg, 0))
+
+    assert result["ok"] is False
+    assert result["error"]["category"] == "capability"
+    # Connectivity passed; the capability did not. Both must be visible, or the
+    # admin cannot tell "unreachable" from "reachable but unusable".
+    by_label = {c["label"]: c for c in result["checks"]}
+    assert by_label["Live completion"]["ok"] is True
+    assert by_label["Structured output"]["ok"] is False
+    assert "extraction and workflows will fail" in by_label["Structured output"]["detail"]
+    assert "structured output failed" in result["summary"]
+
+
+def test_diagnose_model_probes_the_mode_the_engine_will_use():
+    """The probe must ask for the same output mode a real run asks for.
+
+    A diagnostic that always used the default mode would pass on exactly the
+    configuration extraction fails on.
+    """
+    from pydantic_ai import NativeOutput
+
+    cfg = _cfg(
+        available_models=[{"name": "Qwen/Qwen3-32B", "api_protocol": "vllm",
+                           "endpoint": "http://inference.local:8000"}],
+    )
+    text_run = MagicMock()
+    text_run.output = "ok"
+    text_run.usage = lambda: SimpleNamespace(request_tokens=1, response_tokens=1, total_tokens=2)
+    struct_run = MagicMock()
+    struct_run.output = SimpleNamespace(answer="ok")
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(side_effect=[text_run, struct_run])
+    agent_cls = MagicMock(return_value=fake_agent)
+
+    import asyncio
+
+    with patch("app.services.system_diagnostics.get_agent_model", return_value=MagicMock()), \
+         patch("pydantic_ai.Agent", agent_cls), \
+         patch("app.services.system_diagnostics.decrypt_value", return_value=""):
+        result = asyncio.run(diagnose_model(cfg, 0))
+
+    assert result["ok"] is True
+    # Second Agent(...) construction is the structured probe.
+    probe_kwargs = agent_cls.call_args_list[1].kwargs
+    assert isinstance(probe_kwargs["output_type"], NativeOutput)
+
+
+def test_diagnose_model_reports_the_dialed_url_not_the_stored_one():
+    """vLLM/Ollama append "/v1" to the saved endpoint and the OpenAI provider
+    does not, so the stored string alone cannot tell an admin which URL was
+    called — and switching protocol silently changes it."""
+    cfg = _cfg(
+        available_models=[{"name": "qwen3-32b", "api_protocol": "vllm",
+                           "endpoint": "http://inference.local:8000"}],
+    )
+    text_run = MagicMock()
+    text_run.output = "ok"
+    text_run.usage = lambda: SimpleNamespace(request_tokens=1, response_tokens=1, total_tokens=2)
+    struct_run = MagicMock()
+    struct_run.output = SimpleNamespace(answer="ok")
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(side_effect=[text_run, struct_run])
+
+    import asyncio
+
+    with patch("app.services.system_diagnostics.get_agent_model", return_value=MagicMock()), \
+         patch("app.services.system_diagnostics.unwrap_model_base_url",
+               return_value="http://inference.local:8000/v1"), \
+         patch("pydantic_ai.Agent", return_value=fake_agent), \
+         patch("app.services.system_diagnostics.decrypt_value", return_value=""):
+        result = asyncio.run(diagnose_model(cfg, 0))
+
+    endpoint_check = next(c for c in result["checks"] if c["label"] == "Endpoint")
+    assert "→ dialing http://inference.local:8000/v1" in endpoint_check["detail"]
+    assert result["endpoint"] == "http://inference.local:8000/v1"

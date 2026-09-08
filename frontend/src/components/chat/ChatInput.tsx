@@ -171,7 +171,7 @@ export function ChatInput({
             placeholder={
               hasDocuments
                 ? 'Ask about these documents, extract key fields, or compare versions...'
-                : `Ask ${branding.orgName} about a document, workflow, or compliance question...`
+                : `Ask ${branding.appName} about a document, workflow, or compliance question...`
             }
             aria-label="Message input"
             rows={1}

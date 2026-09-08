@@ -30,6 +30,7 @@ const THEME = {
   highlight_complement: '#1e40af',
   ui_radius: '12px',
   org_name: 'Test University',
+  app_name: '',
   logo_data_url: '',
   icon_data_url: '',
   icon_hide_in_nav: false,
@@ -38,6 +39,13 @@ const THEME = {
 /** The colour is bound to two inputs (a native picker and a hex field). */
 function hexField() {
   return screen.getAllByDisplayValue(/^#/)[1]
+}
+
+/** The assistant-name field, which may legitimately be empty. Its placeholder
+ *  is the effective fallback (the org name), which is what distinguishes it
+ *  from the org-name field's own placeholder. */
+function assistantNameField() {
+  return screen.getByPlaceholderText('Test University')
 }
 
 beforeEach(() => {
@@ -59,6 +67,22 @@ describe('ThemePanel — load', () => {
     await waitFor(() => expect(hexField()).toHaveValue('#eab308'))
     expect(screen.getByText('Corner Radius: 12px')).toBeInTheDocument()
     expect(screen.getByDisplayValue('Test University')).toBeInTheDocument()
+  })
+
+  it('loads the assistant name, which is stored separately from the org name', async () => {
+    mockGetThemeConfig.mockResolvedValue({ ...THEME, app_name: 'Scout' })
+    render(<ThemePanel initialColor="#ff0000" initialRadius={4} />)
+
+    await waitFor(() => expect(assistantNameField()).toHaveValue('Scout'))
+    expect(screen.getByDisplayValue('Test University')).toBeInTheDocument()
+  })
+
+  it('leaves the assistant name blank when unset, so the org name stands in', async () => {
+    render(<ThemePanel initialColor="#ff0000" initialRadius={4} />)
+
+    // Wait for the loaded org name — the assistant field's placeholder shows it.
+    await waitFor(() => expect(screen.getByDisplayValue('Test University')).toBeInTheDocument())
+    expect(assistantNameField()).toHaveValue('')
   })
 
   it('keeps the seeded values when the theme request fails', async () => {
@@ -86,6 +110,7 @@ describe('ThemePanel — save', () => {
       highlight_color: '#123456',
       ui_radius: '12px',
       org_name: 'Real University',   // trimmed
+      app_name: '',
       logo_data_url: '',
       icon_data_url: '',
       icon_hide_in_nav: false,
@@ -96,6 +121,20 @@ describe('ThemePanel — save', () => {
     expect(document.documentElement.style.getPropertyValue('--ui-radius')).toBe('20px')
     await waitFor(() => expect(mockBrandingRefresh).toHaveBeenCalled())
     expect(await screen.findByText('Theme saved!')).toBeInTheDocument()
+  })
+
+  it('sends the assistant name trimmed, without disturbing the org name', async () => {
+    mockGetThemeConfig.mockResolvedValue({ ...THEME, app_name: 'Scout' })
+    render(<ThemePanel initialColor="#eab308" initialRadius={12} />)
+    await waitFor(() => expect(assistantNameField()).toHaveValue('Scout'))
+
+    fireEvent.change(assistantNameField(), { target: { value: '  Ranger  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save Theme' }))
+
+    await waitFor(() => expect(mockUpdateThemeConfig).toHaveBeenCalledWith(expect.objectContaining({
+      app_name: 'Ranger',
+      org_name: 'Test University',
+    })))
   })
 
   it('sends the corner radius as a px string', async () => {

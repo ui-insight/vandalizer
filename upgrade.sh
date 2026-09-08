@@ -6,8 +6,9 @@
 #   ./upgrade.sh v2026.04.1 --dry-run  # show what would happen, change nothing
 #   ./upgrade.sh --rollback            # restore the previous version from .last_version
 #
-# Requires: docker compose v2, a working .env in backend/ (created by setup.sh),
-# and GHCR pull access (public images need no auth; private images need
+# Requires: a Compose implementation (docker compose v2, docker-compose, or
+# podman-compose), a working .env in backend/ (created by setup.sh), and GHCR
+# pull access (public images need no auth; private images need
 # `docker login ghcr.io` first).
 set -euo pipefail
 
@@ -16,7 +17,8 @@ cd "$SCRIPT_DIR"
 
 VERSION_FILE="${SCRIPT_DIR}/.vandalizer_version"
 PREV_VERSION_FILE="${SCRIPT_DIR}/.vandalizer_version.prev"
-COMPOSE=(docker compose -f compose.yaml -f compose.prod.yaml)
+COMPOSE_FILES=(-f compose.yaml -f compose.prod.yaml)
+# CONTAINER_CLI and COMPOSE are resolved in preflight below.
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -48,8 +50,23 @@ fi
 [[ -n "$TAG" ]] || { echo "error: no version tag given" >&2; usage 1; }
 
 # --- preflight ----------------------------------------------------------------
-command -v docker >/dev/null || die "docker not installed"
-docker compose version >/dev/null 2>&1 || die "docker compose v2 required"
+if command -v docker >/dev/null 2>&1; then
+  CONTAINER_CLI="docker"
+elif command -v podman >/dev/null 2>&1; then
+  CONTAINER_CLI="podman"
+else
+  die "no container engine found — install docker or podman"
+fi
+
+if docker compose version >/dev/null 2>&1; then
+  COMPOSE=(docker compose "${COMPOSE_FILES[@]}")
+elif docker-compose version >/dev/null 2>&1; then
+  COMPOSE=(docker-compose "${COMPOSE_FILES[@]}")
+elif podman-compose version >/dev/null 2>&1; then
+  COMPOSE=(podman-compose "${COMPOSE_FILES[@]}")
+else
+  die "no Compose implementation found (docker compose v2, docker-compose, or podman-compose)"
+fi
 [[ -f compose.yaml ]]      || die "compose.yaml not found (run from repo root)"
 [[ -f compose.prod.yaml ]] || die "compose.prod.yaml not found"
 [[ -f backend/.env ]]      || die "backend/.env not found — run ./setup.sh first"
@@ -58,8 +75,8 @@ docker compose version >/dev/null 2>&1 || die "docker compose v2 required"
 for image in "ghcr.io/ui-insight/vandalizer-backend:${TAG}" \
              "ghcr.io/ui-insight/vandalizer-frontend:${TAG}"; do
   echo "Checking $image..."
-  if ! docker manifest inspect "$image" >/dev/null 2>&1; then
-    die "image $image not found in registry (private registry? run 'docker login ghcr.io')"
+  if ! $CONTAINER_CLI manifest inspect "$image" >/dev/null 2>&1; then
+    die "image $image not found in registry (private registry? run '$CONTAINER_CLI login ghcr.io')"
   fi
 done
 
@@ -106,5 +123,5 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
-echo "warning: api did not pass health check within 60s — check 'docker compose logs api'" >&2
+echo "warning: api did not pass health check within 60s — check '${COMPOSE[*]} logs api'" >&2
 exit 1

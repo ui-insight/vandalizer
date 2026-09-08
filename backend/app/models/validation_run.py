@@ -20,7 +20,18 @@ class ValidationRun(Document):
     consistency: Optional[float] = None  # 0-1 (extraction only)
     grade: Optional[str] = None  # A-F (workflow only)
     score: float = 0.0  # Unified 0-100 (computed)
+    # The model that actually executed the run (not merely the one requested —
+    # a config-pinned model wins over a caller's fallback, and the label must
+    # say which one ran). None when no single task model is attributable, e.g.
+    # a workflow validation graded over executions from mixed models.
     model: Optional[str] = None
+    # Effective model settings snapshotted at run time, so a later change to a
+    # model's live config (e.g. its temperature in System Config) can't
+    # silently rewrite what a historical score measured. Shape varies by
+    # run_type: extraction {"source", "requested_model", "temperature",
+    # "pass_models"}, workflow {"models_used"}, kb_validation
+    # {"requested_model", "judge_model", "answer_temperature"}.
+    model_settings: Optional[dict] = None
     num_runs: int = 1
     num_test_cases: int = 0
     num_checks: int = 0
@@ -44,6 +55,13 @@ class ValidationRun(Document):
 
     class Settings:
         name = "validation_runs"
+        indexes = [
+            # Per-item history (get_quality_history, get_latest_validation).
+            [("item_kind", 1), ("item_id", 1), ("created_at", -1)],
+            # By-model rollups and the mgmt API's model filter — previously a
+            # full collection scan.
+            [("model", 1), ("created_at", -1)],
+        ]
 
     def __init__(self, **data):
         super().__init__(**data)

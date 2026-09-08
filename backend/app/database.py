@@ -39,6 +39,7 @@ from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
 from app.models.verification_session import VerificationSession
+from app.models.regression_suite_run import RegressionSuiteRun
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
@@ -104,6 +105,7 @@ ALL_MODELS = [
     ValidationRun,
     QualityAlert,
     VerificationSession,
+    RegressionSuiteRun,
     DemoApplication,
     PostExperienceResponse,
     WorkflowTriggerEvent,

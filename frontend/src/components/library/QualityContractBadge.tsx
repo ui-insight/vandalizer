@@ -7,6 +7,9 @@ interface QualityContractBadgeProps {
   lastValidatedAt: string | null
   isStale: boolean
   monitored: boolean
+  /** The tier was hand-typed in the catalog seed and no measured validation
+   *  backs it — render it as an assertion, never as a measurement. */
+  asserted?: boolean
 }
 
 const statusColors: Record<string, { bg: string; text: string; border: string }> = {
@@ -16,8 +19,10 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   unmonitored: { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' },
 }
 
-export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, monitored }: QualityContractBadgeProps) {
-  const effectiveStatus = isStale ? 'stale' : status
+export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, monitored, asserted }: QualityContractBadgeProps) {
+  // An asserted tier is a claim, not a measurement \u2014 present it in the
+  // neutral style regardless of how confident the tier word sounds.
+  const effectiveStatus = asserted ? 'unmonitored' : isStale ? 'stale' : status
   const colors = statusColors[effectiveStatus] || statusColors.unmonitored
 
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : 'Unknown'
@@ -26,7 +31,9 @@ export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, m
 
   let label = `Verified`
   if (tier) label += ` \u00b7 ${tierLabel}`
-  if (isStale) {
+  if (asserted) {
+    label += ` (asserted)`
+  } else if (isStale) {
     label += ` \u00b7 Stale`
     if (staleLabel) label += ` \u00b7 ${staleLabel}`
   } else {
@@ -35,6 +42,9 @@ export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, m
 
   return (
     <span
+      title={asserted
+        ? 'This tier was assigned by the catalog author; no measured validation backs it yet. Validate the item to measure it.'
+        : undefined}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

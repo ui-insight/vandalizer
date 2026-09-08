@@ -19,9 +19,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+import pytest
+
 from app.services.context_budget import (
     DEFAULT_TOKEN_SAFETY_MARGIN,
     DocumentSegment,
+    NativeCount,
     count_raw_tokens,
     count_tokens,
     estimate_input_tokens,
@@ -470,3 +473,216 @@ class TestLoudFallback:
             token_safety_margin("gpt-4o")
 
         assert not [r for r in caplog.records if "estimated" in r.getMessage()]
+
+
+class TestNativeCountRung:
+    """A provider's own count is evidence; 1.5 is a guess sized for the worst case.
+
+    This rung sits between the OpenAI check and the default, so it only ever
+    displaces the guess. It is deliberately a *ratio*, not a total: the margin is
+    applied per component in `estimate_input_tokens` and recounted on mutated
+    text inside the planner's trim loop, so a recorded total would be wrong the
+    moment anything was trimmed. A ratio stays approximately right.
+    """
+
+    MODEL = "Qwen/Qwen3-VL-8B-Instruct"
+    # The worst row in OBSERVED_UNDERCOUNTS, used as a stand-in for a count the
+    # provider handed back alongside a locally-taken baseline over the same text.
+    NATIVE_TOKENS = 2527
+    BASELINE_TOKENS = 2154
+    RATIO = NATIVE_TOKENS / BASELINE_TOKENS  # 1.1732
+
+    def setup_method(self):
+        from app.services import context_budget
+
+        context_budget._ESTIMATED_MODELS_WARNED.clear()
+
+    def _native(self, **overrides) -> NativeCount:
+        kwargs = dict(
+            model_name=self.MODEL,
+            tokens=self.NATIVE_TOKENS,
+            baseline_tokens=self.BASELINE_TOKENS,
+        )
+        kwargs.update(overrides)
+        return NativeCount(**kwargs)
+
+    def test_a_measured_ratio_displaces_the_default_guess(self):
+        """The whole point: stop paying 1.5 for a model that told us 1.17.
+
+        Neither 1.5 (the guess this replaces) nor 1.0 (which this is not — the
+        margin is applied per component and recounted after trimming, so the
+        count cannot be made exact this way)."""
+        margin = token_safety_margin(self.MODEL, None, native=self._native())
+        assert margin == pytest.approx(self.RATIO)
+        assert margin != DEFAULT_TOKEN_SAFETY_MARGIN
+        assert margin != 1.0
+
+    def test_a_provider_counting_below_tiktoken_is_clamped_to_one(self):
+        """A ratio under 1.0 must not be used to reclaim window.
+
+        Counting low is the direction that hard-fails, and the per-component
+        application plus post-trim recounting means the ratio is approximate.
+        Deflating every component on the strength of one measurement re-creates
+        the original bug from the other side."""
+        margin = token_safety_margin(
+            self.MODEL, None, native=self._native(tokens=900, baseline_tokens=1000)
+        )
+        assert margin == 1.0
+
+    def test_a_count_measured_for_another_model_is_not_a_count_for_this_one(self):
+        """Vocabularies differ per model; carrying one model's ratio onto
+        another is exactly the wrong-ruler bug this module exists to remove."""
+        margin = token_safety_margin(
+            self.MODEL, None, native=self._native(model_name="Qwen/Qwen3.5-9B")
+        )
+        assert margin == DEFAULT_TOKEN_SAFETY_MARGIN
+
+    def test_a_zero_baseline_is_ignored_rather_than_dividing(self):
+        """No baseline means no ratio. Dividing by it would raise inside the
+        token counter, taking down chat for a merely-missing measurement."""
+        margin = token_safety_margin(
+            self.MODEL, None, native=self._native(baseline_tokens=0)
+        )
+        assert margin == DEFAULT_TOKEN_SAFETY_MARGIN
+
+    def test_a_non_positive_native_count_is_ignored(self):
+        """A provider that reported 0 (or a negative, from a bad parse) measured
+        nothing. Trusting it would clamp the margin to 1.0 and plan against the
+        raw estimate — the original under-count."""
+        for bad in (0, -5):
+            margin = token_safety_margin(
+                self.MODEL, None, native=self._native(tokens=bad)
+            )
+            assert margin == DEFAULT_TOKEN_SAFETY_MARGIN, f"tokens={bad}"
+
+    def test_a_non_finite_ratio_falls_through_instead_of_returning_garbage(self):
+        """The dataclass is not validated, so inf/nan can reach the division.
+        `_apply_margin` would then `math.ceil` it and raise, or produce a budget
+        no request could ever fit."""
+        for bad in (float("inf"), float("nan")):
+            margin = token_safety_margin(
+                self.MODEL, None, native=self._native(tokens=bad)
+            )
+            assert margin == DEFAULT_TOKEN_SAFETY_MARGIN, f"tokens={bad}"
+
+    def test_an_exact_local_tokenizer_still_wins(self, monkeypatch):
+        """Rung 1 beats this one. When we can count the text exactly there is
+        nothing to correct, and applying a measured ratio on top would inflate
+        every budget and make every trim over-aggressive by that factor."""
+        from app.services import context_budget as cb
+
+        monkeypatch.setattr(
+            cb, "resolve_exact_tokenizer", lambda name, config=None: object()
+        )
+        assert token_safety_margin(self.MODEL, None, native=self._native()) == 1.0
+
+    def test_a_configured_margin_still_wins(self):
+        """Rung 2 beats this one. A deployment that wrote a number down is
+        making a deliberate statement about its own content, and a single
+        provider observation must not silently override it."""
+        cfg = {"token_safety_margin": 1.35}
+        assert token_safety_margin(self.MODEL, cfg, native=self._native()) == 1.35
+
+    def test_openai_models_are_still_not_inflated(self):
+        """Rung 3 beats this one. tiktoken *is* these models' tokenizer, so any
+        divergence a native count shows is measurement noise, not a ruler
+        mismatch — inflating on it would only route requests early."""
+        native = NativeCount(model_name="gpt-4o", tokens=2527, baseline_tokens=2154)
+        assert token_safety_margin("gpt-4o", None, native=native) == 1.0
+
+    def test_no_native_count_reproduces_the_existing_ladder(self):
+        """The new parameter must be inert when unused. Every caller that has
+        no provider count keeps exactly the behaviour it had."""
+        assert token_safety_margin(self.MODEL, None, native=None) == (
+            DEFAULT_TOKEN_SAFETY_MARGIN
+        )
+        assert token_safety_margin(self.MODEL) == DEFAULT_TOKEN_SAFETY_MARGIN
+        assert token_safety_margin("gpt-4o", None, native=None) == 1.0
+
+    def test_the_estimated_warning_does_not_fire_on_a_measured_ratio(self, caplog):
+        """That warning means 'we are guessing'. Firing it while holding the
+        provider's own count would train operators to ignore it on the models
+        where it is genuinely true."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            token_safety_margin(
+                "a-model-never-warned-about",
+                None,
+                native=NativeCount(
+                    model_name="a-model-never-warned-about",
+                    tokens=self.NATIVE_TOKENS,
+                    baseline_tokens=self.BASELINE_TOKENS,
+                ),
+            )
+
+        assert not [r for r in caplog.records if "estimated" in r.getMessage()]
+
+    def test_the_estimated_warning_still_fires_when_the_native_rung_is_skipped(
+        self, caplog
+    ):
+        """The other half: an unusable native count is still a guess, and the
+        silence would be the alias bug all over again."""
+        import logging
+
+        with caplog.at_level(logging.WARNING):
+            token_safety_margin(
+                "another-model-never-warned-about",
+                None,
+                native=NativeCount(
+                    model_name="a-different-model", tokens=2527, baseline_tokens=2154
+                ),
+            )
+
+        assert [
+            r
+            for r in caplog.records
+            if "another-model-never-warned-about" in r.getMessage()
+        ], "an ignored native count leaves us guessing, and that must be visible"
+
+    def test_the_measured_ratio_reaches_estimate_input_tokens(self):
+        """In the spirit of TestMarginReachesTheCallers: a margin that never
+        reaches the planner's arithmetic changes nothing."""
+        from app.services.context_budget import REQUEST_SCAFFOLD_TOKENS
+
+        kwargs = dict(
+            system_prompt="",
+            user_message="hello",
+            history=[],
+            documents=[DocumentSegment(label="doc:a", text="Body text. " * 500)],
+            attachments=[],
+        )
+        raw_est = estimate_input_tokens(
+            model_name=self.MODEL, model_config={"token_safety_margin": 1.0}, **kwargs
+        )
+        default_est = estimate_input_tokens(model_name=self.MODEL, **kwargs)
+        native_est = estimate_input_tokens(
+            model_name=self.MODEL, native=self._native(), **kwargs
+        )
+
+        assert raw_est < native_est < default_est
+        # The scaffold allowance is a flat addition identical for all three, so
+        # it has to come off before the ratio means anything.
+        assert (native_est - REQUEST_SCAFFOLD_TOKENS) == pytest.approx(
+            (raw_est - REQUEST_SCAFFOLD_TOKENS) * self.RATIO, rel=0.02
+        )
+
+    def test_the_measured_ratio_reaches_the_planner(self):
+        """`plan_and_compact_context` sizes and trims against the same margin;
+        a ratio that stopped at the estimator would leave the two disagreeing."""
+        pieces = dict(
+            model_config={"context_window": 32_768},
+            system_prompt="You are a research assistant.",
+            user_message="Summarise this.",
+            history=[],
+            documents=[DocumentSegment(label="doc:a", text="Body text. " * 2_000)],
+            attachments=[],
+        )
+        default_plan = plan_and_compact_context(model_name=self.MODEL, **pieces)
+        native_plan = plan_and_compact_context(
+            model_name=self.MODEL, native=self._native(), **pieces
+        )
+        assert (
+            native_plan.plan.documents_tokens < default_plan.plan.documents_tokens
+        ), "the measured ratio never reached the planner's component counts"
+        assert not native_plan.fatal

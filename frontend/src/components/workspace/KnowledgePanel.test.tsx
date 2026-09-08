@@ -423,4 +423,31 @@ describe('KnowledgePanel export on an empty KB', () => {
     expect(line.textContent).toContain('serving text from')
     expect(line.textContent).toContain('abcdef012345')
   }, 30000)
+
+  // Support ticket: a PAPPG whose converted text held the Introduction,
+  // Chapter II and Chapter XII and none of I, III, IV or V sat in the KB
+  // behind a green check. The pipeline had recorded the partial conversion
+  // on the document; the KB row never said so.
+  it('marks a source whose document was only partly converted as incomplete, not ready', async () => {
+    detail.current = makeDetail({
+      can_manage: true,
+      sources: [{
+        uuid: 'src-1',
+        source_type: 'document',
+        document_uuid: 'doc-1',
+        document_title: 'nsf24_1.pdf',
+        document_exists: true,
+        status: 'ready',
+        chunk_count: 120,
+        created_at: '2026-01-01T00:00:00Z',
+        ingestion_warnings: ['partial_ocr'],
+        ingestion_warning_text: 'only part of this document could be converted',
+      }],
+    })
+    await openDetail()
+
+    expect(screen.getByLabelText('Source document was only partly converted')).toBeInTheDocument()
+    // The visible line carries the pipeline's own clause, not only a hover.
+    expect(screen.getByText(/Only part of this document is indexed — only part of this document could be converted/)).toBeInTheDocument()
+  }, 30000)
 })

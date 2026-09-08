@@ -1,6 +1,6 @@
 """Knowledge Base schemas for request/response validation."""
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -92,6 +92,11 @@ class KBSourceResponse(BaseModel):
     # URL source whose extracted text was cut off at the fetcher size cap:
     # "ready" but incomplete, so the UI warns instead of showing a clean check.
     truncated: bool = False
+    # Document source whose document the pipeline recorded as only partly
+    # converted (``partial_ocr``, ``sparse_text``): the same "ready but
+    # incomplete" shape as ``truncated``, read live from the document.
+    ingestion_warnings: list[str] = []
+    ingestion_warning_text: Optional[str] = None
     created_at: Optional[str] = None
     # When the source's text was last fetched/ingested. Surfaced on the list
     # so a user can tell how stale a URL snapshot is before refreshing it.
@@ -107,6 +112,14 @@ class KBSourceDetailResponse(KBSourceResponse):
     """
 
     content: Optional[str] = None  # Cached extracted text (URL sources)
+    # Whether *this viewer* can open the original file behind a document
+    # source: ``available``, ``no_access`` (the document exists but is not
+    # theirs to open — a shared KB over a private upload), or ``missing``
+    # (the stored file is gone from storage). The text is shown either way;
+    # this decides whether the File view is offered at all, instead of a
+    # viewer that answers ``{"detail": "File not found"}``. None for URL
+    # sources and for a document that no longer exists.
+    document_file: Optional[Literal["available", "no_access", "missing"]] = None
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
     parent_source_uuid: Optional[str] = None

@@ -198,6 +198,7 @@ async def get_theme():
         highlight_color=config.highlight_color,
         ui_radius=config.ui_radius,
         org_name=config.org_name,
+        app_name=config.app_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
         icon_hide_in_nav=config.icon_hide_in_nav,
@@ -215,6 +216,8 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         config.ui_radius = req.ui_radius
     if req.org_name is not None:
         config.org_name = req.org_name.strip()
+    if req.app_name is not None:
+        config.app_name = req.app_name.strip()
     if req.logo_data_url is not None:
         config.logo_data_url = _validate_image_data_url(req.logo_data_url, "logo_data_url")
     if req.icon_data_url is not None:
@@ -228,6 +231,7 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         highlight_color=config.highlight_color,
         ui_radius=config.ui_radius,
         org_name=config.org_name,
+        app_name=config.app_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
         icon_hide_in_nav=config.icon_hide_in_nav,

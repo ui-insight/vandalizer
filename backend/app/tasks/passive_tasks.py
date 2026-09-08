@@ -478,10 +478,23 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                 continue
 
             tasks = []
+            step_data = step_doc.get("data", {}) or {}
             for task_id in step_doc.get("tasks", []):
                 task_doc = db.workflow_step_task.find_one({"_id": task_id})
                 if task_doc:
                     task_data = dict(task_doc.get("data", {}))
+
+                    # Input is configured on the step and shared by every task
+                    # in it. This has to happen BEFORE the preloads below, for
+                    # the same reason workflow_tasks._build_steps_data does it
+                    # here: the engine resolves the step's choice, so a preload
+                    # reading the task's own keys would fetch a different
+                    # document than the one that runs -- or none at all, and
+                    # the step answers over empty text without erroring. This
+                    # path is the scheduled and folder-watch one, so the
+                    # mismatch would only ever show up in automation.
+                    from app.services.workflow_engine import apply_step_input_config
+                    apply_step_input_config(step_data, task_data)
 
                     # Resolve extraction keys from search set
                     if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
@@ -532,13 +545,21 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
 
             steps_data.append({
                 "name": step_doc.get("name", ""),
-                "data": step_doc.get("data", {}),
+                "data": step_data,
                 "tasks": tasks,
             })
 
-        # Resolve model
+        # Resolve model. The canvas says a workflow's default model "runs every
+        # step on this model" without qualifying it to interactive runs, so an
+        # automated run has to honour it too -- otherwise the same workflow uses
+        # one model when a person clicks Run and another when the schedule
+        # fires, with nothing in the UI saying so. Falling back to the first
+        # configured model stays the last resort.
         models = sys_config.get("available_models", [])
-        model = models[0]["name"] if models else "gpt-4o-mini"
+        model = (
+            (workflow.get("input_config") or {}).get("default_model")
+            or (models[0]["name"] if models else "gpt-4o-mini")
+        )
 
         # Check if the workflow owner is an admin (gates code execution)
         wf_user_id = workflow.get("user_id")

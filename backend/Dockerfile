@@ -1,4 +1,4 @@
-FROM python:3.12-slim AS builder
+FROM docker.io/library/python:3.12-slim AS builder
 
 RUN pip install --no-cache-dir uv
 
@@ -9,7 +9,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 # ---------------------------------------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM docker.io/library/python:3.12-slim AS runtime
 
 # Build-time version identifier (release tag, SHA, or "dev"). Written to
 # /app/VERSION so the app can self-report its version at runtime.

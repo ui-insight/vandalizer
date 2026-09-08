@@ -73,4 +73,33 @@ describe('LoginForm', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
     await waitFor(() => expect(screen.queryByText('Bad credentials')).not.toBeInTheDocument())
   })
+
+  // The sign-in page is the first thing a white-labeled deployment shows, so the
+  // primary button has to follow the configured brand — background and the
+  // runtime-computed contrast colour for the label on it — not Vandalizer's gold.
+  it('paints the submit button from the brand tokens, not a hardcoded hex', () => {
+    render(<LoginForm />)
+    const submit = screen.getByRole('button', { name: /sign in/i })
+
+    expect(submit).toHaveClass('bg-highlight')
+    expect(submit).toHaveClass('text-highlight-text')
+    expect(submit.className).not.toMatch(/#[0-9a-f]{6}/i)
+  })
+
+  // These inputs set focus:outline-none, which suppresses the global
+  // :focus-visible outline -- so the ring IS the focus indicator, and it has to
+  // be the contrast-corrected token. Painted with the raw brand, a dark brand
+  // (#163A64 over near-black) leaves a ~1.3:1 ring: a keyboard user on a
+  // white-labelled deployment cannot see where they are. The raw token is
+  // correct on the app's light surfaces and wrong here, so this pins the
+  // distinction rather than the presence of a class.
+  it.each(['email', 'password'])('gives the %s input a focus ring visible on dark', (field) => {
+    render(<LoginForm />)
+    const input = screen.getByPlaceholderText(new RegExp(field, 'i'))
+
+    expect(input.className).toContain('focus:outline-none')
+    expect(input.className).toContain('focus:ring-highlight-on-dark/50')
+    expect(input.className).not.toContain('focus:ring-highlight/50')
+    expect(input.className).not.toContain('focus:border-highlight/50')
+  })
 })

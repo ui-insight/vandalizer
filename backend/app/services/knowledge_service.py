@@ -419,6 +419,42 @@ async def resolve_existing_documents(sources) -> set[str]:
     return {d.uuid for d in docs}
 
 
+async def resolve_document_ingestion_warnings(sources) -> dict[str, list[str]]:
+    """Per-source ingestion-warning codes, keyed by source uuid.
+
+    A document source indexes ``SmartDocument.raw_text`` as it stands, and
+    the document pipeline already records when that text is not the whole
+    document (``partial_ocr`` — the converter gave up partway; ``sparse_text``
+    — far too little text for the page count). Chat and the file list say so;
+    the KB did not, so a source built on such a document wore a green check
+    and answered questions about a fraction of it (support ticket: a PAPPG
+    whose text had the Introduction, Chapter II and Chapter XII and none of
+    I, III, IV or V). Read live from the document rather than copied onto the
+    source at ingest, so a re-extraction that succeeds clears it.
+
+    A lookup failure yields no warnings: unknown beats "partial".
+    """
+    from app.services import document_service
+
+    doc_sources = [
+        s for s in sources if s.source_type == "document" and s.document_uuid
+    ]
+    if not doc_sources:
+        return {}
+    try:
+        docs = await SmartDocument.find(
+            {"uuid": {"$in": [s.document_uuid for s in doc_sources]}},
+        ).to_list()
+    except Exception:
+        return {}
+    by_doc = {d.uuid: document_service.ingestion_warnings(d) for d in docs}
+    return {
+        s.uuid: by_doc[s.document_uuid]
+        for s in doc_sources
+        if by_doc.get(s.document_uuid)
+    }
+
+
 async def resolve_openable_documents(
     source_uuids: list[str], user_id: str | None = None
 ) -> dict[str, str]:
@@ -1448,6 +1484,8 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
     text) so the importer can reconstruct + re-embed without re-fetching. Does
     NOT include ChromaDB vectors — embeddings are regenerated on import.
     """
+    from app.services import document_service
+
     await require_kb_sources(kb, "exporting")
 
     sources = await get_kb_sources(kb.uuid)
@@ -1455,16 +1493,22 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
     for s in sources:
         content = s.content
         document_title: str | None = None
+        ingestion_warnings: list[str] = []
         if s.source_type == "document" and s.document_uuid:
             doc = await SmartDocument.find_one(SmartDocument.uuid == s.document_uuid)
             if doc:
                 document_title = doc.title
                 if not content:
                     content = doc.raw_text or None
+                ingestion_warnings = document_service.ingestion_warnings(doc)
         exported_sources.append({
             "source_type": s.source_type,
             "document_uuid": s.document_uuid,
             "document_title": document_title,
+            # Why the content below may not be the whole document — the
+            # pipeline's own codes (partial_ocr, sparse_text), empty when it
+            # recorded none. The importer ignores it.
+            "ingestion_warnings": ingestion_warnings,
             "url": s.url,
             "url_title": s.url_title,
             "custom_name": s.custom_name,
@@ -1653,6 +1697,55 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
     return None
 
 
+# A refresh that returns a small fraction of the text it is replacing is not a
+# revised page, it is a page that did not load — a JavaScript app's shell, an
+# error page served with a 200, a login wall. Below this share of the retained
+# text the refresh is refused and the previous content kept.
+#
+# This gate is relative on purpose. The phrase-based gates above recognise
+# pages by their wording, and every site whose shell they have not seen
+# passes straight through: eCFR's did (support ticket — a 208-chunk Subpart
+# of 2 CFR 200 became 1 chunk, marked "Refreshed" with a green check, and
+# chat began answering §200.414 questions from general knowledge). The size
+# of what is already indexed is the one thing known about a page that no
+# phrase list can miss. A quarter is loose enough that a genuine revision —
+# which rarely removes most of a page — is not refused; a page that shrinks
+# that far on purpose can be removed and re-added.
+_REFRESH_COLLAPSE_RATIO = 0.25
+
+
+def _reject_collapsed_refresh(
+    previous_text: str | None, new_text: str, last_collapsed_hash: str | None = None,
+) -> str | None:
+    """Why a refreshed page must not replace what it fetched over, or None.
+
+    Compares the fetched text against the retained snapshot. Only meaningful
+    on a refresh — first ingest has nothing to compare to.
+
+    A page genuinely can shrink below the ratio: a policy rescinded down to
+    "This policy has been rescinded — see APM 45.15", or a page whose body
+    moves to subpages leaving a table of contents. Refusing those forever
+    would serve the superseded text indefinitely, which is the failure this
+    whole area exists to prevent. So the refusal is not permanent: the refused
+    text's hash is remembered, and if the next refresh returns exactly the same
+    bytes the gate steps aside. A site shell or an error page does not come
+    back byte-identical on the next attempt; a page that really is short now
+    does.
+    """
+    previous_len = len((previous_text or "").strip())
+    new_len = len(new_text.strip())
+    if not previous_len or new_len >= previous_len * _REFRESH_COLLAPSE_RATIO:
+        return None
+    if last_collapsed_hash and currency.content_fingerprint(new_text) == last_collapsed_hash:
+        return None
+    return (
+        f"Page returned {new_len:,} characters where the indexed text has "
+        f"{previous_len:,} — this looks like the site's shell or an error page, "
+        "not the content. If the page really is this short now, refresh again "
+        "and the same text will be accepted"
+    )
+
+
 async def refresh_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
 ) -> str | None:
@@ -1665,7 +1758,10 @@ async def refresh_url_source(
 
     Unlike first ingest, a fetch that fails or is rejected by the content
     gates leaves the existing text and chunks untouched — a page that is
-    temporarily down must not blank out a working source. Returns None on
+    temporarily down must not blank out a working source. A refresh has one
+    gate first ingest cannot have: a page whose text is a small fraction of
+    the retained snapshot is refused as not having loaded, whatever it says
+    (see ``_reject_collapsed_refresh``). Returns None on
     success, otherwise the reason (also recorded on ``error_message`` so the
     source list can show it).
 
@@ -1690,6 +1786,16 @@ async def refresh_url_source(
 
         result = await fetch_url(source.url)
         reason = _reject_fetched_page(result)
+        if reason is None:
+            reason = _reject_collapsed_refresh(
+                source.content, result.text,
+                # getattr: rows written before this field existed, and the
+                # hand-built source stubs several test suites use.
+                getattr(source, "last_collapsed_hash", None),
+            )
+            source.last_collapsed_hash = (
+                currency.content_fingerprint(result.text) if reason else None
+            )
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
