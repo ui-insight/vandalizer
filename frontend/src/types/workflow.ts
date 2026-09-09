@@ -128,6 +128,13 @@ export interface WorkflowCitation {
    *  which base a passage came from. */
   kb_uuid?: string | null;
   kb_title?: string | null;
+  /** The exact source line the model was told to cite for this passage,
+   *  e.g. "OMB Uniform Guidance — Subpart F · p. 12". Matches a bracketed
+   *  citation in the output to this entry. */
+  label?: string | null;
+  /** The passage text itself (the chunk the claim rests on), for the
+   *  citation popover. Older runs only carry `content_preview`. */
+  content?: string | null;
 }
 
 /** One knowledge base a grounded task reads, with the retrieval queries it is

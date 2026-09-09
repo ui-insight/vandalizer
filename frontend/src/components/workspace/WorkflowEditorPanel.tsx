@@ -56,6 +56,7 @@ import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
 import { FixedDocumentsZone, stripFixedDocumentFlags, type FixedDocument } from './FixedDocumentsZone'
 import { StepInputSources } from './StepInputSources'
+import { CitedMarkdown, useCitationPopover } from './CitedMarkdown'
 import {
   DEFAULT_STEP_INPUT, deriveStepInput, INPUT_SOURCE_LABELS, inputValuePatch,
   readInputValue, taskOverridesStepInput, TASK_INPUT_OVERRIDE_KEY,
@@ -1996,9 +1997,10 @@ function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
             isFileDownloadPayload(value) ? (
               <FileOutputChip payload={value} />
             ) : typeof value === 'string' ? (
-              <div
+              <CitedMarkdown
+                markdown={value}
+                sources={entry && Array.isArray(entry.retrieved_sources) ? (entry.retrieved_sources as WorkflowCitation[]) : []}
                 style={{ fontSize: 13, color: '#202124', lineHeight: 1.6, wordBreak: 'break-word' }}
-                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }}
               />
             ) : (
               <pre style={{
@@ -5585,6 +5587,22 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   // run ends with; show the file, not its base64.
                   const file = summarizeFilePayload(testResult)
                   if (file) return <FileOutputCard summary={file} onDownload={handleDownloadTestResult} maxHeight={200} />
+                  if (typeof testResult === 'string' && testSources.length > 0) {
+                    // Grounded output: render it so its citations become chips
+                    // that open the passage — the point of testing the step.
+                    return (
+                      <CitedMarkdown
+                        markdown={testResult}
+                        sources={testSources}
+                        className="chat-markdown"
+                        style={{
+                          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                          padding: 12, fontSize: 12, lineHeight: 1.6,
+                          maxHeight: 260, overflowY: 'auto', color: '#374151', wordBreak: 'break-word',
+                        }}
+                      />
+                    )
+                  }
                   return (
                     <div style={{
                       backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
@@ -6179,6 +6197,20 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           </div>
           {fileSummary ? (
             <FileOutputCard summary={fileSummary} downloadHref={fileDownloadHref} />
+          ) : typeof output === 'string' ? (
+            // A citation in the text becomes a chip beside the claim; clicking
+            // it shows the knowledge-base passage the claim rests on.
+            <CitedMarkdown
+              markdown={output}
+              sources={status?.retrieved_sources ?? []}
+              className="chat-markdown"
+              style={{
+                backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+                padding: 12, fontSize: 13, lineHeight: 1.6,
+                maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto',
+                color: '#374151', wordBreak: 'break-word',
+              }}
+            />
           ) : (
             <div
               className="chat-markdown"
@@ -6317,6 +6349,9 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 
 function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
   const [expanded, setExpanded] = useState(false)
+  // Same popover the inline chips open, so the numbered chip here and the
+  // numbered citation in the text lead to the same passage.
+  const { anchor, openAt, popover } = useCitationPopover(sources)
   return (
     <div style={{ marginTop: 4, borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
       <button
@@ -6343,25 +6378,37 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
             // Several knowledge bases in one run: say which one a passage came from.
             const label = c.kb_title ? `${base} — ${c.kb_title}` : base
             const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
-            const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' — ')
+            const open = anchor?.index === i
             return (
-              <span
+              <button
+                type="button"
                 key={`${c.chunk_id ?? c.document_id ?? i}`}
-                title={tooltip}
+                className="kb-cite-chip"
+                title={[relevance, 'Click to see the passage'].filter(Boolean).join(' — ')}
+                aria-expanded={open}
+                onClick={e => openAt(i, e.currentTarget)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                  backgroundColor: '#f3f4f6', color: '#374151',
-                  border: '1px solid #e5e7eb', borderRadius: 999,
-                  cursor: 'help',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '2px 8px 2px 3px', fontSize: 11, fontWeight: 500, fontFamily: 'inherit',
+                  backgroundColor: open ? '#e0f2fe' : '#f3f4f6', color: open ? '#075985' : '#374151',
+                  border: `1px solid ${open ? '#7dd3fc' : '#e5e7eb'}`, borderRadius: 999,
+                  cursor: 'pointer', textAlign: 'left',
                 }}
               >
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  minWidth: 16, height: 16, padding: '0 4px', borderRadius: 999,
+                  backgroundColor: open ? '#0369a1' : '#6b7280', color: '#fff', fontSize: 10, fontWeight: 700,
+                }}>
+                  {i + 1}
+                </span>
                 {label}
-              </span>
+              </button>
             )
           })}
         </div>
       )}
+      {popover}
     </div>
   )
 }

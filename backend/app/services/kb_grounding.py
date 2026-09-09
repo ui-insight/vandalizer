@@ -84,6 +84,8 @@ PIN_LIMIT_PER_TERM = 6
 # Rough allowance for the prompt scaffolding around CONTEXT when a caller
 # derives a token budget for the passages.
 PROMPT_SCAFFOLD_TOKENS = 400
+# How much of a passage's text a citation carries into the run record.
+CITATION_CONTENT_CHARS = 2000
 
 
 KB_GROUNDING_HEADER = (
@@ -103,6 +105,27 @@ KB_APPROXIMATE_PAGE_RULE = (
     "page positions were interpolated rather than read. Keep the tilde when "
     "you cite it and describe the location as approximate; never restate such "
     "a page as exact."
+)
+
+# Appended to the INSTRUCTION of a task whose context carries knowledge-base
+# passages or already-cited statements. It cannot live in the passages header:
+# the engine's grounded prompt tells the model that CONTEXT is data, never
+# instructions, so a rule placed there is (correctly) ignored. The JSON clause
+# is what lets a citation survive a task that emits a fragment for a later
+# consolidation step to render.
+CITATION_RULE = (
+    "CITATIONS (required): the CONTEXT includes knowledge-base passages, each "
+    "under a source line in square brackets such as "
+    "[OMB Uniform Guidance — Subpart E · p. 40], and may include statements "
+    "that already carry such citations. Whenever a statement you write draws "
+    "on a passage, follow that statement immediately with the passage's "
+    "source line in square brackets, copied exactly as shown — right after "
+    "the sentence or value it supports, never gathered in a list at the end. "
+    "When you restate or reorganize a statement that already carries a "
+    "citation, keep the citation with it. If your output is JSON, put the "
+    "citation inside the string value it supports. Never invent a citation, "
+    "never attach one to a claim the passage does not support, and cite "
+    "nothing for statements that come only from the document under review."
 )
 
 
@@ -534,6 +557,14 @@ def _passage_label(r: dict, *, kb_title: Optional[str], query: str) -> tuple[str
         "score": r.get("score"),
         "similarity": r.get("similarity"),
         "content_preview": content[:240],
+        # The exact source line the model was told to copy when it cites this
+        # passage, and the passage itself: the run UI turns a citation in the
+        # output into an inline chip and shows the passage on click, so a
+        # reader can check the claim against the text it rests on without
+        # opening the knowledge base. Chunks are ~1,000 characters; the cap
+        # only guards against an oversized ingest.
+        "label": label,
+        "content": content[:CITATION_CONTENT_CHARS],
         "kb_uuid": r.get("kb_uuid"),
         "kb_title": r.get("kb_title"),
     }
@@ -642,6 +673,99 @@ def trim_to_budget(
         f"{dropped} lower-ranked knowledge-base passage{'s were' if dropped != 1 else ' was'} "
         "left out to fit the model's context window."
     )
+
+
+# ---------------------------------------------------------------------------
+# Citations in output
+# ---------------------------------------------------------------------------
+
+def merge_sources(*groups) -> list[dict]:
+    """Concatenate citation lists, keeping the first copy of each passage.
+
+    A step that keeps its input's citations carries that input's passages
+    forward, and the run aggregates every step's list — so the same chunk
+    would otherwise appear once per step that mentioned it, and the numbered
+    chips would count it several times.
+    """
+    out: list[dict] = []
+    seen: set = set()
+    for group in groups:
+        if not isinstance(group, list):
+            continue
+        for s in group:
+            if not isinstance(s, dict):
+                continue
+            key = s.get("chunk_id") or (
+                s.get("document_id"), s.get("page"), (s.get("content_preview") or "")[:80],
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(s)
+    return out
+
+
+_CITATION_RE = re.compile(r"\[([^\[\]\n]{3,300})\]")
+_PAGE_RE = re.compile(r"\bp\.\s*~?\s*\d")
+_PAGE_WORD_RE = re.compile(r"\bpage\s+\d")
+
+
+def _norm_citation(text: str) -> str:
+    """Loose form of a citation for comparison; mirrors the run UI's matcher."""
+    t = (text or "").lower()
+    t = re.sub(r"[‒–—―]", "-", t)
+    t = re.sub(r"\s*--+\s*", " - ", t)
+    t = re.sub(r"[·•|,]", "·", t)
+    t = re.sub(r"\bpages?\s+", "p. ", t)
+    t = re.sub(r"\bpp?\.\s*~?\s*", "p. ", t)
+    t = re.sub(r"\s*·\s*", " · ", t)
+    t = re.sub(r"\s*-\s*", " - ", t)
+    t = re.sub(r"[\"'“”]", "", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def looks_like_citation(text: str) -> bool:
+    """Whether a bracketed string is shaped like a source line, as opposed to
+    ordinary bracketed prose such as [N/A] or [see above]."""
+    t = text or ""
+    return ("·" in t or "—" in t or " -- " in t
+            or bool(_PAGE_RE.search(t)) or bool(_PAGE_WORD_RE.search(t)))
+
+
+def unmatched_citations(text: str, sources: list[dict]) -> list[str]:
+    """Citation-shaped brackets in ``text`` that name no retrieved passage.
+
+    The run UI links a citation to a passage by the same loose match; what
+    it cannot link it leaves as plain text. Reporting those here on the step
+    is what stops an invented source from passing as a verified one.
+    """
+    if not text or not sources:
+        return []
+    labels: set[str] = set()
+    titles: list[str] = []
+    for s in sources:
+        if not isinstance(s, dict):
+            continue
+        if s.get("label"):
+            labels.add(_norm_citation(str(s["label"])))
+        title = _norm_citation(str(s.get("document_title") or ""))
+        if len(title) >= 4:
+            titles.append(title)
+    bad: list[str] = []
+    for m in _CITATION_RE.finditer(text):
+        for part in re.split(r"\s*;\s*", m.group(1)):
+            part = part.strip()
+            if not part or not looks_like_citation(part):
+                continue
+            n = _norm_citation(part)
+            if n in labels:
+                continue
+            title_only = re.sub(r"\s*·?\s*p\. \d+(\s*-\s*\d+)?\s*$", "", n).strip()
+            if any(t in n or (len(title_only) >= 4 and title_only in t) for t in titles):
+                continue
+            if part not in bad:
+                bad.append(part)
+    return bad
 
 
 # ---------------------------------------------------------------------------

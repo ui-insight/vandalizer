@@ -28,14 +28,17 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
     form_value_is_missing,
 )
 from app.services.kb_grounding import (
+    CITATION_RULE,
     GROUNDING_SECTION_LABEL,
     GROUNDING_SOURCE,
     GroundingConfigError,
     GroundingResult,
     grounding_token_budget,
     has_grounding,
+    merge_sources,
     parse_grounding_config,
     retrieve_grounding,
+    unmatched_citations,
 )
 from app.services.llm_service import create_chat_agent
 from app.services.metering import current_scope, metered_step, step_models
@@ -421,18 +424,55 @@ def _resolve_grounding(
     return result, None
 
 
-def _attach_grounding(result: dict, grounding: GroundingResult | None) -> dict:
-    """Carry a grounding's citations and warnings on the task result, where
-    ``MultiTaskNode`` merges them into the step and the run's Sources panel."""
-    if grounding is None:
-        return result
-    if grounding.sources:
-        existing = result.get("retrieved_sources")
-        result["retrieved_sources"] = (
-            list(existing) if isinstance(existing, list) else []
-        ) + grounding.sources
-    if grounding.warnings:
-        joined = " | ".join(grounding.warnings)
+def _upstream_sources(inputs: dict, sources: list[str]) -> list[dict]:
+    """The passages behind the previous step's output, when this task reads
+    that output. A grounded step's citations only mean something to a task
+    that sees the cited text; a task reading documents alone never does."""
+    if "step_input" not in sources or not isinstance(inputs, dict):
+        return []
+    carried = inputs.get("retrieved_sources")
+    return [s for s in carried if isinstance(s, dict)] if isinstance(carried, list) else []
+
+
+def _cited_instruction(instruction: str, cited: bool) -> str:
+    """Append the citation rule to a task's instruction when its context holds
+    passages or cited statements. Last, because the rule is what the model
+    must still honour after everything the author asked for."""
+    return f"{instruction}\n\n{CITATION_RULE}" if cited else instruction
+
+
+def _attach_grounding(
+    result: dict, grounding: GroundingResult | None, carried: list[dict] | None = None,
+) -> dict:
+    """Carry citations and warnings on the task result, where ``MultiTaskNode``
+    merges them into the step and the run's Sources panel.
+
+    ``carried`` is the previous step's passages, for a task that was told to
+    keep its input's citations: they ride along so the citations in this
+    task's output still resolve to passages downstream. An output that cites
+    a source no passage matches is flagged — the run UI leaves such a
+    citation unlinked, and a reader must not take it for a verified one.
+    """
+    sources = merge_sources(
+        result.get("retrieved_sources"),
+        grounding.sources if grounding is not None else None,
+        carried,
+    )
+    if sources:
+        result["retrieved_sources"] = sources
+    warnings = list(grounding.warnings) if grounding is not None else []
+    output = result.get("output")
+    if sources and isinstance(output, str):
+        bad = unmatched_citations(output, sources)
+        if bad:
+            shown = "; ".join(f"[{b}]" for b in bad[:3]) + (" …" if len(bad) > 3 else "")
+            plural = "s" if len(bad) != 1 else ""
+            warnings.append(
+                f"The output cites {len(bad)} source{plural} that were not among "
+                f"the retrieved passages, so those citations are not linked: {shown}"
+            )
+    if warnings:
+        joined = " | ".join(warnings)
         prev = result.get("warning")
         result["warning"] = f"{joined} | {prev}" if isinstance(prev, str) and prev else joined
     return result
@@ -966,15 +1006,20 @@ class PromptNode(Node):
             self.data, inputs, sources,
             grounding_text=grounding.text if grounding else None,
         )
+        # Cite: this task's own passages, or citations riding on the previous
+        # step's output that must stay attached to what they support.
+        upstream = _upstream_sources(inputs, sources)
+        cited = bool(grounding is not None and grounding.text) or bool(upstream)
 
         chat_response = llm_chat_model(
-            model=self.model, prompt=prompt, data=context,
+            model=self.model, prompt=_cited_instruction(prompt, cited), data=context,
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
 
         return _attach_grounding(
             {"output": chat_response, "input": prompt, "step_name": self.name}, grounding,
+            carried=upstream,
         )
 
 
@@ -1003,11 +1048,16 @@ class FormatNode(Node):
             self.data, inputs, sources,
             grounding_text=grounding.text if grounding else None,
         )
+        upstream = _upstream_sources(inputs, sources)
+        cited = bool(grounding is not None and grounding.text) or bool(upstream)
 
-        _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg,
-                                 usage_acc=self._usage_acc)
+        _, output = format_model(
+            self.model, _cited_instruction(formatting_prompt, cited), text,
+            system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+        )
         return _attach_grounding(
             {"output": output, "input": formatting_prompt, "step_name": self.name}, grounding,
+            carried=upstream,
         )
 
 
@@ -1446,6 +1496,8 @@ class ResearchNode(Node):
             self.data, inputs, sources,
             grounding_text=grounding.text if grounding else None,
         )
+        upstream = _upstream_sources(inputs, sources)
+        cited = bool(grounding is not None and grounding.text) or bool(upstream)
 
         # No data means nothing to analyze — stop here, before any model call.
         # Sent through anyway, the chat helper would drop into its standalone
@@ -1478,7 +1530,7 @@ class ResearchNode(Node):
             "does contain. Do not produce findings from general knowledge."
         )
         findings = llm_chat_model(
-            model=self.model, prompt=analysis_prompt, data=input_data,
+            model=self.model, prompt=_cited_instruction(analysis_prompt, cited), data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
@@ -1514,12 +1566,13 @@ class ResearchNode(Node):
             f"Findings:\n{findings}"
         )
         report = llm_chat_model(
-            model=self.model, prompt=synthesis_prompt, data=input_data,
+            model=self.model, prompt=_cited_instruction(synthesis_prompt, cited), data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
         return _attach_grounding(
             {"output": report, "input": inputs.get("output"), "step_name": self.name}, grounding,
+            carried=upstream,
         )
 
 

@@ -17,11 +17,14 @@ from app.services.kb_grounding import (
     dedupe_passages,
     grounding_targets,
     has_grounding,
+    looks_like_citation,
     merge_pools,
+    merge_sources,
     parse_grounding_config,
     render_queries,
     retrieve_grounding,
     trim_to_budget,
+    unmatched_citations,
 )
 
 
@@ -395,3 +398,54 @@ class TestTrimToBudget:
     def test_no_budget_means_no_trim(self):
         passages = [_chunk("a", "a")]
         assert trim_to_budget(passages, None, model="m", system_config_doc={}) == (passages, None)
+
+
+class TestCitationPayload:
+    def test_sources_carry_the_label_the_model_cites_and_the_passage(self):
+        """The run UI links a bracketed citation in the output to a passage by
+        this exact label, and shows this text on click."""
+        dm = FakeDM(vector={("ug", "cost"): [
+            _chunk("u1", "Cost sharing means the portion of project costs not paid by Federal funds.", source="Subpart C", page=12),
+        ]})
+        meta = {"ug": {"title": "OMB Uniform Guidance", "exists": True}}
+        cfg = GroundingConfig(targets=_targets(ug=["cost"]), k=2, max_passages=8)
+        result = retrieve_grounding(cfg, {}, kb_meta=meta, dm=dm)
+        src = result.sources[0]
+        assert src["label"] == "OMB Uniform Guidance — Subpart C · p. 12"
+        assert src["content"].startswith("Cost sharing means")
+        # The model is shown the same line it is told to copy when citing.
+        assert "[1] " + src["label"] in result.text
+
+
+class TestCitationHelpers:
+    SOURCES = [
+        {"document_title": "2 CFR Part 200 Subpart F -- Audit Requirements", "page": 12,
+         "kb_title": "OMB Uniform Guidance (2 CFR 200)",
+         "label": "OMB Uniform Guidance (2 CFR 200) — 2 CFR Part 200 Subpart F -- Audit Requirements · p. 12",
+         "chunk_id": "a"},
+        {"document_title": "APM 45.05 Cost Share", "page": 3, "label": "APM 45.05 Cost Share · p. 3", "chunk_id": "b"},
+    ]
+
+    def test_merge_sources_keeps_the_first_copy_of_a_passage(self):
+        a = {"chunk_id": "a", "document_title": "A"}
+        b = {"chunk_id": "b", "document_title": "B"}
+        again = {"chunk_id": "a", "document_title": "A (again)"}
+        no_id = {"document_id": "d", "page": 1, "content_preview": "same text"}
+        assert merge_sources([a, b], None, [again, no_id], [dict(no_id)]) == [a, b, no_id]
+
+    def test_exact_and_loosely_written_citations_match(self):
+        text = (
+            "Audits [OMB Uniform Guidance (2 CFR 200) — 2 CFR Part 200 Subpart F -- Audit Requirements · p. 12] "
+            "and cost share [APM 45.05 Cost Share, page 3] and [2 CFR Part 200 Subpart F -- Audit Requirements - p. 12]."
+        )
+        assert unmatched_citations(text, self.SOURCES) == []
+
+    def test_an_invented_source_is_reported_once(self):
+        text = "x [NIH GPS — Section 7 · p. 3] y [NIH GPS — Section 7 · p. 3]"
+        assert unmatched_citations(text, self.SOURCES) == ["NIH GPS — Section 7 · p. 3"]
+
+    def test_ordinary_brackets_are_not_citations(self):
+        assert unmatched_citations("[N/A] [see above] [Section II.B] [1]", self.SOURCES) == []
+        assert not looks_like_citation("N/A")
+        assert looks_like_citation("PAPPG.pdf · p. 234")
+        assert looks_like_citation("PAPPG.pdf, page 234")

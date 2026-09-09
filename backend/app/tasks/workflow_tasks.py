@@ -1451,11 +1451,14 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # Aggregate citations from every step that produced retrieved_sources so
     # the frontend can render them next to the workflow output without
     # walking the steps_output dict itself.
-    retrieved_sources: list[dict] = []
-    for step in data or []:
-        sources = step.get("retrieved_sources") if isinstance(step, dict) else None
-        if isinstance(sources, list):
-            retrieved_sources.extend(sources)
+    # A step that keeps its input's citations carries the same passages
+    # forward, so the lists are merged rather than concatenated: one chip per
+    # passage, numbered once.
+    from app.services.kb_grounding import merge_sources
+
+    retrieved_sources: list[dict] = merge_sources(
+        *[step.get("retrieved_sources") for step in (data or []) if isinstance(step, dict)]
+    )
 
     # Save final result. The status guard matters: cancellation flips the row to
     # "canceled" out-of-band, and a step already in flight keeps running until
@@ -1727,10 +1730,9 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     # Citations from a Knowledge Base Query or a grounded task: the editor
     # shows them under the test output, so an author can see which passages
     # a retrieval query actually pulled before running the whole workflow.
-    sources = [
-        src for s in steps if isinstance(s, dict)
-        for src in (s.get("retrieved_sources") or []) if isinstance(src, dict)
-    ]
+    from app.services.kb_grounding import merge_sources
+
+    sources = merge_sources(*[s.get("retrieved_sources") for s in steps if isinstance(s, dict)])
     if warnings or sources:
         payload: dict = {"output": final_output}
         if warnings:
