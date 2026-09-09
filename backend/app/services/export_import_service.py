@@ -56,6 +56,86 @@ def validate_export_data(data: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+async def _embed_knowledge_base(kb_uuid: str) -> dict | None:
+    """Portable description of a knowledge base a task references.
+
+    Carries the catalog ``seed_id`` when the base came from the verified
+    catalog, so the importer can bind the task to the same catalog base on
+    the target install instead of asking the operator to pick it by hand.
+    """
+    from app.models.knowledge import KnowledgeBase
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        return None
+    embedded: dict = {"title": kb.title, "description": kb.description}
+    resource_config = getattr(kb, "resource_config", None)
+    seed_id = resource_config.get("seed_id") if isinstance(resource_config, dict) else None
+    if isinstance(seed_id, str) and seed_id:
+        embedded["seed_id"] = seed_id
+    return embedded
+
+
+async def _rebind_knowledge_base(
+    embedded: dict, user_id: str, team_id: str | None,
+) -> str | None:
+    """The uuid of a local knowledge base matching an exported one, or None.
+
+    Exact matches only — the same catalog seed first, then the exact title —
+    and only among bases the importing user can see, so a workflow never
+    silently binds to a stranger's base or a look-alike. A lookup failure
+    counts as no match: the task is then left unbound with the note the
+    editor shows, which is what happened before rebinding existed.
+    """
+    from app.models.knowledge import KnowledgeBase
+    from app.services.knowledge_service import build_kb_list_query
+
+    visible = build_kb_list_query(user_id, team_id, None, None) or {}
+    conditions: list[dict] = []
+    seed_id = embedded.get("seed_id")
+    if isinstance(seed_id, str) and seed_id:
+        conditions.append({"resource_config.seed_id": seed_id})
+    title = embedded.get("title")
+    if isinstance(title, str) and title.strip():
+        conditions.append({"title": title})
+    for condition in conditions:
+        try:
+            kb = await KnowledgeBase.find_one({"$and": [visible, condition]})
+        except Exception:  # noqa: BLE001
+            return None
+        uuid = getattr(kb, "uuid", None) if kb else None
+        if isinstance(uuid, str) and uuid:
+            return uuid
+    return None
+
+
+async def _rebind_many(
+    embedded_list: list, user_id: str, team_id: str | None,
+) -> tuple[list[str], list[str]]:
+    """``(bound_uuids, unbound_titles)`` for a list of embedded bases."""
+    bound: list[str] = []
+    unbound: list[str] = []
+    for embedded in embedded_list:
+        if not isinstance(embedded, dict):
+            continue
+        uuid = await _rebind_knowledge_base(embedded, user_id, team_id)
+        if uuid and uuid not in bound:
+            bound.append(uuid)
+        elif not uuid:
+            unbound.append(embedded.get("title") or "Unknown")
+    return bound, unbound
+
+
+def _unbound_note(titles: list[str], *, what: str) -> str:
+    quoted = ", ".join(f"\"{t}\"" for t in titles)
+    plural = "s" if len(titles) != 1 else ""
+    return (
+        f"Originally referenced knowledge base{plural} {quoted} {what}. "
+        f"No matching knowledge base was found here — please select a local "
+        f"knowledge base{plural} for this step."
+    )
+
+
 async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
     """Resolve external object references in a task and embed their data inline.
 
@@ -97,13 +177,36 @@ async def _resolve_task_references(task_data: dict, task_name: str) -> dict:
 
     # --- KnowledgeBaseQuery tasks: embed KB metadata ---
     if task_name == "KnowledgeBaseQuery" and data.get("kb_uuid"):
-        from app.models.knowledge import KnowledgeBase
-        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == data["kb_uuid"])
-        if kb:
-            data["_embedded_knowledge_base"] = {
-                "title": kb.title,
-                "description": kb.description,
-            }
+        embedded = await _embed_knowledge_base(data["kb_uuid"])
+        if embedded:
+            data["_embedded_knowledge_base"] = embedded
+    if task_name == "KnowledgeBaseQuery" and isinstance(data.get("knowledge_bases"), list):
+        embedded_list = [
+            e for e in [await _embed_knowledge_base(u) for u in data["knowledge_bases"] if u]
+            if e
+        ]
+        if embedded_list:
+            data["_embedded_knowledge_bases"] = embedded_list
+
+    # --- Grounded tasks: embed every knowledge base they read, with the
+    # queries that base is searched with, so import can rebind each one and
+    # keep its queries ---
+    grounding = data.get("kb_grounding")
+    if isinstance(grounding, dict):
+        from app.services.kb_grounding import grounding_targets
+
+        grounding = dict(grounding)
+        embedded_list = []
+        for target in grounding_targets(grounding):
+            embedded = await _embed_knowledge_base(target.kb_uuid)
+            if embedded:
+                embedded_list.append({**embedded, "queries": list(target.queries)})
+        if embedded_list:
+            grounding["_embedded_knowledge_bases"] = embedded_list
+        # Pre-loaded run-time metadata never belongs in an export.
+        grounding.pop("_kb_meta", None)
+        data["kb_grounding"] = grounding
+    data.pop("_kb_meta", None)
 
     # --- Tasks with selected_document_uuid: embed document title ---
     if data.get("input_source") == "select_document" and data.get("selected_document_uuid"):
@@ -235,17 +338,64 @@ async def _reconstruct_task_references(
         # Point the task at the newly created search set
         data["search_set_uuid"] = new_uuid
 
-    # --- KnowledgeBaseQuery: clear stale UUID, keep metadata for user ---
+    # --- KnowledgeBaseQuery: rebind to a local knowledge base, else clear ---
     if task_name == "KnowledgeBaseQuery" and data.get("_embedded_knowledge_base"):
-        # The original kb_uuid won't exist on the target system.
-        # Clear it so the workflow doesn't silently fail; the user will need
-        # to select a local knowledge base.
+        # The original kb_uuid won't exist on the target system. Bind to the
+        # same catalog base (or an exact-title match) the importer can see;
+        # otherwise clear it so the workflow doesn't silently query a base
+        # that isn't there, and leave a note naming what to pick.
         embedded_kb = data.pop("_embedded_knowledge_base")
-        data["kb_uuid"] = ""
-        data["_import_note"] = (
-            f"Originally referenced knowledge base \"{embedded_kb.get('title', 'Unknown')}\". "
-            f"Please select a local knowledge base for this step."
-        )
+        rebound = await _rebind_knowledge_base(embedded_kb, user_id, team_id)
+        if rebound:
+            data["kb_uuid"] = rebound
+        else:
+            data["kb_uuid"] = ""
+            data["_import_note"] = _unbound_note(
+                [embedded_kb.get("title") or "Unknown"], what="for this lookup",
+            )
+    if task_name == "KnowledgeBaseQuery" and data.get("_embedded_knowledge_bases"):
+        embedded_list = data.pop("_embedded_knowledge_bases")
+        bound, unbound = await _rebind_many(embedded_list, user_id, team_id)
+        data["knowledge_bases"] = bound
+        if unbound:
+            data["_import_note"] = _unbound_note(unbound, what="for this lookup")
+
+    # --- Grounded tasks: same treatment for kb_grounding.knowledge_bases ---
+    grounding = data.get("kb_grounding")
+    if isinstance(grounding, dict):
+        grounding = dict(grounding)
+        embedded_list = grounding.pop("_embedded_knowledge_bases", None)
+        if embedded_list:
+            # Each base is rebound on its own and keeps the queries it was
+            # exported with — the per-base form the editor writes.
+            bound_entries: list[dict] = []
+            unbound: list[str] = []
+            for embedded in embedded_list:
+                if not isinstance(embedded, dict):
+                    continue
+                uuid = await _rebind_knowledge_base(embedded, user_id, team_id)
+                if uuid and not any(e["kb_uuid"] == uuid for e in bound_entries):
+                    bound_entries.append({
+                        "kb_uuid": uuid,
+                        "queries": [q for q in (embedded.get("queries") or []) if isinstance(q, str) and q.strip()],
+                    })
+                elif not uuid:
+                    unbound.append(embedded.get("title") or "Unknown")
+            grounding["knowledge_bases"] = bound_entries
+            # The shared list was folded into each entry at export time.
+            grounding.pop("queries", None)
+            if unbound:
+                data["_import_note"] = _unbound_note(unbound, what="for grounding")
+        elif grounding.get("knowledge_bases"):
+            # A v1-style export with bare uuids: nothing to match on, and the
+            # uuids won't exist here. Clear them rather than let the step fail
+            # by name on every run.
+            grounding["knowledge_bases"] = []
+            data["_import_note"] = (
+                "This step was grounded in knowledge bases that do not exist "
+                "here. Please select local knowledge bases for it."
+            )
+        data["kb_grounding"] = grounding
 
     # --- Document references: clear stale UUID ---
     if data.get("_embedded_document_ref"):

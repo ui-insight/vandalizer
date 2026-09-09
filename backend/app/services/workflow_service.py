@@ -1149,12 +1149,15 @@ def get_test_status(task_id: str) -> dict:
                 "error": payload.get("error") or "Test failed",
                 "output": payload.get("output"),
             }
-        if isinstance(payload, dict) and "step_test_warning" in payload:
-            return {
-                "status": "completed",
-                "result": payload.get("output"),
-                "warning": payload["step_test_warning"],
-            }
+        if isinstance(payload, dict) and (
+            "step_test_warning" in payload or "retrieved_sources" in payload
+        ):
+            out = {"status": "completed", "result": payload.get("output")}
+            if payload.get("step_test_warning"):
+                out["warning"] = payload["step_test_warning"]
+            if payload.get("retrieved_sources"):
+                out["retrieved_sources"] = payload["retrieved_sources"]
+            return out
         return {"status": "completed", "result": payload}
     payload = result.result
     if isinstance(payload, WorkflowStepError):

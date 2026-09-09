@@ -235,6 +235,10 @@ class ExtractionEngine:
         # these — a document silently yielding zero entities on a run marked
         # completed was indistinguishable from "the document has no matches".
         self.skipped_doc_indices: list[int] = []
+        # Reference material for the current extract() call (a workflow
+        # task's knowledge-base passages). Shown to the model beside every
+        # document, never extracted from as a document.
+        self._reference_context: str | None = None
         self._usage_lock = threading.Lock()
 
     def _record_usage(self, result) -> None:
@@ -263,6 +267,7 @@ class ExtractionEngine:
         doc_file_paths: list[str] | None = None,
         capture_sources: bool = False,
         doc_metadata: list[dict] | None = None,
+        reference_context: str | None = None,
     ) -> list:
         """Run extraction. Returns list of entity dicts.
 
@@ -284,7 +289,13 @@ class ExtractionEngine:
             doc_metadata: Index-aligned with doc_texts; per-doc
                 ``{"uuid", "title", "text_markers"}`` used to resolve source
                 passages to pages. Only consulted when capture_sources is set.
+            reference_context: Passages a workflow task retrieved from its
+                knowledge bases. Appended to every extraction prompt as
+                reference material, kept apart from the document text so it
+                yields no entity of its own and no supporting quote is looked
+                up in it.
         """
+        self._reference_context = (reference_context or "").strip() or None
         # Normalize keys
         if isinstance(extract_keys, str):
             fields_to_extract = [k.strip() for k in extract_keys.split(",")]
@@ -951,6 +962,20 @@ class ExtractionEngine:
             return "attached document page images"
         return "text"
 
+    def _reference_block(self) -> str:
+        """The knowledge-base passages, framed so the model reads them as
+        reference material and keeps extracting *from the document*."""
+        return (
+            "REFERENCE PASSAGES (policy and guidance context retrieved for this "
+            "task — NOT the document being extracted from):\n"
+            "Use them to interpret the document's terms and to decide what a "
+            "field means, but extract every value from the document text above. "
+            "A value that appears only in these passages is not in the "
+            "document; report the field as not found rather than copying it "
+            "from here.\n\n"
+            f"{self._reference_context}"
+        )
+
     def _build_user_prompt(
         self,
         content: ExtractionContent,
@@ -984,6 +1009,9 @@ class ExtractionEngine:
                 draft_json = json.dumps(draft_hint, ensure_ascii=False)
                 text_part = f"Draft extraction (may be incorrect):\n{draft_json}\n\n{text_part}"
 
+            if self._reference_context:
+                text_part = f"{text_part}\n\n{self._reference_block()}"
+
             return [text_part, *items]
 
         # Plain text
@@ -998,6 +1026,9 @@ class ExtractionEngine:
             )
         else:
             prompt = f"Extract the following fields: {fields_str}\n\nText:\n{text}"
+
+        if self._reference_context:
+            prompt = f"{prompt}\n\n{self._reference_block()}"
 
         if draft_hint:
             draft_json = json.dumps(draft_hint, ensure_ascii=False)

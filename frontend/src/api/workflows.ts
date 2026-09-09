@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { Workflow, WorkflowStatus } from '../types/workflow'
+import type { Workflow, WorkflowStatus, WorkflowCitation } from '../types/workflow'
 
 // Workflow CRUD
 
@@ -125,6 +125,28 @@ export function improvePrompt(data: {
   sample_input?: string
 }) {
   return apiFetch<PromptImprovement>('/api/workflows/improve-prompt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    timeoutMs: 90_000,
+  })
+}
+
+// Knowledge-base grounding: draft retrieval queries for a task from its
+// instructions and the knowledge bases it will search. Design-time only —
+// the author edits and saves the result.
+
+export interface KbQuerySuggestion {
+  queries: string[]
+  rationale: string[]
+}
+
+export function suggestKbQueries(data: {
+  prompt: string
+  task_name?: string
+  knowledge_bases?: { title: string; description?: string }[]
+  max_queries?: number
+}) {
+  return apiFetch<KbQuerySuggestion>('/api/workflows/suggest-kb-queries', {
     method: 'POST',
     body: JSON.stringify(data),
     timeoutMs: 90_000,
@@ -279,7 +301,15 @@ export function testStep(data: { task_name: string; task_data: Record<string, un
 export function getTestStepStatus(taskId: string) {
   // `warning`: the step completed but flagged something (e.g. fields a Form
   // Filler could not fill) — show it, the output needs checking.
-  return apiFetch<{ status: string; result?: unknown; error?: string; warning?: string }>(`/api/workflows/steps/test/${taskId}`)
+  // `retrieved_sources`: passages a Knowledge Base Query or a grounded task
+  // pulled during the test, for the citation chips under the output.
+  return apiFetch<{
+    status: string
+    result?: unknown
+    error?: string
+    warning?: string
+    retrieved_sources?: WorkflowCitation[]
+  }>(`/api/workflows/steps/test/${taskId}`)
 }
 
 // The server names a download for the run's date and time; it needs the

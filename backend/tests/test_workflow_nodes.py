@@ -2039,7 +2039,10 @@ class TestKnowledgeBaseQueryNode:
         })
         node.process({"output": "NSF", "step_name": "Extraction"})
 
-        mock_dm.query_kb.assert_called_once_with("kb-1", "policies for NSF", k=8)
+        # The rendered query reaches the store (over-fetched for the
+        # diversity pass, so only the base and the query text are asserted).
+        mock_dm.query_kb.assert_called_once()
+        assert mock_dm.query_kb.call_args.args[:2] == ("kb-1", "policies for NSF")
 
     def test_template_error_is_a_step_error(self):
         """A broken template is a configuration error; its message must fail

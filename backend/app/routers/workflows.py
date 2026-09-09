@@ -1344,6 +1344,44 @@ async def improve_prompt_endpoint(
         raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 
 
+class SuggestKbQueriesRequest(BaseModel):
+    prompt: str
+    task_name: str | None = None
+    # [{"title": ..., "description": ...}] for the knowledge bases the task
+    # will read, so the queries target what those bases actually cover.
+    knowledge_bases: list[dict] = []
+    max_queries: int = 3
+
+
+@router.post("/suggest-kb-queries")
+@limiter.limit("10/minute")
+async def suggest_kb_queries_endpoint(
+    request: Request,
+    body: SuggestKbQueriesRequest,
+    user: User = Depends(get_current_user),
+):
+    """LLM-drafted retrieval queries for a task's knowledge-base grounding.
+
+    Design-time only: the author edits and saves the result, so what a run
+    retrieves is deterministic and reviewable in Test Step.
+    """
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="The task's instructions are required")
+    from app.services.prompt_improvement_service import suggest_grounding_queries
+    try:
+        return await suggest_grounding_queries(
+            prompt=body.prompt,
+            task_name=body.task_name,
+            knowledge_bases=body.knowledge_bases,
+            max_queries=body.max_queries,
+            user_id=user.user_id,
+        )
+    except TrialSpendBlockedError:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to suggest queries: {exc}")
+
+
 @router.get("/{workflow_id}/quality-status")
 async def get_workflow_quality_status(
     workflow_id: str, user: User = Depends(get_current_user),

@@ -42,6 +42,52 @@ def _wants_selected_document(task_data: dict) -> bool:
     return task_data.get("input_source") == "select_document"
 
 
+def _task_kb_uuids(task_name: str, task_data: dict) -> list[str]:
+    """Every knowledge base a task will query: a Knowledge Base Query step's
+    own list (or legacy single ``kb_uuid``) and a grounded task's
+    ``kb_grounding.knowledge_bases``."""
+    from app.services.kb_grounding import _as_str_list, grounding_targets
+
+    uuids: list[str] = []
+    if task_name == "KnowledgeBaseQuery":
+        uuids.extend(
+            _as_str_list(task_data.get("knowledge_bases"))
+            or _as_str_list(task_data.get("kb_uuid"))
+        )
+    uuids.extend(t.kb_uuid for t in grounding_targets(task_data.get("kb_grounding")))
+    return list(dict.fromkeys(u for u in uuids if u))
+
+
+def _preload_kb_meta(db, task_name: str, task_data: dict) -> None:
+    """Attach ``_kb_meta`` — title, tuned retrieval settings and existence —
+    for every knowledge base the task queries, the way document texts are
+    pre-loaded. Retrieval (kb_grounding.py) then needs no database of its
+    own, and a base that no longer exists fails the step by name instead of
+    silently querying an empty collection."""
+    uuids = _task_kb_uuids(task_name, task_data)
+    if not uuids:
+        return
+    meta: dict[str, dict] = {}
+    try:
+        rows = db.knowledge_bases.find(
+            {"uuid": {"$in": uuids}},
+            {"uuid": 1, "title": 1, "rag_config_override": 1},
+        )
+        for row in rows:
+            override = row.get("rag_config_override")
+            meta[row["uuid"]] = {
+                "title": row.get("title"),
+                "rag_config_override": override if isinstance(override, dict) else None,
+                "exists": True,
+            }
+    except Exception as e:  # noqa: BLE001 — metadata is a nicety; retrieval still runs
+        logger.warning("Could not pre-load knowledge base metadata: %s", e)
+        return
+    for uuid in uuids:
+        meta.setdefault(uuid, {"title": None, "rag_config_override": None, "exists": False})
+    task_data["_kb_meta"] = meta
+
+
 def _resolve_saved_prompt_formatter(db, task_name: str, task_data: dict) -> None:
     """Resolve a linked saved Prompt/Formatter into the inline body in-place.
 
@@ -345,6 +391,8 @@ def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
 
             if task_doc.get("name") == "FormFiller":
                 _preload_form_filler_template(db, task_data)
+
+            _preload_kb_meta(db, task_doc.get("name", ""), task_data)
 
             tasks.append({"name": task_doc.get("name", ""), "data": task_data})
 
@@ -1595,6 +1643,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     if task_name == "FormFiller":
         _preload_form_filler_template(db, task_data)
 
+    _preload_kb_meta(db, task_name, task_data)
+
     # Resolve a linked saved Prompt/Formatter so Test Step uses the live body.
     _resolve_saved_prompt_formatter(db, task_name, task_data)
 
@@ -1674,8 +1724,20 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         s["warning"] for s in steps
         if isinstance(s, dict) and isinstance(s.get("warning"), str) and s["warning"]
     ]
-    if warnings:
-        return {"step_test_warning": " | ".join(warnings), "output": final_output}
+    # Citations from a Knowledge Base Query or a grounded task: the editor
+    # shows them under the test output, so an author can see which passages
+    # a retrieval query actually pulled before running the whole workflow.
+    sources = [
+        src for s in steps if isinstance(s, dict)
+        for src in (s.get("retrieved_sources") or []) if isinstance(src, dict)
+    ]
+    if warnings or sources:
+        payload: dict = {"output": final_output}
+        if warnings:
+            payload["step_test_warning"] = " | ".join(warnings)
+        if sources:
+            payload["retrieved_sources"] = sources
+        return payload
     return final_output
 
 

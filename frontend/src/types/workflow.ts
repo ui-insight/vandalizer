@@ -124,6 +124,32 @@ export interface WorkflowCitation {
   score?: number | null;
   similarity?: number | null;
   content_preview?: string;
+  /** Set when several knowledge bases fed one step or task, so a chip can say
+   *  which base a passage came from. */
+  kb_uuid?: string | null;
+  kb_title?: string | null;
+}
+
+/** One knowledge base a grounded task reads, with the retrieval queries it is
+ *  searched with (`{{ inputs.output }}` templating allowed). */
+export interface KbGroundingTarget {
+  kb_uuid: string;
+  queries: string[];
+}
+
+/** A task's knowledge-base grounding (`data.kb_grounding`). A property of the
+ *  task, independent of the step's data sources: each base has its own
+ *  queries, so parallel tasks in one step can read different policy. The
+ *  backend also reads an older flat form (`knowledge_bases: string[]` plus a
+ *  shared `queries`). See backend kb_grounding.py. */
+export interface KbGroundingConfig {
+  knowledge_bases: KbGroundingTarget[];
+  /** Passages per knowledge base per query. */
+  k?: number;
+  /** Total passages after merge and dedupe. */
+  max_passages?: number;
+  /** 0 = inherit each base's tuned relevance floor. */
+  min_similarity?: number;
 }
 
 export interface WorkflowStatus {

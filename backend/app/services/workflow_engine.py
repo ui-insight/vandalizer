@@ -27,9 +27,18 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
     _FORM_FREEFORM_UNFILLED_RE,
     form_value_is_missing,
 )
+from app.services.kb_grounding import (
+    GROUNDING_SECTION_LABEL,
+    GROUNDING_SOURCE,
+    GroundingConfigError,
+    GroundingResult,
+    grounding_token_budget,
+    has_grounding,
+    parse_grounding_config,
+    retrieve_grounding,
+)
 from app.services.llm_service import create_chat_agent
 from app.services.metering import current_scope, metered_step, step_models
-from app.services.page_locator import annotate_chunk_pages, cited_pages, format_page_range, locator_for_meta
 
 logger = logging.getLogger(__name__)
 
@@ -251,13 +260,20 @@ def _join_doc_texts(doc_texts: list[str]) -> str:
     return "\n\n".join(f"=== Document {i} ===\n{dt}" for i, dt in enumerate(doc_texts, 1))
 
 
-def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
+def _build_combined_context(
+    data: dict, inputs: dict, sources: list[str], grounding_text: str | None = None,
+):
     """Build the data payload to feed an LLM node.
 
     For a single source, returns the raw payload (str / dict / list) so the
     downstream prompt template formats it the same as before. For multiple
     sources, returns a labeled multi-section string. Empty sources are
     skipped; if all are empty, returns "".
+
+    ``grounding_text`` is the rendered knowledge-base passage block of a task
+    with ``kb_grounding`` configured; the node retrieves it first (it needs the
+    model and the rest of the context to size the block) and hands it in here
+    so it lands in its own labeled section after the step's sources.
     """
     sections: list[tuple[str, str]] = []
     raw_single = None
@@ -278,6 +294,12 @@ def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
             if joined:
                 sections.append((INPUT_SOURCE_LABELS[src], joined))
                 raw_single = joined
+
+    if grounding_text:
+        # The task's own passages, after whatever the step handed it, so the
+        # document under review always comes first.
+        sections.append((GROUNDING_SECTION_LABEL, grounding_text))
+        raw_single = grounding_text
 
     if not sections:
         return ""
@@ -345,6 +367,75 @@ def _build_extraction_inputs(
                     meta = metas[i] if i < len(metas) else None
                     pairs.append((dt, _normalize_doc_meta(meta)))
     return pairs
+
+
+# ---------------------------------------------------------------------------
+# Knowledge-base grounding (per task; see kb_grounding.py)
+# ---------------------------------------------------------------------------
+
+def _resolve_grounding(
+    node, inputs: dict, *, base_context, instruction: str = "",
+) -> tuple[GroundingResult | None, str | None]:
+    """Retrieve a task's knowledge-base passages when it has grounding set.
+
+    Grounding is a property of the task (``data.kb_grounding``), read on its
+    own rather than through the step's input sources — the step's sources
+    are shared by every task in it, while the policy each task needs differs.
+
+    Returns ``(result, error)``. ``result`` is ``None`` when the task has no
+    grounding. ``error`` is set for a configuration or lookup failure — the
+    caller fails the step with it, so the failure text never flows downstream
+    as if it were retrieved content. Soft outcomes (no passages matched, a
+    query rendered empty) ride on ``result.warnings`` instead.
+
+    ``base_context`` is the task's other input, already built, so the
+    passages can be sized to what the model has room for after it.
+    """
+    data = getattr(node, "data", None) or {}
+    if not has_grounding(data.get("kb_grounding")):
+        return None, None
+    try:
+        cfg = parse_grounding_config(data.get("kb_grounding"))
+    except GroundingConfigError as e:
+        return None, str(e)
+    model = data.get("model")
+    sys_cfg = getattr(node, "_sys_cfg", None)
+    budget = grounding_token_budget(
+        model, sys_cfg, instruction or "", _stringify_context(base_context),
+    )
+    try:
+        result = retrieve_grounding(
+            cfg, inputs,
+            kb_meta=data.get("_kb_meta"),
+            model=model,
+            system_config_doc=sys_cfg,
+            usage_acc=getattr(node, "_usage_acc", None),
+            token_budget=budget,
+            progress=node.report_progress,
+        )
+    except GroundingConfigError as e:
+        return None, str(e)
+    except Exception as e:  # noqa: BLE001 — a dead vector store must fail the step, not the worker
+        logger.error("Knowledge-base grounding failed for %s: %s", node.name, e)
+        return None, f"Knowledge base lookup failed: {e}"
+    return result, None
+
+
+def _attach_grounding(result: dict, grounding: GroundingResult | None) -> dict:
+    """Carry a grounding's citations and warnings on the task result, where
+    ``MultiTaskNode`` merges them into the step and the run's Sources panel."""
+    if grounding is None:
+        return result
+    if grounding.sources:
+        existing = result.get("retrieved_sources")
+        result["retrieved_sources"] = (
+            list(existing) if isinstance(existing, list) else []
+        ) + grounding.sources
+    if grounding.warnings:
+        joined = " | ".join(grounding.warnings)
+        prev = result.get("warning")
+        result["warning"] = f"{joined} | {prev}" if isinstance(prev, str) and prev else joined
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -418,12 +509,18 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
                           usage_acc: UsageAccumulator | None = None,
                           field_metadata: list[dict] | None = None,
                           capture_sources: bool = False,
-                          doc_metadata: list[dict] | None = None):
+                          doc_metadata: list[dict] | None = None,
+                          reference_context: str | None = None):
     """Run extraction and return {raw, formatted}. Sync context.
 
     ``capture_sources`` attaches the verified supporting passage and page for
     each field under ``SOURCE_KEY`` on every entity, the same provenance the
     interactive extraction run produces.
+
+    ``reference_context`` is a task's knowledge-base passage block. It rides
+    beside every document in the extraction prompt as reference material and
+    is never treated as a document itself, so it produces no entity of its
+    own and no quote from it is resolved to a document page.
     """
     engine = ExtractionEngine(system_config_doc=system_config_doc)
     output = engine.extract(
@@ -434,6 +531,7 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
         field_metadata=field_metadata,
         capture_sources=capture_sources,
         doc_metadata=doc_metadata,
+        reference_context=reference_context,
     )
     if usage_acc:
         usage_acc.add(engine.tokens_in, engine.tokens_out)
@@ -724,6 +822,20 @@ class ExtractionNode(Node):
         pairs = _build_extraction_inputs(self.data, inputs, sources)
         texts = [text for text, _ in pairs]
 
+        # Knowledge-base passages the task asked for. They go to the engine as
+        # reference context beside each document — not as another text to
+        # extract from, which would yield a bogus entity per run and resolve
+        # its quotes to the wrong pages.
+        grounding, grounding_error = _resolve_grounding(
+            self, inputs,
+            base_context="\n\n".join(texts), instruction=", ".join(str(k) for k in keys),
+        )
+        if grounding_error:
+            return {
+                "output": "", "error": grounding_error,
+                "input": inputs.get("output"), "step_name": self.name,
+            }
+
         # Use `doc_texts` whenever the user picked a doc-list source or has
         # more than one text; otherwise pass a single string via `full_text`.
         # Functionally equivalent in the engine, but preserves call-shape
@@ -733,6 +845,8 @@ class ExtractionNode(Node):
             kwargs["doc_texts"] = texts
         elif texts:
             kwargs["full_text"] = texts[0]
+        if grounding is not None and grounding.text:
+            kwargs["reference_context"] = grounding.text
 
         # Same provenance the interactive run produces: a workflow or overnight
         # automation is the least-supervised path there is, so it is the one
@@ -799,7 +913,7 @@ class ExtractionNode(Node):
         # exactly the output shape it had before.
         if any(field_sources):
             out["field_sources"] = field_sources
-        return out
+        return _attach_grounding(out, grounding)
 
 
 class PromptNode(Node):
@@ -842,7 +956,16 @@ class PromptNode(Node):
         self.report_progress(f"Prompt: {prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        context = _build_combined_context(self.data, inputs, sources)
+        base_context = _build_combined_context(self.data, inputs, sources)
+        grounding, grounding_error = _resolve_grounding(
+            self, inputs, base_context=base_context, instruction=prompt,
+        )
+        if grounding_error:
+            return {"output": "", "error": grounding_error, "input": prompt, "step_name": self.name}
+        context = _build_combined_context(
+            self.data, inputs, sources,
+            grounding_text=grounding.text if grounding else None,
+        )
 
         chat_response = llm_chat_model(
             model=self.model, prompt=prompt, data=context,
@@ -850,7 +973,9 @@ class PromptNode(Node):
             usage_acc=self._usage_acc,
         )
 
-        return {"output": chat_response, "input": prompt, "step_name": self.name}
+        return _attach_grounding(
+            {"output": chat_response, "input": prompt, "step_name": self.name}, grounding,
+        )
 
 
 class FormatNode(Node):
@@ -865,11 +990,25 @@ class FormatNode(Node):
         self.report_progress(f"Formatter: {formatting_prompt}")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        text = _build_combined_context(self.data, inputs, sources)
+        base_context = _build_combined_context(self.data, inputs, sources)
+        grounding, grounding_error = _resolve_grounding(
+            self, inputs, base_context=base_context, instruction=formatting_prompt,
+        )
+        if grounding_error:
+            return {
+                "output": "", "error": grounding_error,
+                "input": formatting_prompt, "step_name": self.name,
+            }
+        text = _build_combined_context(
+            self.data, inputs, sources,
+            grounding_text=grounding.text if grounding else None,
+        )
 
         _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg,
                                  usage_acc=self._usage_acc)
-        return {"output": output, "input": formatting_prompt, "step_name": self.name}
+        return _attach_grounding(
+            {"output": output, "input": formatting_prompt, "step_name": self.name}, grounding,
+        )
 
 
 class WebsiteNode(Node):
@@ -1294,7 +1433,19 @@ class ResearchNode(Node):
         prev_step_name = inputs.get("step_name")
 
         sources = _resolve_input_sources(self.data, prev_step_name)
-        input_data = _build_combined_context(self.data, inputs, sources)
+        base_context = _build_combined_context(self.data, inputs, sources)
+        grounding, grounding_error = _resolve_grounding(
+            self, inputs, base_context=base_context, instruction=question,
+        )
+        if grounding_error:
+            return {
+                "output": "", "error": grounding_error,
+                "input": inputs.get("output"), "step_name": self.name,
+            }
+        input_data = _build_combined_context(
+            self.data, inputs, sources,
+            grounding_text=grounding.text if grounding else None,
+        )
 
         # No data means nothing to analyze — stop here, before any model call.
         # Sent through anyway, the chat helper would drop into its standalone
@@ -1367,7 +1518,9 @@ class ResearchNode(Node):
             include_next_step=False, system_config_doc=self._sys_cfg,
             usage_acc=self._usage_acc,
         )
-        return {"output": report, "input": inputs.get("output"), "step_name": self.name}
+        return _attach_grounding(
+            {"output": report, "input": inputs.get("output"), "step_name": self.name}, grounding,
+        )
 
 
 def _open_sync_db():
@@ -1856,6 +2009,7 @@ class FormFillerNode(Node):
         """The inputs the model saw, in order, each with the metadata needed to
         say which document and page a value came from (see form_fill)."""
         out: list[dict] = []
+        grounding = getattr(self, "_grounding", None)
         for src in sources:
             if src == "step_input":
                 text = _stringify_context(inputs.get("output"))
@@ -1884,6 +2038,15 @@ class FormFillerNode(Node):
                         "uuid": meta.get("uuid"),
                         "text_markers": meta.get("text_markers") or [],
                     })
+        if grounding is not None and grounding.text:
+            # A value found only in a policy passage is supported by the
+            # knowledge base, not by a document page — tagged so the report
+            # says so rather than attributing it to a document. Last, matching
+            # where the passages sit in the context the model saw.
+            out.append({
+                "kind": GROUNDING_SOURCE, "title": GROUNDING_SECTION_LABEL,
+                "text": grounding.text,
+            })
         return out
 
     def _ask_values(self, instructions: str, prompt: str, names: list[str]) -> dict:
@@ -1912,12 +2075,30 @@ class FormFillerNode(Node):
     # -- fill --------------------------------------------------------------
 
     def process(self, inputs):
+        prev_step_name = inputs.get("step_name")
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        base_context = _build_combined_context(self.data, inputs, sources)
+        grounding, grounding_error = _resolve_grounding(
+            self, inputs, base_context=base_context,
+            instruction=self.data.get("template", "") or "",
+        )
+        if grounding_error:
+            return {
+                "output": "", "error": grounding_error,
+                "input": inputs.get("output"), "step_name": self.name,
+            }
+        # Read by _attribution_sources so a value the model took from a
+        # passage is credited to the knowledge base, not to a document.
+        self._grounding = grounding
+        input_data = _build_combined_context(
+            self.data, inputs, sources,
+            grounding_text=grounding.text if grounding else None,
+        )
+        return _attach_grounding(self._fill(inputs, sources, input_data), grounding)
+
+    def _fill(self, inputs, sources: list[str], input_data) -> dict:
         template = self.data.get("template", "")
         missing_token = (self.data.get("missing_value") or "").strip() or None
-        prev_step_name = inputs.get("step_name")
-
-        sources = _resolve_input_sources(self.data, prev_step_name)
-        input_data = _build_combined_context(self.data, inputs, sources)
         context = _context_block(input_data)
 
         result = {"input": inputs.get("output"), "step_name": self.name}
@@ -2277,17 +2458,30 @@ KB_ANSWER_INSTRUCTION = (
 
 
 class KnowledgeBaseQueryNode(Node):
-    """Workflow step that queries a knowledge base via RAG.
+    """Workflow step that queries one or more knowledge bases via RAG.
 
-    Two modes, selected by ``data["mode"]``:
+    Three modes, selected by ``data["mode"]``:
 
     * ``"passages"`` (default) — returns the matching chunks as a framed
       plain-text context block for downstream steps to read losslessly.
     * ``"answer"`` — additionally runs an LLM over the retrieved passages and
       returns a grounded, citation-bearing answer.
+    * ``"augment"`` — returns the previous step's output with the passages
+      appended in a labeled section, so a lookup placed mid-chain adds
+      context without hiding what the step before it produced.
+
+    Configuration: ``knowledge_bases`` (list of uuids; the legacy single
+    ``kb_uuid`` still works) and ``queries`` (one per line or a list; legacy
+    ``query``), ``k`` passages per base per query, ``max_passages`` in total
+    (default ``k`` × number of queries) and ``min_similarity``. Retrieval,
+    merging and rendering are shared with per-task grounding
+    (:mod:`app.services.kb_grounding`): a knowledge base's tuned relevance
+    floor applies, near-duplicate passages collapse, cited section numbers
+    are pinned lexically, and a templated query that renders too long is
+    condensed rather than truncated by the embedder.
 
     The query supports ``{{ inputs.output }}`` placeholders so the lookup can
-    be driven by upstream step output. Both modes emit ``retrieved_sources``
+    be driven by upstream step output. All modes emit ``retrieved_sources``
     citations. Misconfiguration and retrieval failures set ``error`` — the
     engine halts the run naming this step, so failure text never flows
     downstream as the next step's input. Data-dependent soft outcomes (the
@@ -2310,121 +2504,103 @@ class KnowledgeBaseQueryNode(Node):
             result["retrieved_sources"] = sources
         return result
 
-    def process(self, inputs):
-        from app.services.document_manager import DocumentManager
-        from app.utils import templating
+    def _config(self):
+        from app.services.kb_grounding import _as_int, _as_str_list
 
-        kb_uuid = (self.data.get("kb_uuid") or "").strip()
+        queries = _as_str_list(self.data.get("queries")) or _as_str_list(self.data.get("query"))
+        k = _as_int(self.data.get("k"), 8, lo=1, hi=20)
+        raw = {
+            "knowledge_bases": (
+                _as_str_list(self.data.get("knowledge_bases"))
+                or _as_str_list(self.data.get("kb_uuid"))
+            ),
+            "queries": queries,
+            "k": k,
+            # One query used to return exactly ``k`` passages; several keep
+            # that rate per query unless the author caps the total.
+            "max_passages": self.data.get("max_passages") or k * max(1, len(queries)),
+            "min_similarity": self.data.get("min_similarity") or 0.0,
+        }
+        return parse_grounding_config(raw, what="Knowledge Base Query")
+
+    def process(self, inputs):
         mode = (self.data.get("mode") or "passages").strip().lower()
         try:
-            k = int(self.data.get("k") or 8)
-        except (TypeError, ValueError):
-            k = 8
-        try:
-            min_similarity = float(self.data.get("min_similarity") or 0.0)
-        except (TypeError, ValueError):
-            min_similarity = 0.0
-
-        if not kb_uuid:
+            cfg = self._config()
+        except GroundingConfigError as e:
             # Configuration errors halt the run (mirroring Add Website): a
             # warning here let the run finish Completed with a step that
             # queried nothing.
-            return self._result(
-                "", inputs,
-                error="Knowledge Base Query is not configured: no knowledge base selected.",
-            )
-
-        raw_query = (self.data.get("query") or "").strip()
-        if not raw_query:
-            return self._result(
-                "", inputs,
-                error="Knowledge Base Query is not configured: the query is empty.",
-            )
-
-        try:
-            query = templating.render(raw_query, inputs, json_encode=False).strip()
-        except templating.TemplateError as e:
             return self._result("", inputs, error=str(e))
-        if not query:
-            return self._result(
-                "", inputs,
-                warning="Knowledge Base Query skipped: the query template rendered to an empty string.",
-            )
 
         self.report_progress("Querying knowledge base…")
-
-        dm = DocumentManager()
         try:
-            results = dm.query_kb(kb_uuid, query, k=k)
+            grounding = retrieve_grounding(
+                cfg, inputs,
+                kb_meta=self.data.get("_kb_meta"),
+                model=self.data.get("model"),
+                system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
+                header=KB_PASSAGES_HEADER,
+                # A single base reads exactly as it always has; several are
+                # told apart on every source line.
+                label_kb=len(cfg.knowledge_bases) > 1,
+                show_queries=False,
+                progress=self.report_progress,
+            )
+        except GroundingConfigError as e:
+            return self._result("", inputs, error=str(e))
         except Exception as e:
-            logger.error("KB query failed for kb_uuid=%s: %s", kb_uuid, e)
+            logger.error("KB query failed for kb_uuids=%s: %s", cfg.knowledge_bases, e)
             # A lookup failure used to return this text as the step's OUTPUT
             # under a warning, so the halt check never fired and the error
             # message flowed downstream as the next step's input.
-            return self._result(
-                "", inputs, error=f"Knowledge base lookup failed: {e}",
-            )
+            return self._result("", inputs, error=f"Knowledge base lookup failed: {e}")
 
-        if min_similarity > 0:
-            results = [
-                r for r in results
-                if not isinstance(r.get("similarity"), (int, float))
-                or r["similarity"] >= min_similarity
-            ]
-
-        if not results:
-            self.report_progress("No matching passages found")
-            warning = f"The knowledge base returned no matching passages for the query: {query!r}."
+        warning = " | ".join(grounding.warnings) if grounding.warnings else None
+        if grounding.empty:
+            if not grounding.queries:
+                warning = (
+                    "Knowledge Base Query skipped: the query template rendered "
+                    "to an empty string."
+                )
+                return self._result("", inputs, warning=warning)
             return self._result(f"({warning})", inputs, warning=warning)
 
-        # Format as plain text context block so downstream LLM steps can use it naturally
-        parts = []
-        sources: list[dict] = []
-        for i, r in enumerate(results, 1):
-            meta = r.get("metadata") or {}
-            content = r.get("content") or ""
-            source_name = meta.get("source_name", "Unknown source")
-            sheet = meta.get("sheet")
-            # Cite the page of the passage that matches the query, or the
-            # range, for a chunk that crosses a page break (see page_locator).
-            cited = cited_pages(meta, content, query)
-            page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
-            locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
-            label = f"{source_name} · {locator}" if locator else source_name
-            parts.append(f"[{i}] {label}\n{annotate_chunk_pages(content, meta)}")
-            sources.append({
-                "document_id": meta.get("source_id"),
-                "document_title": source_name,
-                "page": page,
-                "page_end": page_end,
-                "page_approximate": approximate,
-                "sheet": sheet if isinstance(sheet, str) else None,
-                "chunk_id": r.get("chunk_id"),
-                "score": r.get("score"),
-                "similarity": r.get("similarity"),
-                "content_preview": (r.get("content") or "")[:240],
-            })
+        sources = grounding.sources
+        passages = grounding.text
 
-        passages = "\n\n---\n\n".join(parts)
-        # The hedged label alone does not survive the model: an unexplained
-        # tilde gets normalised away and the estimate is restated as fact.
-        instruction = KB_ANSWER_INSTRUCTION
-        if any(src.get("page_approximate") for src in sources):
-            instruction += KB_APPROXIMATE_PAGE_RULE
+        if mode == "answer":
+            # The hedged label alone does not survive the model: an
+            # unexplained tilde gets normalised away and the estimate is
+            # restated as fact.
+            instruction = KB_ANSWER_INSTRUCTION
+            if any(src.get("page_approximate") for src in sources):
+                instruction += KB_APPROXIMATE_PAGE_RULE
+            self.report_progress("Synthesizing answer from retrieved passages…")
+            question = "\n".join(grounding.queries)
+            answer = llm_chat_model(
+                model=self.data.get("model"),
+                prompt=instruction + f"QUESTION:\n{question}",
+                data=passages,
+                include_next_step=False,
+                system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
+            )
+            return self._result(answer, inputs, sources=sources, warning=warning)
 
-        if mode != "answer":
-            return self._result(f"{KB_PASSAGES_HEADER}\n\n{passages}", inputs, sources=sources)
+        if mode == "augment":
+            upstream = _stringify_context(inputs.get("output"))
+            if upstream:
+                output = (
+                    f"=== {INPUT_SOURCE_LABELS['step_input']} ===\n{upstream}\n\n"
+                    f"=== {GROUNDING_SECTION_LABEL} ===\n{passages}"
+                )
+            else:
+                output = passages
+            return self._result(output, inputs, sources=sources, warning=warning)
 
-        self.report_progress("Synthesizing answer from retrieved passages…")
-        answer = llm_chat_model(
-            model=self.data.get("model"),
-            prompt=instruction + f"QUESTION:\n{query}",
-            data=passages,
-            include_next_step=False,
-            system_config_doc=self._sys_cfg,
-            usage_acc=self._usage_acc,
-        )
-        return self._result(answer, inputs, sources=sources)
+        return self._result(passages, inputs, sources=sources, warning=warning)
 
 
 # ---------------------------------------------------------------------------
