@@ -1,0 +1,5 @@
+# Shell scripts are copied into Linux images (backend/Dockerfile) and run by
+# sh there. A CRLF checkout on Windows (core.autocrlf=true) ships "set -e\r"
+# into the celery image, which then crash-loops on "set: Illegal option -".
+# Pin every script to LF regardless of the checkout platform.
+*.sh text eol=lf

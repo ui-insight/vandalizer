@@ -95,6 +95,12 @@ COPY create_admin.py ./
 COPY run_celery.sh ./
 COPY setup_default_team.py ./
 
+# A Windows checkout can hand the build CRLF scripts (core.autocrlf, or a
+# checkout that predates .gitattributes); sh then dies on "set -e\r" and the
+# celery container crash-loops. Normalize inside the image so it never
+# depends on the host's line endings.
+RUN sed -i 's/\r$//' run_celery.sh
+
 RUN mkdir -p /app/static/uploads /app/static/db && \
     chown -R appuser:appuser /app
 
