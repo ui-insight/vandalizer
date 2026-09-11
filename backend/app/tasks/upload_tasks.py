@@ -7,16 +7,25 @@ def dispatch_upload_tasks(
     extension: str,
     document_path: str,
     user_id: str = "",
+    force_ocr: bool = False,
 ) -> str:
     """
     Dispatch extraction + update + semantic_ingestion to Celery workers.
       extraction → update_document_fields → semantic_ingestion (on success)
       cleanup_document (on error)
-    Validation runs independently in the background.
+    Validation runs independently in the background. `force_ocr` reaches the
+    extraction task's kwargs only when it is actually requested, so an
+    ordinary upload's signature is unchanged.
     """
+    extraction_kwargs: dict = {
+        "document_uuid": document_uuid,
+        "extension": extension,
+    }
+    if force_ocr:
+        extraction_kwargs["force_ocr"] = True
     extraction = celery.signature(
         "tasks.document.extraction",
-        kwargs={"document_uuid": document_uuid, "extension": extension},
+        kwargs=extraction_kwargs,
         queue="documents",
     )
     update = celery.signature(

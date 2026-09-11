@@ -1,9 +1,10 @@
 """Re-OCR (re-extract text from) SmartDocuments older than N days.
 
 Dispatches the existing `tasks.document.extraction` Celery task for each
-matching document. For PDFs this routes through the UIPDF OCR endpoint
-(see app/services/document_readers.py:ocr_extract_text_from_pdf); other
-extensions just re-run their normal text extraction.
+matching document. For PDFs the pages are re-read with OCR first — the local
+fast path is skipped (see app/services/document_readers.py:
+ocr_extract_text_from_pdf); other extensions just re-run their normal text
+extraction.
 
 Usage:
     cd backend
@@ -81,6 +82,7 @@ async def main(days: int, dry_run: bool, limit: int | None, all_types: bool) -> 
                 extension=doc.extension or "",
                 document_path=doc.path,
                 user_id=doc.user_id,
+                force_ocr=True,
             )
             dispatched += 1
             if dispatched % 50 == 0:

@@ -65,6 +65,31 @@ class TestDispatchUploadTasks:
             immutable=True,
         )
 
+    def test_force_ocr_reaches_extraction_signature(self, mock_celery):
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks("doc-uuid", "pdf", "/uploads/test.pdf", force_ocr=True)
+
+        extraction_call = next(
+            c for c in mock_celery.signature.call_args_list
+            if c[0][0] == "tasks.document.extraction"
+        )
+        assert extraction_call[1]["kwargs"]["force_ocr"] is True
+
+    def test_force_ocr_false_is_not_on_the_wire(self, mock_celery):
+        """An ordinary upload's signature keeps the shape it has always had:
+        a queued task whose kwargs a worker rollout has to understand should
+        not grow a key that means "do what you already do"."""
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks("doc-uuid", "pdf", "/uploads/test.pdf", force_ocr=False)
+
+        extraction_call = next(
+            c for c in mock_celery.signature.call_args_list
+            if c[0][0] == "tasks.document.extraction"
+        )
+        assert "force_ocr" not in extraction_call[1]["kwargs"]
+
     def test_attaches_cleanup_as_error_link(self, mock_celery):
         from app.tasks.upload_tasks import dispatch_upload_tasks
 

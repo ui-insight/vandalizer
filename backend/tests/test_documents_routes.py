@@ -45,6 +45,9 @@ def _make_document(
     title="Test Document",
     classification=None,
     retention_hold=False,
+    task_status="complete",
+    processing=False,
+    extraction_nonletter_ratio=None,
 ):
     doc = MagicMock()
     doc.uuid = doc_uuid
@@ -58,6 +61,12 @@ def _make_document(
     doc.retention_hold = retention_hold
     doc.retention_hold_reason = None
     doc.scheduled_deletion_at = "scheduled" if retention_hold else None
+    # Explicit rather than MagicMock attributes: the retry route reads these
+    # to decide whether to force OCR and whether a run is already in flight,
+    # and a MagicMock is truthy and uncomparable.
+    doc.task_status = task_status
+    doc.processing = processing
+    doc.extraction_nonletter_ratio = extraction_nonletter_ratio
     doc.save = AsyncMock()
     return doc
 
@@ -405,3 +414,103 @@ class TestDocumentGovernanceAuth:
         assert doc.retention_hold_reason is None
         doc.save.assert_awaited_once()
         mock_log_event.assert_awaited_once()
+
+
+class TestRetryExtractionRoute:
+    """A retry re-reads the pages with OCR when the previous extraction failed
+    or produced unreadable text, and re-reads a healthy document the ordinary
+    way — an OCR round-trip to get back text that was already fine is pure
+    cost, and on a busy deployment it is cost per impatient click."""
+
+    async def _post(self, client, doc):
+        user = _make_user("owner1")
+        doc.extension = "pdf"
+        doc.path = "uploads/doc-1.pdf"
+        cookies, headers = _auth("owner1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.documents.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc, \
+             patch("app.tasks.upload_tasks.dispatch_upload_tasks", return_value="task-id-123") as mock_dispatch, \
+             patch("app.services.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_get_doc.return_value = doc
+
+            resp = await client.post(
+                "/api/documents/doc-1/retry-extraction",
+                cookies=cookies,
+                headers=headers,
+            )
+        return resp, mock_dispatch, mock_log_event
+
+    @pytest.mark.asyncio
+    async def test_errored_document_is_re_read_with_ocr(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="error")
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert resp.json() == {"uuid": "doc-1", "task_id": "task-id-123", "status": "extracting"}
+        mock_dispatch.assert_called_once()
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        doc.save.assert_awaited_once()
+        mock_log_event.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_low_quality_document_is_re_read_with_ocr(self, client):
+        """The garbled text layer that motivated #858 succeeds — the document
+        is not in an error state, it just holds mojibake — so the error status
+        alone would never force OCR for it."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="complete", extraction_nonletter_ratio=0.95,
+        )
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+
+    @pytest.mark.asyncio
+    async def test_healthy_document_is_re_read_the_ordinary_way(self, client):
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="complete", extraction_nonletter_ratio=0.01,
+        )
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+
+    @pytest.mark.asyncio
+    async def test_document_already_processing_is_rejected(self, client):
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="extracting", processing=True,
+        )
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 409
+        assert "already in progress" in resp.json()["detail"]
+        mock_dispatch.assert_not_called()
+        doc.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_stalled_in_progress_status_is_rejected_too(self, client):
+        """processing=False with an in-progress stage is the stuck-document
+        shape the reaper repairs; a retry must not race it."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="readying", processing=False,
+        )
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 409
+        mock_dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_audit_detail_records_the_decision(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="error")
+        resp, _, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        detail = mock_log_event.call_args.kwargs["detail"]
+        assert detail == {"force_ocr": True, "previous_task_status": "error"}

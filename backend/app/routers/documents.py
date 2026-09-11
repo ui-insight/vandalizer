@@ -8,6 +8,7 @@ from app.dependencies import get_current_user
 from app.models.document import SmartDocument
 from app.models.team import Team, TeamMembership
 from app.models.user import User
+from app.rate_limit import limiter
 from app.services import access_control, audit_service, document_service
 
 router = APIRouter()
@@ -135,7 +136,9 @@ async def poll_status(
 
 
 @router.post("/{doc_uuid}/retry-extraction")
+@limiter.limit("30/minute")
 async def retry_extraction(
+    request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
 ):
@@ -144,6 +147,11 @@ async def retry_extraction(
     Useful when the original extraction silently produced no text — for example
     because the OCR endpoint was temporarily down. Clears any prior error state
     and re-dispatches the same Celery chain that ran at upload time.
+
+    A retry re-reads the pages with OCR when the previous extraction failed or
+    produced unreadable text; a healthy document is re-read the ordinary way,
+    so a retry on a working document does not spend an OCR round-trip to get
+    back what it already had.
     """
     doc = await access_control.get_authorized_document(
         doc_uuid, user, manage=True, allow_admin=True
@@ -151,7 +159,21 @@ async def retry_extraction(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Same lazy import as dispatch_upload_tasks below: the tasks module pulls
+    # in Celery and the sync DB, which the router must not do at import time.
+    from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
     from app.tasks.upload_tasks import dispatch_upload_tasks
+
+    if doc.processing or doc.task_status in _IN_PROGRESS_TASK_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail="Extraction is already in progress for this document",
+        )
+
+    # Both reads must happen before the field resets below wipe the evidence
+    # they are based on.
+    previous_task_status = doc.task_status
+    force_ocr = doc.task_status == "error" or document_service.is_extraction_low_quality(doc)
 
     doc.task_status = "extracting"
     doc.processing = True
@@ -168,6 +190,7 @@ async def retry_extraction(
         extension=doc.extension or "",
         document_path=doc.path,
         user_id=user.user_id,
+        force_ocr=force_ocr,
     )
 
     await audit_service.log_event(
@@ -176,6 +199,10 @@ async def retry_extraction(
         resource_type="document",
         resource_id=doc_uuid,
         resource_name=doc.title,
+        detail={
+            "force_ocr": force_ocr,
+            "previous_task_status": previous_task_status,
+        },
     )
 
     return {"uuid": doc_uuid, "task_id": task_id, "status": "extracting"}

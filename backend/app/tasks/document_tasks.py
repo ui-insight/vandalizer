@@ -310,7 +310,9 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     max_retries=5,
     default_retry_delay=5,
 )
-def perform_extraction_and_update(self, document_uuid: str, extension: str) -> str:
+def perform_extraction_and_update(
+    self, document_uuid: str, extension: str, force_ocr: bool = False,
+) -> str:
     """Extract text from a document file (PDF, DOCX, XLSX, etc.).
 
     Updates SmartDocument.raw_text and processing flags.
@@ -368,8 +370,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 extract_text_with_markers,
                 pdf_page_count,
             )
+            # A retry sets force_ocr so the pages are re-read rather than the
+            # same text layer re-decided (#858).
             raw_text, text_markers = extract_text_with_markers(
-                str(absolute_path), extension, report=ocr_report,
+                str(absolute_path), extension, report=ocr_report, force_ocr=force_ocr,
             )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file
@@ -420,13 +424,24 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 "Document %s produced empty extracted text (ext=%s) — marking as error",
                 document_uuid, extension,
             )
-            message = (
-                "We couldn't extract any text from this document. "
-                "It may be blank, image-only, or encrypted, or our "
-                "OCR service may be temporarily unavailable. Try "
-                "retrying — if it keeps failing, re-upload or "
-                "contact support."
-            )
+            if ocr_report.get("text_layer_rejected"):
+                # The reader refused this PDF's own text layer: naming the
+                # cause is the difference between "retry later" and "this
+                # copy of the file will never read".
+                message = (
+                    "This PDF's text layer is unreadable (its fonts don't map "
+                    "to characters), and OCR could not read the pages. Retry "
+                    "extraction once OCR is available, or re-upload a printed "
+                    "or scanned copy."
+                )
+            else:
+                message = (
+                    "We couldn't extract any text from this document. "
+                    "It may be blank, image-only, or encrypted, or our "
+                    "OCR service may be temporarily unavailable. Try "
+                    "retrying — if it keeps failing, re-upload or "
+                    "contact support."
+                )
             db.smart_document.update_one(
                 {"uuid": document_uuid},
                 {
@@ -1082,6 +1097,9 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
     settings = Settings()
     try:
         dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+        # A retry must replace the chunks from the previous extraction, or
+        # retrieval keeps answering from the old text.
+        dm.delete_document(user_id, document_uuid)
         chunk_count = dm.add_document(
             user_id=user_id,
             document_name=doc.get("title", ""),

@@ -149,7 +149,9 @@ def ocr_extract_text_from_pdf(
 
     ``report``, when given, is filled in with what the returned string cannot
     say — notably ``{"partial": True}`` when the converter only managed part of
-    the document. Optional so existing callers are unaffected.
+    the document, and ``{"ocr_skipped": "unconfigured"}`` when no request was
+    made at all because this deployment has no working OCR endpoint. Optional
+    so existing callers are unaffected.
     """
     # OCR endpoint is stored in the database via admin config (SystemConfig)
     from app.services import ocr_client
@@ -167,6 +169,8 @@ def ocr_extract_text_from_pdf(
 
     if not ocr_endpoint:
         logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
+        if report is not None:
+            report["ocr_skipped"] = "unconfigured"
         return ""
 
     # If decrypt_value returned the raw 'enc:' ciphertext, CONFIG_ENCRYPTION_KEY
@@ -176,6 +180,8 @@ def ocr_extract_text_from_pdf(
             "OCR api key could not be decrypted — CONFIG_ENCRYPTION_KEY missing "
             "or mismatched in this worker. Fix the env var and restart Celery."
         )
+        if report is not None:
+            report["ocr_skipped"] = "unconfigured"
         return ""
 
     logger.info(
@@ -925,10 +931,26 @@ def pdf_has_ocrable_content(pdf_path: str) -> bool:
     return False
 
 
-def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | None:
-    """Classify a PDF locally and, if it's confidently text-based with no
-    pages flagged for OCR, extract structured Markdown locally — skipping
-    the OCR round-trip entirely.
+def _classify_pdf(pdf_path: str):
+    """Classify with pdf-inspector; None when it can't run. Never raises."""
+    try:
+        import pdf_inspector
+    except ImportError:
+        return None
+
+    try:
+        return pdf_inspector.classify_pdf(pdf_path)
+    except Exception as e:
+        logger.warning("pdf-inspector classification failed for %s: %s", pdf_path, e)
+        return None
+
+
+def _local_markdown_extract_from_pdf(
+    pdf_path: str, classification,
+) -> tuple[str, list[dict]] | None:
+    """Given a PDF's pdf-inspector classification, extract structured
+    Markdown locally when it's confidently text-based with no pages flagged
+    for OCR — skipping the OCR round-trip entirely.
 
     Most research-admin PDFs (proposals, budgets, reports) are digitally
     native, not scanned, so this fast path is expected to fire for the
@@ -937,19 +959,17 @@ def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | 
     doesn't have.
 
     Returns None — signalling "not a fit for the fast path" — for anything
-    scanned, image-based, mixed, low classifier confidence, or any error, so
-    the caller falls through to the existing OCR-first flow unchanged. This
+    scanned, image-based, mixed, low classifier confidence, a failed
+    classification (``classification is None``), or any error, so the
+    caller falls through to the existing OCR-first flow unchanged. This
     function never raises.
     """
-    try:
-        import pdf_inspector
-    except ImportError:
+    if classification is None:
         return None
 
     try:
-        classification = pdf_inspector.classify_pdf(pdf_path)
-    except Exception as e:
-        logger.warning("pdf-inspector classification failed for %s: %s", pdf_path, e)
+        import pdf_inspector
+    except ImportError:
         return None
 
     if (
@@ -990,8 +1010,32 @@ def _local_markdown_extract_from_pdf(pdf_path: str) -> tuple[str, list[dict]] | 
     return text, markers
 
 
+def _text_layer_untrustworthy(classification) -> bool:
+    """True when pdf-inspector's document-level verdict says the text layer
+    may be untrustworthy.
+
+    `image_based` is the verdict a CID-mangled text layer gets (subset
+    fonts, no usable ToUnicode CMap: extraction yields glyph IDs, not
+    characters), and the text PyMuPDF scrapes off such a file is mojibake.
+    The non-letter ratio cannot separate these, because legitimate
+    box-drawing, combining marks and similar score just as high.
+
+    The verdict alone is not proof of garbage, though: a slide deck or
+    figure-heavy document gets it too. That is why the caller's gate also
+    requires that OCR actually ran and could not read the pages — see
+    ``_read_pdf_text_and_markers``.
+
+    pdf-inspector emits this verdict at a fixed confidence, so no
+    threshold is applied here.
+    """
+    return (
+        classification is not None
+        and classification.pdf_type == "image_based"
+    )
+
+
 def _extract_pdf_text_and_markers(
-    file_path: str, report: dict | None = None,
+    file_path: str, report: dict | None = None, *, force_ocr: bool = False,
 ) -> tuple[str, list[dict]]:
     """The one PDF path: read the text, then remove what the page hides.
 
@@ -1003,14 +1047,31 @@ def _extract_pdf_text_and_markers(
     here, at the single point every caller goes through, rather than
     defended against separately in each prompt downstream.
     """
-    text, markers = _read_pdf_text_and_markers(file_path, report=report)
+    text, markers = _read_pdf_text_and_markers(
+        file_path, report=report, force_ocr=force_ocr,
+    )
     return pdf_hidden_text.scrub_pdf(file_path, text, markers, report=report)
 
 
 def _read_pdf_text_and_markers(
-    file_path: str, report: dict | None = None,
+    file_path: str, report: dict | None = None, *, force_ocr: bool = False,
 ) -> tuple[str, list[dict]]:
-    """Extract a PDF's text and page markers with the best reader available."""
+    """Extract a PDF's text and page markers with the best reader available.
+
+    The pdf-inspector classification decides whether PyMuPDF's local text
+    layer may be used as a fallback at all: an ``image_based`` verdict means
+    that text layer may be glyph-ID mojibake, so when OCR ran and could not
+    read the pages this returns empty rather than storing it (#858). When
+    OCR was never asked — no endpoint configured on this deployment — the
+    verdict alone is not enough to refuse the only text there is, and the
+    PyMuPDF fallback stands as before.
+
+    ``force_ocr`` makes OCR run first, skipping the local fast path, so a
+    retry re-reads the pages through OCR instead of the (already-rejected)
+    local extraction — but when OCR still comes back empty, or is down
+    altogether, a confidently text-based PDF falls back to that local fast
+    path rather than to flat PyMuPDF text.
+    """
     # A local dict when the caller passed none: the partial-conversion signal
     # the OCR client records here decides below whether page markers can be
     # emitted at all, so it is needed even when no caller wants the report.
@@ -1024,7 +1085,11 @@ def _read_pdf_text_and_markers(
         )
         return "", []
 
-    fast_path = _local_markdown_extract_from_pdf(file_path)
+    classification = _classify_pdf(file_path)
+
+    fast_path = None
+    if not force_ocr:
+        fast_path = _local_markdown_extract_from_pdf(file_path, classification)
     if fast_path is not None:
         return fast_path
 
@@ -1036,9 +1101,23 @@ def _read_pdf_text_and_markers(
     try:
         ocr_text = ocr_extract_text_from_pdf(file_path, report=report)
     except ocr_client.OcrUnavailableError:
-        # Deliberately not swallowed: a transient outage must reach the task
-        # layer so the whole extraction is retried later, rather than being
-        # degraded to whatever PyMuPDF can scrape off a scanned page now.
+        # A forced re-read asked for OCR first, not OCR only: when the service
+        # is down and the file is confidently text-based, its local Markdown is
+        # the right answer, and the caller has already cleared the document's
+        # stored text. Every verdict where the fast path declines still raises,
+        # so the task retries once OCR is back (#633).
+        if force_ocr:
+            fast_path = _local_markdown_extract_from_pdf(file_path, classification)
+            if fast_path is not None:
+                logger.warning(
+                    "OCR unavailable during a forced re-read of %s — using the "
+                    "local Markdown fast path instead of failing the task",
+                    file_path,
+                )
+                return fast_path
+        # Otherwise deliberately not swallowed: a transient outage must reach
+        # the task layer so the whole extraction is retried later, rather than
+        # being degraded to whatever PyMuPDF can scrape off a scanned page now.
         raise
     except Exception as e:
         logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
@@ -1059,12 +1138,44 @@ def _read_pdf_text_and_markers(
             return ocr_text, []
         num_pages = pdf_page_count(file_path)
         return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
+    if _text_layer_untrustworthy(classification) and not report.get("ocr_skipped"):
+        # OCR ran and could not read the pages, and the classifier says the
+        # local text layer is glyph-ID mojibake — so there is nothing worth
+        # storing. When OCR was never configured no request was made at all,
+        # and the verdict on its own is not enough to refuse the only text
+        # there is: that case keeps the PyMuPDF fallback below and the
+        # existing low-quality notice.
+        logger.warning(
+            "PDF %s: classifier says image_based (%d page(s) need OCR) and "
+            "OCR returned %d chars — refusing the local text layer rather "
+            "than storing it",
+            file_path, len(classification.pages_needing_ocr or []),
+            len(ocr_text or ""),
+        )
+        # Every other early return here pops these first: a surviving
+        # ``partial`` logs "ingested with warnings" for a document that
+        # ingested nothing at all.
+        report.pop("partial", None)
+        report.pop("errors", None)
+        report["text_layer_rejected"] = True
+        return "", []
     # Falling back means the partial OCR text is not what we return, so the
     # partial-conversion warning must not survive onto the PyMuPDF result.
     ocr_report_partial = bool(report.get("partial"))
     ocr_report_errors = list(report.get("errors") or [])
     report.pop("partial", None)
     report.pop("errors", None)
+    if force_ocr:
+        # A forced re-read asked for OCR first, not OCR only: when the
+        # service produced nothing usable, a confidently text-based PDF is
+        # still better served by its structured local Markdown than by the
+        # flat PyMuPDF text below. The partial-conversion signal above was
+        # already popped off ``report`` for the OCR text this fast path is
+        # about to discard, so it can't survive onto Markdown that isn't
+        # partial at all.
+        fast_path = _local_markdown_extract_from_pdf(file_path, classification)
+        if fast_path is not None:
+            return fast_path
     # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
     # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
     # hard requirement. If it fails (corrupt PDF, or the source file was
@@ -1094,6 +1205,7 @@ def _read_pdf_text_and_markers(
 
 def extract_text_with_markers(
     file_path: str, file_extension: str, report: dict | None = None,
+    *, force_ocr: bool = False,
 ) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
@@ -1103,12 +1215,16 @@ def extract_text_with_markers(
 
     Locations that can't preserve structure (DOCX text, plaintext, code
     files) return an empty marker list — chunks from those documents simply
-    omit page metadata in citations.
+    omit page metadata in citations. ``force_ocr`` (PDF only) makes OCR run
+    first, skipping the local fast path, so a retry re-reads the pages
+    through OCR.
     """
     ext = file_extension.lower().lstrip(".")
 
     if ext == "pdf":
-        return _extract_pdf_text_and_markers(file_path, report=report)
+        return _extract_pdf_text_and_markers(
+            file_path, report=report, force_ocr=force_ocr,
+        )
 
     if ext == "xlsx":
         text = extract_text_from_xlsx(file_path)

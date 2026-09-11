@@ -728,9 +728,9 @@ async def chat_stream(
                 f"Text extracted poorly from {len(low_quality_docs)} selected "
                 f"document(s): {joined}. Most of the stored text is unreadable, "
                 "so answers about these documents are likely to be unreliable "
-                "or wrong. Try \"Retry extraction\" on the document, or "
-                "re-upload it (e.g. as a scanned/printed copy) so OCR can "
-                "produce clean text."
+                "or wrong. Use \"Retry extraction\" on the document to read "
+                "its pages again with OCR, or re-upload it as a scanned or "
+                "printed copy so OCR can produce clean text."
             ),
             "action": "documents_low_quality",
             "tokens_dropped": 0,

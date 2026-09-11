@@ -146,6 +146,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const [docxText, setDocxText] = useState<string | null>(null)
   const [extractionError, setExtractionError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
+  const [lowQuality, setLowQuality] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const [previewUnavailable, setPreviewUnavailable] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -232,6 +233,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           setIsPdf(false)
           pollStatus(docUuid).then(res => {
             if (cancelled) return
+            setLowQuality(Boolean(res.extraction_low_quality))
             if (res.status === 'error' || (res.complete && !res.raw_text)) {
               setExtractionError(res.error_message || "We couldn't extract any text from this document.")
               setDocxText('')
@@ -279,6 +281,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     let cancelled = false
     pollStatus(docUuid).then(res => {
       if (cancelled) return
+      setLowQuality(Boolean(res.extraction_low_quality))
       if (res.status === 'error' || (res.complete && !res.raw_text)) {
         setExtractionError(res.error_message || "We couldn't extract any text from this document.")
         setDocxText('')
@@ -302,6 +305,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           const res = await pollStatus(docUuid)
           if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
             window.clearInterval(interval)
+            setLowQuality(Boolean(res.extraction_low_quality))
             if (res.status === 'error' || (res.complete && !res.raw_text)) {
               setExtractionError(res.error_message || "We couldn't extract any text from this document.")
               setDocxText('')
@@ -990,6 +994,43 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               lineHeight: 1.7,
               color: '#333',
             }}>
+              {/* The extraction succeeded, so the error branch above never
+                  runs — but the text below is mojibake, and Retry extraction
+                  was only reachable from that branch. */}
+              {lowQuality && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '10px 12px', marginBottom: 16,
+                  fontSize: 13, lineHeight: 1.4, color: '#92400e',
+                  backgroundColor: '#fffbeb', border: '1px solid #fcd34d',
+                  borderRadius: 6,
+                }}>
+                  <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+                  <span style={{ flex: 1 }}>
+                    Text extracted poorly &mdash; most of the stored text is unreadable.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRetryExtraction}
+                    disabled={retrying}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                      padding: '5px 10px', fontSize: 13, fontWeight: 500,
+                      backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
+                      color: '#fff', border: 'none', borderRadius: 6,
+                      cursor: retrying ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <RefreshCw
+                      style={{
+                        width: 13, height: 13,
+                        animation: retrying ? 'spin 1s linear infinite' : undefined,
+                      }}
+                    />
+                    {retrying ? 'Retrying...' : 'Retry extraction'}
+                  </button>
+                </div>
+              )}
               <div
                 ref={docxContentRef}
                 className="chat-markdown"
