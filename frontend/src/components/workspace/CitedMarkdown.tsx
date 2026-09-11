@@ -89,6 +89,38 @@ export function matchCitation(text: string, sources: WorkflowCitation[]): number
 
 const BRACKET_RE = /\[([^[\]\n]{3,300})\]/g
 
+// A regulation section named in the text, e.g. "2 CFR 200.403(h)",
+// "§ 200.407", "45 CFR 46.101". A section number is itself a precise
+// citation into a regulation base, and a model that keeps a strict JSON
+// contract names the section far more reliably than it appends a bracket.
+export const SECTION_RE = /(?:§\s*|\b\d{1,2}\s*CFR\s*(?:part\s*)?)?\b(\d{2,4}\.\d{1,4})(?:\([a-z0-9]{1,3}\))*/gi
+
+/** The passage whose text literally contains the section a reference names,
+ *  or null. Only a base that holds the regulation qualifies: the marker must
+ *  appear as "§ 200.403" (or "200.403" followed by a heading) in the passage. */
+export function matchSectionReference(section: string, sources: WorkflowCitation[]): number | null {
+  const wanted = section.trim()
+  if (!/^\d{2,4}\.\d{1,4}$/.test(wanted)) return null
+  const escaped = wanted.replace('.', '\\.')
+  // "§ 200.407 Prior written approval." — the marker followed by a heading is
+  // the section itself; "(see § 200.407)" is a passage that merely cites it.
+  const heading = new RegExp(`§\\s*${escaped}\\s+[A-Z][a-z]`)
+  const mention = new RegExp(`(?:§\\s*|\\b)${escaped}(?![\\d])`)
+  let best: number | null = null
+  let bestScore = -Infinity
+  for (let i = 0; i < sources.length; i++) {
+    const content = sources[i].content || ''
+    if (!content) continue
+    const h = heading.exec(content)
+    const m = h || mention.exec(content)
+    if (!m) continue
+    // A heading beats a mention; among equals, the earlier the better.
+    const score = (h ? 1_000_000 : 0) - m.index
+    if (score > bestScore) { best = i; bestScore = score }
+  }
+  return best
+}
+
 /** Skip code, links and anything already a chip. */
 const SKIP_TAGS = new Set(['CODE', 'PRE', 'A', 'BUTTON', 'SCRIPT', 'STYLE'])
 
@@ -104,7 +136,8 @@ function shortLabel(c: WorkflowCitation): string {
  * this runs after sanitization without reopening it.
  */
 export function injectCitationChips(html: string, sources: WorkflowCitation[]): string {
-  if (!sources.length || !html.includes('[')) return html
+  // Nothing to link unless there is a bracket or something section-shaped.
+  if (!sources.length || !/[[§]|\d\.\d/.test(html)) return html
   const doc = new DOMParser().parseFromString(`<div id="root">${html}</div>`, 'text/html')
   const root = doc.getElementById('root')
   if (!root) return html
@@ -116,41 +149,66 @@ export function injectCitationChips(html: string, sources: WorkflowCitation[]): 
     for (let p = n.parentElement; p && p !== root; p = p.parentElement) {
       if (SKIP_TAGS.has(p.tagName)) { skip = true; break }
     }
-    if (!skip && n.nodeValue && n.nodeValue.includes('[')) textNodes.push(n as Text)
+    if (!skip && n.nodeValue && /[[§]|\d\.\d/.test(n.nodeValue)) textNodes.push(n as Text)
+  }
+
+  const makeChip = (idx: number, compact: boolean): HTMLElement => {
+    const c = sources[idx]
+    const chip = doc.createElement('button')
+    chip.setAttribute('type', 'button')
+    chip.className = compact ? 'kb-cite kb-cite-ref' : 'kb-cite'
+    chip.setAttribute('data-cite', String(idx))
+    chip.setAttribute('title', `${citationLabel(c)} — click to see the passage`)
+    chip.setAttribute('aria-label', `Citation: ${citationLabel(c)}`)
+    const n = doc.createElement('span')
+    n.className = 'kb-cite-n'
+    n.textContent = String(idx + 1)
+    chip.appendChild(n)
+    if (!compact) chip.appendChild(doc.createTextNode(shortLabel(c)))
+    return chip
   }
 
   for (const node of textNodes) {
     const text = node.nodeValue || ''
-    const frag = doc.createDocumentFragment()
-    let last = 0
-    let changed = false
+    // Every replacement in this text node: [start, end, chips, keepText].
+    const spans: Array<{ start: number; end: number; chips: HTMLElement[]; keep: boolean }> = []
+
     BRACKET_RE.lastIndex = 0
     for (let m = BRACKET_RE.exec(text); m; m = BRACKET_RE.exec(text)) {
       // A bracket may hold several citations separated by semicolons.
       const parts = m[1].split(/\s*;\s*/).filter(Boolean)
       const matches = parts.map(p => matchCitation(p, sources))
       if (matches.some(i => i === null)) continue
-      if (m.index > last) frag.appendChild(doc.createTextNode(text.slice(last, m.index)))
-      matches.forEach((idx, k) => {
-        const c = sources[idx as number]
-        const chip = doc.createElement('button')
-        chip.setAttribute('type', 'button')
-        chip.className = 'kb-cite'
-        chip.setAttribute('data-cite', String(idx))
-        chip.setAttribute('title', `${citationLabel(c)} — click to see the passage`)
-        chip.setAttribute('aria-label', `Citation: ${citationLabel(c)}`)
-        const n = doc.createElement('span')
-        n.className = 'kb-cite-n'
-        n.textContent = String((idx as number) + 1)
-        chip.appendChild(n)
-        chip.appendChild(doc.createTextNode(shortLabel(c)))
-        frag.appendChild(chip)
-        if (k < matches.length - 1) frag.appendChild(doc.createTextNode(' '))
+      spans.push({
+        start: m.index, end: m.index + m[0].length,
+        chips: matches.map(i => makeChip(i as number, false)), keep: false,
       })
-      last = m.index + m[0].length
-      changed = true
     }
-    if (!changed) continue
+    // Section references stay as written and get a compact numbered chip
+    // right after them; one already inside a matched bracket is skipped.
+    SECTION_RE.lastIndex = 0
+    for (let m = SECTION_RE.exec(text); m; m = SECTION_RE.exec(text)) {
+      const start = m.index, end = m.index + m[0].length
+      if (spans.some(s => start < s.end && end > s.start)) continue
+      const idx = matchSectionReference(m[1], sources)
+      if (idx === null) continue
+      spans.push({ start, end, chips: [makeChip(idx, true)], keep: true })
+    }
+    if (spans.length === 0) continue
+
+    spans.sort((a, b) => a.start - b.start)
+    const frag = doc.createDocumentFragment()
+    let last = 0
+    for (const s of spans) {
+      if (s.start < last) continue
+      if (s.start > last) frag.appendChild(doc.createTextNode(text.slice(last, s.start)))
+      if (s.keep) frag.appendChild(doc.createTextNode(text.slice(s.start, s.end)))
+      s.chips.forEach((chip, k) => {
+        frag.appendChild(chip)
+        if (k < s.chips.length - 1) frag.appendChild(doc.createTextNode(' '))
+      })
+      last = s.end
+    }
     if (last < text.length) frag.appendChild(doc.createTextNode(text.slice(last)))
     node.parentNode?.replaceChild(frag, node)
   }
@@ -293,6 +351,7 @@ export const CITATION_CHIP_CSS = `
   cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .kb-cite:hover, .kb-cite:focus-visible { background: #bae6fd; border-color: #7dd3fc; outline: none; }
+.kb-cite-ref { padding: 0 2px; margin: 0 1px 0 3px; height: 16px; vertical-align: super; font-size: 9px; line-height: 16px; }
 .kb-cite-n {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 14px; height: 14px; padding: 0 3px; border-radius: 999px;

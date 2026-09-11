@@ -122,10 +122,16 @@ CITATION_RULE = (
     "source line in square brackets, copied exactly as shown — right after "
     "the sentence or value it supports, never gathered in a list at the end. "
     "When you restate or reorganize a statement that already carries a "
-    "citation, keep the citation with it. If your output is JSON, put the "
-    "citation inside the string value it supports. Never invent a citation, "
-    "never attach one to a claim the passage does not support, and cite "
-    "nothing for statements that come only from the document under review."
+    "citation, keep the citation with it. If your output is JSON, this rule "
+    "still applies and overrides any instruction to emit only the listed "
+    "fields' bare values: end every string value that states a rule, "
+    "requirement, threshold, or rationale drawn from a passage with the "
+    "citation, inside the string — e.g. \"rationale\": \"Prior written "
+    "approval is required for equipment purchases [OMB Uniform Guidance "
+    "(2 CFR 200) — Subpart E · p. 40]\". Add no new fields. Never invent a "
+    "citation, never attach one to a claim the passage does not support, "
+    "and cite nothing for statements that come only from the document under "
+    "review."
 )
 
 

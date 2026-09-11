@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { citationLabel, injectCitationChips, matchCitation, normalizeCitation, renderCitedMarkdown } from './CitedMarkdown'
+import { SECTION_RE, citationLabel, injectCitationChips, matchCitation, matchSectionReference, normalizeCitation, renderCitedMarkdown } from './CitedMarkdown'
 import type { WorkflowCitation } from '../../types/workflow'
 
 const UG: WorkflowCitation = {
@@ -92,6 +92,54 @@ describe('injectCitationChips', () => {
     const out = injectCitationChips('<p>[evil · p. 1]</p>', [nasty])
     expect(out).not.toContain('<img')
     expect(out).toContain('&lt;img')
+  })
+})
+
+describe('section references', () => {
+  const SEC_407: WorkflowCitation = {
+    document_title: 'Subpart E—Cost Principles', page: 40, kb_title: 'OMB Uniform Guidance (2 CFR 200)',
+    label: 'OMB Uniform Guidance (2 CFR 200) — Subpart E—Cost Principles · p. 40', chunk_id: 's407',
+    content: '§ 200.407 Prior written approval (prior approval). Under any given Federal award, the reasonableness…',
+  }
+  const MENTIONS_407: WorkflowCitation = {
+    document_title: 'Subpart C—Pre-Federal Award Requirements', page: 12, chunk_id: 'c1',
+    label: 'Subpart C—Pre-Federal Award Requirements · p. 12',
+    content: 'The recipient must request prior approvals from the Federal agency (see § 200.407 and § 200.308).',
+  }
+  const NO_TEXT: WorkflowCitation = { document_title: 'preview only', label: 'x', content_preview: '…' }
+
+  it('finds section numbers in prose, with or without a CFR prefix', () => {
+    const text = 'Prior approval is governed by 2 CFR 200.407(a) and § 200.308; amount 1240.00.'
+    expect([...text.matchAll(SECTION_RE)].map(m => [m[0], m[1]])).toEqual([
+      ['2 CFR 200.407(a)', '200.407'], ['§ 200.308', '200.308'], ['1240.00', '1240.00'],
+    ])
+  })
+
+  it('links a named section to the passage that is that section, not one that cites it', () => {
+    expect(matchSectionReference('200.407', [MENTIONS_407, SEC_407])).toBe(1)
+    expect(matchSectionReference('200.308', [MENTIONS_407, SEC_407])).toBe(0)
+    expect(matchSectionReference('200.999', [MENTIONS_407, SEC_407])).toBeNull()
+    expect(matchSectionReference('200.407', [NO_TEXT])).toBeNull()
+  })
+
+  it('adds a compact chip after the reference and keeps the reference text', () => {
+    const html = '<p>Prior approval is governed by 2 CFR 200.407(a) and § 200.308.</p>'
+    const out = injectCitationChips(html, [MENTIONS_407, SEC_407])
+    expect(out).toContain('2 CFR 200.407(a)<button type="button" class="kb-cite kb-cite-ref" data-cite="1"')
+    expect(out).toContain('§ 200.308<button type="button" class="kb-cite kb-cite-ref" data-cite="0"')
+    expect(out).toContain('<span class="kb-cite-n">2</span></button> and ')
+  })
+
+  it('does not link a number that is not a section in any passage', () => {
+    const html = '<p>Amount 1240.00 on 2025-03-14; see 45 CFR 46.101.</p>'
+    expect(injectCitationChips(html, [SEC_407])).toBe(html)
+  })
+
+  it('leaves a bracket citation alone when it already contains the section', () => {
+    const html = `<p>Rule [${SEC_407.label}] applies.</p>`
+    const out = injectCitationChips(html, [SEC_407])
+    expect(out.match(/kb-cite/g)!.length).toBe(2) // one chip (class + kb-cite-n span), no second ref chip
+    expect(out).not.toContain('kb-cite-ref')
   })
 })
 
