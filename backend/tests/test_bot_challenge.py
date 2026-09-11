@@ -139,6 +139,36 @@ def test_empty_boilerplate_input():
     assert looks_like_boilerplate_only(None) is False
 
 
+# What a plain fetch of an ecfr.gov content page returns: the search-help
+# panel and nothing else. Verbatim from a seeded 2 CFR 200 subpart source,
+# which had been indexed as exactly this one paragraph.
+ECFR_SHELL = (
+    "Navigate by entering citations or phrases (eg: 1 CFR 1.1 49 CFR 172.101 "
+    "Organization and Purpose 1/1.1 Regulation Y FAR). Choosing an item from "
+    "citations and headings will bring you directly to the content. Choosing "
+    "an item from full text search results will bring you to those results. "
+    "Pressing enter in the search box will also bring you to search results. "
+    "Background and more details are available in the Search & Navigation guide."
+)
+
+
+def test_detects_ecfr_search_help_shell():
+    # No .gov banner, so the two-family rule never fired on it; the help
+    # panel alone, on a short page with no section text, is the shell.
+    assert looks_like_boilerplate_only(ECFR_SHELL) is True
+    assert looks_like_bot_challenge(ECFR_SHELL) is False
+
+
+def test_ecfr_page_with_regulation_text_passes():
+    page = ECFR_SHELL + (
+        " § 200.414 Indirect (F&A) costs. (f) In addition to the procedures "
+        "outlined in the appendices in paragraph (e) of this section, any "
+        "non-Federal entity that does not have a current negotiated rate may "
+        "elect to charge a de minimis rate of 15% of modified total direct costs."
+    )
+    assert looks_like_boilerplate_only(page) is False
+
+
 # ---------------------------------------------------------------------------
 # Marker families: a real page carrying the .gov banner must survive
 # ---------------------------------------------------------------------------

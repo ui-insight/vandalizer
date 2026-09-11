@@ -92,7 +92,21 @@ _CHROME_MARKER_FAMILIES: dict[str, tuple[str, ...]] = {
         "enable javascript to use this site",
         "this site requires javascript",
     ),
+    # eCFR's search-help panel: the only text a plain fetch of an ecfr.gov
+    # content page gets, since the regulation itself is rendered client-side.
+    # It carries no .gov banner, so the two-family rule never fired on it and
+    # every seeded 2 CFR 200 subpart was indexed as this one paragraph.
+    "ecfr_search_help": (
+        "navigate by entering citations or phrases",
+        "choosing an item from citations and headings will bring you directly to the content",
+        "background and more details are available in the search & navigation guide",
+    ),
 }
+
+# Families that are decisive on their own: a short page made of them and
+# nothing else is a shell. A real eCFR page that includes the help panel also
+# carries the regulation text, which is long and always contains "§".
+_STANDALONE_SHELL_FAMILIES = ("ecfr_search_help",)
 
 # Flat view, kept for callers that just want to know the phrases.
 _CHROME_MARKERS = tuple(
@@ -159,9 +173,11 @@ def looks_like_boilerplate_only(text: str | None) -> bool:
     if not stripped or len(stripped) > _MAX_CHROME_TEXT_CHARS:
         return False
     lowered = stripped.lower()
-    families = sum(
-        1
-        for markers in _CHROME_MARKER_FAMILIES.values()
+    present = {
+        name
+        for name, markers in _CHROME_MARKER_FAMILIES.items()
         if any(marker in lowered for marker in markers)
-    )
-    return families >= _MIN_CHROME_FAMILIES
+    }
+    if "§" not in stripped and any(name in present for name in _STANDALONE_SHELL_FAMILIES):
+        return True
+    return len(present) >= _MIN_CHROME_FAMILIES
