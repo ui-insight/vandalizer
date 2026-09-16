@@ -28,7 +28,9 @@ from app.services.form_fill import (  # noqa: F401  (form_value_is_missing is re
     form_value_is_missing,
 )
 from app.services.kb_grounding import (
+    CITATION_RETRY_NUDGE,
     CITATION_RULE,
+    cites_any,
     GROUNDING_SECTION_LABEL,
     GROUNDING_SOURCE,
     GroundingConfigError,
@@ -439,6 +441,26 @@ def _cited_instruction(instruction: str, cited: bool) -> str:
     passages or cited statements. Last, because the rule is what the model
     must still honour after everything the author asked for."""
     return f"{instruction}\n\n{CITATION_RULE}" if cited else instruction
+
+
+def _cited_call(call, instruction: str, sources: list[dict], *, report=None) -> str:
+    """Run an LLM call that is expected to cite, once more if it did not.
+
+    ``call(instruction)`` returns the model's text. Whether a reply carries a
+    citation is a matter of instruction-following, so a grounded task shows
+    chips on one run and none on the next; a single nudged retry makes it
+    dependable at the cost of one extra call, only when the first reply
+    cited nothing at all. The retry's reply is kept even if it still does
+    not cite — the unmatched/uncited warning then says so.
+    """
+    text = call(instruction)
+    if sources and isinstance(text, str) and text.strip() and not cites_any(text, sources):
+        if report:
+            report("Reply cited no passage — asking once more for citations…")
+        again = call(f"{instruction}\n\n{CITATION_RETRY_NUDGE}")
+        if isinstance(again, str) and again.strip():
+            text = again
+    return text
 
 
 def _attach_grounding(
@@ -1010,11 +1032,16 @@ class PromptNode(Node):
         # step's output that must stay attached to what they support.
         upstream = _upstream_sources(inputs, sources)
         cited = bool(grounding is not None and grounding.text) or bool(upstream)
+        citable = (grounding.sources if grounding is not None else []) + upstream
 
-        chat_response = llm_chat_model(
-            model=self.model, prompt=_cited_instruction(prompt, cited), data=context,
-            include_next_step=False, system_config_doc=self._sys_cfg,
-            usage_acc=self._usage_acc,
+        chat_response = _cited_call(
+            lambda instruction: llm_chat_model(
+                model=self.model, prompt=instruction, data=context,
+                include_next_step=False, system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
+            ),
+            _cited_instruction(prompt, cited), citable if cited else [],
+            report=self.report_progress,
         )
 
         return _attach_grounding(
@@ -1050,10 +1077,15 @@ class FormatNode(Node):
         )
         upstream = _upstream_sources(inputs, sources)
         cited = bool(grounding is not None and grounding.text) or bool(upstream)
+        citable = (grounding.sources if grounding is not None else []) + upstream
 
-        _, output = format_model(
-            self.model, _cited_instruction(formatting_prompt, cited), text,
-            system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+        output = _cited_call(
+            lambda instruction: format_model(
+                self.model, instruction, text,
+                system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
+            )[1],
+            _cited_instruction(formatting_prompt, cited), citable if cited else [],
+            report=self.report_progress,
         )
         return _attach_grounding(
             {"output": output, "input": formatting_prompt, "step_name": self.name}, grounding,

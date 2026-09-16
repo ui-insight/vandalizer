@@ -738,6 +738,33 @@ def looks_like_citation(text: str) -> bool:
             or bool(_PAGE_RE.search(t)) or bool(_PAGE_WORD_RE.search(t)))
 
 
+def cites_any(text: str, sources: list[dict]) -> bool:
+    """Whether ``text`` carries at least one citation that resolves to a
+    retrieved passage: a bracketed source line, or a regulation section
+    number a passage literally contains (what the run UI links)."""
+    if not text or not sources:
+        return False
+    for m in _CITATION_RE.finditer(text):
+        for part in re.split(r"\s*;\s*", m.group(1)):
+            if looks_like_citation(part) and part.strip() not in unmatched_citations(f"[{part}]", sources):
+                return True
+    contents = [str(s.get("content") or "") for s in sources if isinstance(s, dict)]
+    for m in re.finditer(r"\b(\d{2,4}\.\d{1,4})\b", text):
+        sec = re.escape(m.group(1))
+        if any(re.search(rf"(?:§\s*|\b){sec}(?!\d)", c) for c in contents):
+            return True
+    return False
+
+
+CITATION_RETRY_NUDGE = (
+    "Your previous reply used the knowledge-base passages but did not cite "
+    "them. Reply again with the same content and, after every statement or "
+    "value that rests on a passage, its source line in square brackets "
+    "exactly as shown above the passage — inside the string value when the "
+    "output is JSON."
+)
+
+
 def unmatched_citations(text: str, sources: list[dict]) -> list[str]:
     """Citation-shaped brackets in ``text`` that name no retrieved passage.
 

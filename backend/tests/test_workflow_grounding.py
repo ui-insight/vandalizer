@@ -408,6 +408,37 @@ class TestInlineCitations:
         result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
         assert "warning" not in result
 
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_an_uncited_reply_is_asked_once_more(self, mock_dm_cls, mock_llm):
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.side_effect = [
+            "Cost share is 20%.",
+            "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12].",
+        ]
+        result = PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert mock_llm.call_count == 2
+        assert "cited no passage" not in str(result.get("warning"))
+        assert "did not cite them" in mock_llm.call_args_list[1].kwargs["prompt"]
+        assert result["output"].endswith("· p. 12].")
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_a_cited_reply_is_not_retried(self, mock_dm_cls, mock_llm):
+        mock_dm_cls.return_value = _grounding_dm([_grounding_chunk()])
+        mock_llm.return_value = "Cost share is 20% [OMB Uniform Guidance — Subpart C · p. 12]."
+        PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert mock_llm.call_count == 1
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_a_section_number_counts_as_a_citation(self, mock_dm_cls, mock_llm):
+        chunk = _grounding_chunk("§ 200.306 Cost sharing or matching. (a) Under Federal research proposals…")
+        mock_dm_cls.return_value = _grounding_dm([chunk])
+        mock_llm.return_value = '{"rationale": "Voluntary committed cost share is not expected under 2 CFR 200.306."}'
+        PromptNode(dict(GROUNDED_PROMPT)).process({"output": ["u"], "step_name": "Document"})
+        assert mock_llm.call_count == 1
+
     @patch("app.services.workflow_engine.format_model")
     def test_formatter_keeps_citations_from_its_input(self, mock_format):
         mock_format.return_value = ("prompt", "formatted")
