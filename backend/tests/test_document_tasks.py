@@ -868,6 +868,58 @@ class TestPerformSemanticIngestion:
         assert final_update["chromadb_ready"] is False
         assert "embedding service down" in final_update["ingest_error"]
 
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.config.Settings")
+    @patch("app.tasks.document_tasks.get_sync_db")
+    def test_re_ingesting_a_project_document_refreshes_the_project_kb(
+        self, mock_get_db, MockSettings, MockDM, recalc,
+    ):
+        """End to end on the retry path: retry-extraction re-dispatches the
+        chain, and the mirror at the end of this task must replace the
+        project's chunks, not skip them because a row exists."""
+        from app.tasks.document_tasks import perform_semantic_ingestion
+        from app.utils import kb_source_currency as currency
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {
+            "uuid": "doc-1", "title": "Report.pdf", "path": "uploads/report.pdf",
+            "folder": "proj-root", "text_markers": [],
+        }
+        # proj-root is itself the project root.
+        db.smart_folder.find_one.return_value = {"parent_id": "0"}
+        db.project.find_one.return_value = {"uuid": "p1", "kb_uuid": "kb1"}
+        db.knowledge_base_sources.find_one.return_value = {
+            "_id": ObjectId(),
+            "status": "ready",
+            "chunk_count": 3,
+            "content_hash": currency.content_fingerprint("the first, bad extraction"),
+        }
+
+        MockSettings.return_value = MagicMock(chromadb_persist_dir="/data/chroma")
+        dm = MagicMock()
+        dm.add_document.return_value = 5
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 6
+        MockDM.return_value = dm
+
+        result = perform_semantic_ingestion(
+            raw_text="the re-extracted text", document_uuid="doc-1", user_id="user1",
+        )
+
+        assert result == "doc-1"
+        dm.delete_kb_source.assert_called_once_with("kb1", "doc-1")
+        dm.add_to_kb.assert_called_once()
+        assert dm.add_to_kb.call_args.kwargs["raw_text"] == "the re-extracted text"
+        written = db.knowledge_base_sources.update_one.call_args[0][1]["$set"]
+        assert written["chunk_count"] == 6
+        assert written["status"] == "ready"
+        assert written["content_hash"] == currency.content_fingerprint(
+            "the re-extracted text"
+        )
+        recalc.assert_called_once_with(db, "kb1")
+
 
 # ---------------------------------------------------------------------------
 # Project KB membership sync (move into / out of a Project's folder tree)
@@ -975,6 +1027,376 @@ class TestSyncProjectKbOnMove:
         inc = db.knowledge_bases.update_one.call_args[0][1]["$inc"]
         assert inc["total_chunks"] == -3
         assert inc["total_sources"] == -1
+
+
+def _mirror_row(**overrides):
+    """A ``knowledge_base_sources`` row for a document already mirrored into
+    a project KB. Defaults describe a healthy, current row; override to
+    describe a stale, legacy or errored one."""
+    row = {
+        "_id": ObjectId(),
+        "uuid": "src-1",
+        "knowledge_base_uuid": "kb1",
+        "source_type": "document",
+        "document_uuid": "doc-1",
+        "status": "ready",
+        "error_message": None,
+        "chunk_count": 4,
+    }
+    row.update(overrides)
+    return row
+
+
+def _project_doc(text="Performance Date & Time: 4.29.26"):
+    """A smart_document living directly under a project's root folder."""
+    return {
+        "uuid": "doc-1",
+        "folder": "proj-root",
+        "title": "Composer-Performer Agreement",
+        "raw_text": text,
+        "text_markers": [],
+    }
+
+
+_PROJECT = {"uuid": "p1", "kb_uuid": "kb1"}
+
+
+class TestProjectKbMirrorRefresh:
+    """A document already in a project KB must be re-chunked when its text
+    changed, and left completely alone when it did not (#887 follow-up)."""
+
+    def test_unchanged_text_is_not_re_embedded(self):
+        """The gate that keeps a file move — or a forty-file folder move —
+        from re-embedding a subtree nobody edited."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = _mirror_row(
+            content_hash=currency.content_fingerprint(text),
+        )
+        dm = MagicMock()
+
+        _mirror_into_project_kb(db, dm, _project_doc(text), _PROJECT, text)
+
+        dm.delete_kb_source.assert_not_called()
+        dm.add_to_kb.assert_not_called()
+        db.knowledge_base_sources.update_one.assert_not_called()
+        db.knowledge_base_sources.insert_one.assert_not_called()
+        db.knowledge_bases.update_one.assert_not_called()
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_re_extracted_text_replaces_the_old_chunks(self, recalc):
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        new_text = "Performance Date & Time: 29 April 2026, 7:30pm"
+        row = _mirror_row(
+            content_hash=currency.content_fingerprint("the first, bad extraction"),
+        )
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = row
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 7
+
+        _mirror_into_project_kb(db, dm, _project_doc(new_text), _PROJECT, new_text)
+
+        # Chunks are keyed by document_uuid in a project KB, not by the row's uuid.
+        dm.delete_kb_source.assert_called_once_with("kb1", "doc-1")
+        # Order matters: deleting after the add would wipe the new chunks too.
+        assert [c[0] for c in dm.mock_calls[:2]] == ["delete_kb_source", "add_to_kb"]
+        assert dm.add_to_kb.call_args.kwargs["raw_text"] == new_text
+        assert dm.add_to_kb.call_args.kwargs["source_id"] == "doc-1"
+
+        db.knowledge_base_sources.insert_one.assert_not_called()
+        where, update = db.knowledge_base_sources.update_one.call_args[0]
+        assert where == {"_id": row["_id"]}
+        written = update["$set"]
+        assert written["chunk_count"] == 7
+        assert written["status"] == "ready"
+        assert written["error_message"] is None
+        assert written["document_title"] == "Composer-Performer Agreement"
+        assert written["content_hash"] == currency.content_fingerprint(new_text)
+        assert written["last_ingested_at"] is not None
+        assert written["last_retrieved_at"] is not None
+
+        # Recomputed from the rows, never incremented: this row was already
+        # counted when it was inserted, and its old chunk_count is the number
+        # the new one replaces.
+        recalc.assert_called_once_with(db, "kb1")
+        db.knowledge_bases.update_one.assert_not_called()
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_a_row_with_no_fingerprint_refreshes_once(self, recalc):
+        """Rows the mirror wrote before this change carry no ``content_hash``.
+        They are stale by definition, refresh on the next pass, and the stamp
+        written then settles them — no migration."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = _mirror_row()  # legacy: no hash
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 4
+
+        _mirror_into_project_kb(db, dm, _project_doc(text), _PROJECT, text)
+
+        dm.delete_kb_source.assert_called_once_with("kb1", "doc-1")
+        dm.add_to_kb.assert_called_once()
+        written = db.knowledge_base_sources.update_one.call_args[0][1]["$set"]
+        assert written["content_hash"] == currency.content_fingerprint(text)
+        recalc.assert_called_once_with(db, "kb1")
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_an_errored_row_refreshes_even_when_the_text_matches(self, recalc):
+        """A matching hash on a row that never finished indexing is not
+        evidence the chunks are there."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = _mirror_row(
+            status="error",
+            error_message="chroma collection gone",
+            content_hash=currency.content_fingerprint(text),
+        )
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 4
+
+        _mirror_into_project_kb(db, dm, _project_doc(text), _PROJECT, text)
+
+        dm.add_to_kb.assert_called_once()
+        written = db.knowledge_base_sources.update_one.call_args[0][1]["$set"]
+        assert written["status"] == "ready"
+        assert written["error_message"] is None
+        recalc.assert_called_once_with(db, "kb1")
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_a_row_claiming_zero_chunks_refreshes(self, recalc):
+        """``ready`` with nothing indexed is the shape an empty add leaves
+        behind; the hash alone must not certify it."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = _mirror_row(
+            chunk_count=0, content_hash=currency.content_fingerprint(text),
+        )
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 4
+
+        _mirror_into_project_kb(db, dm, _project_doc(text), _PROJECT, text)
+
+        dm.add_to_kb.assert_called_once()
+        recalc.assert_called_once_with(db, "kb1")
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_moving_a_document_whose_text_is_unchanged_costs_nothing(
+        self, MockDM, MockSettings, mock_get_db,
+    ):
+        """sync_project_kb_on_move and sync_project_kb_on_folder_move both
+        come through the mirror for every document they touch. Re-embedding a
+        subtree whose text nobody edited is a real bill for no change in what
+        retrieval returns."""
+        from app.tasks.document_tasks import sync_project_kb_on_move
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = _project_doc(text)
+        # proj-root is itself the project root; the old folder is the same tree.
+        db.smart_folder.find_one.return_value = {"parent_id": "0"}
+        db.project.find_one.return_value = dict(_PROJECT)
+        db.knowledge_base_sources.find_one.return_value = _mirror_row(
+            content_hash=currency.content_fingerprint(text),
+        )
+
+        dm = MagicMock()
+        MockDM.return_value = dm
+        MockSettings.return_value = MagicMock()
+
+        assert sync_project_kb_on_move("doc-1", "proj-root") == "doc-1"
+
+        dm.delete_kb_source.assert_not_called()
+        dm.add_to_kb.assert_not_called()
+        db.knowledge_base_sources.update_one.assert_not_called()
+        db.knowledge_base_sources.insert_one.assert_not_called()
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_moving_a_document_with_no_real_text_touches_nothing(
+        self, MockDM, MockSettings, mock_get_db,
+    ):
+        """The move tasks guard on there being text to index, the way
+        perform_semantic_ingestion does. Whitespace-only raw_text passed that
+        guard when it read ``if text:``, and the row it wrote — ready, zero
+        chunks — fails the currency gate, so every later move deleted, re-added
+        nothing and recomputed the KB again."""
+        from app.tasks.document_tasks import sync_project_kb_on_move
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = _project_doc("   \n\t ")
+        db.smart_folder.find_one.return_value = {"parent_id": "0"}
+        db.project.find_one.return_value = dict(_PROJECT)
+        db.knowledge_base_sources.find_one.return_value = _mirror_row(chunk_count=0)
+
+        dm = MagicMock()
+        MockDM.return_value = dm
+        MockSettings.return_value = MagicMock()
+
+        assert sync_project_kb_on_move("doc-1", "proj-root") == "doc-1"
+
+        dm.delete_kb_source.assert_not_called()
+        dm.add_to_kb.assert_not_called()
+        db.knowledge_base_sources.update_one.assert_not_called()
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_no_existing_row_stamps_the_fingerprint_on_insert(self, recalc):
+        """The ruling amending this task's brief: the insert branch is
+        otherwise unchanged, but it now writes an ingestion stamp too, so a
+        document moved again with unchanged text is a no-op instead of a
+        one-time re-embed the very first time the mirror sees it."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        text = "Performance Date & Time: 4.29.26"
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = None
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 5
+
+        _mirror_into_project_kb(db, dm, _project_doc(text), _PROJECT, text)
+
+        dm.delete_kb_source.assert_not_called()
+        db.knowledge_base_sources.insert_one.assert_called_once()
+        inserted = db.knowledge_base_sources.insert_one.call_args[0][0]
+        assert inserted["content_hash"] == currency.content_fingerprint(text)
+        assert inserted["status"] == "ready"
+
+        inc = db.knowledge_bases.update_one.call_args[0][1]["$inc"]
+        assert inc["total_sources"] == 1
+        recalc.assert_not_called()
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_a_refresh_that_fails_after_the_delete_marks_the_row(self, recalc):
+        """The delete has already happened by the time add_to_kb can raise, so
+        a row left at status "ready" with its old chunk_count describes chunks
+        that are gone: the project card counts the document as indexed and
+        retrieval finds nothing of it."""
+        from app.tasks.document_tasks import _mirror_into_project_kb
+        from app.utils import kb_source_currency as currency
+
+        new_text = "Performance Date & Time: 29 April 2026, 7:30pm"
+        row = _mirror_row(
+            content_hash=currency.content_fingerprint("the first, bad extraction"),
+        )
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = row
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.side_effect = RuntimeError("chroma collection gone")
+
+        with pytest.raises(RuntimeError, match="chroma collection gone"):
+            _mirror_into_project_kb(db, dm, _project_doc(new_text), _PROJECT, new_text)
+
+        dm.delete_kb_source.assert_called_once_with("kb1", "doc-1")
+        where, update = db.knowledge_base_sources.update_one.call_args[0]
+        assert where == {"_id": row["_id"]}
+        written = update["$set"]
+        assert written["status"] == "error"
+        assert "chroma collection gone" in written["error_message"]
+        # The chunks this row counted were deleted a moment ago, and
+        # _recalculate_kb sums chunk_count over every row whatever its status:
+        # leaving the old number would keep the KB advertising chunks that are
+        # gone. Nothing stamps the new fingerprint either.
+        assert written["chunk_count"] == 0
+        assert "content_hash" not in written
+        # The KB's sources_ready must not keep counting this one.
+        recalc.assert_called_once_with(db, "kb1")
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_a_delete_that_failed_stops_the_refresh(self, recalc):
+        """delete_kb_source logs and swallows, so its return value is the only
+        evidence the old chunks are gone. Carrying on regardless would be the
+        worst outcome available: add_to_kb writes the same deterministic ids
+        with collection.add, which skips ids that already exist, so the first
+        extraction's text would survive under a row stamped ready with the new
+        text's fingerprint — and the gate would certify it as current forever."""
+        from app.tasks.document_tasks import (
+            ProjectKbDeleteFailed,
+            _mirror_into_project_kb,
+        )
+        from app.utils import kb_source_currency as currency
+
+        new_text = "Performance Date & Time: 29 April 2026, 7:30pm"
+        row = _mirror_row(
+            content_hash=currency.content_fingerprint("the first, bad extraction"),
+        )
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = row
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = False
+
+        # Its own type, because the state it leaves is the opposite of the
+        # one a failed re-add leaves: the old chunks are still answering.
+        with pytest.raises(ProjectKbDeleteFailed, match="could not remove the previous chunks"):
+            _mirror_into_project_kb(db, dm, _project_doc(new_text), _PROJECT, new_text)
+
+        dm.add_to_kb.assert_not_called()
+        written = db.knowledge_base_sources.update_one.call_args[0][1]["$set"]
+        assert written["status"] == "error"
+        assert "could not remove the previous chunks" in written["error_message"]
+        assert written["chunk_count"] == 0
+        assert "content_hash" not in written
+        recalc.assert_called_once_with(db, "kb1")
+
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    def test_a_failure_after_the_add_is_still_a_refresh_failure(self, recalc):
+        """The chunks are replaced by the time the row write and the recount
+        run, so a failure there leaves the same half-done state as a failure
+        before them — and used to escape unwrapped, belling the owner the
+        insert branch's "was saved, but could not be added"."""
+        from app.tasks.document_tasks import (
+            ProjectKbRefreshFailed,
+            _mirror_into_project_kb,
+        )
+        from app.utils import kb_source_currency as currency
+
+        new_text = "Performance Date & Time: 29 April 2026, 7:30pm"
+        row = _mirror_row(
+            content_hash=currency.content_fingerprint("the first, bad extraction"),
+        )
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = row
+        # The success write raises; the error write that follows it lands.
+        db.knowledge_base_sources.update_one.side_effect = [
+            RuntimeError("mongo write concern failed"), None,
+        ]
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.return_value = 7
+
+        with pytest.raises(ProjectKbRefreshFailed, match="mongo write concern failed"):
+            _mirror_into_project_kb(db, dm, _project_doc(new_text), _PROJECT, new_text)
+
+        written = db.knowledge_base_sources.update_one.call_args[0][1]["$set"]
+        assert written["status"] == "error"
+        assert written["chunk_count"] == 0
+        assert "mongo write concern failed" in written["error_message"]
+        recalc.assert_called_once_with(db, "kb1")
 
 
 # ---------------------------------------------------------------------------

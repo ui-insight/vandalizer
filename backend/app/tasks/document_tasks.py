@@ -14,6 +14,7 @@ from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError
 from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
+from app.utils import kb_source_currency as currency
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,28 @@ def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
         cursor = folder.get("parent_id")
 
     return db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
+
+
+class ProjectKbRefreshFailed(RuntimeError):
+    """A mirror that failed on the refresh branch rather than the insert one.
+
+    What it carries is which of three states the project KB was left in, since
+    the bell has to say a different thing for each: an insert failure means a
+    file the user just added never got in; this one means the previously
+    indexed chunks were deleted and their replacement did not land, so the
+    project can no longer answer from the document at all. Wraps the underlying
+    error and keeps its message, so the cause snippet in the body is unchanged.
+    """
+
+
+class ProjectKbDeleteFailed(ProjectKbRefreshFailed):
+    """The third state: the delete itself failed, so nothing was removed.
+
+    The opposite of its parent, and the reason the two cannot share wording —
+    the project still answers from the superseded extraction, and telling the
+    owner their document has gone from the project would send them looking for
+    the wrong problem.
+    """
 
 
 def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
@@ -69,26 +92,141 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
         )
         from app.services.failure_notifications import notify_project_kb_sync_failed
 
-        notify_project_kb_sync_failed(db, doc=doc, project=project, error=e)
+        if isinstance(e, ProjectKbDeleteFailed):
+            failed_at = "delete"
+        elif isinstance(e, ProjectKbRefreshFailed):
+            failed_at = "replace"
+        else:
+            failed_at = "insert"
+        notify_project_kb_sync_failed(
+            db, doc=doc, project=project, error=e, failed_at=failed_at,
+        )
         return False
+
+
+def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
+    """The one place that calls ``dm.add_to_kb`` for a project-KB document.
+
+    Both the insert branch and the refresh branch of ``_mirror_into_project_kb``
+    need the identical five kwargs; factored out so they cannot drift apart.
+    """
+    return dm.add_to_kb(
+        kb_uuid=kb_uuid,
+        source_id=doc["uuid"],
+        source_name=doc.get("title", ""),
+        raw_text=text,
+        text_markers=doc.get("text_markers") or [],
+    )
 
 
 def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None:
     kb_uuid = project["kb_uuid"]
     doc_uuid = doc["uuid"]
-    # Dedupe — never add the same document to a project KB twice.
-    if db.knowledge_base_sources.find_one(
+    existing = db.knowledge_base_sources.find_one(
         {"knowledge_base_uuid": kb_uuid, "document_uuid": doc_uuid}
-    ):
+    )
+    if existing:
+        # A row proves membership, not currency. It used to answer both
+        # questions, so a successful re-extraction replaced the document's own
+        # chunks and left the project's alone — "chat with this project" went
+        # on quoting whatever the first extraction read (#887 review).
+        #
+        # The hash is what keeps the two move tasks cheap: sync_project_kb_on_move
+        # and sync_project_kb_on_folder_move come through here for every document
+        # they touch, and re-embedding a forty-file subtree nobody edited is a
+        # real bill for no change in what retrieval returns.
+        #
+        # ``status`` and ``chunk_count`` are part of the gate because a matching
+        # hash on a row that never finished indexing is not evidence the chunks
+        # are there. ``or 0`` because a row may carry an explicit None.
+        if (
+            existing.get("content_hash") == currency.content_fingerprint(text)
+            and existing.get("status") == "ready"
+            and (existing.get("chunk_count") or 0) > 0
+        ):
+            return
+
+        # Chunk ids are deterministic (``<document_uuid>_chunk_<i>``), so a
+        # shorter second extraction would leave the tail of the first one behind
+        # for retrieval to find. The delete is what makes the replacement total
+        # — and it is why the whole block needs a guard: from the delete to the
+        # recount, every step leaves a row whose "ready" and chunk_count
+        # describe chunks that are no longer what the document says.
+        #
+        # delete_kb_source logs and swallows its own exceptions, so its return
+        # value is the only evidence the old chunks are gone. Re-adding over a
+        # delete that failed is the worst outcome available: add_to_kb writes
+        # the same deterministic ids with ``collection.add``, which skips ids
+        # that already exist, so the first extraction's text would survive
+        # under a row stamped ready with the new text's fingerprint — and the
+        # gate above would certify that row as current from then on.
+        from app.tasks.knowledge_base_tasks import _recalculate_kb
+
+        try:
+            if not dm.delete_kb_source(kb_uuid, doc_uuid):
+                raise ProjectKbDeleteFailed(
+                    f"could not remove the previous chunks for {doc_uuid} from {kb_uuid}"
+                )
+            chunk_count = _add_document_chunks_to_kb(dm, kb_uuid, doc, text)
+            db.knowledge_base_sources.update_one(
+                {"_id": existing["_id"]},
+                {
+                    "$set": {
+                        "chunk_count": chunk_count,
+                        "status": "ready",
+                        "error_message": None,
+                        # Kept so the row still has a name if the document is
+                        # later deleted from Files — the chunks outlive it.
+                        "document_title": doc.get("title") or None,
+                        # The document was just re-read, so the retrieval dates
+                        # move with the ingestion one.
+                        **currency.ingestion_stamp(text),
+                    }
+                },
+            )
+            # Recomputed from the rows, not incremented: this row was already
+            # counted toward total_sources when it was inserted, and its old
+            # chunk_count is the number the new one replaces. An $inc here
+            # would double-count the source on every retry.
+            _recalculate_kb(db, kb_uuid)
+        except Exception as e:
+            db.knowledge_base_sources.update_one(
+                {"_id": existing["_id"]},
+                # chunk_count 0, not the old number: _recalculate_kb sums it
+                # over every row whatever the status, so leaving it would keep
+                # the KB advertising chunks that are gone. On the delete-failure
+                # path they may still be there, but the row is errored and the
+                # next pass replaces them — under-counting an errored row is the
+                # honest side to err on.
+                {"$set": {
+                    "status": "error",
+                    "error_message": str(e)[:2000],
+                    "chunk_count": 0,
+                }},
+            )
+            try:
+                _recalculate_kb(db, kb_uuid)
+            except Exception:
+                # The row is already written and the bell is what matters from
+                # here; a recount that fails too must not be the thing that
+                # decides which failure the owner is told about.
+                logger.exception(
+                    "Failed to recompute project KB %s after a failed refresh", kb_uuid,
+                )
+            # _ingest_into_project_kb is the one catch: it logs and bells the
+            # project owner. Same contract the insert branch has always had,
+            # with the one thing that branch cannot say — which of the two
+            # half-done states this document is in.
+            if isinstance(e, ProjectKbRefreshFailed):
+                raise
+            raise ProjectKbRefreshFailed(str(e)) from e
+        logger.info(
+            "Refreshed document %s in project %s implicit KB (%d chunks)",
+            doc_uuid, project.get("uuid"), chunk_count,
+        )
         return
 
-    chunk_count = dm.add_to_kb(
-        kb_uuid=kb_uuid,
-        source_id=doc_uuid,
-        source_name=doc.get("title", ""),
-        raw_text=text,
-        text_markers=doc.get("text_markers") or [],
-    )
+    chunk_count = _add_document_chunks_to_kb(dm, kb_uuid, doc, text)
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     db.knowledge_base_sources.insert_one({
@@ -109,6 +247,10 @@ def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None
         "crawled_urls": None,
         "created_at": now,
         "processed_at": now,
+        # Stamped from the start so a later move of an unchanged document is
+        # a no-op instead of a one-time re-embed the first time the refresh
+        # gate above sees this row.
+        **currency.ingestion_stamp(text, now=now),
     })
     db.knowledge_bases.update_one(
         {"uuid": kb_uuid},
@@ -199,12 +341,13 @@ def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | Non
                 "Failed to remove %s from old project KB on move", document_uuid
             )
 
-    # Add to the new project's KB. _ingest_into_project_kb dedupes, so a no-op
-    # move (same project) is harmless. Requires extracted text — a doc still being
-    # processed will be mirrored by perform_semantic_ingestion when it finishes.
+    # Add to the new project's KB. _ingest_into_project_kb no-ops when the text
+    # is unchanged and refreshes when it changed, so a same-project move is
+    # harmless either way. Requires extracted text — a doc still being processed
+    # will be mirrored by perform_semantic_ingestion when it finishes.
     if new_project:
         text = doc.get("raw_text", "") or ""
-        if text:
+        if text.strip():
             try:
                 _ingest_into_project_kb(db, dm, doc, text)
             except Exception:
@@ -260,7 +403,7 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
                 )
         if new_project:
             text = doc.get("raw_text", "") or ""
-            if text:
+            if text.strip():
                 try:
                     # Counted only on success: a Chroma outage mirroring zero
                     # of 40 documents must not log "re-synced 40".

@@ -582,13 +582,22 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Error deleting KB collection {collection_name}: {e}")
 
-    def delete_kb_source(self, kb_uuid: str, source_id: str) -> None:
-        """Remove all chunks for a single source from a KB collection."""
+    def delete_kb_source(self, kb_uuid: str, source_id: str) -> bool:
+        """Remove all chunks for a single source from a KB collection.
+
+        Returns True when the delete ran, False when it raised. The failure is
+        still logged and still swallowed, so callers wanting best effort can go
+        on ignoring the answer; a caller that re-adds the same source
+        afterwards cannot, because add_to_kb writes the same deterministic ids
+        and Chroma's ``add`` skips ids that already exist.
+        """
         try:
             collection = self.get_kb_collection(kb_uuid)
             collection.delete(where={"source_id": source_id})
+            return True
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
+            return False
 
     def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
         """Rewrite source_name on every chunk for this source.
