@@ -41,6 +41,13 @@ class SmartDocument(Document):
     # None = not measured (legacy docs, or docs whose text bypassed extraction).
     extraction_nonletter_ratio: Optional[float] = None
 
+    # A non-OCR reading of this file was refused as unreadable. Any forced
+    # re-read must use OCR. Set by the retry route when it dispatches an
+    # OCR-required retry and by the extraction task when the reader refuses
+    # the layer; never cleared, because it describes the file, not the
+    # extraction.
+    text_layer_rejected: bool = False
+
     # Ingestion warnings — machine-readable codes for the ways an extraction can
     # succeed and still not be the whole document. Emptiness and garbling are
     # already covered (task_status="error" and the ratio above); these are the

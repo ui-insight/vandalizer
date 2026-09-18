@@ -49,6 +49,8 @@ def _make_document(
     task_status="complete",
     processing=False,
     extraction_nonletter_ratio=None,
+    text_layer_rejected=False,
+    extension="pdf",
     updated_at=None,
 ):
     doc = MagicMock()
@@ -69,6 +71,8 @@ def _make_document(
     doc.task_status = task_status
     doc.processing = processing
     doc.extraction_nonletter_ratio = extraction_nonletter_ratio
+    doc.text_layer_rejected = text_layer_rejected
+    doc.extension = extension
     doc.updated_at = datetime.now() if updated_at is None else updated_at
     doc.created_at = doc.updated_at
     doc.save = AsyncMock()
@@ -428,7 +432,6 @@ class TestRetryExtractionRoute:
 
     async def _post(self, client, doc):
         user = _make_user("owner1")
-        doc.extension = "pdf"
         doc.path = "uploads/doc-1.pdf"
         cookies, headers = _auth("owner1")
 
@@ -456,6 +459,9 @@ class TestRetryExtractionRoute:
         assert resp.json() == {"uuid": "doc-1", "task_id": "task-id-123", "status": "extracting"}
         mock_dispatch.assert_called_once()
         assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        # An errored document has no stored text to re-store, so the reader's
+        # outage fallback is still the right answer for it.
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is False
         doc.save.assert_awaited_once()
         mock_log_event.assert_awaited_once()
 
@@ -472,6 +478,69 @@ class TestRetryExtractionRoute:
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        # And this is the one retry that may not fall back: the local reading
+        # of these pages is the text being replaced.
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is True
+
+    @pytest.mark.asyncio
+    async def test_the_refusal_is_recorded_on_the_document(self, client):
+        """The ratio that proves the stored text was garbage is cleared by
+        this very dispatch, and every error write clears it too — so if the
+        OCR-required run fails, the next click would read a document with
+        nothing left to justify requiring OCR and would happily re-store the
+        mojibake. The refusal is written down instead."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="complete", extraction_nonletter_ratio=0.95,
+        )
+        resp, _, _ = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert doc.text_layer_rejected is True
+        doc.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_a_previously_refused_layer_still_requires_ocr(self, client):
+        """The second click of the loop: the first OCR-required retry failed,
+        so the document is in the error state with its ratio nulled. Without
+        the remembered refusal this is an ordinary errored document and the
+        re-read may fall back to the very text layer that was refused."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="error", extraction_nonletter_ratio=None,
+            text_layer_rejected=True,
+        )
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is True
+        assert mock_log_event.call_args.kwargs["detail"] == {
+            "force_ocr": True,
+            "ocr_required": True,
+            "previous_task_status": "error",
+        }
+
+    @pytest.mark.asyncio
+    async def test_a_low_quality_non_pdf_carries_neither_flag(self, client):
+        """Both flags are PDF-only: the extraction task forwards them to the
+        PDF reader and nowhere else, so setting them for a DOCX would record
+        an OCR requirement in the audit log that nothing ever applied."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1", extension="docx",
+            task_status="error", extraction_nonletter_ratio=0.95,
+        )
+        resp, mock_dispatch, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is False
+        assert mock_log_event.call_args.kwargs["detail"] == {
+            "force_ocr": False,
+            "ocr_required": False,
+            "previous_task_status": "error",
+        }
+        assert doc.text_layer_rejected is False
 
     @pytest.mark.asyncio
     async def test_healthy_document_is_re_read_the_ordinary_way(self, client):
@@ -483,6 +552,7 @@ class TestRetryExtractionRoute:
 
         assert resp.status_code == 200
         assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is False
 
     @pytest.mark.asyncio
     async def test_document_already_processing_is_rejected(self, client):
@@ -558,4 +628,39 @@ class TestRetryExtractionRoute:
 
         assert resp.status_code == 200
         detail = mock_log_event.call_args.kwargs["detail"]
-        assert detail == {"force_ocr": True, "previous_task_status": "error"}
+        assert detail == {
+            "force_ocr": True,
+            "ocr_required": False,
+            "previous_task_status": "error",
+        }
+
+    @pytest.mark.asyncio
+    async def test_audit_detail_separates_the_two_reasons_for_ocr(self, client):
+        """Both flags are recorded because they answer different questions
+        after the fact: whether the retry spent an OCR round-trip, and
+        whether it was allowed to finish without one."""
+        doc = _make_document(
+            doc_uuid="doc-1", user_id="owner1",
+            task_status="complete", extraction_nonletter_ratio=0.95,
+        )
+        resp, _, mock_log_event = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        detail = mock_log_event.call_args.kwargs["detail"]
+        assert detail == {
+            "force_ocr": True,
+            "ocr_required": True,
+            "previous_task_status": "complete",
+        }
+
+
+class TestTextLayerRejectedField:
+    """The bit the retry route reads and writes is on the document, not on
+    the extraction, so it has to outlive every error write."""
+
+    def test_defaults_to_false(self):
+        """Documents stored before the field existed read as False, so no
+        migration is needed and no existing document starts requiring OCR."""
+        from app.models.document import SmartDocument
+
+        assert SmartDocument.model_fields["text_layer_rejected"].default is False

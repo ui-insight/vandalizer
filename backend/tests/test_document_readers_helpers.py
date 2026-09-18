@@ -576,6 +576,9 @@ class TestGarbledTextLayerGate:
         assert result == ("", [])
         mock_pymupdf.assert_not_called()
         assert report["text_layer_rejected"] is True
+        # Which half of the gate fired: the classifier's verdict is what the
+        # task's "its fonts don't map to characters" message rests on.
+        assert report["text_layer_rejected_reason"] == "classifier"
         assert "partial" not in report
         assert "errors" not in report
 
@@ -717,10 +720,12 @@ class TestGarbledTextLayerGate:
                 dr.extract_text_with_markers(text_pdf, "pdf")
 
     def test_forced_reread_during_an_outage_uses_the_local_fast_path(self, text_pdf):
-        """A forced re-read asked for OCR first, not OCR only. The retry route
-        has already cleared the document's stored text, so raising here would
-        leave it empty until the outage ends; a confidently text-based file's
-        local Markdown is the right answer instead."""
+        """A *plain* forced re-read — a retry of a document in the error
+        state, or the bulk re-OCR script — asked for OCR first, not OCR only.
+        The retry route has already cleared the document's stored text, so
+        raising here would leave it empty until the outage ends, and there is
+        no refused text that the local Markdown would re-store. (A re-read
+        forced by low-quality text passes ocr_required and raises instead.)"""
         from unittest.mock import patch
         import app.services.document_readers as dr
         from app.services import ocr_client
@@ -734,7 +739,9 @@ class TestGarbledTextLayerGate:
                  side_effect=ocr_client.OcrUnavailableError("ocr down"),
              ), \
              patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
-            text, _ = dr.extract_text_with_markers(text_pdf, "pdf", force_ocr=True)
+            text, _ = dr.extract_text_with_markers(
+                text_pdf, "pdf", force_ocr=True, ocr_required=False,
+            )
 
         assert "research document body line" in text
         mock_pymupdf.assert_not_called()
@@ -837,6 +844,289 @@ class TestGarbledTextLayerGate:
         with patch.object(dr, "pdf_has_ocrable_content", return_value=False), \
              patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
             result = dr.extract_text_with_markers(text_pdf, "pdf", force_ocr=True)
+
+        assert result == ("", [])
+        mock_ocr.assert_not_called()
+
+    def test_forced_reread_for_a_low_quality_document_raises_during_an_outage(self, text_pdf):
+        """The #858 class of document: a confidently text-based PDF whose text
+        layer is glyph-ID mojibake. The retry was forced *because* that text
+        was refused, so the local fast path returns the very text the retry
+        exists to replace. Raising instead hands the outage to the task's
+        backoff (TRANSIENT_EXCEPTIONS), which is the deferred retry the
+        swallow silently skipped."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+        from app.services import ocr_client
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(
+                 dr, "ocr_extract_text_from_pdf",
+                 side_effect=ocr_client.OcrUnavailableError("ocr down"),
+             ), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            with pytest.raises(ocr_client.OcrUnavailableError):
+                dr.extract_text_with_markers(
+                    text_pdf, "pdf", force_ocr=True, ocr_required=True,
+                )
+
+        mock_pymupdf.assert_not_called()
+
+    def test_ocr_required_refuses_the_text_layer_when_the_conversion_came_back_empty(
+        self, text_pdf,
+    ):
+        """The outage is not the only door into the loop: OCR reachable and
+        answering with nothing usable reaches the same fast path. Under
+        ocr_required the classifier's verdict is beside the point — this PDF
+        reads as text_based and its text layer is exactly what was refused —
+        so the layer is refused and the task names the cause instead."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr("")), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            result = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert result == ("", [])
+        mock_pymupdf.assert_not_called()
+        assert report["text_layer_rejected"] is True
+        # Nothing here established a font problem — this PDF reads as
+        # text_based — so the task must not claim one.
+        assert report["text_layer_rejected_reason"] == "ocr_required"
+        assert "partial" not in report
+        assert "errors" not in report
+
+    def test_ocr_required_refuses_the_text_layer_when_the_conversion_came_back_short(
+        self, text_pdf,
+    ):
+        """The condition is "under MIN_PDF_TEXT_LENGTH", not "empty" — a
+        conversion that completed with a few words is exactly as unusable as
+        one that completed with nothing, and must be refused the same way."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(
+                 dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr("x" * 50),
+             ), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            result = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert result == ("", [])
+        mock_pymupdf.assert_not_called()
+        assert report["text_layer_rejected"] is True
+
+    def test_force_ocr_alone_with_a_completed_empty_conversion_still_falls_back(
+        self, text_pdf,
+    ):
+        """The other half of the same branch. A plain re-read — a retry of a
+        document in the error state, or the bulk re-OCR script — has no
+        rejected text to re-store, so an empty conversion still leaves the
+        local Markdown as the best reading available."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr("")), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            text, _ = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True,
+            )
+
+        assert "research document body line" in text
+        mock_pymupdf.assert_not_called()
+        assert "text_layer_rejected" not in report
+
+    def test_ocr_required_is_inert_on_a_deployment_with_no_ocr(self, text_pdf):
+        """A no-OCR deployment is a supported mode (DEPLOY.md). Nothing there
+        ever looked at the pages, so ocr_required has nothing to require and
+        must not turn every retry into an error state."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        def skipped_ocr(pdf_path, report=None):
+            if report is not None:
+                report["ocr_skipped"] = "unconfigured"
+            return ""
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=skipped_ocr), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            text, _ = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert "research document body line" in text
+        mock_pymupdf.assert_not_called()
+        assert "text_layer_rejected" not in report
+
+    def test_ocr_required_asks_ocr_first_even_without_force_ocr(self, text_pdf):
+        """ocr_required implies OCR-first. The pre-OCR fast path returns the
+        local reading without asking OCR anything, which is the one outcome
+        this flag exists to forbid, so it must not be reachable by passing
+        ocr_required on its own."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+        ocr_result = "x" * 200
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(
+                 dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr(ocr_result),
+             ) as mock_ocr, \
+             patch.object(dr, "_pymupdf_extract_with_pages"):
+            text, _ = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, ocr_required=True,
+            )
+
+        assert text == ocr_result
+        mock_ocr.assert_called_once()
+
+    def test_ocr_required_propagates_a_failure_to_even_ask_for_ocr(self, text_pdf):
+        """Everything inside the OCR retry loop is caught there, so what
+        raises out of the call is a fault before the first request — an
+        unreadable system config, a DB blip, a bad timeout value. Swallowing
+        it would hand the document back the local reading the retry exists to
+        replace; the caller said that reading is unacceptable, so the failure
+        is the task's to retry."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=ValueError("bad input")), \
+             patch.object(dr, "_local_markdown_extract_from_pdf") as mock_fast_path, \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            with pytest.raises(ValueError):
+                dr._read_pdf_text_and_markers(
+                    text_pdf, report=report, force_ocr=True, ocr_required=True,
+                )
+
+        mock_fast_path.assert_not_called()
+        mock_pymupdf.assert_not_called()
+        assert "text_layer_rejected" not in report
+
+    def test_ocr_required_keeps_the_fallback_when_the_service_rejected_the_file(
+        self, text_pdf,
+    ):
+        """The disclosed limit, pinned so a change to it is deliberate. A
+        wrong API key (401) or an oversized file (413) exhausts the attempts
+        and returns "" having never read a page — the same shape as a
+        deployment with no OCR at all, and not a verdict on the document, so
+        ocr_required has nothing to require and the fallback stands."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        classification = self._image_based_classification()
+        pymupdf_result = ("some pymupdf text", [{"char_offset": 0, "kind": "page", "value": 1}])
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=""), \
+             patch.object(dr, "_pymupdf_extract_with_pages", return_value=pymupdf_result) as mock_pymupdf:
+            result = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert result == pymupdf_result
+        mock_pymupdf.assert_called_once()
+        assert "text_layer_rejected" not in report
+
+    def test_ocr_required_accepts_a_good_conversion_normally(self, text_pdf):
+        """ocr_required only ever refuses; it must not change what a working
+        OCR round-trip returns."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        ocr_result = "x" * 200
+        classification = type(
+            "C", (), {"pdf_type": "text_based", "confidence": 0.95, "pages_needing_ocr": []},
+        )()
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", return_value=classification), \
+             patch.object(
+                 dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr(ocr_result),
+             ), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            text, _ = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert text == ocr_result
+        mock_pymupdf.assert_not_called()
+        assert "text_layer_rejected" not in report
+
+    def test_ocr_required_refuses_without_a_classification_at_all(self, text_pdf):
+        """_classify_pdf returns None when pdf-inspector is missing or throws.
+        The gate used to be unreachable with a None classification —
+        _text_layer_untrustworthy short-circuits on it — and under
+        ocr_required it is reachable, which is the whole of what this pins: a
+        deployment whose classifier is unavailable still refuses the layer
+        rather than falling through to store it."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        report: dict = {}
+        with patch("pdf_inspector.classify_pdf", side_effect=RuntimeError("boom")), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=self._completed_ocr("")), \
+             patch.object(dr, "_pymupdf_extract_with_pages") as mock_pymupdf:
+            result = dr._read_pdf_text_and_markers(
+                text_pdf, report=report, force_ocr=True, ocr_required=True,
+            )
+
+        assert result == ("", [])
+        mock_pymupdf.assert_not_called()
+        assert report["text_layer_rejected"] is True
+
+    def test_ocr_required_still_skips_a_blank_pdf(self, text_pdf):
+        """The blank-PDF guard runs before any OCR request, so there is no
+        outage and no conversion to require. A PDF that renders blank on
+        every page must not start asking a vision model to invent text."""
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "pdf_has_ocrable_content", return_value=False), \
+             patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            result = dr.extract_text_with_markers(
+                text_pdf, "pdf", force_ocr=True, ocr_required=True,
+            )
 
         assert result == ("", [])
         mock_ocr.assert_not_called()

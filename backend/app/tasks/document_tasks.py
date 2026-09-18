@@ -311,7 +311,8 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     default_retry_delay=5,
 )
 def perform_extraction_and_update(
-    self, document_uuid: str, extension: str, force_ocr: bool = False,
+    self, document_uuid: str, extension: str,
+    force_ocr: bool = False, ocr_required: bool = False,
 ) -> str:
     """Extract text from a document file (PDF, DOCX, XLSX, etc.).
 
@@ -378,9 +379,12 @@ def perform_extraction_and_update(
                 pdf_page_count,
             )
             # A retry sets force_ocr so the pages are re-read rather than the
-            # same text layer re-decided (#858).
+            # same text layer re-decided (#858), and ocr_required when that
+            # re-read was forced because the stored text was refused — then
+            # no non-OCR reading of these pages is acceptable.
             raw_text, text_markers = extract_text_with_markers(
-                str(absolute_path), extension, report=ocr_report, force_ocr=force_ocr,
+                str(absolute_path), extension, report=ocr_report,
+                force_ocr=force_ocr, ocr_required=ocr_required,
             )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file
@@ -431,16 +435,29 @@ def perform_extraction_and_update(
                 "Document %s produced empty extracted text (ext=%s) — marking as error",
                 document_uuid, extension,
             )
-            if ocr_report.get("text_layer_rejected"):
+            layer_rejected = bool(ocr_report.get("text_layer_rejected"))
+            if layer_rejected:
                 # The reader refused this PDF's own text layer: naming the
                 # cause is the difference between "retry later" and "this
-                # copy of the file will never read".
-                message = (
-                    "This PDF's text layer is unreadable (its fonts don't map "
-                    "to characters), and OCR could not read the pages. Retry "
-                    "extraction once OCR is available, or re-upload a printed "
-                    "or scanned copy."
-                )
+                # copy of the file will never read". Which cause depends on
+                # which half of the reader's gate fired — only the classifier
+                # half diagnoses the fonts, and only it leaves "retry once OCR
+                # is available" as advice worth giving, since the other half
+                # is reached with OCR up and answering.
+                if ocr_report.get("text_layer_rejected_reason") == "ocr_required":
+                    message = (
+                        "OCR read this document's pages and found nothing "
+                        "usable, and its own text layer was already refused "
+                        "as unreadable. Re-upload a printed or scanned copy "
+                        "of the document."
+                    )
+                else:
+                    message = (
+                        "This PDF's text layer is unreadable (its fonts don't "
+                        "map to characters), and OCR could not read the pages. "
+                        "Retry extraction once OCR is available, or re-upload "
+                        "a printed or scanned copy."
+                    )
             else:
                 message = (
                     "We couldn't extract any text from this document. "
@@ -449,23 +466,29 @@ def perform_extraction_and_update(
                     "retrying — if it keeps failing, re-upload or "
                     "contact support."
                 )
+            error_fields: dict = {
+                "raw_text": "",
+                "processing": False,
+                "token_count": 0,
+                "text_markers": [],
+                "extraction_nonletter_ratio": None,
+                "ingestion_warnings": [],
+                # Don't leave a stale page count beside empty text when
+                # a previously-good document is reprocessed.
+                "num_pages": 0,
+                "task_status": "error",
+                "error_message": message,
+            }
+            if layer_rejected:
+                # The ratio cleared above is the other evidence that a
+                # non-OCR reading of this file is unacceptable, and the retry
+                # route clears it too. Recording the refusal here is what
+                # makes the next retry require OCR rather than fall back to
+                # the layer this run just refused.
+                error_fields["text_layer_rejected"] = True
             db.smart_document.update_one(
                 {"uuid": document_uuid},
-                {
-                    "$set": {
-                        "raw_text": "",
-                        "processing": False,
-                        "token_count": 0,
-                        "text_markers": [],
-                        "extraction_nonletter_ratio": None,
-                        "ingestion_warnings": [],
-                        # Don't leave a stale page count beside empty text when
-                        # a previously-good document is reprocessed.
-                        "num_pages": 0,
-                        "task_status": "error",
-                        "error_message": message,
-                    }
-                },
+                {"$set": error_fields},
             )
             # Every other terminal-error branch notifies; this one silently
             # relied on the user noticing the row state — which the file list

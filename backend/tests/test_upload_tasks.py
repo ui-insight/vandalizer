@@ -90,6 +90,37 @@ class TestDispatchUploadTasks:
         )
         assert "force_ocr" not in extraction_call[1]["kwargs"]
 
+    def test_ocr_required_reaches_extraction_signature(self, mock_celery):
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks(
+            "doc-uuid", "pdf", "/uploads/test.pdf", force_ocr=True, ocr_required=True,
+        )
+
+        extraction_call = next(
+            c for c in mock_celery.signature.call_args_list
+            if c[0][0] == "tasks.document.extraction"
+        )
+        assert extraction_call[1]["kwargs"]["force_ocr"] is True
+        assert extraction_call[1]["kwargs"]["ocr_required"] is True
+
+    def test_ocr_required_false_is_not_on_the_wire(self, mock_celery):
+        """Same rule as force_ocr, and for the same reason: a message queued
+        before this deploy carries neither key, and a worker rolled out after
+        it must read that message as "do what you already do" rather than
+        fail on a missing argument."""
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+
+        dispatch_upload_tasks(
+            "doc-uuid", "pdf", "/uploads/test.pdf", force_ocr=True, ocr_required=False,
+        )
+
+        extraction_call = next(
+            c for c in mock_celery.signature.call_args_list
+            if c[0][0] == "tasks.document.extraction"
+        )
+        assert "ocr_required" not in extraction_call[1]["kwargs"]
+
     def test_attaches_cleanup_as_error_link(self, mock_celery):
         from app.tasks.upload_tasks import dispatch_upload_tasks
 

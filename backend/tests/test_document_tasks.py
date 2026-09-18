@@ -103,6 +103,35 @@ class TestPerformExtractionAndUpdate:
 
         _, call_kwargs = mock_extract.call_args
         assert call_kwargs["force_ocr"] is True
+        assert call_kwargs["ocr_required"] is False
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("Extracted text content", [{"char_offset": 0, "kind": "page", "value": 1}]),
+    )
+    def test_ocr_required_is_passed_to_pdf_reader(self, mock_extract, MockSettings, mock_get_db):
+        """The reader is where the two reasons for a forced re-read part
+        company, so the reason has to survive the hop through Celery — a task
+        that forwards only force_ocr silently re-reads a refused text layer
+        the permissive way."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(
+            document_uuid="doc-1", extension="pdf", force_ocr=True, ocr_required=True,
+        )
+
+        _, call_kwargs = mock_extract.call_args
+        assert call_kwargs["ocr_required"] is True
 
     @patch("app.tasks.document_tasks.get_sync_db")
     @patch("app.config.Settings")
@@ -272,8 +301,9 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
             report["text_layer_rejected"] = True
+            report["text_layer_rejected_reason"] = "classifier"
             return "", []
 
         with patch(
@@ -289,6 +319,78 @@ class TestPerformExtractionAndUpdate:
             "characters), and OCR could not read the pages. Retry extraction "
             "once OCR is available, or re-upload a printed or scanned copy."
         )
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    def test_a_layer_refused_under_ocr_required_gets_its_own_message(
+        self, MockSettings, mock_get_db,
+    ):
+        """The other half of the gate diagnoses nothing about the fonts — the
+        PDF reads as text_based and it was its stored text that was refused —
+        and OCR was plainly available, so "retry once OCR is available" invites
+        a click that does the same thing again."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "garbled.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
+            report["text_layer_rejected"] = True
+            report["text_layer_rejected_reason"] = "ocr_required"
+            return "", []
+
+        with patch(
+            "app.services.document_readers.extract_text_with_markers", side_effect=reject,
+        ):
+            perform_extraction_and_update(
+                document_uuid="doc-1", extension="pdf",
+                force_ocr=True, ocr_required=True,
+            )
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["task_status"] == "error"
+        assert update_set["error_message"] == (
+            "OCR read this document's pages and found nothing usable, and its "
+            "own text layer was already refused as unreadable. Re-upload a "
+            "printed or scanned copy of the document."
+        )
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    def test_rejected_text_layer_is_remembered_on_the_document(
+        self, MockSettings, mock_get_db,
+    ):
+        """This same write clears the ratio, which is the only other evidence
+        that a non-OCR reading of this file is unacceptable. The refusal is
+        recorded beside the error so the next retry still requires OCR
+        instead of falling back to the layer that was just refused."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "garbled.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
+            report["text_layer_rejected"] = True
+            return "", []
+
+        with patch(
+            "app.services.document_readers.extract_text_with_markers", side_effect=reject,
+        ):
+            perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["text_layer_rejected"] is True
+        assert update_set["extraction_nonletter_ratio"] is None
 
     @patch("app.tasks.document_tasks.get_sync_db")
     @patch("app.config.Settings")
