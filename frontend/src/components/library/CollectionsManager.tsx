@@ -348,9 +348,9 @@ export function CollectionsManager() {
                                 </span>
                                 {item?.quality_tier && (
                                   <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
-                                    item.quality_tier === 'gold' ? 'bg-yellow-50 text-yellow-700'
-                                      : item.quality_tier === 'silver' ? 'bg-gray-100 text-gray-600'
-                                      : 'bg-orange-50 text-orange-700'
+                                    item.quality_tier === 'excellent' ? 'bg-green-50 text-green-700'
+                                      : item.quality_tier === 'good' ? 'bg-blue-50 text-blue-700'
+                                      : 'bg-yellow-50 text-yellow-700'
                                   }`}>
                                     {item.quality_tier}
                                   </span>

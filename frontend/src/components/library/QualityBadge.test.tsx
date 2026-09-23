@@ -39,6 +39,19 @@ describe('QualityBadge', () => {
     expect(screen.queryByText('Quality: Excellent (95%)')).toBeNull()
   })
 
+  it('renders an asserted tier in the neutral style with no percentage', () => {
+    // A seeded "excellent" with no measured score is a claim, not a rating.
+    render(<QualityBadge tier="excellent" score={null} asserted />)
+    const badge = screen.getByText('Quality: Excellent (asserted)')
+    expect(badge.getAttribute('title')).toContain('no measured validation')
+    expect(badge.style.color).not.toBe('rgb(21, 128, 61)')
+  })
+
+  it('ignores the asserted flag when there is no tier to assert', () => {
+    render(<QualityBadge tier={null} score={null} asserted />)
+    expect(screen.getByText('Unvalidated')).toBeTruthy()
+  })
+
   it('explains the pending-review state on hover', () => {
     render(<QualityBadge tier="good" score={70} regressionPending title="ignored" />)
     const badge = screen.getByText('Regression pending review')

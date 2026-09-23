@@ -6,7 +6,7 @@
     "seed_id": "kb-2cfr200",
     "display_name": "OMB Uniform Guidance (2 CFR 200)",
     "description": "OMB Uniform Administrative Requirements, Cost Principles, and Audit Requirements for Federal Awards - the foundational compliance framework.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance",
       "reference-knowledge"

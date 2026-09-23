@@ -7,7 +7,7 @@
     "seed_id": "wf-compliance-coi-review",
     "display_name": "Conflict of Interest Review",
     "description": "Screens a proposal or disclosure for conflict of interest concerns, assessing financial relationships and recommending management plans.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance"
     ]

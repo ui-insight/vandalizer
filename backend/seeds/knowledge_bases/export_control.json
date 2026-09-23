@@ -6,7 +6,7 @@
     "seed_id": "kb-export-control",
     "display_name": "Export Control (EAR)",
     "description": "The Export Administration Regulations (15 CFR Parts 730-774): the Commerce Control List, license exceptions, end-use/end-user controls, and deemed-export rules for research.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance",
       "reference-knowledge"

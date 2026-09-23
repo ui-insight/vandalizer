@@ -6,7 +6,7 @@
     "seed_id": "kb-rcr",
     "display_name": "Responsible Conduct of Research (RCR)",
     "description": "Federal requirements for responsible conduct of research training, research misconduct policies, and data management mandates.",
-    "quality_tier": "silver",
+    "quality_tier": "good",
     "collections": [
       "compliance",
       "reference-knowledge"

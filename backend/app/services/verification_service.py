@@ -543,6 +543,28 @@ def catalog_row_is_openable(item, underlying) -> bool:
     return bool(getattr(underlying, "verified", True))
 
 
+# The one tier vocabulary: what compute_quality_tier emits. Ordered best-first.
+_TIER_ORDER = {"excellent": 0, "good": 1, "fair": 2}
+
+# Tier names from before the vocabulary was unified. Rows written then still
+# carry them until a re-seed touches them — and rows the seeds no longer cover
+# never get re-seeded — so every read maps them rather than trusting storage.
+LEGACY_TIERS = {"gold": "excellent", "silver": "good", "bronze": "fair"}
+
+
+def normalize_tier(tier: str | None) -> str | None:
+    return LEGACY_TIERS.get(tier, tier) if tier else tier
+
+
+def _quality_sort_key(entry: dict) -> tuple:
+    """Sort key for ``sort=quality``: best tier first, and within a tier a
+    measured score outranks a hand-asserted tier (score None) — a catalog
+    author typing "excellent" must never rank above a run that earned it."""
+    tier = entry.get("quality_tier") or ""
+    score = entry.get("quality_score")
+    return (_TIER_ORDER.get(tier, 99), 1 if score is None else 0, -(score or 0))
+
+
 async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
@@ -680,7 +702,7 @@ async def list_verified_items(
                 continue
 
         # Quality tier filter
-        item_tier = meta.quality_tier if meta else None
+        item_tier = normalize_tier(meta.quality_tier) if meta else None
         if quality_tier and item_tier != quality_tier:
             continue
 
@@ -762,8 +784,7 @@ async def list_verified_items(
 
     # --- Sort ---
     if sort == "quality":
-        tier_order = {"gold": 0, "silver": 1, "bronze": 2}
-        results.sort(key=lambda e: (tier_order.get(e.get("quality_tier") or "", 99), -(e.get("quality_score") or 0)))
+        results.sort(key=_quality_sort_key)
     elif sort == "name":
         results.sort(key=lambda e: (e.get("display_name") or e.get("name") or "").lower())
     elif sort == "validations":
@@ -836,7 +857,7 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
         "quality_score": meta.quality_score,
-        "quality_tier": meta.quality_tier,
+        "quality_tier": normalize_tier(meta.quality_tier),
         "quality_grade": meta.quality_grade,
         "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
         "validation_run_count": meta.validation_run_count,
@@ -1134,7 +1155,7 @@ async def list_catalog_coverage(
             "coverage": coverage,
             "coverage_order": coverage_order.get(coverage, 99),
             "quality_score": meta.quality_score if meta else None,
-            "quality_tier": meta.quality_tier if meta else None,
+            "quality_tier": normalize_tier(meta.quality_tier) if meta else None,
             "quality_asserted": bool(meta and meta.quality_tier and meta.quality_score is None),
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "official_baseline_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta and meta.official_baseline_pinned_at else None,

@@ -6,7 +6,7 @@
     "seed_id": "kb-fcoi",
     "display_name": "Financial Conflict of Interest (FCOI)",
     "description": "PHS financial conflict-of-interest regulations (42 CFR 50 Subpart F): investigator disclosure, significant financial interests, and institutional review, management, and reporting.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance",
       "reference-knowledge"

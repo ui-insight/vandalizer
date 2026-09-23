@@ -7,7 +7,7 @@
     "seed_id": "wf-compliance-export-control",
     "display_name": "Export Control Screening",
     "description": "Screens a project description or agreement for potential export control concerns under EAR, ITAR, and OFAC regulations.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance"
     ]

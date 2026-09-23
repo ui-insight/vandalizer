@@ -7,7 +7,7 @@
     "seed_id": "wf-post-award-closeout",
     "display_name": "Closeout Checklist Generator",
     "description": "Generates a comprehensive, timeline-ordered closeout checklist from award terms and conditions.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "post-award"
     ]

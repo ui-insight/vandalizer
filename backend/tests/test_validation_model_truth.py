@@ -182,7 +182,7 @@ async def _run_validation_with(requested_model, sys_cfg_doc):
         ) as mock_persist,
         patch(
             "app.services.quality_service.compute_quality_tier",
-            return_value="gold",
+            return_value="excellent",
         ),
     ):
         mock_sc.get_config = AsyncMock(return_value=sys_config)

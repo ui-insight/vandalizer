@@ -76,7 +76,7 @@ function makeItem(overrides: Partial<VerifiedCatalogItem> = {}): VerifiedCatalog
     markdown: null,
     organization_ids: [],
     quality_score: 85,
-    quality_tier: 'silver',
+    quality_tier: 'good',
     quality_grade: 'B',
     last_validated_at: null,
     validation_run_count: 0,
@@ -216,5 +216,27 @@ describe('ExploreTab KB adopt', () => {
       expect(adoptKnowledgeBase).toHaveBeenCalled()
     })
     expect(invalidateQueriesMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('ExploreTab quality tiers', () => {
+  it('spotlights measured excellent items ahead of asserted ones and labels assertions', async () => {
+    // #908/#909: the spotlight is keyed on the tier the measurement pipeline
+    // emits, a validated item leads it, and a seeded tier is shown as a claim.
+    const measured = makeItem({ id: 'c-1', item_id: 'wf-1', name: 'Measured WF', source_uuid: 'wf-1', quality_tier: 'excellent', quality_score: 94 })
+    const asserted = makeItem({ id: 'c-2', item_id: 'wf-2', name: 'Seeded WF', source_uuid: 'wf-2', quality_tier: 'excellent', quality_score: null, quality_asserted: true })
+    const good = makeItem({ id: 'c-3', item_id: 'wf-3', name: 'Good WF', source_uuid: 'wf-3', quality_tier: 'good', quality_score: 80 })
+    vi.mocked(listVerifiedItems).mockResolvedValue({ items: [asserted, good, measured], total: 3 })
+    render(<ExploreTab />)
+
+    const heading = await screen.findByText('Top Rated')
+    expect(heading.parentElement?.textContent).toContain('2 excellent-tier items')
+    const spotlight = heading.parentElement!.parentElement!
+    const names = Array.from(spotlight.querySelectorAll('button')).map(b => b.textContent || '')
+    expect(names.findIndex(n => n.includes('Measured WF'))).toBeLessThan(names.findIndex(n => n.includes('Seeded WF')))
+    expect(names.some(n => n.includes('Good WF'))).toBe(false)
+
+    expect(screen.getByText('Quality: Excellent (asserted)')).toBeTruthy()
+    expect(screen.getByText('Quality: Excellent (94%)')).toBeTruthy()
   })
 })

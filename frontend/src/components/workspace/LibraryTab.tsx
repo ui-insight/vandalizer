@@ -753,7 +753,7 @@ export function LibraryTab() {
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
-            { key: 'explore' as const, label: 'Explore' },
+            { key: 'explore' as const, label: 'Explore Catalog' },
           ]).map(({ key, label }) => {
             const active = scope === key
             return (

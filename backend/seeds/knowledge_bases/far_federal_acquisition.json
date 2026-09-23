@@ -6,7 +6,7 @@
     "seed_id": "kb-far",
     "display_name": "Federal Acquisition Regulation (FAR)",
     "description": "Federal Acquisition Regulation — the primary regulation governing federal government procurement and contract administration.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": ["compliance", "reference-knowledge"]
   },
   "items": [{

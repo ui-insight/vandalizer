@@ -7,7 +7,7 @@
     "seed_id": "wf-financial-fa-rate-validator",
     "display_name": "F&A Rate Validator",
     "description": "Validates that the correct facilities and administrative (indirect cost) rate is applied to an award, checking the MTDC base and sponsor caps.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "financial"
     ]

@@ -31,7 +31,7 @@ type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'mine', label: 'My KBs' },
   { key: 'team', label: 'Team' },
-  { key: 'explore', label: 'Explore' },
+  { key: 'explore', label: 'Explore Knowledge Bases' },
 ]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -1926,7 +1926,7 @@ export function KnowledgePanel() {
                     title: 'Remove from My KBs?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore Knowledge Bases.
                       </>
                     ),
                     confirmLabel: 'Remove',
@@ -1948,7 +1948,7 @@ export function KnowledgePanel() {
             emptyComponent={!isProjectScoped && activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
             emptyMessage={
               isProjectScoped
-                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or in Explore, or switch to "Show all".`
+                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or in Explore Knowledge Bases, or switch to "Show all".`
                 : activeTab === 'team'
                   ? 'No knowledge bases shared with your team yet.'
                   : 'No knowledge bases found.'

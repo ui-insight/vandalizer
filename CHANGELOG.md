@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Validating a catalog item no longer demotes it (#908).** The catalog browser and the measurement pipeline spoke two different tier vocabularies: `compute_quality_tier` only ever emits `excellent` / `good` / `fair`, while the Explore sort, quality filter, "Top Rated" spotlight and card styling were keyed on `gold` / `silver` / `bronze` — names nothing in the system could produce. So the moment an item was actually validated it vanished from the quality filter, dropped out of "Top Rated", lost its card ring, and under "Highest Quality" sorted *below* every unmeasured seed item. Everything now uses the one measured vocabulary; the `sort=quality` ordering puts a measured score ahead of a hand-asserted tier within the same tier, and a tier word outside the vocabulary sorts with the unrated tail rather than at the top.
+- **Explore now says when a catalog tier is an assertion (#909).** The shipped catalog carries hand-typed tiers on 23 items and a measured score on none, and the "(asserted)" disclosure built for that case only ever rendered on the examiner-only Verification → Catalog page. `QualityBadge` — the badge on both Explore tabs' cards and detail modals — now takes `asserted` and renders such a tier in the neutral style as "Quality: Excellent (asserted)", with the same explanatory hover as the examiner badge, and the card gets no tier ring or coloured shield. A seeded "excellent" can no longer pass for one a validation run earned.
+- **The two "Explore" tabs have distinct names (#910).** Knowledge Bases → **Explore Knowledge Bases**; Library → **Explore Catalog**. From a support ticket: a new user who browsed the Knowledge one assumed they had seen the whole catalog and never found the workflows and extractions in the other. The two subtitles also stopped disagreeing about what the catalog is ("Validated…" vs "Verified…"); both now just say the items come from the catalog.
+
+### Changed
+- **Catalog is at v1.3.4 — re-seed to retier the bundled items.** `backend/seeds/VERSION` moves 1.3.3 → **1.3.4**: the 22 seed files that carried `gold` / `silver` now carry `excellent` / `good` (the one `fair` is unchanged). The seeder also translates legacy tier names on the way in, so an existing install's rows are fixed on the next `./setup.sh --seed` / Admin → Catalog run even where a seed file omits the tier. No retirements.
+
 ## [v4.13.0] - 2026-09-22
 
 ### Added

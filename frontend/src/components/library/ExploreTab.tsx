@@ -40,7 +40,7 @@ marked.setOptions({ breaks: true, gfm: true })
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 type SortOption = '' | 'quality' | 'name' | 'validations'
-type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
+type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
 const PAGE_SIZE = 30
 
@@ -102,11 +102,20 @@ function KindBadge({ kind }: { kind: string }) {
 // Quality tier styling
 // ---------------------------------------------------------------------------
 
+// Keyed on the tiers compute_quality_tier emits — the only vocabulary a
+// measured item can carry. Matches the colours QualityBadge uses for them.
 const TIER_STYLES = {
-  gold: { ring: 'ring-amber-300', glow: 'shadow-amber-100', accent: 'text-amber-600', bg: 'bg-amber-50' },
-  silver: { ring: 'ring-gray-300', glow: 'shadow-gray-100', accent: 'text-gray-500', bg: 'bg-gray-50' },
-  bronze: { ring: 'ring-orange-200', glow: 'shadow-orange-50', accent: 'text-orange-600', bg: 'bg-orange-50' },
+  excellent: { ring: 'ring-green-300', glow: 'shadow-green-100', accent: 'text-green-700', bg: 'bg-green-50' },
+  good: { ring: 'ring-blue-300', glow: 'shadow-blue-100', accent: 'text-blue-700', bg: 'bg-blue-50' },
+  fair: { ring: 'ring-yellow-300', glow: 'shadow-yellow-100', accent: 'text-yellow-700', bg: 'bg-yellow-50' },
 } as const
+
+// Top-tier items that a validation run actually measured lead the spotlight;
+// hand-asserted ones follow. Both stay eligible so a fresh install still has
+// a landing page, but the earned rating always outranks the typed one.
+function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
+  return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
+}
 
 // ---------------------------------------------------------------------------
 // Item Detail Modal
@@ -186,6 +195,7 @@ export function ItemDetailModal({
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
             />
             {item.validation_run_count > 0 && (
@@ -362,7 +372,9 @@ function CatalogCard({
   onTagClick: (tag: string) => void
   onClick: () => void
 }) {
-  const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
+  // An asserted tier gets no ring: the ring is the card-level version of the
+  // badge colour, and the badge renders assertions in neutral.
+  const tierStyle = item.quality_asserted ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
 
   return (
     <button
@@ -374,9 +386,7 @@ function CatalogCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1.5 mb-1">
-            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
-              item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-500' : 'text-green-500'
-            }`} />
+            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${tierStyle ? tierStyle.accent : 'text-gray-400'}`} />
             <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
             <span className="text-sm font-semibold text-gray-900 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
@@ -387,6 +397,7 @@ function CatalogCard({
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
             />
             {item.validation_run_count > 0 && (
@@ -706,9 +717,12 @@ export function ExploreTab() {
   ]
 
   // Split items by tier for the hero landing
-  const goldItems = useMemo(() => items.filter(i => i.quality_tier === 'gold'), [items])
+  const topItems = useMemo(
+    () => items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder),
+    [items],
+  )
   const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'gold') : items,
+    () => showHero ? items.filter(i => i.quality_tier !== 'excellent') : items,
     [items, showHero],
   )
 
@@ -779,7 +793,7 @@ export function ExploreTab() {
                   </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Explore the Catalog</h2>
-                    <p className="text-sm text-gray-500">Validated workflows, extractions, and knowledge bases ready to use</p>
+                    <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases from the catalog, ready to use</p>
                   </div>
                 </div>
               </div>
@@ -842,9 +856,9 @@ export function ExploreTab() {
                 className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
               >
                 <option value="">Any quality</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="bronze">Bronze</option>
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
               </select>
 
               <div className="flex items-center gap-1">
@@ -937,16 +951,16 @@ export function ExploreTab() {
                   </div>
                 )}
 
-                {/* Gold tier spotlight (hero landing only) */}
-                {showHero && !activeCollection && goldItems.length > 0 && (
+                {/* Top-tier spotlight (hero landing only) */}
+                {showHero && !activeCollection && topItems.length > 0 && (
                   <div className="mb-8">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="h-4 w-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600" />
+                      <div className="h-4 w-4 rounded-full bg-gradient-to-br from-green-400 to-green-600" />
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
-                      <span className="text-xs text-gray-500">{goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-500">{topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-                      {goldItems.slice(0, 6).map(item => (
+                      {topItems.slice(0, 6).map(item => (
                         <CatalogCard
                           key={item.id}
                           item={item}
@@ -960,7 +974,7 @@ export function ExploreTab() {
 
                 {/* Main grid */}
                 <div className="mb-2">
-                  {showHero && !activeCollection && goldItems.length > 0 && (
+                  {showHero && !activeCollection && topItems.length > 0 && (
                     <h3 className="text-sm font-bold text-gray-900 mb-3">All Items</h3>
                   )}
                   {!showHero && !loading && (

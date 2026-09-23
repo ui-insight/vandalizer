@@ -681,14 +681,14 @@ async def test_check_auto_approve_no_score(mock_vr, mock_sc):
 async def test_get_item_metadata_found(mock_vim):
     from app.services.verification_service import get_item_metadata
 
-    meta = _make_meta(display_name="Nice Name", quality_score=92.5, quality_tier="gold")
+    meta = _make_meta(display_name="Nice Name", quality_score=92.5, quality_tier="excellent")
     mock_vim.find_one = AsyncMock(return_value=meta)
 
     result = await get_item_metadata("workflow", "obj-id-123")
     assert result is not None
     assert result["display_name"] == "Nice Name"
     assert result["quality_score"] == 92.5
-    assert result["quality_tier"] == "gold"
+    assert result["quality_tier"] == "excellent"
     assert result["id"] == "meta-oid"
 
 
@@ -1119,7 +1119,7 @@ async def test_submit_for_verification_gate_min_score_fails(mock_wf_cls, mock_sc
     }
 
     with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
-         patch("app.services.quality_service.compute_quality_tier", return_value="bronze"):
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"):
         with pytest.raises(ValueError, match="Quality score is 70"):
             await submit_for_verification(
                 item_kind="workflow",
@@ -1391,3 +1391,35 @@ class TestVerificationSubmittedDeepLink:
         assert 'href="https://vandalizer.example.edu/verification"' in html
         assert "request=" not in html
         assert "Open Queue" in html
+
+
+# ---------------------------------------------------------------------------
+# sort=quality — one tier vocabulary, measured before asserted
+# ---------------------------------------------------------------------------
+
+
+def test_quality_sort_measured_excellent_outranks_asserted_excellent():
+    """A catalog author typing "excellent" must never rank above a run that
+    earned it. Regression for #908, where validating an item sank it below
+    every hand-tiered seed."""
+    from app.services.verification_service import _quality_sort_key
+
+    asserted = {"quality_tier": "excellent", "quality_score": None}
+    measured = {"quality_tier": "excellent", "quality_score": 94.0}
+    good = {"quality_tier": "good", "quality_score": 99.0}
+    unrated = {"quality_tier": None, "quality_score": None}
+    legacy = {"quality_tier": "gold", "quality_score": None}
+
+    ordered = sorted([legacy, unrated, good, asserted, measured], key=_quality_sort_key)
+    # sorted() is stable, so the two 99-keyed tail entries keep input order.
+    assert ordered == [measured, asserted, good, legacy, unrated]
+    # Anything outside the measured vocabulary sorts with the unrated tail.
+    assert _quality_sort_key(legacy)[0] == _quality_sort_key(unrated)[0] == 99
+
+
+def test_quality_sort_higher_score_first_within_tier():
+    from app.services.verification_service import _quality_sort_key
+
+    lo = {"quality_tier": "good", "quality_score": 71.0}
+    hi = {"quality_tier": "good", "quality_score": 88.0}
+    assert sorted([lo, hi], key=_quality_sort_key) == [hi, lo]

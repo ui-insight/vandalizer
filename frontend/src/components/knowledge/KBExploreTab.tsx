@@ -18,7 +18,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 type SortOption = '' | 'quality' | 'name' | 'validations'
-type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
+type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
 const PAGE_SIZE = 30
 
@@ -75,11 +75,24 @@ function DarkAuthorChip({ author, size = 'sm' }: { author: AuthorRef | null | un
 // Tier styling
 // ---------------------------------------------------------------------------
 
+// Keyed on the tiers compute_quality_tier emits — the only vocabulary a
+// measured item can carry. Colours track QualityBadge's for the same tiers.
 const TIER_RING = {
-  gold: '1px solid rgba(251, 191, 36, 0.45)',
-  silver: '1px solid rgba(156, 163, 175, 0.45)',
-  bronze: '1px solid rgba(251, 146, 60, 0.4)',
+  excellent: '1px solid rgba(74, 222, 128, 0.45)',
+  good: '1px solid rgba(96, 165, 250, 0.45)',
+  fair: '1px solid rgba(250, 204, 21, 0.4)',
 } as const
+
+const TIER_ICON = {
+  excellent: '#4ade80',
+  good: '#60a5fa',
+  fair: '#facc15',
+} as const
+
+// Measured top-tier items lead the spotlight; hand-asserted ones follow.
+function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
+  return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
+}
 
 // ---------------------------------------------------------------------------
 // Featured collection card (dark)
@@ -140,14 +153,13 @@ function KBCatalogCard({
   onTagClick: (tag: string) => void
   onClick: () => void
 }) {
-  const tierBorder = item.quality_tier
-    ? TIER_RING[item.quality_tier as keyof typeof TIER_RING]
-    : `1px solid ${C.border}`
-
-  const tierIconColor =
-    item.quality_tier === 'gold' ? '#fbbf24'
-    : item.quality_tier === 'silver' ? '#9ca3af'
-    : '#34d399'
+  // An asserted tier gets neither ring nor colour: the badge renders
+  // assertions in neutral and the card must not out-claim it.
+  const measuredTier = item.quality_tier && !item.quality_asserted
+    ? (item.quality_tier as keyof typeof TIER_RING)
+    : null
+  const tierBorder = (measuredTier && TIER_RING[measuredTier]) || `1px solid ${C.border}`
+  const tierIconColor = (measuredTier && TIER_ICON[measuredTier]) || C.textFaint
 
   return (
     <button
@@ -186,6 +198,7 @@ function KBCatalogCard({
           tier={item.quality_tier}
           score={item.quality_score}
           title={KB_QUALITY_SCORE_HOVER}
+          asserted={item.quality_asserted}
           regressionPending={item.regression_pending_review}
         />
         {item.validation_run_count > 0 && (
@@ -433,9 +446,12 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
     ['validations', 'Most Validated'],
   ]
 
-  const goldItems = useMemo(() => items.filter(i => i.quality_tier === 'gold'), [items])
+  const topItems = useMemo(
+    () => items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder),
+    [items],
+  )
   const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'gold') : items,
+    () => showHero ? items.filter(i => i.quality_tier !== 'excellent') : items,
     [items, showHero],
   )
 
@@ -532,7 +548,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       Explore Knowledge Bases
                     </h2>
                     <p style={{ fontSize: 13, color: C.textDim, margin: '2px 0 0' }}>
-                      Verified knowledge bases ready to chat with
+                      Knowledge bases from the catalog, ready to chat with
                     </p>
                   </div>
                 </div>
@@ -603,9 +619,9 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 }}
               >
                 <option value="">Any quality</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="bronze">Bronze</option>
+                <option value="excellent">Excellent</option>
+                <option value="good">Good</option>
+                <option value="fair">Fair</option>
               </select>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -755,23 +771,23 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   </div>
                 )}
 
-                {/* Gold tier spotlight */}
-                {showHero && !activeCollection && goldItems.length > 0 && (
+                {/* Top-tier spotlight */}
+                {showHero && !activeCollection && topItems.length > 0 && (
                   <div style={{ marginBottom: 28 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                       <div style={{
                         height: 14, width: 14, borderRadius: 999,
-                        background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                        background: 'linear-gradient(135deg, #4ade80 0%, #16a34a 100%)',
                       }} />
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>
                         Top Rated
                       </h3>
                       <span style={{ fontSize: 11, color: C.textFaint }}>
-                        {goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}
+                        {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                     <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-                      {goldItems.slice(0, 6).map(item => (
+                      {topItems.slice(0, 6).map(item => (
                         <KBCatalogCard
                           key={item.id}
                           item={item}
@@ -785,7 +801,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
                 {/* Main grid */}
                 <div style={{ marginBottom: 6 }}>
-                  {showHero && !activeCollection && goldItems.length > 0 && (
+                  {showHero && !activeCollection && topItems.length > 0 && (
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
                   )}
                   {!showHero && !loading && (
