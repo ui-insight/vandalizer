@@ -18,6 +18,8 @@ class UpdateKBRequest(BaseModel):
     shared_with_team: Optional[bool] = None
     organization_ids: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    # "off" clears it; None leaves it as it is.
+    url_refresh_interval: Optional[Literal["off", "daily", "weekly", "monthly"]] = None
 
 
 class AddDocumentsRequest(BaseModel):
@@ -197,6 +199,8 @@ class KBResponse(BaseModel):
     # endpoints that don't set it explicitly (create/import/adopt) only ever
     # return a KB the requester just became the owner of.
     can_manage: bool = True
+    # Automatic re-fetch of web sources: None (off) | daily | weekly | monthly.
+    url_refresh_interval: Optional[str] = None
     # Set by KB Autovalidate's apply path. Presence (not value) is what the UI
     # surfaces as a small "Optimized" chip.
     has_optimized_config: bool = False

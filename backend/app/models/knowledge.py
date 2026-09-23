@@ -64,6 +64,9 @@ class KnowledgeBaseSource(Document):
     content_hash: Optional[str] = None  # sha256 of the text handed to the indexer
     last_refresh_outcome: Optional[str] = None  # refreshed | unchanged | retrieval_failed | ingestion_failed
     last_refresh_error: Optional[str] = None
+    # When a refresh was last queued — tells a queued refresh from one whose
+    # worker died (see kb_url_refresh.is_in_flight).
+    refresh_queued_at: Optional[datetime.datetime] = None
     # sha256 of a fetch refused by the collapse gate. If the next refresh
     # returns the same bytes, the page really is that short now and the gate
     # steps aside -- a transient shell does not come back identical twice.
@@ -164,6 +167,9 @@ class KnowledgeBase(Document):
     rag_config_override: Optional[dict] = None
     rag_config_override_set_at: Optional[datetime.datetime] = None
     rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
+    # Re-fetch web sources automatically: None (off) | daily | weekly | monthly.
+    # See services/kb_url_refresh.py.
+    url_refresh_interval: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

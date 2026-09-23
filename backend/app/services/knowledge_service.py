@@ -558,6 +558,7 @@ async def update_knowledge_base(
     organization_ids: list[str] | None = None,
     tags: list[str] | None = None,
     user_org_ancestry: list[str] | None = None,
+    url_refresh_interval: str | None = None,
 ) -> KnowledgeBase | None:
     kb = await get_knowledge_base(
         uuid,
@@ -580,6 +581,8 @@ async def update_knowledge_base(
         kb.description = description[:5000] or None
     if shared_with_team is not None:
         kb.shared_with_team = shared_with_team
+    if url_refresh_interval is not None:
+        kb.url_refresh_interval = None if url_refresh_interval == "off" else url_refresh_interval
     org_scope_changed = False
     if organization_ids is not None and organization_ids != list(kb.organization_ids or []):
         kb.organization_ids = organization_ids

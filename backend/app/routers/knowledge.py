@@ -155,6 +155,10 @@ def _kb_response(
             last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
         ),
         can_manage=can_manage,
+        url_refresh_interval=(
+            kb.url_refresh_interval
+            if isinstance(getattr(kb, "url_refresh_interval", None), str) else None
+        ),
     )
 
 
@@ -662,6 +666,7 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
             organization_ids=req.organization_ids,
             tags=req.tags,
             user_org_ancestry=user_org_ancestry,
+            url_refresh_interval=req.url_refresh_interval,
         )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -877,17 +882,37 @@ async def refresh_source(
             status_code=400,
             detail="Only URL sources can be refreshed — re-upload the document to update a document source",
         )
-    if source.status == "processing":
-        raise HTTPException(status_code=409, detail="This source is already being processed")
+    from app.services import kb_url_refresh
+
+    # Queued counts as in progress too — a second click used to queue a
+    # second fetch of the same page.
+    if kb_url_refresh.is_in_flight(source, datetime.datetime.now(tz=datetime.timezone.utc)):
+        raise HTTPException(status_code=409, detail="This source is already being refreshed")
 
     from app.tasks.kb_validation_tasks import refresh_url_source_task
 
     source.status = "pending"
+    source.refresh_queued_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await source.save()
+    queued_stamp = source.refresh_queued_at.isoformat()
     kb.status = "building"
     await kb.save()
-    refresh_url_source_task.delay(kb.uuid, source.uuid)
+    refresh_url_source_task.delay(kb.uuid, source.uuid, queued_stamp)
     return {"ok": True, "status": "queued", "source_uuid": source.uuid}
+
+
+@router.post("/{uuid}/refresh-web-sources")
+@limiter.limit("5/minute")
+async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(get_current_user)):
+    """Re-fetch every web source in the KB, each exactly as its own Refresh
+    would. Sources already being refreshed are left alone and counted in
+    ``in_progress``. A failed fetch keeps that source's previous text."""
+    from app.services import kb_url_refresh
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    result = await kb_url_refresh.refresh_all(kb)
+    return {"ok": True, **result}
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)

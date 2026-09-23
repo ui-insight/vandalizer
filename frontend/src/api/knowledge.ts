@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -44,7 +44,13 @@ export function getKnowledgeBase(uuid: string) {
   return apiFetch<KnowledgeBaseDetail>(`/api/knowledge/${uuid}`)
 }
 
-export function updateKnowledgeBase(uuid: string, data: { title?: string; description?: string; tags?: string[] }) {
+export function updateKnowledgeBase(uuid: string, data: {
+  title?: string
+  description?: string
+  tags?: string[]
+  /** 'off' clears it. */
+  url_refresh_interval?: 'off' | URLRefreshInterval
+}) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/update`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -114,6 +120,14 @@ export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',
   })
+}
+
+/** Re-fetch every web source in the KB, each as its own Refresh would (background). */
+export function refreshKBWebSources(uuid: string) {
+  return apiFetch<{ ok: boolean; queued: number; in_progress: number }>(
+    `/api/knowledge/${uuid}/refresh-web-sources`,
+    { method: 'POST' },
+  )
 }
 
 /** Re-fetch a URL source from its page and rebuild its chunks in place (background). */

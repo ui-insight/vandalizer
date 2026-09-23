@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
+import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -1250,6 +1251,20 @@ export function KnowledgePanel() {
                 {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
               </span>
             </button>
+            {!sourcesCollapsed && (
+              <WebSourceRefreshBar
+                kbUuid={selectedKB.uuid}
+                sources={selectedKB.sources}
+                interval={selectedKB.url_refresh_interval}
+                canManage={canManageKB}
+                onChanged={message => {
+                  if (message) toast(message, 'success')
+                  loadDetail(selectedKB.uuid)
+                  refresh()
+                }}
+                onError={message => toast(message, 'error')}
+              />
+            )}
             {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
               <div style={{ fontSize: 12, color: '#888', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.

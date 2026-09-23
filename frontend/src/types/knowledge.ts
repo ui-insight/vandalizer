@@ -22,6 +22,9 @@ export interface KBOptimizationStatus {
   queries_edited?: number
 }
 
+/** Automatic re-fetch of a KB's web sources. */
+export type URLRefreshInterval = 'daily' | 'weekly' | 'monthly'
+
 export interface KnowledgeBase {
   uuid: string
   title: string
@@ -51,6 +54,8 @@ export interface KnowledgeBase {
   // share, delete). False for e.g. an adopted verified catalog KB the user
   // doesn't own. Treat a missing value as true — read it as `can_manage !== false`.
   can_manage?: boolean
+  // Automatic web-source refresh; null/absent = off.
+  url_refresh_interval?: URLRefreshInterval | null
   // Set by KB Autovalidate's apply path
   has_optimized_config?: boolean
   optimized_config_set_at?: string | null

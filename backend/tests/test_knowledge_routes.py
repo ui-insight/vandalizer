@@ -1142,7 +1142,9 @@ class TestKnowledgeDocSources:
 
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "status": "queued", "source_uuid": "src-1"}
-        mock_delay.assert_called_once_with(kb.uuid, "src-1")
+        mock_delay.assert_called_once()
+        assert mock_delay.call_args.args[:2] == (kb.uuid, "src-1")
+        assert mock_delay.call_args.args[2] == src.refresh_queued_at.isoformat()
         assert src.status == "pending"
         assert kb.status == "building"
         # The refresh must not run inline — the service isn't touched here.
