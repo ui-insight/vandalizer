@@ -8,6 +8,7 @@ import io
 import logging
 import os
 import re
+from collections.abc import Callable
 from datetime import date, datetime, time
 from typing import NoReturn
 
@@ -1088,9 +1089,26 @@ def _text_layer_untrustworthy(classification) -> bool:
     )
 
 
+def _report_stage(on_stage: Callable[[str], None] | None, stage: str) -> None:
+    """Tell the caller the read has reached ``stage``, and never fail over it.
+
+    A status update is reporting, not extraction: if the caller's callback
+    raises — a dropped Mongo connection, a deleted document — the document
+    must still be read. Swallowing here keeps that guarantee at the one place
+    it is made, rather than asking every future caller to be careful.
+    """
+    if on_stage is None:
+        return
+    try:
+        on_stage(stage)
+    except Exception as e:  # noqa: BLE001 — a status write must never fail a read
+        logger.warning("Stage callback for '%s' failed (continuing): %s", stage, e)
+
+
 def _extract_pdf_text_and_markers(
     file_path: str, report: dict | None = None, *,
     force_ocr: bool = False, ocr_required: bool = False,
+    on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """The one PDF path: read the text, then remove what the page hides.
 
@@ -1103,7 +1121,8 @@ def _extract_pdf_text_and_markers(
     defended against separately in each prompt downstream.
     """
     text, markers = _read_pdf_text_and_markers(
-        file_path, report=report, force_ocr=force_ocr, ocr_required=ocr_required,
+        file_path, report=report, force_ocr=force_ocr,
+        ocr_required=ocr_required, on_stage=on_stage,
     )
     return pdf_hidden_text.scrub_pdf(file_path, text, markers, report=report)
 
@@ -1111,6 +1130,7 @@ def _extract_pdf_text_and_markers(
 def _read_pdf_text_and_markers(
     file_path: str, report: dict | None = None, *,
     force_ocr: bool = False, ocr_required: bool = False,
+    on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """Extract a PDF's text and page markers with the best reader available.
 
@@ -1164,6 +1184,13 @@ def _read_pdf_text_and_markers(
     # boundaries, so fall back to interpolating against PyMuPDF's page
     # count — approximate, but enough for "around page N" citations.
     from app.services import ocr_client
+
+    # Announced only here, where the fast path has already declined and the
+    # round-trip is genuinely about to happen. OCR is where a slow ingestion
+    # spends its minutes, and a document that sat on "Extracting text from
+    # each page" for the whole of a 25-minute OCR retry envelope told nobody
+    # — not the user, not support — which stage was actually stuck.
+    _report_stage(on_stage, "ocr")
 
     try:
         ocr_text = ocr_extract_text_from_pdf(file_path, report=report)
@@ -1304,6 +1331,7 @@ def _read_pdf_text_and_markers(
 def extract_text_with_markers(
     file_path: str, file_extension: str, report: dict | None = None,
     *, force_ocr: bool = False, ocr_required: bool = False,
+    on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
 
@@ -1318,12 +1346,18 @@ def extract_text_with_markers(
     through OCR; ``ocr_required`` (PDF only) additionally refuses any
     non-OCR reading of those pages, for a retry forced because the stored
     text was low quality.
+
+    ``on_stage`` (PDF only) is called with a pipeline stage name when the read
+    reaches one worth reporting — currently ``"ocr"``, just before the OCR
+    round-trip. It lets the caller move a document's visible status without
+    this module knowing anything about documents or the database.
     """
     ext = file_extension.lower().lstrip(".")
 
     if ext == "pdf":
         return _extract_pdf_text_and_markers(
-            file_path, report=report, force_ocr=force_ocr, ocr_required=ocr_required,
+            file_path, report=report, force_ocr=force_ocr,
+            ocr_required=ocr_required, on_stage=on_stage,
         )
 
     if ext == "xlsx":

@@ -88,6 +88,76 @@ class TestPerformExtractionAndUpdate:
         "app.services.document_readers.extract_text_with_markers",
         return_value=("Extracted text content", [{"char_offset": 0, "kind": "page", "value": 1}]),
     )
+    def test_ocr_stage_is_written_when_the_reader_reaches_ocr(
+        self, mock_extract, MockSettings, mock_get_db,
+    ):
+        """OCR is where a slow ingestion spends its minutes — up to ~25 during
+        an outage — and the UI named "extracting" for all of it. The reader
+        hands back a stage callback; the task turns it into a status write."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        # Stand in for the reader deciding the local fast path won't do.
+        mock_extract.side_effect = lambda *a, **kw: (
+            kw["on_stage"]("ocr"),
+            ("Extracted text content", []),
+        )[1]
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        stage_writes = [
+            c for c in db.smart_document.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("task_status") == "ocr"
+        ]
+        assert len(stage_writes) == 1
+        # Written through advance_task_status, so a document that already
+        # failed is not quietly un-failed by a stage marker.
+        assert stage_writes[0][0][0]["task_status"] == {"$ne": "error"}
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("Extracted text content", [{"char_offset": 0, "kind": "page", "value": 1}]),
+    )
+    def test_a_failing_stage_write_does_not_fail_the_extraction(
+        self, mock_extract, MockSettings, mock_get_db,
+    ):
+        """Reporting progress must never cost us the document."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "test.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        def reader(*a, **kw):
+            from app.services.document_readers import _report_stage
+            _report_stage(lambda _s: (_ for _ in ()).throw(RuntimeError("mongo gone")), "ocr")
+            return ("Extracted text content", [])
+
+        mock_extract.side_effect = reader
+
+        assert perform_extraction_and_update(
+            document_uuid="doc-1", extension="pdf",
+        ) == "Extracted text content"
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=("Extracted text content", [{"char_offset": 0, "kind": "page", "value": 1}]),
+    )
     def test_force_ocr_is_passed_to_pdf_reader(self, mock_extract, MockSettings, mock_get_db):
         from app.tasks.document_tasks import perform_extraction_and_update
 
@@ -301,7 +371,7 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
             report["text_layer_rejected"] = True
             report["text_layer_rejected_reason"] = "classifier"
             return "", []
@@ -339,7 +409,7 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
             report["text_layer_rejected"] = True
             report["text_layer_rejected_reason"] = "ocr_required"
             return "", []
@@ -380,7 +450,7 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
             report["text_layer_rejected"] = True
             return "", []
 

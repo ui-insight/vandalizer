@@ -2923,76 +2923,38 @@ class TestOcrRequest(BaseModel):
 
 @router.post("/config/test-ocr")
 async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(get_current_user)):
-    """Test OCR endpoint connectivity by sending a small health-check request.
+    """Convert a generated one-page PDF through the OCR service and report it
+    step by step — the same structured diagnostic shape as the model Test button.
 
     Accepts the admin form's current values so unsaved edits can be tested;
     an ``"***"`` api key means "use the saved key", the same sentinel the
     config update path uses. Omitted fields fall back to the saved config.
 
-    The probe is provider-aware: docling-serve's convert path only answers
-    POSTs, so a GET against it reports 405 and tells an admin nothing. For that
-    provider we probe the service's ``/health`` endpoint instead, and report
-    the convert URL the extraction path will actually use — the field most
-    often misconfigured.
+    This used to GET the endpoint and call any response "ok". Both of UIdaho's
+    OCR services answer a GET with 405, so the panel read "OCR endpoint
+    responded with 405" — green — while one returned HTTP 500 to every real
+    conversion and the other returned an empty body. A month of scanned uploads
+    failed behind that badge. A test that cannot fail when the thing it tests is
+    broken is not a test, so this one does the actual conversion.
+
+    Returns HTTP 200 with ``ok`` true/false in-band (like the model diagnostic)
+    so the UI can render the breakdown rather than a bare error toast.
     """
     await _require_superadmin(user)
 
+    from app.services.system_diagnostics import diagnose_ocr
+
     cfg = await SystemConfig.get_config()
-    endpoint = body.ocr_endpoint if body and body.ocr_endpoint is not None else cfg.ocr_endpoint
-    if not endpoint:
-        raise HTTPException(status_code=400, detail="OCR endpoint not configured")
-
-    provider_raw = body.ocr_provider if body and body.ocr_provider is not None else cfg.ocr_provider
-    provider = ocr_client.normalize_provider(provider_raw)
-
-    import httpx
-
+    api_key: Optional[str] = None
     if body and body.ocr_api_key is not None and body.ocr_api_key != "***":
         api_key = body.ocr_api_key
-    else:
-        api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
 
-    headers: dict[str, str] = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    probe_url = (
-        ocr_client.docling_health_url(endpoint) if provider == "docling" else endpoint
+    return await diagnose_ocr(
+        cfg,
+        endpoint=body.ocr_endpoint if body else None,
+        api_key=api_key,
+        provider=body.ocr_provider if body else None,
     )
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(probe_url, headers=headers)
-            if provider == "docling":
-                convert_url = ocr_client.normalize_endpoint(
-                    endpoint, provider, use_async=bool(cfg.ocr_async)
-                )
-                healthy = resp.status_code == 200
-                message = (
-                    f"Docling-Serve health check returned {resp.status_code}"
-                    f" — documents will be converted via POST {convert_url}"
-                )
-                if not healthy:
-                    message += (
-                        f" (probed {probe_url}; a non-200 here usually means the URL "
-                        "is not a docling-serve root)"
-                    )
-                return {
-                    "status": "ok" if healthy else "warning",
-                    "status_code": resp.status_code,
-                    "message": message,
-                }
-            return {
-                "status": "ok",
-                "status_code": resp.status_code,
-                "message": f"OCR endpoint responded with {resp.status_code}",
-            }
-    except httpx.ConnectError:
-        raise HTTPException(status_code=502, detail="Could not connect to OCR endpoint")
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="OCR endpoint timed out")
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"OCR test failed: {e}")
 
 
 @router.post("/config/test-model/{model_id}")
@@ -3036,6 +2998,36 @@ async def get_readiness(user: User = Depends(get_current_user)) -> dict:
 
     cfg = await SystemConfig.get_config()
     return build_readiness(cfg)
+
+
+@router.get("/readiness/ocr")
+async def get_readiness_ocr(user: User = Depends(get_current_user)) -> dict:
+    """Live-probe the saved OCR service and return the checklist's OCR item.
+
+    Split from ``/readiness`` rather than folded into it because a real
+    conversion takes seconds and the checklist must render on page load. The
+    admin UI fetches this after the checklist paints and upgrades the OCR row
+    in place, so a dead OCR service turns red on its own — which is what was
+    missing when both campus services broke and the only symptom anyone saw
+    was a support ticket about uploads six weeks later.
+
+    Admin, not superadmin: reading a health verdict is not editing config, and
+    the row is already on a page admins can open. So only the verdict row is
+    returned — the probe itself carries the endpoint URL (credentials can
+    live in it) and the service's raw reply, which are for the superadmin's
+    Test button.
+    """
+    await _require_admin(user)
+
+    from app.services.system_diagnostics import build_readiness, diagnose_ocr
+
+    cfg = await SystemConfig.get_config()
+    probe = await diagnose_ocr(cfg)
+    item = next(
+        (it for it in build_readiness(cfg, ocr_probe=probe)["items"] if it["key"] == "ocr"),
+        None,
+    )
+    return {"item": item}
 
 
 class TestPromptRequest(BaseModel):

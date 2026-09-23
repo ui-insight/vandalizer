@@ -535,9 +535,16 @@ def perform_extraction_and_update(
             # same text layer re-decided (#858), and ocr_required when that
             # re-read was forced because the stored text was refused — then
             # no non-OCR reading of these pages is acceptable.
+            # The reader calls this when it hands the pages to OCR, which is
+            # where a slow ingestion actually spends its time: up to three
+            # attempts per task and five task retries with backoff, so roughly
+            # 25 minutes during an OCR outage. Without it the UI sat on
+            # "Extracting text from each page" for all of it, naming the one
+            # stage that had already finished.
             raw_text, text_markers = extract_text_with_markers(
                 str(absolute_path), extension, report=ocr_report,
                 force_ocr=force_ocr, ocr_required=ocr_required,
+                on_stage=lambda stage: advance_task_status(db, document_uuid, stage),
             )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file

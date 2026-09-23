@@ -533,8 +533,26 @@ export function setDefaultModel(name: string) {
 
 // Test connectivity
 
+// The result of converting a generated one-page PDF through the OCR service.
+// Not a reachability ping: the probe this replaced reported any HTTP response
+// as success, which is how two dead OCR services sat behind a green badge for
+// a month while every scanned upload failed.
+export type OcrTestResult = {
+  ok: boolean
+  summary: string
+  endpoint: string
+  provider: string
+  convert_url: string
+  checks: ModelCheck[]
+  latency_ms?: number
+  status_code?: number | null
+  chars?: number
+  sample?: string
+  error?: ModelDiagnosticError | null
+}
+
 export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string; ocr_provider?: OcrProvider }) {
-  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', {
+  return apiFetch<OcrTestResult>('/api/admin/config/test-ocr', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -571,7 +589,7 @@ export function testModel(modelId: string) {
 // System readiness — the admin setup checklist
 
 export type ReadinessSeverity = 'blocker' | 'recommended' | 'optional'
-export type ReadinessStatus = 'missing' | 'incomplete' | 'configured'
+export type ReadinessStatus = 'missing' | 'incomplete' | 'configured' | 'broken'
 
 export type ReadinessItem = {
   key: string
@@ -592,6 +610,14 @@ export type ReadinessReport = {
 
 export function getReadiness() {
   return apiFetch<ReadinessReport>('/api/admin/readiness')
+}
+
+// Live-probes the OCR service and returns the checklist's OCR row as it stands
+// once the verdict is in. Split from getReadiness because a real conversion
+// takes seconds and the checklist has to render on page load; the UI fetches
+// this afterwards and upgrades the row in place.
+export function probeOcrReadiness() {
+  return apiFetch<{ item: ReadinessItem | null; probe: OcrTestResult }>('/api/admin/readiness/ocr')
 }
 
 export type TestPromptResult = {

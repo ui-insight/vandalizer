@@ -698,35 +698,38 @@ class TestUserActivityHistory:
 
 
 class TestOcrConnectivityTest:
-    """POST /api/admin/config/test-ocr — form-value overrides vs saved config."""
+    """POST /api/admin/config/test-ocr — a real conversion, and whose values it uses.
 
-    def _httpx_client_mock(self, status_code=200):
-        resp = MagicMock(status_code=status_code)
-        client = MagicMock()
-        client.get = AsyncMock(return_value=resp)
-        ctx = MagicMock()
-        ctx.__aenter__ = AsyncMock(return_value=client)
-        ctx.__aexit__ = AsyncMock(return_value=False)
-        return ctx, client
+    This endpoint used to GET the endpoint and call any response "ok". Both of
+    UIdaho's OCR services answer a GET with 405, so it reported green for a
+    month while one returned HTTP 500 to every conversion and the other
+    returned an empty body; every scanned upload in that window failed. The
+    tests below pin the conversion actually happening, and the form-override
+    semantics that were worth keeping from the old probe.
+    """
+
+    def _cfg(self, **overrides):
+        base = dict(
+            ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved",
+            ocr_provider="raw", ocr_async=False, ocr_options={},
+            ocr_timeout_seconds=120,
+        )
+        base.update(overrides)
+        return SimpleNamespace(**base)
 
     @pytest.mark.asyncio
     async def test_body_overrides_saved_endpoint_and_key(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(
-            ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved",
-            ocr_provider="raw", ocr_async=False,
-        )
-        ctx, http_client = self._httpx_client_mock()
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.admin.SystemConfig") as MockCfg,
-            patch("httpx.AsyncClient", return_value=ctx),
+            patch("app.services.ocr_client.convert", return_value="probe text, plenty of it") as convert,
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg())
             resp = await client.post(
                 "/api/admin/config/test-ocr",
                 json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "new-key"},
@@ -735,29 +738,24 @@ class TestOcrConnectivityTest:
             )
 
         assert resp.status_code == 200
-        url, kwargs = http_client.get.call_args[0][0], http_client.get.call_args[1]
-        assert url == "https://form.example/ocr"
-        assert kwargs["headers"]["Authorization"] == "Bearer new-key"
+        assert resp.json()["ok"] is True
+        assert convert.call_args.kwargs["endpoint"] == "https://form.example/ocr"
+        assert convert.call_args.kwargs["headers"]["Authorization"] == "Bearer new-key"
 
     @pytest.mark.asyncio
     async def test_masked_key_sentinel_uses_saved_key(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(
-            ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved",
-            ocr_provider="raw", ocr_async=False,
-        )
-        ctx, http_client = self._httpx_client_mock()
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.admin.SystemConfig") as MockCfg,
-            patch("app.routers.admin.decrypt_value", return_value="saved-plain"),
-            patch("httpx.AsyncClient", return_value=ctx),
+            patch("app.services.system_diagnostics.decrypt_value", return_value="saved-plain"),
+            patch("app.services.ocr_client.convert", return_value="probe text, plenty of it") as convert,
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg())
             resp = await client.post(
                 "/api/admin/config/test-ocr",
                 json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "***"},
@@ -766,39 +764,35 @@ class TestOcrConnectivityTest:
             )
 
         assert resp.status_code == 200
-        assert http_client.get.call_args[1]["headers"]["Authorization"] == "Bearer saved-plain"
+        assert convert.call_args.kwargs["headers"]["Authorization"] == "Bearer saved-plain"
 
     @pytest.mark.asyncio
     async def test_no_body_falls_back_to_saved_config(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(
-            ocr_endpoint="https://saved.example/ocr", ocr_api_key="",
-            ocr_provider="raw", ocr_async=False,
-        )
-        ctx, http_client = self._httpx_client_mock()
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.admin.SystemConfig") as MockCfg,
-            patch("httpx.AsyncClient", return_value=ctx),
+            patch("app.services.ocr_client.convert", return_value="probe text, plenty of it") as convert,
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg(ocr_api_key=""))
             resp = await client.post(
                 "/api/admin/config/test-ocr", cookies=cookies, headers=headers
             )
 
         assert resp.status_code == 200
-        assert http_client.get.call_args[0][0] == "https://saved.example/ocr"
-        assert "Authorization" not in http_client.get.call_args[1]["headers"]
+        assert convert.call_args.kwargs["endpoint"] == "https://saved.example/ocr"
+        assert "Authorization" not in convert.call_args.kwargs["headers"]
 
     @pytest.mark.asyncio
-    async def test_no_endpoint_anywhere_returns_400(self, client):
+    async def test_no_endpoint_anywhere_is_an_in_band_verdict(self, client):
+        # In-band (200 + ok=False), like the model diagnostic: the UI renders a
+        # step breakdown, and an HTTP error status would collapse it to a toast.
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(ocr_endpoint="", ocr_api_key="", ocr_provider="raw", ocr_async=False)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
@@ -806,32 +800,56 @@ class TestOcrConnectivityTest:
             patch("app.routers.admin.SystemConfig") as MockCfg,
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg(ocr_endpoint=""))
             resp = await client.post(
                 "/api/admin/config/test-ocr", json={}, cookies=cookies, headers=headers
             )
 
-        assert resp.status_code == 400
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is False
+        assert body["error"]["category"] == "config"
 
     @pytest.mark.asyncio
-    async def test_docling_probes_health_not_the_convert_path(self, client):
-        # docling-serve's convert path only answers POSTs, so a GET against it
-        # reports 405 and tells the admin nothing about their config.
+    async def test_a_service_that_only_answers_pings_is_not_ok(self, client):
+        """The regression itself. A GET-based probe called this endpoint
+        healthy; a conversion against it returns HTTP 500."""
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(
-            ocr_endpoint="", ocr_api_key="", ocr_provider="docling", ocr_async=False,
+
+        from app.services import ocr_client
+
+        err = ocr_client.OcrRequestError(
+            "OCR endpoint returned HTTP 500", status_code=500, body="Internal server error",
         )
-        ctx, http_client = self._httpx_client_mock()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.services.ocr_client.convert", side_effect=err),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg())
+            resp = await client.post(
+                "/api/admin/config/test-ocr", json={}, cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is False
+
+    @pytest.mark.asyncio
+    async def test_docling_reports_the_convert_url_uploads_will_use(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.admin.SystemConfig") as MockCfg,
-            patch("httpx.AsyncClient", return_value=ctx),
+            patch("app.services.ocr_client.convert", return_value="probe text, plenty of it"),
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg(ocr_endpoint="", ocr_provider="docling"))
             resp = await client.post(
                 "/api/admin/config/test-ocr",
                 json={"ocr_endpoint": "https://docling.example.edu", "ocr_provider": "docling"},
@@ -840,36 +858,63 @@ class TestOcrConnectivityTest:
             )
 
         assert resp.status_code == 200
-        assert http_client.get.call_args[0][0] == "https://docling.example.edu/health"
-        # The message names the URL uploads will actually go to.
-        assert "https://docling.example.edu/v1/convert/file" in resp.json()["message"]
+        assert resp.json()["convert_url"] == "https://docling.example.edu/v1/convert/file"
+
+
+class TestReadinessOcrProbe:
+    """GET /api/admin/readiness/ocr — the live row behind the setup checklist."""
+
+    def _cfg(self, **overrides):
+        base = dict(
+            ocr_endpoint="https://ocr.example/convert", ocr_api_key="",
+            ocr_provider="raw", ocr_async=False, ocr_options={},
+            ocr_timeout_seconds=120, available_models=[], default_model="",
+            auth_methods=[], oauth_providers=[],
+        )
+        base.update(overrides)
+        return SimpleNamespace(**base)
 
     @pytest.mark.asyncio
-    async def test_docling_unhealthy_probe_reports_warning(self, client):
+    async def test_a_broken_service_reports_the_row_as_broken(self, client):
         admin = _make_user("admin", is_admin=True)
         cookies, headers = _auth("admin")
-        cfg = SimpleNamespace(
-            ocr_endpoint="", ocr_api_key="", ocr_provider="docling", ocr_async=False,
-        )
-        ctx, _ = self._httpx_client_mock(status_code=404)
+
+        from app.services import ocr_client
+
+        err = ocr_client.OcrRequestError("boom", status_code=500, body="Internal server error")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.services.ocr_client.convert", side_effect=err),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=self._cfg())
+            resp = await client.get("/api/admin/readiness/ocr", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["item"]["status"] == "broken"
+        # The probe (endpoint URL, raw service reply) is not handed to staff.
+        assert "probe" not in body
+
+    @pytest.mark.asyncio
+    async def test_a_working_service_reports_the_row_as_configured(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.admin.SystemConfig") as MockCfg,
-            patch("httpx.AsyncClient", return_value=ctx),
+            patch("app.services.ocr_client.convert", return_value="probe text, plenty of it"),
         ):
             MockUser.find_one = AsyncMock(return_value=admin)
-            MockCfg.get_config = AsyncMock(return_value=cfg)
-            resp = await client.post(
-                "/api/admin/config/test-ocr",
-                json={"ocr_endpoint": "https://not-docling.example", "ocr_provider": "docling"},
-                cookies=cookies,
-                headers=headers,
-            )
+            MockCfg.get_config = AsyncMock(return_value=self._cfg())
+            resp = await client.get("/api/admin/readiness/ocr", cookies=cookies, headers=headers)
 
         assert resp.status_code == 200
-        assert resp.json()["status"] == "warning"
+        assert resp.json()["item"]["status"] == "configured"
 
 
 class TestOcrProviderConfig:

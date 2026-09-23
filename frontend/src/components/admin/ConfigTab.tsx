@@ -8,9 +8,10 @@ import {
 } from 'lucide-react'
 import {
   getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  testOcr, testPrompt, getReadiness,
+  testOcr, testPrompt, getReadiness, probeOcrReadiness,
 } from '../../api/admin'
-import type { TestPromptResult, ReadinessReport, ReadinessItem } from '../../api/admin'
+import type { TestPromptResult, ReadinessReport, ReadinessItem, OcrTestResult } from '../../api/admin'
+import { DiagnosticsPanel, type DiagnosticFact } from './config/DiagnosticsPanel'
 import type {
   SystemConfigData, OcrProvider,
 } from '../../api/admin'
@@ -46,6 +47,9 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
   const sevColor: Record<string, string> = { blocker: '#dc2626', recommended: '#d97706', optional: '#6b7280' }
   const statusPill = (item: ReadinessItem) => {
     if (item.status === 'configured') return { label: 'Done', bg: '#dcfce7', fg: '#166534' }
+    // Configured but failing its live check. Red rather than amber: the service
+    // is not doing its job, and the row is the only place that says so.
+    if (item.status === 'broken') return { label: 'Not working', bg: '#fee2e2', fg: '#991b1b' }
     if (item.status === 'incomplete') return { label: 'Needs attention', bg: '#fef9c3', fg: '#854d0e' }
     return item.severity === 'blocker'
       ? { label: 'Required', bg: '#fee2e2', fg: '#991b1b' }
@@ -76,12 +80,15 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
         {report.items.map(item => {
           const pill = statusPill(item)
           const done = item.status === 'configured'
+          const broken = item.status === 'broken'
           return (
             <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderTop: '1px solid #f8fafc' }}>
               <div style={{ marginTop: 1 }}>
                 {done
                   ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
-                  : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
+                  : broken
+                    ? <XCircle size={18} style={{ color: '#dc2626' }} />
+                    : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -105,6 +112,18 @@ function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport
       </div>
     </div>
   )
+}
+
+// The facts worth showing beside a passing OCR probe: the URL uploads will
+// actually be POSTed to (the most-misconfigured field), how long one page took,
+// and how much text came back — the number that separates a real conversion
+// from an empty-bodied "success".
+function ocrDiagFacts(result: OcrTestResult): DiagnosticFact[] {
+  const facts: DiagnosticFact[] = [{ label: 'Provider', value: result.provider }]
+  if (result.convert_url) facts.push({ label: 'Converts via', value: result.convert_url, mono: true })
+  if (typeof result.latency_ms === 'number') facts.push({ label: 'Latency', value: `${result.latency_ms} ms` })
+  if (typeof result.chars === 'number') facts.push({ label: 'Text', value: `${result.chars} chars` })
+  return facts
 }
 
 // ──────────────────────────────────────────
@@ -158,7 +177,7 @@ export function ConfigTab() {
   // early return below, which is the primary guard.
   const [ocrApiKeyDirty, setOcrApiKeyDirty] = useState(false)
   const [ocrTesting, setOcrTesting] = useState(false)
-  const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [ocrTestResult, setOcrTestResult] = useState<OcrTestResult | null>(null)
   const [ocrProvider, setOcrProvider] = useState<OcrProvider>('raw')
   // Held as text, not a parsed object, so a half-typed edit isn't destroyed on
   // every keystroke. Parsed on save; a parse error blocks the save with a
@@ -176,6 +195,23 @@ export function ConfigTab() {
       setReadiness(await getReadiness())
     } catch {
       // Readiness is advisory — never block the config page on it.
+    }
+  }, [])
+
+  // The OCR row's live verdict, fetched after the checklist paints because a
+  // real conversion takes seconds. Presence of an endpoint string used to be
+  // the whole claim, and it read "Done" for a month while the service behind
+  // it answered every conversion with an HTTP 500 — the outage's only visible
+  // symptom was a support ticket about stuck uploads.
+  const refreshOcrReadiness = useCallback(async () => {
+    try {
+      const { item } = await probeOcrReadiness()
+      if (!item) return
+      setReadiness(prev => (prev
+        ? { ...prev, items: prev.items.map(i => (i.key === item.key ? item : i)) }
+        : prev))
+    } catch {
+      // Advisory too: a probe that can't run leaves the presence-based row.
     }
   }, [])
 
@@ -229,6 +265,7 @@ export function ConfigTab() {
   const [retentionSaved, setRetentionSaved] = useState(false)
 
   useEffect(() => { void refreshReadiness() }, [refreshReadiness])
+  useEffect(() => { void refreshOcrReadiness() }, [refreshOcrReadiness])
 
   // Extracted so the error panel's Retry control can re-run the exact same
   // load the mount effect performs, resetting loadError/loading each time.
@@ -373,6 +410,7 @@ export function ConfigTab() {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
       void refreshReadiness()
+      void refreshOcrReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -386,10 +424,19 @@ export function ConfigTab() {
     try {
       // Send the form's current values so unsaved edits are what gets tested;
       // an untouched key field holds the "***" sentinel, meaning the saved key.
-      const res = await testOcr({ ocr_endpoint: ocrEndpoint, ocr_api_key: ocrApiKey, ocr_provider: ocrProvider })
-      setOcrTestResult({ ok: res.status !== 'warning', message: res.message })
+      setOcrTestResult(await testOcr({
+        ocr_endpoint: ocrEndpoint, ocr_api_key: ocrApiKey, ocr_provider: ocrProvider,
+      }))
+      // A test that just changed the verdict should change the checklist too.
+      void refreshOcrReadiness()
     } catch (e) {
-      setOcrTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
+      // The verdict itself comes back in-band (200 + ok:false); reaching here
+      // means the request never completed, which is still a failed test.
+      setOcrTestResult({
+        ok: false,
+        summary: e instanceof Error ? e.message : 'Test failed',
+        endpoint: ocrEndpoint, provider: ocrProvider, convert_url: '', checks: [],
+      })
     } finally {
       setOcrTesting(false)
     }
@@ -777,10 +824,24 @@ ${playgroundResult.request.user_prompt}`}
             {ocrTestResult && (
               <span role="status" aria-live="polite" style={{ fontSize: 13, color: ocrTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
                 {ocrTestResult.ok ? <CheckCircle2 size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} />}
-                {ocrTestResult.message}
+                {ocrTestResult.summary}
               </span>
             )}
           </div>
+          {ocrTestResult && ocrTestResult.checks.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <DiagnosticsPanel
+                ok={ocrTestResult.ok}
+                summary={ocrTestResult.summary}
+                checks={ocrTestResult.checks}
+                facts={ocrDiagFacts(ocrTestResult)}
+                preview={ocrTestResult.sample}
+                previewLabel="text"
+                error={ocrTestResult.error}
+                rawLabel="raw response"
+              />
+            </div>
+          )}
           <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f3f4f6' }}>
             <label style={labelStyle} htmlFor="allowed-private-hosts">Allowed private hosts</label>
             <textarea

@@ -1946,3 +1946,70 @@ class TestArchiveInterceptionBeforeMarkItDown:
         path.write_bytes(b"irrelevant; the converter is stubbed")
         with patch.object(dr, "convert_to_markdown", return_value="# Notes\n\nplain prose\n"):
             assert "plain prose" in dr.extract_text_from_file(str(path), "qqq")
+
+
+class TestOcrStageIsAnnounced:
+    """The reader tells its caller when it hands the pages to OCR.
+
+    OCR is where a slow ingestion spends its minutes: three attempts per task
+    and five task retries with backoff, roughly 25 minutes during an outage.
+    Without this signal the UI showed "Extracting text from each page" for all
+    of it — naming the one stage that had already finished — which is what a
+    user and a support engineer both saw while MindRouter was returning 500s.
+    """
+
+    def _image_based_classification(self):
+        return type(
+            "C", (), {"pdf_type": "image_based", "confidence": 0.80, "pages_needing_ocr": [1]},
+        )()
+
+    def test_stage_is_reported_before_the_ocr_round_trip(self, text_pdf):
+        from unittest.mock import patch
+
+        import app.services.document_readers as dr
+
+        seen: list[str] = []
+
+        def ocr(pdf_path, report=None):
+            # Ordering matters: reported *before* the call, or the status is
+            # only correct once the slow part is already over.
+            assert seen == ["ocr"]
+            return (
+                "text recovered by OCR: a full page of converted prose, comfortably past the hundred-character floor the reader requires before it keeps an OCR result at all"
+            )
+
+        with patch("pdf_inspector.classify_pdf", return_value=self._image_based_classification()), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=ocr):
+            dr._read_pdf_text_and_markers(text_pdf, report={}, on_stage=seen.append)
+
+        assert seen == ["ocr"]
+
+    def test_no_stage_is_reported_when_the_local_fast_path_wins(self, text_pdf):
+        """Most uploads never touch OCR; they must not claim to."""
+        from unittest.mock import patch
+
+        import app.services.document_readers as dr
+
+        seen: list[str] = []
+        with patch.object(dr, "ocr_extract_text_from_pdf") as mock_ocr:
+            dr._read_pdf_text_and_markers(text_pdf, report={}, on_stage=seen.append)
+
+        mock_ocr.assert_not_called()
+        assert seen == []
+
+    def test_a_raising_callback_does_not_break_the_read(self, text_pdf):
+        from unittest.mock import patch
+
+        import app.services.document_readers as dr
+
+        def boom(_stage):
+            raise RuntimeError("mongo gone")
+
+        with patch("pdf_inspector.classify_pdf", return_value=self._image_based_classification()), \
+             patch.object(dr, "ocr_extract_text_from_pdf",
+                          return_value=(
+                              "text recovered by OCR: a full page of converted prose, comfortably past the hundred-character floor the reader requires before it keeps an OCR result at all"
+                          )):
+            text, _ = dr._read_pdf_text_and_markers(text_pdf, report={}, on_stage=boom)
+
+        assert "recovered by OCR" in text

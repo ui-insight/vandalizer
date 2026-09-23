@@ -55,6 +55,36 @@ _DOCLING_CONTENT_FIELDS = (
 _ASYNC_POLL_INTERVAL_SECONDS = 2.0
 _ASYNC_MAX_POLL_SECONDS = 900.0
 
+# The sentence rendered onto the probe page. Ordinary words in an ordinary
+# font: a service that converts PDFs at all converts this, so anything less
+# than a recognizable echo of it is the service failing, not the page being
+# hard to read.
+PROBE_PAGE_TEXT = "Vandalizer OCR probe. The quick brown fox jumps over the lazy dog. 0123456789"
+
+# Below this many characters a response is not a conversion of the probe page.
+# Deliberately far under ``len(PROBE_PAGE_TEXT)``: a service that drops the
+# digits or mangles a word still proves it can read, and this exists to catch
+# the empty-bodied "success" — a bare newline, ``{}``, an empty string — not
+# to grade OCR accuracy.
+PROBE_MIN_TEXT_CHARS = 20
+
+
+def build_probe_pdf() -> bytes:
+    """A one-page PDF carrying :data:`PROBE_PAGE_TEXT`, as bytes.
+
+    Generated rather than shipped as a fixture so the probe can never drift
+    from the text it asserts on, and so nothing needs to exist on disk in a
+    container whose upload volume is read-only.
+    """
+    import pymupdf
+
+    doc = pymupdf.open()
+    try:
+        doc.new_page().insert_text((72, 72), PROBE_PAGE_TEXT, fontsize=14)
+        return doc.tobytes()
+    finally:
+        doc.close()
+
 
 class OcrRequestError(RuntimeError):
     """A single OCR attempt failed. Retryable — the caller decides."""
