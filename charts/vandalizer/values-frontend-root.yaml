@@ -1,0 +1,22 @@
+# Example: use the root-nginx frontend image (the same image compose users
+# run) instead of the default unprivileged variant. The three values below
+# must change together, and the pod can no longer satisfy the restricted Pod
+# Security Standard (nginx's master process starts as root to bind port 80).
+image:
+  frontend:
+    repository: ghcr.io/ui-insight/vandalizer-frontend
+frontend:
+  containerPort: 80
+  podSecurityContext:
+    runAsNonRoot: false
+    # Clear the unprivileged defaults — this image's nginx master runs as root.
+    runAsUser: null
+    runAsGroup: null
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    # nginx needs to setuid its workers and bind :80.
+    capabilities:
+      drop: ["ALL"]
+      add: ["CHOWN", "NET_BIND_SERVICE", "SETGID", "SETUID"]

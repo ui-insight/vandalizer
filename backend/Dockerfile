@@ -98,7 +98,9 @@ COPY setup_default_team.py ./
 RUN mkdir -p /app/static/uploads /app/static/db && \
     chown -R appuser:appuser /app
 
-USER appuser
+# Numeric so Kubernetes' runAsNonRoot check can verify it without a
+# runAsUser override (a named USER cannot be verified by the kubelet).
+USER 1000:1000
 
 EXPOSE 8001
 

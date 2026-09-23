@@ -1,0 +1,111 @@
+{{/*
+Adapted from frontend/nginx.conf. The image's baked config assumes the api
+Service is literally named "api"; in a Helm release it carries the fullname
+prefix, so the chart owns this config and mounts it over
+/etc/nginx/conf.d/default.conf. Behavioral requirements preserved from the
+source file: SSE support on /api (buffering off, generous read timeout),
+client_max_body_size for large uploads, the legacy Azure OAuth callback
+route, no-cache index.html, and the SPA fallback.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-frontend-nginx
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+data:
+  default.conf: |
+    # This nginx terminates plain HTTP inside the cluster, so $scheme is
+    # always "http" — stamping it into X-Forwarded-Proto would overwrite the
+    # truthful value set by the TLS-terminating edge (the Gateway, an Ingress
+    # controller, a CDN) and break the backend's scheme-sensitive logic (SAML
+    # issuer/ACS URLs). Pass the upstream header through; when none arrives
+    # (direct access, port-forward), fall back to $scheme. Mirrors
+    # frontend/nginx.conf.
+    map $http_x_forwarded_proto $edge_scheme {
+        default $http_x_forwarded_proto;
+        ""      $scheme;
+    }
+
+    server {
+        listen {{ .Values.frontend.containerPort }};
+        server_name _;
+
+        root /usr/share/nginx/html;
+        index index.html;
+
+        client_max_body_size {{ .Values.frontend.clientMaxBodySize }};
+
+        # Security headers (applied to all responses)
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        # X-Frame-Options is set only on HTML page responses (not on API/file responses)
+
+        # Health check endpoint for probes
+        location = /health {
+            access_log off;
+            return 200 "ok";
+            add_header Content-Type text/plain;
+        }
+
+        # Prometheus metrics are unauthenticated; never serve them at the edge.
+        # Scrape the api Service directly (see values: serviceMonitor).
+        location = /api/metrics {
+            return 404;
+        }
+
+        # Proxy API requests to the backend
+        location /api/ {
+            proxy_pass http://{{ include "vandalizer.fullname" . }}-api:8001;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $edge_scheme;
+
+            # SSE/streaming support (for chat endpoints)
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout {{ .Values.frontend.proxyReadTimeout }};
+        }
+
+        # Azure AD OAuth callback — legacy redirect URI registered in Azure app
+        location = /login/azure/authorized {
+            proxy_pass http://{{ include "vandalizer.fullname" . }}-api:8001;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $edge_scheme;
+        }
+
+        # index.html must never be cached so deploys take effect immediately
+        location = /index.html {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header Pragma "no-cache";
+            add_header Expires "0";
+            add_header X-Frame-Options "DENY";
+            add_header X-Content-Type-Options "nosniff";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+        }
+
+        # SPA fallback - serve index.html for all other routes
+        location / {
+            add_header Cache-Control "no-cache, no-store, must-revalidate";
+            add_header X-Frame-Options "DENY";
+            add_header X-Content-Type-Options "nosniff";
+            add_header Referrer-Policy "strict-origin-when-cross-origin";
+            try_files $uri $uri/ /index.html;
+        }
+
+        # Serve .mjs files with correct MIME type (pdfjs worker, etc.)
+        location ~* \.mjs$ {
+            types { application/javascript mjs; }
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # Cache static assets
+        location ~* \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+    }

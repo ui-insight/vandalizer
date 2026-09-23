@@ -1,0 +1,19 @@
+{{- if and .Values.chromadb.enabled (not .Values.chromadb.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-chromadb
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "chromadb") | nindent 4 }}
+  {{- with .Values.chromadb.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.chromadb.persistence.accessModes | nindent 4 }}
+  {{- include "vandalizer.storageClass" .Values.chromadb.persistence | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ .Values.chromadb.persistence.size }}
+{{- end }}

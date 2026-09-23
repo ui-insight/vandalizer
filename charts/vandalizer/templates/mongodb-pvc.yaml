@@ -1,0 +1,19 @@
+{{- if and .Values.mongodb.enabled (not .Values.mongodb.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-mongodb
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "mongodb") | nindent 4 }}
+  {{- with .Values.mongodb.persistence.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.mongodb.persistence.accessModes | nindent 4 }}
+  {{- include "vandalizer.storageClass" .Values.mongodb.persistence | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ .Values.mongodb.persistence.size }}
+{{- end }}

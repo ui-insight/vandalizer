@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check security security-gate security-built-images
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit review-graph endpoint-map endpoint-map-check backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci helm-lint docker-build release-check security security-gate security-built-images
 
 help:
 	@printf "Common targets:\n"
@@ -15,7 +15,8 @@ help:
 	@printf "  make frontend-install  Install frontend dependencies\n"
 	@printf "  make frontend-ci       Run frontend typecheck, lint, tests, and build\n"
 	@printf "  make ci                Run backend and frontend CI checks\n"
-	@printf "  make release-check     Run CI checks and both Docker builds\n"
+	@printf "  make helm-lint         Lint and schema-validate the Helm chart\n"
+	@printf "  make release-check     Run CI checks, Docker builds, and chart lint\n"
 	@printf "  make security          Full vulnerability report (deps, images, secrets, config)\n"
 	@printf "  make security-gate     Release-gating scan: fails on CRITICAL or a leaked secret\n"
 	@printf "  make security-built-images  Scan the published images (run after docker-build)\n"
@@ -154,6 +155,24 @@ frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test front
 
 ci: backend-ci frontend-ci
 
+# Requires helm and kubeconform on PATH. Lints and schema-validates the chart
+# against every values permutation in charts/vandalizer/ci/. Core resources
+# validate against kubeconform's default schema source; the two CRDs the chart
+# can emit (Gateway API HTTPRoute, Prometheus Operator ServiceMonitor) come
+# from the community CRDs-catalog. Override CRD_SCHEMAS to point at a local
+# mirror laid out as {group}/{kind}_{version}.json.
+CRD_SCHEMAS ?= https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json
+helm-lint:
+	@for f in charts/vandalizer/ci/*-values.yaml; do \
+		echo "== $$f"; \
+		helm lint charts/vandalizer -f $$f --quiet || exit 1; \
+		helm template vandalizer charts/vandalizer -f $$f \
+			| kubeconform -strict -summary \
+				-schema-location default \
+				-schema-location '$(CRD_SCHEMAS)' \
+			|| exit 1; \
+	done
+
 docker-build:
 	docker build -t vandalizer-backend ./backend
 	# Forward Sentry build-args from the shell. Unset vars expand to empty,
@@ -163,8 +182,16 @@ docker-build:
 		--build-arg VITE_SENTRY_ENVIRONMENT="$$VITE_SENTRY_ENVIRONMENT" \
 		--build-arg VITE_SENTRY_RELEASE="$$VITE_SENTRY_RELEASE" \
 		-t vandalizer-frontend ./frontend
+	# The unprivileged frontend variant published for Kubernetes; built here
+	# so release-check catches a broken target before the release workflow.
+	docker build \
+		--target runtime-unprivileged \
+		--build-arg VITE_SENTRY_DSN="$$VITE_SENTRY_DSN" \
+		--build-arg VITE_SENTRY_ENVIRONMENT="$$VITE_SENTRY_ENVIRONMENT" \
+		--build-arg VITE_SENTRY_RELEASE="$$VITE_SENTRY_RELEASE" \
+		-t vandalizer-frontend-unprivileged ./frontend
 
-release-check: backend-static ci security-gate docker-build
+release-check: backend-static ci security-gate docker-build helm-lint
 
 # ---------------------------------------------------------------------------
 # Vulnerability scanning (Trivy)
@@ -189,7 +216,7 @@ TRIVY ?= trivy
 # absent: its packages never reach a shipped artifact, and including it would
 # put findings in front of reviewers that they cannot act on and should not
 # care about. Scan what runs in production.
-RUNTIME_IMAGES := python:3.12-slim nginx:alpine
+RUNTIME_IMAGES := python:3.12-slim nginx:alpine nginxinc/nginx-unprivileged:alpine
 
 security:
 	@printf "\n=== Dependencies, secrets, and config ===\n"
@@ -253,7 +280,7 @@ security-gate:
 # been scanned, so the finding count is unknown and a gate switched on blind
 # would either be vacuous or block the release pipeline on day one. Promote it
 # to security-gate once a few runs have established the real baseline.
-BUILT_IMAGES := vandalizer-backend vandalizer-frontend
+BUILT_IMAGES := vandalizer-backend vandalizer-frontend vandalizer-frontend-unprivileged
 
 security-built-images:
 	@for img in $(BUILT_IMAGES); do \

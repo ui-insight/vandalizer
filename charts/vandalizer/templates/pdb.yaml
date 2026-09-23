@@ -1,0 +1,32 @@
+{{/*
+PDBs only for the stateless tiers. Celery workers drain via their generous
+terminationGracePeriodSeconds, and the single-replica datastores must not
+carry a PDB — it would block node drains outright.
+*/}}
+{{- if .Values.api.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-api
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "api") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.api.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "api") | nindent 6 }}
+{{- end }}
+{{- if .Values.frontend.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-frontend
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.frontend.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "frontend") | nindent 6 }}
+{{- end }}

@@ -1,0 +1,23 @@
+# Lint/render values: every datastore external, secrets and uploads
+# user-managed, bootstrap disabled.
+config:
+  frontendUrl: https://vandalizer.ci.example.edu
+secrets:
+  existingSecret: my-vandalizer-secrets
+uploads:
+  existingClaim: my-uploads-claim
+mongodb:
+  enabled: false
+  external:
+    uri: mongodb://user:pass@mongo.ci.example.edu:27017/
+redis:
+  enabled: false
+  external:
+    host: redis.ci.example.edu
+chromadb:
+  enabled: false
+  external:
+    host: chroma.ci.example.edu
+    port: 8000
+bootstrap:
+  enabled: false

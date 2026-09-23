@@ -1,0 +1,75 @@
+{{- if .Values.beat.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-celery-beat
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "celery-beat") | nindent 4 }}
+spec:
+  # Never scale beat: each replica fires the full schedule, so two replicas
+  # means every periodic task runs twice. Recreate prevents even a transient
+  # second scheduler during rollouts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "celery-beat") | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "vandalizer.backendChecksums" . | nindent 8 }}
+        {{- with .Values.celery.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "celery-beat") | nindent 8 }}
+        vandalizer.io/role: backend
+        {{- with .Values.celery.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vandalizer.serviceAccountName" . }}
+      {{- with .Values.celery.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celery-beat
+          image: {{ include "vandalizer.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.celery.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - celery
+            - -A
+            - celery_worker.celery_app
+            - beat
+            - --loglevel=info
+            # The default schedule file lands next to the code (read-only
+            # territory); keep beat's state on the writable scratch volume.
+            - --schedule=/tmp/beat/celerybeat-schedule
+          {{- include "vandalizer.backendEnvFrom" . | nindent 10 }}
+          {{- with .Values.beat.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            # Settings() creates upload_dir at import; beat never serves
+            # files, so scratch space is enough — no claim on the RWX volume.
+            - name: uploads-scratch
+              mountPath: {{ .Values.config.uploadDir }}
+            - name: beat-state
+              mountPath: /tmp/beat
+      volumes:
+        - name: uploads-scratch
+          emptyDir: {}
+        - name: beat-state
+          emptyDir: {}
+{{- end }}

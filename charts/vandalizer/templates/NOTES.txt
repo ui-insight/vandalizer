@@ -1,0 +1,45 @@
+Vandalizer {{ .Chart.AppVersion }} has been deployed as release "{{ .Release.Name }}".
+
+{{- if .Values.ingress.enabled }}
+
+Reach the app at: http{{ if .Values.ingress.tls }}s{{ end }}://{{ default .Values.hostname .Values.ingress.host }}/
+{{- else if .Values.httpRoute.enabled }}
+
+An HTTPRoute was created{{ with include "vandalizer.httpRouteHostnames" . }} for hostnames: {{ . | fromYamlArray | join ", " }}{{ end }}.
+Check that it attached to its Gateway:
+  kubectl -n {{ .Release.Namespace }} get httproute {{ include "vandalizer.fullname" . }} -o jsonpath='{.status.parents}'
+{{- else }}
+
+No Ingress or HTTPRoute is enabled. Reach the app with a port-forward:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "vandalizer.fullname" . }}-frontend 8080:{{ .Values.frontend.service.port }}
+then open http://localhost:8080/
+{{- end }}
+
+{{- if .Values.bootstrap.enabled }}
+
+First-run bootstrap: a post-install Job created the admin account
+{{- if .Values.bootstrap.adminEmail }} ({{ .Values.bootstrap.adminEmail }}){{ end }} and seeded the
+workflow catalog. It runs on INSTALL ONLY — re-running it resets the admin
+password — so upgrades never trigger it. To re-run it deliberately:
+  kubectl -n {{ .Release.Namespace }} create job --from=job/{{ include "vandalizer.fullname" . }}-bootstrap {{ include "vandalizer.fullname" . }}-bootstrap-rerun
+(if the original Job has been cleaned up, `helm template` the chart and apply
+the bootstrap Job manifest by hand).
+{{- else }}
+
+Bootstrap is disabled. Create the admin account manually:
+  kubectl -n {{ .Release.Namespace }} exec deploy/{{ include "vandalizer.fullname" . }}-api -- \
+    env ADMIN_EMAIL=you@example.edu ADMIN_PASSWORD=... python bootstrap_install.py
+{{- end }}
+
+IMPORTANT — back up your CONFIG_ENCRYPTION_KEY. It encrypts the LLM API keys
+and OAuth credentials stored in MongoDB; if it is lost or rotated, every
+stored credential becomes permanently undecryptable. Keep the Secret
+({{ include "vandalizer.secretName" . }}) in your backup/secret-management system.
+
+{{- if and .Values.uploads.existingClaim (not .Values.uploads.accessModes) }}
+{{- else if not .Values.uploads.existingClaim }}
+
+Storage note: the uploads volume requests {{ join ", " .Values.uploads.accessModes }}.
+On multi-node clusters it must be ReadWriteMany (api and celery pods mount it
+simultaneously); make sure your storage class supports RWX.
+{{- end }}

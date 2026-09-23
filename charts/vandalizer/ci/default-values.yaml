@@ -1,0 +1,9 @@
+# Lint/render values: default topology (in-cluster datastores, no edge).
+config:
+  frontendUrl: https://vandalizer.ci.example.edu
+secrets:
+  jwtSecretKey: ci-only-jwt-secret
+  configEncryptionKey: ci-only-fernet-key
+bootstrap:
+  adminEmail: ci@example.edu
+  adminPassword: ci-only-password

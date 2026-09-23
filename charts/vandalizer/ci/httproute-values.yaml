@@ -1,0 +1,40 @@
+# Lint/render values: Gateway API edge, ServiceMonitor, HPA, and PDBs on —
+# exercises the optional resources.
+# hostname derivation exercised here: frontendUrl and httpRoute.hostnames
+# are intentionally NOT set — both must render from `hostname`.
+hostname: vandalizer.ci.example.edu
+secrets:
+  jwtSecretKey: ci-only-jwt-secret
+  configEncryptionKey: ci-only-fernet-key
+bootstrap:
+  existingSecret: my-bootstrap-secret
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: ci-gateway
+      namespace: gateways
+      sectionName: https
+api:
+  hpa:
+    enabled: true
+  pdb:
+    enabled: true
+frontend:
+  pdb:
+    enabled: true
+metrics:
+  serviceMonitor:
+    enabled: true
+# Exercises both peer-list values, including the ipBlock form used for
+# hostNetwork edges.
+networkPolicy:
+  frontendIngressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: gateways
+    - ipBlock:
+        cidr: 10.0.0.0/24
+  apiExtraIngressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring

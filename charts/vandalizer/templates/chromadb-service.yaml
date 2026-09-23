@@ -1,0 +1,17 @@
+{{- if .Values.chromadb.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-chromadb
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "chromadb") | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP
+  selector:
+    {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "chromadb") | nindent 4 }}
+{{- end }}

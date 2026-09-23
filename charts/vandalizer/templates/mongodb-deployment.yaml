@@ -1,0 +1,89 @@
+{{- if .Values.mongodb.enabled }}
+{{/*
+Deliberately minimal single-replica MongoDB mirroring compose.yaml — a
+pinned image, a PVC, and probes. Sites needing replica sets, auth, or backups
+should run their own MongoDB (or an operator) and set mongodb.enabled=false
+with mongodb.external.uri.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-mongodb
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "mongodb") | nindent 4 }}
+spec:
+  replicas: 1
+  # A second mongod pointed at the same volume would corrupt it; Recreate
+  # guarantees the old pod is gone before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "mongodb") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "mongodb") | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mongodb.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mongodb
+          image: "{{ .Values.mongodb.image.repository }}:{{ .Values.mongodb.image.tag }}"
+          imagePullPolicy: {{ .Values.mongodb.image.pullPolicy }}
+          {{- with .Values.mongodb.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: mongo
+              containerPort: 27017
+              protocol: TCP
+          startupProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--eval", "db.adminCommand('ping')"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          {{- with .Values.mongodb.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Values.mongodb.persistence.existingClaim | default (printf "%s-mongodb" (include "vandalizer.fullname" .)) }}
+      {{- with .Values.mongodb.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mongodb.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mongodb.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

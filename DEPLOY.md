@@ -418,6 +418,33 @@ If anything is broken, run `./setup.sh --repair` to diagnose and fix.
 - **FastAPI workers** are configured via the `--workers` flag in the uvicorn command. The default is 4; increase for higher API concurrency.
 - **MongoDB and Redis** can be externalized to managed services (MongoDB Atlas, AWS ElastiCache, etc.) by updating `MONGO_HOST` and `REDIS_HOST`.
 
+## Kubernetes (Helm)
+
+A Helm chart lives at [`charts/vandalizer/`](charts/vandalizer/README.md). It
+deploys the api, one Celery worker Deployment per queue plus the beat
+scheduler, the frontend (defaulting to the non-root
+`vandalizer-frontend-unprivileged` image), and optional in-cluster MongoDB,
+Redis, and ChromaDB — each replaceable with an external endpoint.
+
+What you need up front:
+
+- **Storage**: a ReadWriteMany-capable storage class for the shared uploads
+  volume on multi-node clusters (any RWX provisioner works — Ceph NFS, EFS,
+  Azure Files, ...). All storage classes, access modes, and sizes are
+  values-driven, and every volume accepts an `existingClaim`.
+- **Edge**: either a classic Ingress (`ingress.enabled=true`) or Gateway API
+  (`httpRoute.enabled=true` with your Gateway's `parentRefs`).
+- **Secrets**: a JWT signing key and a Fernet `CONFIG_ENCRYPTION_KEY`
+  (back it up — it encrypts credentials stored in MongoDB).
+- **Bootstrap**: the chart runs `bootstrap_install.py` as a post-install Job
+  (admin account + catalog seed); set `bootstrap.adminEmail`/`adminPassword`
+  or point `bootstrap.existingSecret` at a Secret.
+
+See the [chart README](charts/vandalizer/README.md) for a quickstart, the
+routing topology, external-datastore examples, and OpenShift notes. Validate
+chart changes locally with `make helm-lint` (requires `helm` and
+`kubeconform`).
+
 ## Architecture
 
 ```

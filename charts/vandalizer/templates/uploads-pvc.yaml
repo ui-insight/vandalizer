@@ -1,0 +1,19 @@
+{{- if not .Values.uploads.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-uploads
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "uploads") | nindent 4 }}
+  {{- with .Values.uploads.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.uploads.accessModes | nindent 4 }}
+  {{- include "vandalizer.storageClass" .Values.uploads | nindent 2 }}
+  resources:
+    requests:
+      storage: {{ .Values.uploads.size }}
+{{- end }}

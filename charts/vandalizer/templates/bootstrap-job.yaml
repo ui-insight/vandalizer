@@ -1,0 +1,148 @@
+{{- if .Values.bootstrap.enabled }}
+{{/*
+First-run install bootstrap: admin account, optional default team/org, and
+the workflow catalog seed. POST-INSTALL ONLY, never post-upgrade —
+bootstrap_install.py unconditionally resets the admin password, so running it
+on upgrades would clobber password changes made in the UI. NOTES.txt explains
+how to re-run it deliberately.
+*/}}
+{{- if not .Values.bootstrap.existingSecret }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-bootstrap
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "bootstrap") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+type: Opaque
+stringData:
+  ADMIN_EMAIL: {{ required "bootstrap.adminEmail is required when bootstrap.enabled=true (or set bootstrap.existingSecret / bootstrap.enabled=false)" .Values.bootstrap.adminEmail | quote }}
+  ADMIN_PASSWORD: {{ required "bootstrap.adminPassword is required when bootstrap.enabled=true (or set bootstrap.existingSecret / bootstrap.enabled=false)" .Values.bootstrap.adminPassword | quote }}
+  {{- with .Values.bootstrap.adminName }}
+  ADMIN_NAME: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.bootstrap.defaultTeamName }}
+  DEFAULT_TEAM_NAME: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.bootstrap.orgName }}
+  ORG_NAME: {{ . | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-bootstrap
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "bootstrap") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "5"
+    # Kept after success so its logs stay inspectable; replaced if the hook
+    # ever fires again.
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 6
+  template:
+    metadata:
+      labels:
+        {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "bootstrap") | nindent 8 }}
+        # Grants datastore access under the chart's NetworkPolicy.
+        vandalizer.io/role: backend
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vandalizer.serviceAccountName" . }}
+      {{- with .Values.api.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # /api/health only returns 200 once Mongo, Redis, and ChromaDB all
+        # answer, so gating on it keeps the bootstrap from burning its retry
+        # budget while the datastores are still pulling and starting.
+        - name: wait-for-stack
+          image: {{ include "vandalizer.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.api.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - python
+            - -c
+            - |
+              import time, urllib.request
+              url = "http://{{ include "vandalizer.fullname" . }}-api:8001/api/health"
+              deadline = time.monotonic() + 900
+              while time.monotonic() < deadline:
+                  try:
+                      with urllib.request.urlopen(url, timeout=5) as r:
+                          if r.status == 200:
+                              print("stack healthy")
+                              raise SystemExit(0)
+                  except SystemExit:
+                      raise
+                  except Exception as e:
+                      print(f"waiting: {e}", flush=True)
+                  time.sleep(10)
+              raise SystemExit("timed out waiting for the stack to become healthy")
+      containers:
+        - name: bootstrap
+          image: {{ include "vandalizer.backendImage" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.api.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command: ["python", "bootstrap_install.py"]
+          {{- include "vandalizer.backendEnvFrom" . | nindent 10 }}
+          env:
+            # Sourced individually (not envFrom) so the admin credentials
+            # never leak into the api/celery pod environments.
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret | default (printf "%s-bootstrap" (include "vandalizer.fullname" .)) }}
+                  key: ADMIN_EMAIL
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret | default (printf "%s-bootstrap" (include "vandalizer.fullname" .)) }}
+                  key: ADMIN_PASSWORD
+            - name: ADMIN_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret | default (printf "%s-bootstrap" (include "vandalizer.fullname" .)) }}
+                  key: ADMIN_NAME
+                  optional: true
+            - name: DEFAULT_TEAM_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret | default (printf "%s-bootstrap" (include "vandalizer.fullname" .)) }}
+                  key: DEFAULT_TEAM_NAME
+                  optional: true
+            - name: ORG_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret | default (printf "%s-bootstrap" (include "vandalizer.fullname" .)) }}
+                  key: ORG_NAME
+                  optional: true
+          {{- with .Values.bootstrap.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: uploads
+              mountPath: {{ .Values.config.uploadDir }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ include "vandalizer.uploadsClaimName" . }}
+{{- end }}

@@ -244,3 +244,23 @@ jobs:
       - name: Scan published images (advisory)
         continue-on-error: true
         run: make security-built-images
+
+  helm-lint:
+    name: Helm Chart Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # helm is preinstalled on ubuntu-latest runners; kubeconform is not.
+      # Pinned by version and checksum (this repo avoids unpinned fetches in
+      # token-bearing runners).
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  kubeconform.tgz" | sha256sum -c -
+          tar xzf kubeconform.tgz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+
+      - name: Lint and validate the chart
+        run: make helm-lint
