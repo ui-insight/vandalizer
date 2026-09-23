@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
-import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail } from 'lucide-react'
+import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail, CalendarClock } from 'lucide-react'
 import { createAutomation, updateAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { apiFetch } from '../../api/client'
 import { getFeatureFlags } from '../../api/config'
 import { ItemPickerModal } from './ItemPickerModal'
+import { ScheduleConfigFields } from './ScheduleConfigFields'
+import { CollapsibleSection } from '../shared/CollapsibleSection'
+import { defaultScheduleConfig, isScheduleComplete, scheduleConfigPayload } from '../../utils/schedule'
 import type { ActionType, TriggerType } from '../../types/automation'
 import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 interface Props {
@@ -17,6 +20,7 @@ interface Props {
 const BASE_TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
   { value: 'api', label: 'API Endpoint', icon: Globe, description: 'Trigger via HTTP POST request' },
+  { value: 'schedule', label: 'Schedule', icon: CalendarClock, description: 'Run daily, weekly or monthly at a set time' },
 ]
 
 const M365_TRIGGER_OPTION = { value: 'm365_intake' as TriggerType, label: 'M365 Intake', icon: Mail, description: 'Trigger when files arrive in a Microsoft 365 source' }
@@ -66,6 +70,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
 
+  // Schedule config state
+  const [scheduleConfig, setScheduleConfig] = useState(defaultScheduleConfig)
+  // While the document picker is open, Escape and Enter belong to it.
+  const [docPickerOpen, setDocPickerOpen] = useState(false)
+
   // Final step: output, enable, share
   const [enabled, setEnabled] = useState(true)
   const [sharedWithTeam, setSharedWithTeam] = useState(false)
@@ -75,16 +84,16 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [emailNotify, setEmailNotify] = useState(false)
   const [emailRecipients, setEmailRecipients] = useState('')
 
-  // Dynamic step count: folder_watch adds a config step, plus final config step
-  const hasFolderStep = triggerType === 'folder_watch'
-  const totalSteps = hasFolderStep ? 5 : 4
+  // Dynamic step count: folder_watch and schedule add a config step
+  const hasConfigStep = triggerType === 'folder_watch' || triggerType === 'schedule'
+  const totalSteps = hasConfigStep ? 5 : 4
 
   // Map logical step to content:
-  // folder_watch: 1=name, 2=trigger, 3=folder config, 4=action, 5=output & activate
-  // api:          1=name, 2=trigger, 3=action, 4=output & activate
-  const actionStep = hasFolderStep ? 4 : 3
+  // folder_watch / schedule: 1=name, 2=trigger, 3=trigger config, 4=action, 5=output & activate
+  // api:                     1=name, 2=trigger, 3=action, 4=output & activate
+  const actionStep = hasConfigStep ? 4 : 3
   const finalStep = totalSteps
-  const folderStep = 3 // only used when hasFolderStep
+  const configStep = 3 // only used when hasConfigStep
 
   useEffect(() => {
     if (step === 1) nameRef.current?.focus()
@@ -92,7 +101,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
 
   // Load folders when entering the folder config step or the final step (for output folder)
   useEffect(() => {
-    const needsFolders = (hasFolderStep && step === folderStep) || step === finalStep
+    const needsFolders = (hasConfigStep && step === configStep) || step === finalStep
     if (needsFolders && folders.length === 0) {
       setFoldersLoading(true)
       apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
@@ -100,16 +109,18 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         .catch(() => {})
         .finally(() => setFoldersLoading(false))
     }
-  }, [step, hasFolderStep, folderStep, finalStep, folders.length])
+  }, [step, hasConfigStep, configStep, finalStep, folders.length])
 
   const canAdvance = useCallback((): boolean => {
     if (step === 1) return name.trim().length > 0
     if (step === 2) return true
-    if (hasFolderStep && step === folderStep) return watchFolderId.length > 0
+    if (hasConfigStep && step === configStep) {
+      return triggerType === 'schedule' ? isScheduleComplete(scheduleConfig) : watchFolderId.length > 0
+    }
     if (step === actionStep) return actionId.length > 0
     if (step === finalStep) return true
     return false
-  }, [step, name, hasFolderStep, folderStep, actionStep, finalStep, watchFolderId, actionId])
+  }, [step, name, hasConfigStep, configStep, actionStep, finalStep, triggerType, scheduleConfig, watchFolderId, actionId])
 
   const handleActionTypeChange = (type: ActionType) => {
     setActionType(type)
@@ -140,7 +151,9 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
             exclude_patterns: excludePatterns || undefined,
             batch_mode: batchMode,
           }
-        : undefined
+        : triggerType === 'schedule'
+          ? scheduleConfigPayload(scheduleConfig)
+          : undefined
 
       // Build output config
       const outputConfig: Record<string, unknown> = {}
@@ -181,11 +194,12 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to create automation')
       setCreating(false)
     }
-  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, actionType, actionId, enabled, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate])
+  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, scheduleConfig, actionType, actionId, enabled, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate])
 
   // Keyboard: Escape closes, Enter advances/submits
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (docPickerOpen) return
       if (e.key === 'Escape') onClose()
       if (e.key === 'Enter' && !creating && !creatingFolder) {
         if (step < totalSteps && canAdvance()) setStep(s => s + 1)
@@ -194,7 +208,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, step, totalSteps, creating, creatingFolder, canAdvance, handleCreate])
+  }, [onClose, step, totalSteps, creating, creatingFolder, docPickerOpen, canAdvance, handleCreate])
 
   const handleFileTypeToggle = (type: string) => {
     setFileTypes(prev =>
@@ -382,14 +396,37 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
             </div>
           )}
 
-          {/* Step 3 (folder_watch only): Folder Config */}
-          {hasFolderStep && step === folderStep && (
+          {/* Step 3 (schedule): when it runs and what on */}
+          {triggerType === 'schedule' && step === configStep && (
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+                Set the schedule
+              </div>
+              <ScheduleConfigFields
+                value={scheduleConfig}
+                onChange={setScheduleConfig}
+                folders={folders}
+                foldersLoading={foldersLoading}
+                pickerZIndex={2100}
+                onPickerOpenChange={setDocPickerOpen}
+              />
+            </div>
+          )}
+
+          {/* Step 3 (folder_watch): Folder Config */}
+          {triggerType === 'folder_watch' && step === configStep && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
                 Configure folder watch
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <CollapsibleSection
+                title="Folder"
+                summary={folders.find(f => f.uuid === watchFolderId)?.path || 'No folder chosen'}
+                testId="folder-watch-folder"
+              >
+              <div style={{ paddingTop: 8 }}>
                 <label htmlFor="wizard-watch-folder" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Watch Folder <span style={{ color: '#ef4444' }}>*</span>
                 </label>
@@ -461,8 +498,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   </div>
                 )}
               </div>
+              </CollapsibleSection>
 
-              <div style={{ marginBottom: 16 }}>
+              <CollapsibleSection
+                title="Filters"
+                summary={`${fileTypes.length ? fileTypes.map(t => `.${t}`).join(' ') : 'No file types'}${excludePatterns ? ' · with exclusions' : ''}${batchMode ? ' · batch' : ''}`}
+                testId="folder-watch-filters"
+              >
+              <div style={{ marginBottom: 16, paddingTop: 8 }}>
                 <div id="wizard-filetypes-label" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   File Types
                 </div>
@@ -513,6 +556,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 <span style={{ fontWeight: 500 }}>Batch mode</span>
                 <span style={{ color: '#6b7280', fontSize: 12 }}>wait and process files together</span>
               </label>
+              </CollapsibleSection>
+              </div>
             </div>
           )}
 
@@ -520,7 +565,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {step === actionStep && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
-                What should happen when it triggers?
+                {triggerType === 'schedule' ? 'What should run on this schedule?' : 'What should happen when it triggers?'}
               </div>
               <div role="radiogroup" aria-label="Action type" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
                 {ACTION_OPTIONS.map(opt => {
@@ -604,6 +649,13 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 Output &amp; Activation
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <CollapsibleSection
+                title="Activation"
+                summary={`${enabled ? 'Enabled' : 'Off'}${sharedWithTeam ? ' · shared with team' : ''}`}
+                testId="wizard-activation"
+              >
+              <div style={{ paddingTop: 8 }}>
               {/* Enable toggle */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 16, fontSize: 13, color: '#374151' }}>
                 <input
@@ -613,11 +665,13 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
                 />
                 <span style={{ fontWeight: 500 }}>Enable immediately</span>
-                <span style={{ color: '#6b7280', fontSize: 12 }}>start watching as soon as created</span>
+                <span style={{ color: '#6b7280', fontSize: 12 }}>
+                  {triggerType === 'schedule' ? 'start running on the schedule once created' : 'start watching as soon as created'}
+                </span>
               </label>
 
               {/* Share with team */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 20, fontSize: 13, color: '#374151' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
                 <input
                   type="checkbox"
                   checked={sharedWithTeam}
@@ -627,9 +681,15 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 <span style={{ fontWeight: 500 }}>Share with team</span>
                 <span style={{ color: '#6b7280', fontSize: 12 }}>team members can view and manage</span>
               </label>
+              </div>
+              </CollapsibleSection>
 
-              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Output Options</div>
+              <CollapsibleSection
+                title="Output"
+                summary={[saveToFolder && 'save to folder', emailNotify && 'email results'].filter(Boolean).join(' · ') || 'Results stay in the run history'}
+                testId="wizard-output"
+              >
+              <div style={{ paddingTop: 8 }}>
 
                 {/* Save to folder */}
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: saveToFolder ? 12 : 8, fontSize: 13, color: '#374151' }}>
@@ -704,6 +764,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     />
                   </div>
                 )}
+              </div>
+              </CollapsibleSection>
               </div>
             </div>
           )}

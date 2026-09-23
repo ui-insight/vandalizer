@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
+import { CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
@@ -9,6 +9,7 @@ import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
+import { formatRunTime } from '../../utils/schedule'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: string }> = {
   folder_watch: { label: 'Folder Watch', color: '#1d4ed8', bg: '#dbeafe' },
@@ -17,7 +18,7 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
   schedule: { label: 'Schedule', color: '#b45309', bg: '#fef3c7' },
 }
 
-type FilterMode = 'all' | 'folder_watch' | 'api' | 'm365_intake'
+type FilterMode = 'all' | 'folder_watch' | 'api' | 'schedule' | 'm365_intake'
 
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
@@ -77,6 +78,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     all: base.length,
     folder_watch: base.filter(a => a.trigger_type === 'folder_watch').length,
     api: base.filter(a => a.trigger_type === 'api').length,
+    schedule: base.filter(a => a.trigger_type === 'schedule').length,
     m365_intake: base.filter(a => a.trigger_type === 'm365_intake').length,
   }), [base])
 
@@ -191,6 +193,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <FilterPill label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
           <FilterPill label="Folder Watch" count={counts.folder_watch} active={filter === 'folder_watch'} onClick={() => setFilter('folder_watch')} icon={<FolderSearch size={10} />} />
           <FilterPill label="API" count={counts.api} active={filter === 'api'} onClick={() => setFilter('api')} icon={<Globe size={10} />} />
+          {counts.schedule > 0 && <FilterPill label="Schedule" count={counts.schedule} active={filter === 'schedule'} onClick={() => setFilter('schedule')} icon={<CalendarClock size={10} />} />}
           {m365Enabled && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
           <div style={{ flex: 1 }} />
           <div style={{
@@ -347,6 +350,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
+                  {auto.trigger_type === 'schedule' && auto.next_run_at && !isRunning && (
+                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                      {auto.enabled
+                        ? `Next run ${formatRunTime(auto.next_run_at, String(auto.trigger_config?.timezone || 'UTC'))}`
+                        : 'Paused'}
+                    </div>
+                  )}
                 </div>
               )
             })}

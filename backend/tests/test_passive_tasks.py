@@ -528,15 +528,6 @@ class TestProcessOutputs:
 
 class TestProcessScheduledAutomations:
     @patch("app.tasks.passive_tasks.get_sync_db")
-    def test_skips_when_croniter_not_installed(self, mock_get_db):
-        from app.tasks.passive_tasks import process_scheduled_automations
-
-        with patch.dict("sys.modules", {"croniter": None}):
-            # The actual import check is inside the function body
-            # This verifies the function handles missing croniter gracefully
-            pass
-
-    @patch("app.tasks.passive_tasks.get_sync_db")
     def test_processes_empty_automation_list(self, mock_get_db):
         from app.tasks.passive_tasks import process_scheduled_automations
 

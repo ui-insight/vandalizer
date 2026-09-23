@@ -234,13 +234,12 @@ def process_pending_triggers(self) -> dict:
 def process_scheduled_automations(self) -> dict:
     """Evaluate schedule-based automations and create trigger events when due.
 
-    Runs every minute via Celery Beat.
+    Runs every minute via Celery Beat. A schedule is due when the first slot
+    after its last run (see ``automation_schedule.last_run_base``), evaluated
+    in its own time zone, has passed. Each firing is recorded on the
+    automation, whatever the action type, so a schedule fires once per slot.
     """
-    try:
-        from croniter import croniter
-    except ImportError:
-        logger.warning("croniter not installed — schedule triggers disabled")
-        return {"processed": 0, "error": "croniter not installed"}
+    from app.services import automation_schedule
 
     db = get_sync_db()
     now = datetime.now(timezone.utc)
@@ -262,50 +261,82 @@ def process_scheduled_automations(self) -> dict:
             if not cron_expr:
                 continue
 
-            # Determine last run time for this automation
-            last_event = db.workflow_trigger_event.find_one(
-                {
-                    "trigger_context.automation_id": str(auto["_id"]),
-                    "trigger_type": "schedule",
-                },
-                sort=[("created_at", -1)],
-            )
-
-            if last_event:
-                base_time = last_event["created_at"]
-                if base_time.tzinfo is None:
-                    base_time = base_time.replace(tzinfo=timezone.utc)
-            else:
-                # First run — use automation creation time as base
-                base_time = auto.get("created_at", now - timedelta(minutes=2))
-                if base_time.tzinfo is None:
-                    base_time = base_time.replace(tzinfo=timezone.utc)
-
-            cron = croniter(cron_expr, base_time)
-            next_run = cron.get_next(datetime)
-            if next_run.tzinfo is None:
-                next_run = next_run.replace(tzinfo=timezone.utc)
-
+            timing = auto
+            if not auto.get("last_scheduled_run_at") and not auto.get("schedule_armed_at"):
+                # A schedule from before either stamp existed: count from its
+                # last run the way the old scheduler did (its latest trigger
+                # event), or every legacy schedule fires off-slot on upgrade.
+                last_event = db.workflow_trigger_event.find_one(
+                    {"trigger_context.automation_id": str(auto["_id"]), "trigger_type": "schedule"},
+                    sort=[("created_at", -1)],
+                )
+                if last_event and last_event.get("created_at"):
+                    timing = {**auto, "last_scheduled_run_at": last_event["created_at"]}
+            base_time = automation_schedule.last_run_base(timing, now - timedelta(minutes=2))
+            next_run = automation_schedule.next_runs(trigger_config, base_time)[0]
             if next_run > now:
                 continue  # Not due yet
+
+            # Claim the slot before dispatching: a crash mid-dispatch skips
+            # one run rather than repeating it every minute. Conditional on
+            # the stamp this pass read, so two overlapping passes can't both
+            # dispatch the same slot.
+            claim = db.automation.update_one(
+                {"_id": auto["_id"], "last_scheduled_run_at": auto.get("last_scheduled_run_at")},
+                {"$set": {"last_scheduled_run_at": now}},
+            )
+            if getattr(claim, "modified_count", 1) == 0:
+                continue
 
             # Gather documents from trigger_config
             doc_uuids = trigger_config.get("document_uuids", [])
             folder_id = trigger_config.get("folder_id")
+            source_configured = bool(doc_uuids or folder_id)
+
+            scope: dict = {"soft_deleted": {"$ne": True}}
+            if doc_uuids:
+                scope["uuid"] = {"$in": doc_uuids}
+            elif folder_id:
+                scope["folder"] = folder_id
+            doc_query: dict = {**scope, "processing": False}
+            only_new = bool(trigger_config.get("only_new"))
+            if only_new:
+                # "Only new documents": after the first run, each run takes
+                # what arrived since the previous one (by ObjectId — always
+                # UTC, unlike SmartDocument.created_at) plus anything that was
+                # still processing then and so could not run yet.
+                watermark = auto.get("schedule_docs_watermark")
+                if watermark is not None:
+                    new_since = {"$or": [
+                        {"_id": {"$gte": ObjectId.from_datetime(watermark)}},
+                        {"uuid": {"$in": auto.get("schedule_carryover_uuids") or []}},
+                    ]}
+                    doc_query.update(new_since)
+                    scope = {**scope, **new_since}
+                carryover = [
+                    d["uuid"] for d in db.smart_document.find({**scope, "processing": True}, {"uuid": 1})
+                ]
+                db.automation.update_one(
+                    {"_id": auto["_id"]},
+                    {"$set": {"schedule_docs_watermark": now, "schedule_carryover_uuids": carryover}},
+                )
+
+            # A picker-made schedule (it has a frequency) with no folder or
+            # documents chosen yet has nothing to run on. A bare cron schedule
+            # from before the picker keeps running without documents, as it did.
+            if not source_configured and trigger_config.get("frequency"):
+                logger.info("Schedule '%s' has no folder or documents; skipped", auto.get("name"))
+                continue
 
             doc_oids = []
-            if doc_uuids:
-                docs = list(db.smart_document.find(
-                    {"uuid": {"$in": doc_uuids}},
-                    {"_id": 1},
-                ))
-                doc_oids = [d["_id"] for d in docs]
-            elif folder_id:
-                docs = list(db.smart_document.find(
-                    {"folder": folder_id, "processing": False},
-                    {"_id": 1},
-                ))
-                doc_oids = [d["_id"] for d in docs]
+            if source_configured:
+                doc_oids = [d["_id"] for d in db.smart_document.find(doc_query, {"_id": 1})]
+                if not doc_oids:
+                    logger.info(
+                        "Schedule '%s' fired with no documents to run on; skipped",
+                        auto.get("name"),
+                    )
+                    continue
 
             if auto.get("action_type") in ("workflow", "task"):
                 event = {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle, Play } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle, Play, CalendarClock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
@@ -10,12 +10,16 @@ import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
+import { ScheduleConfigFields } from './ScheduleConfigFields'
+import { CollapsibleSection } from '../shared/CollapsibleSection'
+import { defaultScheduleConfig, describeSchedule, formatRunTime, isScheduleComplete, scheduleConfigPayload, toScheduleConfig } from '../../utils/schedule'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
   { value: 'api', label: 'API Endpoint', icon: Globe, description: 'Trigger via HTTP POST request' },
+  { value: 'schedule', label: 'Schedule', icon: CalendarClock, description: 'Run daily, weekly or monthly at a set time' },
 ]
 
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string; enabled: boolean }[] = [
@@ -123,7 +127,10 @@ export function AutomationEditorPanel() {
 
   const handleTriggerTypeChange = async (type: TriggerType) => {
     if (!canManage) return
-    await save({ trigger_type: type, trigger_config: {} })
+    // A schedule needs its timing to be valid at all; start from the picker's
+    // defaults. It runs nothing until a folder or documents are chosen.
+    const trigger_config = type === 'schedule' ? scheduleConfigPayload(defaultScheduleConfig()) : {}
+    await save({ trigger_type: type, trigger_config })
   }
 
   const handleActionTypeChange = async (type: ActionType) => {
@@ -315,9 +322,11 @@ export function AutomationEditorPanel() {
 
         )}
 
+        {/* Sections fold so a long configuration can be worked one part at a time. */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* Section A — Trigger */}
-        <SectionLabel>Trigger</SectionLabel>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
+        <CollapsibleSection title="Trigger" summary={triggerSummary(automation)} testId="automation-trigger-section">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 16px' }}>
           {TRIGGER_OPTIONS.map(opt => {
             const Icon = opt.icon
             const selected = automation.trigger_type === opt.value
@@ -352,13 +361,15 @@ export function AutomationEditorPanel() {
 
         {/* Trigger config card */}
         <TriggerConfigCard
+          key={`${automation.id}:${automation.trigger_type}`}
           automation={automation}
           onSave={debouncedSave}
         />
+        </CollapsibleSection>
 
         {/* Section B — Action */}
-        <SectionLabel>Action</SectionLabel>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+        <CollapsibleSection title="Action" summary={automation.action_name || 'Nothing selected yet'} testId="automation-action-section">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 16px' }}>
           {ACTION_OPTIONS.map(opt => {
             const selected = automation.action_type === opt.value
             return (
@@ -450,10 +461,16 @@ export function AutomationEditorPanel() {
           )
         })()}
 
+        </CollapsibleSection>
+
         {/* Section C — Post-Action Output */}
-        <SectionLabel>Post-Action Output</SectionLabel>
+        <CollapsibleSection title="Post-Action Output" summary={outputSummary(automation)} testId="automation-output-section">
+        <div style={{ paddingTop: 8 }}>
         <OutputStorageCard automation={automation} onSave={debouncedSave} />
         <OutputNotificationCard automation={automation} onSave={debouncedSave} />
+        </div>
+        </CollapsibleSection>
+        </div>
 
         {/* "What are automations?" pill */}
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
@@ -507,15 +524,22 @@ function EditorHeader({ title, onClose }: { title: string; onClose: () => void }
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div style={{
-      fontSize: 13, fontWeight: 700, color: '#374151', textTransform: 'uppercase',
-      letterSpacing: '0.05em', marginBottom: 12,
-    }}>
-      {children}
-    </div>
-  )
+/** One line for the folded Trigger section. */
+function triggerSummary(automation: Automation): string {
+  const label = TRIGGER_OPTIONS.find(o => o.value === automation.trigger_type)?.label ?? automation.trigger_type
+  if (automation.trigger_type === 'schedule') {
+    return `${label} · ${describeSchedule(toScheduleConfig(automation.trigger_config))}`
+  }
+  return label
+}
+
+/** One line for the folded Post-Action Output section. */
+function outputSummary(automation: Automation): string {
+  const cfg = (automation.output_config || {}) as Record<string, unknown>
+  const storage = cfg.storage as { enabled?: boolean } | undefined
+  const notifications = cfg.notifications as unknown[] | undefined
+  const parts = [storage?.enabled && 'save to folder', notifications?.length && 'email'].filter(Boolean)
+  return parts.length ? parts.join(' · ') : 'Results stay in the run history'
 }
 
 function TriggerConfigCard({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
@@ -525,7 +549,50 @@ function TriggerConfigCard({ automation, onSave }: { automation: Automation; onS
   if (automation.trigger_type === 'api') {
     return <ApiConfig automation={automation} />
   }
+  if (automation.trigger_type === 'schedule') {
+    return <ScheduleConfig automation={automation} onSave={onSave} />
+  }
   return null
+}
+
+function ScheduleConfig({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
+  // Local copy so the picker answers immediately; saves are debounced upstream.
+  const [config, setConfig] = useState(() => toScheduleConfig(automation.trigger_config))
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
+  const [foldersLoading, setFoldersLoading] = useState(true)
+
+  useEffect(() => {
+    apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
+      .then(setFolders)
+      .catch(() => {})
+      .finally(() => setFoldersLoading(false))
+  }, [])
+
+  const handleChange = (next: typeof config) => {
+    setConfig(next)
+    onSave({ trigger_config: scheduleConfigPayload(next) })
+  }
+
+  return (
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <ScheduleConfigFields
+        value={config}
+        onChange={handleChange}
+        folders={folders}
+        foldersLoading={foldersLoading}
+        disabled={!automation.can_manage}
+      />
+      <div style={{ marginTop: 10, fontSize: 12, color: '#6b7280', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {!isScheduleComplete(config) && (
+          <span style={{ color: '#b45309' }}>Choose a folder or documents; until then the schedule runs nothing.</span>
+        )}
+        {!automation.enabled && <span>Paused: it will not run until the automation is enabled.</span>}
+        <span>
+          {automation.last_run_at ? `Last ran ${formatRunTime(automation.last_run_at, config.timezone)}` : 'Has not run yet'}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 // Sensible starting filter for a new watch — the common document types.
