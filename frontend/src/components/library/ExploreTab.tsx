@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -13,12 +13,10 @@ import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
 import { CatalogSignals } from './CatalogSignals'
+import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type KindFilter, type QualityFilter, type SortOption } from './useCatalogBrowser'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import { AuthorChip } from '../shared/AuthorChip'
-import {
-  listVerifiedItems, browseCollections, listFeaturedCollections,
-  listLibraries,
-} from '../../api/library'
+import { listLibraries } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
 import { ApiError } from '../../api/client'
 import { listTeams } from '../../api/teams'
@@ -39,11 +37,6 @@ const KIND_TO_PIN_TYPE: Record<string, string> = {
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
-type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
-type QualityFilter = '' | 'excellent' | 'good' | 'fair'
-
-const PAGE_SIZE = 30
 
 // ---------------------------------------------------------------------------
 // Markdown renderer
@@ -110,13 +103,6 @@ const TIER_STYLES = {
   good: { ring: 'ring-blue-300', glow: 'shadow-blue-100', accent: 'text-blue-700', bg: 'bg-blue-50' },
   fair: { ring: 'ring-yellow-300', glow: 'shadow-yellow-100', accent: 'text-yellow-700', bg: 'bg-yellow-50' },
 } as const
-
-// Top-tier items that a validation run actually measured lead the spotlight;
-// hand-asserted ones follow. Both stay eligible so a fresh install still has
-// a landing page, but the earned rating always outranks the typed one.
-function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
-  return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
-}
 
 // ---------------------------------------------------------------------------
 // Item Detail Modal
@@ -512,51 +498,24 @@ export function ExploreTab() {
     }
   }
 
-  // Data
-  const [items, setItems] = useState<VerifiedCatalogItem[]>([])
-  const [total, setTotal] = useState(0)
-  // Unfiltered catalog count for the "All Items" badge — `total` tracks the
-  // active query, so it shrinks whenever a kind/collection/search filter is on.
-  const [allTotal, setAllTotal] = useState<number | null>(null)
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
+  const browser = useCatalogBrowser({
+    loadErrorMessage: 'Failed to load catalog items. Please try again.',
+    onLoadMoreError: (m) => toast(m, 'error'),
+  })
+  const {
+    items, total, allTotal, collections, featuredCollections,
+    loading, loadingMore, error,
+    searchQuery, setSearchQuery, kindFilter, setKindFilter, qualityFilter, setQualityFilter,
+    tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
+    refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
+    topItems, otherItems,
+  } = browser
   const [libraries, setLibraries] = useState<Library[]>([])
   const [currentTeamName, setCurrentTeamName] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filters
-  const [searchQuery, setSearchQuery] = useState('')
-  const [kindFilter, setKindFilter] = useState<KindFilter>('')
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
-  const [tagFilter, setTagFilter] = useState('')
-  const [sortOption, setSortOption] = useState<SortOption>('')
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
 
   // Detail + dialogs
   const [detailItem, setDetailItem] = useState<VerifiedCatalogItem | null>(null)
   const [addToLibraryItem, setAddToLibraryItem] = useState<VerifiedCatalogItem | null>(null)
-
-  // Debounced search
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
-
-  // Load collections once
-  useEffect(() => {
-    browseCollections()
-      .then(d => setCollections(d.collections))
-      .catch(() => setError('Failed to load collections'))
-    listFeaturedCollections()
-      .then(d => setFeaturedCollections(d.collections))
-      .catch(() => {})
-  }, [])
 
   // Load user libraries
   useEffect(() => {
@@ -574,78 +533,6 @@ export function ExploreTab() {
       .then(teams => setCurrentTeamName(teams.find(t => t.uuid === user.current_team_uuid)?.name ?? null))
       .catch(() => {})
   }, [user?.current_team_uuid])
-
-  // Fetch items when filters change
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listVerifiedItems({
-        kind: kindFilter || undefined,
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: 0,
-        limit: PAGE_SIZE,
-      })
-      setItems(data.items)
-      setTotal(data.total)
-      // Sort doesn't change the result count, so any fetch without narrowing
-      // filters carries the true "all items" total.
-      if (!kindFilter && !debouncedSearch && !qualityFilter && !tagFilter && !selectedCollectionId) {
-        setAllTotal(data.total)
-      }
-    } catch {
-      setError('Failed to load catalog items. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }, [kindFilter, debouncedSearch, qualityFilter, tagFilter, sortOption, selectedCollectionId])
-
-  useEffect(() => { refresh() }, [refresh])
-
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const data = await listVerifiedItems({
-        kind: kindFilter || undefined,
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: items.length,
-        limit: PAGE_SIZE,
-      })
-      setItems(prev => [...prev, ...data.items])
-    } catch {
-      toast('Failed to load more items', 'error')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const hasMore = items.length < total
-
-  const activeCollection = selectedCollectionId
-    ? collections.find(c => c.id === selectedCollectionId) ?? null
-    : null
-
-  const clearFilters = () => {
-    setSearchQuery('')
-    setKindFilter('')
-    setQualityFilter('')
-    setTagFilter('')
-    setSortOption('')
-    setSelectedCollectionId(null)
-  }
-
-  const hasActiveFilters = !!(kindFilter || qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
-
-  // Show the hero landing when no filters are active
-  const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -708,24 +595,6 @@ export function ExploreTab() {
     ['search_set', 'Extractions'],
     ['knowledge_base', 'Knowledge Bases'],
   ]
-
-  const sortOptions: [SortOption, string][] = [
-    ['', 'Newest'],
-    ['quality', 'Highest Quality'],
-    ['name', 'Name A-Z'],
-    ['adoption', 'Most Used'],
-    ['validations', 'Most Validated'],
-  ]
-
-  // Split items by tier for the hero landing
-  const topItems = useMemo(
-    () => items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder),
-    [items],
-  )
-  const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'excellent') : items,
-    [items, showHero],
-  )
 
   return (
     <>
@@ -856,10 +725,9 @@ export function ExploreTab() {
                 aria-label="Filter by quality"
                 className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
               >
-                <option value="">Any quality</option>
-                <option value="excellent">Excellent</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
+                {QUALITY_FILTER_OPTIONS.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
 
               <div className="flex items-center gap-1">
@@ -870,7 +738,7 @@ export function ExploreTab() {
                   aria-label="Sort items"
                   className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
                 >
-                  {sortOptions.map(([val, label]) => (
+                  {SORT_OPTIONS.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>

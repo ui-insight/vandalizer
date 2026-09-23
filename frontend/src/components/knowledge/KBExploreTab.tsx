@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   Search, ShieldCheck, BookOpen, FolderOpen, Star, X,
   ArrowUpDown, ArrowLeft, Loader2, Tag, Sparkles, User as UserIcon, Mail,
@@ -7,9 +7,7 @@ import { QualityBadge } from '../library/QualityBadge'
 import { KB_QUALITY_SCORE_HOVER } from './kbScoreFormula'
 import { ItemDetailModal } from '../library/ExploreTab'
 import { CatalogSignals } from '../library/CatalogSignals'
-import {
-  listVerifiedItems, browseCollections, listFeaturedCollections,
-} from '../../api/library'
+import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type QualityFilter, type SortOption } from '../library/useCatalogBrowser'
 import { adoptKnowledgeBase } from '../../api/knowledge'
 import { ApiError } from '../../api/client'
 import type {
@@ -18,10 +16,7 @@ import type {
 import { useToast } from '../../contexts/ToastContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
-type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
-type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
-const PAGE_SIZE = 30
 
 // Dark palette (matches KnowledgePanel)
 const C = {
@@ -90,10 +85,6 @@ const TIER_ICON = {
   fair: '#facc15',
 } as const
 
-// Measured top-tier items lead the spotlight; hand-asserted ones follow.
-function spotlightOrder(a: VerifiedCatalogItem, b: VerifiedCatalogItem): number {
-  return Number(!!a.quality_asserted) - Number(!!b.quality_asserted)
-}
 
 // ---------------------------------------------------------------------------
 // Featured collection card (dark)
@@ -304,117 +295,20 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
   const { toast } = useToast()
   const { activateKB } = useWorkspace()
 
-  // Data
-  const [items, setItems] = useState<VerifiedCatalogItem[]>([])
-  const [total, setTotal] = useState(0)
-  // Unfiltered KB count for the "All Knowledge Bases" badge — `total` tracks
-  // the active query, so it shrinks whenever a collection/search filter is on.
-  const [allTotal, setAllTotal] = useState<number | null>(null)
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filters (kind locked to knowledge_base)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
-  const [tagFilter, setTagFilter] = useState('')
-  const [sortOption, setSortOption] = useState<SortOption>('')
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
+  const {
+    items, total, allTotal, featuredCollections, regularCollections,
+    loading, loadingMore, error,
+    searchQuery, setSearchQuery, qualityFilter, setQualityFilter,
+    tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
+    refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
+    topItems, otherItems,
+  } = useCatalogBrowser({
+    lockedKind: 'knowledge_base',
+    loadErrorMessage: 'Failed to load knowledge bases. Please try again.',
+    onLoadMoreError: (m) => toast(m, 'error'),
+  })
 
   const [detailItem, setDetailItem] = useState<VerifiedCatalogItem | null>(null)
-
-  // Debounced search
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
-
-  // Load collections once (counts scoped to knowledge bases only)
-  useEffect(() => {
-    browseCollections('knowledge_base')
-      .then(d => setCollections(d.collections))
-      .catch(() => {})
-    listFeaturedCollections('knowledge_base')
-      .then(d => setFeaturedCollections(d.collections))
-      .catch(() => {})
-  }, [])
-
-  // Fetch items when filters change (kind always knowledge_base)
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listVerifiedItems({
-        kind: 'knowledge_base',
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: 0,
-        limit: PAGE_SIZE,
-      })
-      setItems(data.items)
-      setTotal(data.total)
-      // Sort doesn't change the result count, so any fetch without narrowing
-      // filters carries the true "all KBs" total.
-      if (!debouncedSearch && !qualityFilter && !tagFilter && !selectedCollectionId) {
-        setAllTotal(data.total)
-      }
-    } catch {
-      setError('Failed to load knowledge bases. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, qualityFilter, tagFilter, sortOption, selectedCollectionId])
-
-  useEffect(() => { refresh() }, [refresh])
-
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const data = await listVerifiedItems({
-        kind: 'knowledge_base',
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: items.length,
-        limit: PAGE_SIZE,
-      })
-      setItems(prev => [...prev, ...data.items])
-    } catch {
-      toast('Failed to load more items', 'error')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const hasMore = items.length < total
-
-  const activeCollection = selectedCollectionId
-    ? collections.find(c => c.id === selectedCollectionId) ?? null
-    : null
-
-  const clearFilters = () => {
-    setSearchQuery('')
-    setQualityFilter('')
-    setTagFilter('')
-    setSortOption('')
-    setSelectedCollectionId(null)
-  }
-
-  const hasActiveFilters = !!(qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
-
-  // Show the hero landing when no filters are active
-  const showHero = !hasActiveFilters && !loading
 
   const handleAdoptKB = async (kbUuid: string) => {
     try {
@@ -437,24 +331,6 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
     activateKB(item.source_uuid, item.display_name || item.name)
   }
 
-  const sortOptions: [SortOption, string][] = [
-    ['', 'Newest'],
-    ['quality', 'Highest Quality'],
-    ['name', 'Name A-Z'],
-    ['adoption', 'Most Used'],
-    ['validations', 'Most Validated'],
-  ]
-
-  const topItems = useMemo(
-    () => items.filter(i => i.quality_tier === 'excellent').sort(spotlightOrder),
-    [items],
-  )
-  const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'excellent') : items,
-    [items, showHero],
-  )
-
-  const regularCollections = collections.filter(c => !featuredCollections.some(f => f.id === c.id))
 
   return (
     <>
@@ -617,10 +493,9 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                 }}
               >
-                <option value="">Any quality</option>
-                <option value="excellent">Excellent</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
+                {QUALITY_FILTER_OPTIONS.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -635,7 +510,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                   }}
                 >
-                  {sortOptions.map(([val, label]) => (
+                  {SORT_OPTIONS.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>
