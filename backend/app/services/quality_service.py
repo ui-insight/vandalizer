@@ -1119,80 +1119,168 @@ async def get_quality_contract_status(item_kind: str, item_id: str) -> dict:
     }
 
 
+_GRADE_RANK = {"A": 4, "B": 3, "C": 2, "D": 1, "F": 0}
+
+
+def evaluate_submission_gates(item_kind: str, latest: dict | None, quality_config: dict) -> dict:
+    """The one reading of ``verification_gates`` for both the readiness advisory
+    and ``submit_for_verification``, so advice can never be stricter than what
+    submission actually enforces. (It used to be: the advisory defaulted to
+    3 cases / 3 runs / score 70 from keys absent from the config, while the
+    submit path defaulted the same keys to 0 and let everything through.)
+
+    Returns ``{"enforced": bool, "issues": [...], "observations": [...]}``.
+    ``issues`` are what the submit path refuses on. ``observations`` never
+    block — they say what a stronger validation would add, as a colleague
+    would, not as a gate.
+
+    Three families of threshold:
+
+    - ``require_validation`` — there must be a run at all.
+    - ``min_test_cases`` / ``min_runs`` / ``min_score`` — enforced whenever set
+      above zero. They are not in the admin UI; an operator who set them by
+      hand meant it.
+    - ``min_extraction_accuracy`` / ``min_extraction_consistency`` /
+      ``min_workflow_grade`` — the three the admin UI shows nested under
+      "Require validation before verification submission", so they enforce
+      only while that toggle is on. Before this they were read by nothing.
+    """
+    gates = quality_config.get("verification_gates", {}) or {}
+    enforced = bool(gates.get("require_validation"))
+    issues: list[str] = []
+    observations: list[str] = []
+
+    if not latest:
+        if enforced:
+            issues.append(
+                "This item must be validated before submitting for verification. Run validation first."
+            )
+        else:
+            observations.append(
+                "No validation run yet. A measured score on the catalog entry helps colleagues "
+                "decide whether to adopt it — you can also submit now and ask the reviewer to validate."
+            )
+        return {"enforced": enforced, "issues": issues, "observations": observations}
+
+    snap = latest.get("result_snapshot") or {}
+    num_tc = latest.get("num_test_cases") or len(snap.get("test_cases", snap.get("sources", [])))
+    num_runs = latest.get("num_runs") or snap.get("num_runs", 1)
+    score = latest.get("score") or 0
+
+    min_tc = gates.get("min_test_cases", 0) or 0
+    min_runs = gates.get("min_runs", 0) or 0
+    min_score = gates.get("min_score", 0) or 0
+    if min_tc > 0 and num_tc < min_tc:
+        issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
+    if min_runs > 0 and num_runs < min_runs:
+        issues.append(f"Validation used {num_runs} run(s), minimum is {min_runs}")
+    if min_score > 0 and score < min_score:
+        issues.append(f"Quality score is {score:.0f}, minimum is {min_score}")
+
+    if enforced:
+        if item_kind == "search_set":
+            accuracy = latest.get("accuracy")
+            if accuracy is None:
+                accuracy = snap.get("aggregate_accuracy")
+            consistency = latest.get("consistency")
+            if consistency is None:
+                consistency = snap.get("aggregate_consistency")
+            min_acc = gates.get("min_extraction_accuracy") or 0
+            min_con = gates.get("min_extraction_consistency") or 0
+            if min_acc > 0 and accuracy is not None and accuracy < min_acc:
+                issues.append(f"Extraction accuracy is {accuracy * 100:.0f}%, minimum is {min_acc * 100:.0f}%")
+            if min_con > 0 and consistency is not None and consistency < min_con:
+                issues.append(f"Extraction consistency is {consistency * 100:.0f}%, minimum is {min_con * 100:.0f}%")
+        elif item_kind == "workflow":
+            grade = latest.get("grade") or snap.get("grade")
+            min_grade = gates.get("min_workflow_grade")
+            if min_grade and grade and _GRADE_RANK.get(grade, -1) < _GRADE_RANK.get(min_grade, -1):
+                issues.append(f"Workflow grade is {grade}, minimum is {min_grade}")
+
+    # Advice, never a gate. Skipped where the same threshold is already an issue.
+    if num_tc < 3 and not (min_tc > 0 and num_tc < min_tc):
+        observations.append(
+            f"Validated on {num_tc} test case{'s' if num_tc != 1 else ''} — three or more, "
+            "on different documents, gives a steadier score."
+        )
+    if num_runs < 3 and not (min_runs > 0 and num_runs < min_runs):
+        observations.append(
+            f"{num_runs} run{'s' if num_runs != 1 else ''} per test case — three runs is what "
+            "measures consistency."
+        )
+    return {"enforced": enforced, "issues": issues, "observations": observations}
+
+
 async def check_verification_readiness(
     item_kind: str,
     item_id: str,
 ) -> dict:
-    """Check if an item meets minimum thresholds for verification submission.
+    """Advisory for an author deciding whether to submit.
 
-    Returns dict with 'ready' bool, 'issues' list, and 'recommendations' list.
+    Reads the gates through ``evaluate_submission_gates`` — the same function
+    the submit path uses — so ``ready`` is exactly "submission would be
+    accepted". Everything else is an observation, not a refusal.
+    ``recommendations`` is kept as an alias of ``observations`` for callers of
+    the old shape.
     """
     sys_cfg = await SystemConfig.get_config()
     qc = sys_cfg.get_quality_config()
-    gates = qc.get("verification_gates", {})
-
-    min_test_cases = gates.get("min_test_cases", 3)
-    min_runs = gates.get("min_runs", 3)
-    min_score = gates.get("min_score", 70)
-
-    issues: list[str] = []
-    recommendations: list[str] = []
-
-    # Check latest validation
     latest = await get_latest_validation(item_kind, item_id)
-    if not latest:
-        issues.append("No validation runs found. Run validation first.")
-        return {"ready": False, "issues": issues, "recommendations": ["Run validation with at least 3 test cases and 3 runs per test case."]}
+    verdict = evaluate_submission_gates(item_kind, latest, qc)
+    issues: list[str] = list(verdict["issues"])
+    observations: list[str] = list(verdict["observations"])
+    result = (latest or {}).get("result_snapshot", {}) or {}
 
-    result = latest.get("result_snapshot", {})
-    num_tc = len(result.get("test_cases", result.get("sources", [])))
-    num_runs = result.get("num_runs", 1)
-    score = latest.get("score", 0)
-
-    if num_tc < min_test_cases:
-        issues.append(f"Only {num_tc} test case(s) used. Minimum is {min_test_cases}.")
-        recommendations.append(f"Add at least {min_test_cases - num_tc} more test case(s) with diverse source documents.")
-
-    if num_runs < min_runs:
-        issues.append(f"Only {num_runs} run(s) per test case. Minimum is {min_runs}.")
-        recommendations.append(f"Re-run validation with at least {min_runs} runs for reliable consistency measurement.")
-
-    if score < min_score:
-        issues.append(f"Quality score is {score:.0f}. Minimum for submission is {min_score}.")
-        recommendations.append("Review challenging fields and improve extraction prompts or field definitions.")
-
-    # Check cross-field rules if any exist
-    if item_kind == "search_set":
+    if item_kind == "search_set" and latest:
         from app.models.search_set import SearchSet
         ss = await SearchSet.find_one(SearchSet.uuid == item_id)
         if ss and ss.cross_field_rules and result.get("cross_field_score") is None:
-            recommendations.append("Cross-field rules are defined but haven't been validated. Consider running cross-field validation.")
+            observations.append(
+                "Cross-field rules are defined but haven't been validated. Consider running cross-field validation."
+            )
     elif item_kind == "knowledge_base":
-        # KB-specific readiness checks
+        # KB-specific advice. ``kb_verification_gates`` was defined in the
+        # default config and read by nothing; it is the source of these
+        # thresholds now, and they advise rather than block — submission has
+        # never checked them.
         from app.models.knowledge import KnowledgeBase
         from app.models.kb_test_query import KBTestQuery
+        kb_gates = qc.get("kb_verification_gates", {}) or {}
+        min_sources = kb_gates.get("min_sources", 3)
+        min_chunks = kb_gates.get("min_chunks", 50)
+        min_health = kb_gates.get("min_source_health", 0.8)
         kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
         if kb:
-            if kb.total_sources < 3:
-                issues.append(f"Only {kb.total_sources} source(s). A strong knowledge base should have at least 3 sources.")
-            if kb.total_chunks < 50:
-                recommendations.append(f"Knowledge base has {kb.total_chunks} chunks. Consider adding more sources for better coverage.")
+            if kb.total_sources < min_sources:
+                observations.append(
+                    f"{kb.total_sources} source{'s' if kb.total_sources != 1 else ''} — "
+                    f"{min_sources} or more gives a knowledge base enough coverage to answer broadly."
+                )
+            if kb.total_chunks < min_chunks:
+                observations.append(
+                    f"Knowledge base has {kb.total_chunks} chunks. Consider adding more sources for better coverage."
+                )
             test_query_count = await KBTestQuery.find(
                 KBTestQuery.knowledge_base_uuid == item_id,
             ).count()
             if test_query_count < 3:
-                recommendations.append(f"Add at least {3 - test_query_count} more test query/queries for reliable retrieval validation.")
-
-            # Check source health from latest validation
+                observations.append(
+                    f"Add at least {3 - test_query_count} more test query/queries for reliable retrieval validation."
+                )
             source_health = result.get("source_health", {})
-            if source_health and source_health.get("ratio", 1.0) < 0.8:
-                issues.append(
-                    f"Source health is {source_health['ratio'] * 100:.0f}%. Fix the "
-                    "sources that are unreachable or only partly converted before submitting."
+            if source_health and source_health.get("ratio", 1.0) < min_health:
+                observations.append(
+                    f"Source health is {source_health['ratio'] * 100:.0f}%. Fix the sources that are "
+                    "unreachable or only partly converted so the catalog entry reflects the whole knowledge base."
                 )
 
-    ready = len(issues) == 0
-    return {"ready": ready, "issues": issues, "recommendations": recommendations}
+    return {
+        "ready": len(issues) == 0,
+        "enforced": verdict["enforced"],
+        "issues": issues,
+        "observations": observations,
+        "recommendations": observations,
+    }
 
 
 async def get_quality_items(

@@ -959,6 +959,9 @@ ${playgroundResult.request.user_prompt}`}
               <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
               Require validation before verification submission
             </label>
+            <p style={{ fontSize: 12, color: '#6b7280', margin: '-8px 0 0' }}>
+              The three thresholds below apply only while that box is checked. Unchecked, anything can be submitted and the examiner decides.
+            </p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
               <div>

@@ -1423,3 +1423,40 @@ def test_quality_sort_higher_score_first_within_tier():
     lo = {"quality_tier": "good", "quality_score": 71.0}
     hi = {"quality_tier": "good", "quality_score": 88.0}
     assert sorted([lo, hi], key=_quality_sort_key) == [hi, lo]
+
+
+@pytest.mark.asyncio
+@patch(f"{MODULE}.VerificationRequest")
+@patch(f"{MODULE}.SystemConfig")
+@patch(f"{MODULE}.Workflow")
+async def test_submit_gate_min_workflow_grade_enforces_only_with_require_validation(mock_wf_cls, mock_sc, mock_vr_cls):
+    """min_workflow_grade sits under the admin UI's "Require validation" toggle
+    and was read by nothing (#911). With the toggle on it refuses; off, the
+    same submission goes through."""
+    from app.services.verification_service import submit_for_verification
+
+    wf = _make_obj()
+    mock_wf_cls.get = AsyncMock(return_value=wf)
+    mock_vr_cls.find_one = AsyncMock(return_value=None)
+    latest = {"result_snapshot": {"test_cases": [1, 2, 3], "num_runs": 3}, "score": 62, "grade": "D"}
+
+    mock_sc.get_config = AsyncMock(return_value=_make_sys_config(
+        {"verification_gates": {"require_validation": True, "min_workflow_grade": "C"}}
+    ))
+    with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"):
+        with pytest.raises(ValueError, match="Workflow grade is D, minimum is C"):
+            await submit_for_verification(item_kind="workflow", item_id="507f1f77bcf86cd799439011", user_id="alice")
+
+    mock_sc.get_config = AsyncMock(return_value=_make_sys_config(
+        {"verification_gates": {"require_validation": False, "min_workflow_grade": "C"}}
+    ))
+    created = _make_verification_request()
+    mock_vr_cls.return_value = created
+    with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"), \
+         patch(f"{MODULE}._notify_examiners", new_callable=AsyncMock):
+        result = await submit_for_verification(item_kind="workflow", item_id="507f1f77bcf86cd799439011", user_id="alice")
+    # submit_for_verification returns the serialised request; the insert is the tell.
+    assert isinstance(result, dict)
+    created.insert.assert_awaited_once()

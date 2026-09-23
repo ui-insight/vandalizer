@@ -151,7 +151,9 @@ async def submit_for_verification(
         raise ValueError("A verification request is already pending for this item")
 
     # Fetch latest validation for quality gate checks
-    from app.services.quality_service import get_latest_validation, compute_quality_tier
+    from app.services.quality_service import (
+        get_latest_validation, compute_quality_tier, evaluate_submission_gates,
+    )
 
     item_ref = str(getattr(obj, 'uuid', '')) if item_kind == "search_set" and hasattr(obj, 'uuid') else str(obj_id)
     latest = await get_latest_validation(item_kind, item_ref)
@@ -170,30 +172,13 @@ async def submit_for_verification(
             )
         latest = None  # ignore any stale validation; explicitly an unvalidated path
     else:
-        # Quality gate: require validation before submission
-        if gates.get("require_validation") and not latest:
-            raise ValueError("This item must be validated before submitting for verification. Run validation first.")
-
-        # Enforce minimum sample size thresholds
-        if latest:
-            result_snap = latest.get("result_snapshot", {})
-            min_tc = gates.get("min_test_cases", 0)
-            min_runs = gates.get("min_runs", 0)
-            min_score_gate = gates.get("min_score", 0)
-
-            num_tc = len(result_snap.get("test_cases", result_snap.get("sources", [])))
-            num_runs_val = result_snap.get("num_runs", 1)
-            val_score = latest.get("score", 0)
-
-            issues = []
-            if min_tc > 0 and num_tc < min_tc:
-                issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
-            if min_runs > 0 and num_runs_val < min_runs:
-                issues.append(f"Validation used {num_runs_val} run(s), minimum is {min_runs}")
-            if min_score_gate > 0 and val_score < min_score_gate:
-                issues.append(f"Quality score is {val_score:.0f}, minimum is {min_score_gate}")
-            if issues:
-                raise ValueError("Submission requirements not met: " + "; ".join(issues))
+        # One reading of the gates, shared with check_verification_readiness,
+        # so the advisory an author sees is exactly what is enforced here.
+        verdict = evaluate_submission_gates(item_kind, latest, qc)
+        if verdict["issues"]:
+            if not latest:
+                raise ValueError(verdict["issues"][0])
+            raise ValueError("Submission requirements not met: " + "; ".join(verdict["issues"]))
 
     validation_snapshot = latest.get("result_snapshot") if latest else None
     validation_score = latest.get("score") if latest else None
