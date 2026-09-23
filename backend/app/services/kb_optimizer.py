@@ -24,6 +24,7 @@ from app.models.system_config import SystemConfig
 from app.services import kb_validation_service
 from app.services.kb_validation_service import RAGConfig
 from app.services.lift_stats import paired_lift_bootstrap_ci
+from app.services.optimizer_notifications import notify_run_terminal
 from app.services.optimization_common import (
     DEFAULT_JUDGE_NOISE_FLOOR,
     WINNER_TIE_SIGMAS,
@@ -1765,59 +1766,17 @@ class KBOptimizer:
             await run_doc.save()
 
     async def _notify_terminal(self, run_doc: KBOptimizationRun, kb) -> None:
-        """Emit a Notification to the run's owner when the run reaches a
-        terminal state. Best-effort — never raises into the caller.
+        """Tell the run's owner it finished — see ``optimizer_notifications``
+        for who hears what. Best-effort — never raises into the caller.
 
         Thorough-tier runs span 45-90 minutes; users won't sit and watch the
         panel. The notification carries them back to the KB to inspect results.
         """
-        from app.services import notification_service
-
-        kb_title = (kb.title if kb else None) or "Knowledge base"
-        link = f"/?mode=knowledge&kb={run_doc.kb_uuid}"
-
-        if run_doc.status == "completed":
-            kind = "kb_optimization_completed"
-            score_pct = (run_doc.optimized_score or 0.0) * 100
-            baseline_pct = (run_doc.baseline_default_score or 0.0) * 100
-            lift = score_pct - baseline_pct
-            sign = "+" if lift >= 0 else ""
-            title = f"Optimization complete: {kb_title}"
-            body = (
-                f"Optimized score {score_pct:.0f}% "
-                f"({sign}{lift:.0f}pts vs default). "
-                f"{len(run_doc.trials)} trial{'s' if len(run_doc.trials) != 1 else ''} run."
-            )
-        elif run_doc.status == "cancelled":
-            kind = "kb_optimization_cancelled"
-            title = f"Optimization cancelled: {kb_title}"
-            body = (
-                f"Cancelled after {len(run_doc.trials)} trial"
-                f"{'s' if len(run_doc.trials) != 1 else ''}."
-            )
-        elif run_doc.status == "failed":
-            kind = "kb_optimization_failed"
-            title = f"Optimization failed: {kb_title}"
-            body = run_doc.error_message or "The optimization run failed unexpectedly."
-        else:
-            return  # not a terminal status we care about
-
-        try:
-            await notification_service.create_notification(
-                user_id=run_doc.user_id,
-                kind=kind,
-                title=title,
-                body=body,
-                link=link,
-                item_kind="knowledge_base",
-                item_id=run_doc.kb_uuid,
-                item_name=kb_title,
-            )
-        except Exception as e:
-            logger.warning(
-                "Could not emit %s notification for run %s: %s",
-                kind, run_doc.uuid, e,
-            )
+        await notify_run_terminal(
+            "kb", run_doc,
+            applied=run_doc.applied_at is not None,
+            item_name=kb.title if kb else None,
+        )
 
     @staticmethod
     def _describe_config(cfg: dict) -> str:
@@ -1966,6 +1925,7 @@ async def reap_one(run_doc: KBOptimizationRun | None) -> KBOptimizationRun | Non
     run_doc.completed_at = now
     await run_doc.save()
     logger.info("Reaped orphaned KB optimization run %s", run_doc.uuid)
+    await notify_run_terminal("kb", run_doc)
     return run_doc
 
 

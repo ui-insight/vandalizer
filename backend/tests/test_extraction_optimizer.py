@@ -216,6 +216,7 @@ async def test_run_optimization_records_baselines_and_picks_winner():
                      return_value=candidates),
         patch.object(extraction_optimizer, "_run_single_config",
                      new=AsyncMock(side_effect=fake_run_single_config)),
+        patch.object(extraction_optimizer, "notify_run_terminal", new=AsyncMock()) as notify,
     ):
         MockRun.find_one = AsyncMock(return_value=run_doc)
         find_call = MagicMock(); find_call.to_list = AsyncMock(return_value=[tc])
@@ -235,6 +236,8 @@ async def test_run_optimization_records_baselines_and_picks_winner():
         )
 
     assert result.status == "completed"
+    # The owner hears about it; the winner was not applied (apply_on_finish=False).
+    notify.assert_awaited_once_with("extraction", run_doc, applied=False)
     # Single test case → certified-scale discount (Option A) applies: ssf = 1/3,
     # so scores above the 0.5 midpoint are pulled toward it (and never inflated).
     # 0.36 stays (below midpoint); 0.62 → 0.54; winner 0.92 → 0.64.
@@ -407,6 +410,7 @@ async def test_run_optimization_fails_with_no_fields():
         patch.object(extraction_optimizer, "ExtractionOptimizationRun") as MockRun,
         patch.object(extraction_optimizer, "get_extraction_keys",
                      new=AsyncMock(return_value=[])),
+        patch.object(extraction_optimizer, "notify_run_terminal", new=AsyncMock()) as notify,
     ):
         MockRun.find_one = AsyncMock(return_value=run_doc)
 
@@ -416,6 +420,7 @@ async def test_run_optimization_fails_with_no_fields():
 
     assert result.status == "failed"
     assert "extraction fields" in (result.error_message or "").lower()
+    notify.assert_awaited_once_with("extraction", run_doc)
 
 
 @pytest.mark.asyncio

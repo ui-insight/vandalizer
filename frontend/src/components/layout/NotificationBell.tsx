@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, Timer, TrendingDown, XOctagon } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCheck, FileX, Headphones, Inbox, Lightbulb, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, SlidersHorizontal, Timer, TrendingDown, XOctagon } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -24,6 +24,13 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   document_failed: FileX,
   automation_failed: Timer,
   quality_regression: TrendingDown,
+  tuning_suggestion: Lightbulb,
+  kb_optimization_completed: SlidersHorizontal,
+  extraction_optimization_completed: SlidersHorizontal,
+  workflow_optimization_completed: SlidersHorizontal,
+  kb_optimization_failed: AlertTriangle,
+  extraction_optimization_failed: AlertTriangle,
+  workflow_optimization_failed: AlertTriangle,
 }
 
 const kindColors: Record<string, string> = {
@@ -45,6 +52,12 @@ const kindColors: Record<string, string> = {
   // no email by design) would otherwise fall through to a generic grey bell —
   // indistinguishable from an informational notice.
   quality_regression: '#d97706',
+  tuning_suggestion: '#2563eb',
+  // A failed tuning run leaves the item as it was, so it is a warning, not a
+  // red failure of the user's own work.
+  kb_optimization_failed: '#d97706',
+  extraction_optimization_failed: '#d97706',
+  workflow_optimization_failed: '#d97706',
 }
 
 const SUPPORT_KINDS = new Set([

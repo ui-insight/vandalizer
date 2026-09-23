@@ -38,6 +38,7 @@ from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.services.budget_enforcer import BudgetEnforcer
 from app.services.config_service import get_user_model_name
 from app.services.optimization_common import build_apply_preview, pick_winner_variance_aware
+from app.services.optimizer_notifications import notify_run_terminal
 from app.services.workflow_prompt_variants import PROMPT_VARIANTS
 
 logger = logging.getLogger(__name__)
@@ -181,6 +182,7 @@ async def reap_one(run_doc: WorkflowOptimizationRun | None) -> WorkflowOptimizat
     run_doc.completed_at = now
     await run_doc.save()
     logger.info("Reaped orphaned workflow optimization run %s", run_doc.uuid)
+    await notify_run_terminal("workflow", run_doc)
     return run_doc
 
 
@@ -580,11 +582,12 @@ async def run_optimization(
             return await _finalize_cancelled(run_doc)
 
         # Apply-on-finish only when the winner cleared the significance band.
-        if (
+        applied = bool(
             apply_on_finish
             and run_doc.best_config
             and not run_doc.tied_with_baseline
-        ):
+        )
+        if applied:
             await _apply_best(wf, run_doc)
 
         run_doc.status = "completed"
@@ -592,6 +595,7 @@ async def run_optimization(
         run_doc.progress_message = "Optimization complete"
         run_doc.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await run_doc.save()
+        await notify_run_terminal("workflow", run_doc, applied=applied)
         return run_doc
 
     except Exception as e:
@@ -610,6 +614,7 @@ async def run_optimization(
         run_doc.error_message = str(e)
         run_doc.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await run_doc.save()
+        await notify_run_terminal("workflow", run_doc)
         return run_doc
 
 

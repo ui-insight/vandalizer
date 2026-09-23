@@ -452,7 +452,8 @@ async def test_run_optimization_fails_when_no_validation_plan():
         AsyncMock(return_value=run_doc),
     ), patch.object(
         workflow_optimizer.Workflow, "get", AsyncMock(return_value=wf),
-    ), patch.object(workflow_optimizer.logger, "exception") as mock_exc:
+    ), patch.object(workflow_optimizer.logger, "exception") as mock_exc, \
+         patch.object(workflow_optimizer, "notify_run_terminal", AsyncMock()) as notify:
         result = await workflow_optimizer.run_optimization(
             workflow_id="507f1f77bcf86cd799439011", user_id="u1", run_uuid="opt-wf-1",
         )
@@ -460,6 +461,7 @@ async def test_run_optimization_fails_when_no_validation_plan():
     assert result.status == "failed"
     assert "validation plan" in (result.error_message or "")
     mock_exc.assert_not_called()
+    notify.assert_awaited_once_with("workflow", run_doc)
 
 
 @pytest.mark.asyncio
