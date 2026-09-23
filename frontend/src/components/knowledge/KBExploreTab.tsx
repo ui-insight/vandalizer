@@ -6,6 +6,7 @@ import {
 import { QualityBadge } from '../library/QualityBadge'
 import { KB_QUALITY_SCORE_HOVER } from './kbScoreFormula'
 import { ItemDetailModal } from '../library/ExploreTab'
+import { CatalogSignals } from '../library/CatalogSignals'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
 } from '../../api/library'
@@ -17,7 +18,7 @@ import type {
 import { useToast } from '../../contexts/ToastContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
-type SortOption = '' | 'quality' | 'name' | 'validations'
+type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
 const PAGE_SIZE = 30
@@ -201,11 +202,7 @@ function KBCatalogCard({
           asserted={item.quality_asserted}
           regressionPending={item.regression_pending_review}
         />
-        {item.validation_run_count > 0 && (
-          <span style={{ fontSize: 10, color: C.textFaint }}>
-            {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}
-          </span>
-        )}
+        <CatalogSignals item={item} style={{ fontSize: 10, color: C.textFaint }} />
       </div>
 
       {item.description && (
@@ -443,6 +440,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
     ['', 'Newest'],
     ['quality', 'Highest Quality'],
     ['name', 'Name A-Z'],
+    ['adoption', 'Most Used'],
     ['validations', 'Most Validated'],
   ]
 

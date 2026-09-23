@@ -109,6 +109,12 @@ class VerifiedItemMetadata(Document):
     quality_grade: Optional[str] = None
     last_validated_at: Optional[datetime.datetime] = None
     validation_run_count: int = 0
+    # The two numbers that qualify a score for someone deciding whether to
+    # adopt: how many cases it was scored on, and how consistent it was across
+    # runs (0-1, extraction only). Both were measured on every run and then
+    # dropped before reaching the catalog.
+    test_case_count: int = 0
+    consistency: Optional[float] = None
 
     # Official baseline frozen at approval (Phase A)
     # The pinned validation snapshot that travels with the catalog entry.

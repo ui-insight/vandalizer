@@ -12,6 +12,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
+import { CatalogSignals } from './CatalogSignals'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import { AuthorChip } from '../shared/AuthorChip'
 import {
@@ -39,7 +40,7 @@ const KIND_TO_PIN_TYPE: Record<string, string> = {
 marked.setOptions({ breaks: true, gfm: true })
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
-type SortOption = '' | 'quality' | 'name' | 'validations'
+type SortOption = '' | 'quality' | 'name' | 'adoption' | 'validations'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
 const PAGE_SIZE = 30
@@ -198,6 +199,7 @@ export function ItemDetailModal({
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
             />
+            <CatalogSignals item={item} className="text-white/70" />
             {item.validation_run_count > 0 && (
               <span className="text-white/70">{item.validation_run_count} validation{item.validation_run_count !== 1 ? 's' : ''}</span>
             )}
@@ -400,11 +402,7 @@ function CatalogCard({
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
             />
-            {item.validation_run_count > 0 && (
-              <span className="text-[10px] text-gray-500">
-                {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}
-              </span>
-            )}
+            <CatalogSignals item={item} className="text-[10px] text-gray-500" />
           </div>
         </div>
       </div>
@@ -713,6 +711,7 @@ export function ExploreTab() {
     ['', 'Newest'],
     ['quality', 'Highest Quality'],
     ['name', 'Name A-Z'],
+    ['adoption', 'Most Used'],
     ['validations', 'Most Validated'],
   ]
 

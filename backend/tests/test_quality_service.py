@@ -403,6 +403,60 @@ class TestUpdateQualityMetadata:
             assert meta.quality_score == 88.0
 
     @pytest.mark.asyncio
+    async def test_carries_case_count_and_consistency_to_the_catalog_entry(self):
+        """Both were measured on every run and dropped before the catalog (#913)."""
+        vr = _make_validation_run(score=88.0, grade="B")
+        vr.num_test_cases = 12
+        vr.consistency = 0.91
+        meta = _make_verified_metadata(quality_score=70.0)
+        sys_cfg = _make_sys_config()
+
+        with (
+            patch("app.services.quality_service._get_latest_run", new_callable=AsyncMock, return_value=vr),
+            patch("app.services.quality_service.SystemConfig") as MockSysCfg,
+            patch("app.services.quality_service.ValidationRun") as MockVR,
+            patch("app.services.quality_service.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockSysCfg.get_config = AsyncMock(return_value=sys_cfg)
+            mock_count_chain = MagicMock()
+            mock_count_chain.count = AsyncMock(return_value=5)
+            MockVR.find = MagicMock(return_value=mock_count_chain)
+            MockMeta.find_one = AsyncMock(return_value=meta)
+
+            from app.services.quality_service import update_quality_metadata
+
+            await update_quality_metadata("search_set", "item-1")
+            assert meta.test_case_count == 12
+            assert meta.consistency == 0.91
+
+    @pytest.mark.asyncio
+    async def test_case_count_falls_back_to_the_snapshot_for_older_runs(self):
+        vr = _make_validation_run(score=88.0)
+        vr.num_test_cases = 0
+        vr.consistency = None
+        vr.result_snapshot = {"test_cases": [{"label": "a"}, {"label": "b"}, {"label": "c"}]}
+        meta = _make_verified_metadata(quality_score=70.0)
+        sys_cfg = _make_sys_config()
+
+        with (
+            patch("app.services.quality_service._get_latest_run", new_callable=AsyncMock, return_value=vr),
+            patch("app.services.quality_service.SystemConfig") as MockSysCfg,
+            patch("app.services.quality_service.ValidationRun") as MockVR,
+            patch("app.services.quality_service.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockSysCfg.get_config = AsyncMock(return_value=sys_cfg)
+            mock_count_chain = MagicMock()
+            mock_count_chain.count = AsyncMock(return_value=5)
+            MockVR.find = MagicMock(return_value=mock_count_chain)
+            MockMeta.find_one = AsyncMock(return_value=meta)
+
+            from app.services.quality_service import update_quality_metadata
+
+            await update_quality_metadata("search_set", "item-1")
+            assert meta.test_case_count == 3
+            assert meta.consistency is None
+
+    @pytest.mark.asyncio
     async def test_creates_metadata_when_not_exists(self):
         vr = _make_validation_run(score=88.0)
         sys_cfg = _make_sys_config()

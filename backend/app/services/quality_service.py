@@ -297,12 +297,17 @@ async def update_quality_metadata(item_kind: str, item_id: str, item_name: str |
         VerifiedItemMetadata.item_kind == item_kind,
         VerifiedItemMetadata.item_id == item_id,
     )
+    test_case_count = latest.num_test_cases or len(
+        (latest.result_snapshot or {}).get("test_cases", (latest.result_snapshot or {}).get("sources", []))
+    )
     if meta:
         meta.quality_score = latest.score
         meta.quality_tier = tier
         meta.quality_grade = latest.grade
         meta.last_validated_at = now
         meta.validation_run_count = run_count
+        meta.test_case_count = test_case_count
+        meta.consistency = latest.consistency
         if item_name and not meta.display_name:
             meta.display_name = item_name
         # A run that recovers the pre-regression score clears the review flag
@@ -325,6 +330,8 @@ async def update_quality_metadata(item_kind: str, item_id: str, item_name: str |
             quality_grade=latest.grade,
             last_validated_at=now,
             validation_run_count=run_count,
+            test_case_count=test_case_count,
+            consistency=latest.consistency,
         )
         await meta.insert()
 

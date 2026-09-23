@@ -240,3 +240,23 @@ describe('ExploreTab quality tiers', () => {
     expect(screen.getByText('Quality: Excellent (94%)')).toBeTruthy()
   })
 })
+
+describe('ExploreTab adoption and stability signals', () => {
+  it('shows case count, consistency and adopters for a measured item, and only adopters for an asserted one', async () => {
+    // #913: the numbers that qualify a score. An absent chip means "not
+    // measured" — an asserted tier never gets a case count or consistency.
+    const measured = makeItem({ id: 'c-1', item_id: 'wf-1', name: 'Measured WF', source_uuid: 'wf-1', quality_tier: 'excellent', quality_score: 87, test_case_count: 12, consistency: 0.91, adoption_count: 4 })
+    const asserted = makeItem({ id: 'c-2', item_id: 'wf-2', name: 'Seeded WF', source_uuid: 'wf-2', quality_tier: 'excellent', quality_score: null, quality_asserted: true, test_case_count: 3, consistency: 0.5, adoption_count: 1 })
+    vi.mocked(listVerifiedItems).mockResolvedValue({ items: [measured, asserted], total: 2 })
+    render(<ExploreTab />)
+
+    await screen.findByText('Measured WF')
+    // Each chip appears once per card; the modal is closed.
+    expect(screen.getAllByText('on 12 cases')).toHaveLength(1)
+    expect(screen.getAllByText('91% consistent')).toHaveLength(1)
+    expect(screen.getAllByText('4 people use it')).toHaveLength(1)
+    expect(screen.getAllByText('1 person uses it')).toHaveLength(1)
+    expect(screen.queryByText('on 3 cases')).toBeNull()
+    expect(screen.queryByText('50% consistent')).toBeNull()
+  })
+})
