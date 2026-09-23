@@ -84,17 +84,60 @@ export function UsageCheckFailedNote({ many = false }: { many?: boolean }) {
   )
 }
 
+/**
+ * What deleting does to each kind of reference — said as it is. A knowledge
+ * base answers from its own ingested copy, so deleting the file alone leaves
+ * that copy answering; `removeOffered` says the dialog offers to remove it.
+ */
+export function describeDeleteEffects(
+  usage: Pick<DocumentUsage, 'knowledge_bases' | 'extractions' | 'workflows'>,
+  { many = false, removeOffered = false }: { many?: boolean; removeOffered?: boolean } = {},
+): string {
+  const it = many ? 'them' : 'it'
+  const parts: string[] = []
+  if (usage.knowledge_bases.length) {
+    parts.push(removeOffered
+      ? `Knowledge bases keep their own copy of ${it} and keep answering from it unless you remove it below.`
+      : `Knowledge bases keep their own copy of ${it} and keep answering from it.`)
+  }
+  if (usage.extractions.length) parts.push('Extraction test cases keep a saved snapshot.')
+  if (usage.workflows.length) parts.push(`A workflow that pins ${many ? 'one' : 'it'} will fail until it is replaced.`)
+  return parts.join(' ')
+}
+
+/**
+ * The opt-in that makes "delete" mean "gone from the knowledge bases too".
+ * Checked by default: removing a file usually means its answers should go
+ * with it. Uncontrolled — the confirm dialog renders its message once — so the
+ * choice is reported through `onChange`.
+ */
+export function RemoveFromKnowledgeBasesOption({ count, onChange }: { count: number; onChange: (checked: boolean) => void }) {
+  return (
+    <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginTop: 10, fontSize: 13, cursor: 'pointer' }}>
+      <input
+        type="checkbox"
+        defaultChecked
+        onChange={e => onChange(e.target.checked)}
+        style={{ marginTop: 2 }}
+      />
+      <span>Also remove from {count === 1 ? 'this knowledge base' : `these ${count} knowledge bases`}</span>
+    </label>
+  )
+}
+
 /** Compact list of what references the document — reused inside the delete confirmation. */
 export function UsageSummaryList({ usage }: { usage: Pick<DocumentUsage, 'knowledge_bases' | 'extractions' | 'workflows'> }) {
-  const rows: { icon: typeof Library; label: string; detail?: string }[] = [
-    ...usage.knowledge_bases.map(kb => ({ icon: Library, label: kb.title, detail: 'knowledge base' })),
+  // The kind leads and the name is quoted: a knowledge base auto-named
+  // "NSF_PAPPG.pdf (and 1 more)" otherwise reads as a list of files.
+  const rows: { icon: typeof Library; kind: string; label: string; detail?: string }[] = [
+    ...usage.knowledge_bases.map(kb => ({ icon: Library, kind: 'Knowledge base', label: kb.title })),
     ...usage.extractions.map(ex => ({
-      icon: ListChecks, label: ex.title,
-      detail: `extraction · ${plural(ex.test_cases.length, 'test case', 'test cases')}`,
+      icon: ListChecks, kind: 'Extraction', label: ex.title,
+      detail: plural(ex.test_cases.length, 'test case', 'test cases'),
     })),
     ...usage.workflows.map(wf => ({
-      icon: WorkflowIcon, label: wf.name,
-      detail: `workflow · ${wf.uses.map(describeWorkflowUse).join(', ')}`,
+      icon: WorkflowIcon, kind: 'Workflow', label: wf.name,
+      detail: wf.uses.map(describeWorkflowUse).join(', '),
     })),
   ]
   if (rows.length === 0) return null
@@ -104,7 +147,8 @@ export function UsageSummaryList({ usage }: { usage: Pick<DocumentUsage, 'knowle
         <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 13 }}>
           <r.icon style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 2 }} />
           <span>
-            <strong style={{ fontWeight: 600 }}>{r.label}</strong>
+            <span style={{ color: '#6b7280' }}>{r.kind} </span>
+            <strong style={{ fontWeight: 600 }}>&ldquo;{r.label}&rdquo;</strong>
             {r.detail && <span style={{ color: '#6b7280' }}> — {r.detail}</span>}
           </span>
         </li>
@@ -195,7 +239,7 @@ export function DocumentUsageDialog({
                 This document is {summarizeUsage(usage)}.
                 {usage.total === 0
                   ? ' Deleting it will not affect anything else.'
-                  : ' Deleting it will remove it from each of these; workflows that pin it will fail until it is replaced.'}
+                  : ` ${describeDeleteEffects(usage)}`}
               </div>
 
               <Section icon={Folder} title="Location" count={1}>

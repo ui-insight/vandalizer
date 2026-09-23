@@ -1028,7 +1028,11 @@ async def set_source_reference(
     return source
 
 
-async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
+async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = False) -> bool:
+    """Remove a source and its chunks. With ``strict``, a failure to delete the
+    chunks raises and the source row is kept — the caller reports the KB as
+    still holding the content rather than leaving chunks answering with no
+    source row left to retry from."""
     source = await KnowledgeBaseSource.find_one(
         KnowledgeBaseSource.uuid == source_uuid,
         KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
@@ -1040,9 +1044,71 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
         await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
     except Exception as e:
         logger.error(f"Error deleting KB source from ChromaDB: {e}")
+        if strict:
+            raise
     await source.delete()
     await recalculate_stats(kb)
     return True
+
+
+async def remove_document_from_knowledge_bases(
+    doc_uuid: str, user: User,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Remove every knowledge-base source built from ``doc_uuid``, chunks and all.
+
+    Deleting a document leaves its KB sources in place — each one answers from
+    its own ingested copy — so "delete this file everywhere" has to be asked for
+    and done here. Only the knowledge bases the delete dialog listed are in
+    scope — those in the caller's own tenants (``document_usage``'s rule), so
+    an admin's delete never reaches another team's KB. Of those, only ones the
+    user may manage are touched; the rest are returned as ``kept`` so the
+    caller can say which copies remain. One failing KB never stops the others.
+
+    Returns ``(removed, kept)``, each a list of ``{uuid, title}``.
+    """
+    from app.services import organization_service
+    from app.services.document_usage import in_caller_tenants
+
+    sources = await KnowledgeBaseSource.find({"document_uuid": doc_uuid}).to_list()
+    if not sources:
+        return [], []
+    try:
+        user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+        team_access = await access_control.get_team_access_context(user)
+        visible_teams = team_access.team_uuids | team_access.team_object_ids
+    except Exception:
+        # The file is already deleted; never turn that into a 500.
+        logger.exception("Could not resolve access for removing document %s from KBs", doc_uuid)
+        return [], []
+    removed: list[dict[str, str]] = []
+    kept: list[dict[str, str]] = []
+    kb_uuids = list(dict.fromkeys(s.knowledge_base_uuid for s in sources if s.knowledge_base_uuid))
+    for kb_uuid in kb_uuids:
+        try:
+            kb = await get_knowledge_base(
+                kb_uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+            )
+            if kb is not None and not in_caller_tenants(kb, visible_teams):
+                continue  # not in the dialog's list — another tenant's KB
+            if kb is None:
+                viewable = await get_knowledge_base(
+                    kb_uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+                )
+                # A KB the user cannot even see, or another tenant's, is not named.
+                if viewable is not None and in_caller_tenants(viewable, visible_teams):
+                    kept.append({"uuid": kb_uuid, "title": viewable.title})
+                continue
+            for source in sources:
+                if source.knowledge_base_uuid == kb_uuid:
+                    await remove_source(kb, source.uuid, strict=True)
+        except Exception:
+            logger.exception("Failed to remove document %s from KB %s", doc_uuid, kb_uuid)
+            title = kb.title if kb is not None else None
+            if title:
+                kept.append({"uuid": kb_uuid, "title": title})
+            continue
+        removed.append({"uuid": kb.uuid, "title": kb.title})
+    return removed, kept
 
 
 # --- Clone ---

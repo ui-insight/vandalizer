@@ -12,8 +12,17 @@ export function uploadFile(data: {
   )
 }
 
-export function deleteFile(docUuid: string) {
-  return apiFetch<{ ok: boolean }>(`/api/files/${docUuid}`, { method: 'DELETE' })
+export interface DeleteFileResult {
+  ok: boolean
+  /** Present when `removeFromKnowledgeBases` was asked for. */
+  knowledge_bases_removed?: { uuid: string; title: string }[]
+  /** Knowledge bases that still hold a copy — ones the caller cannot manage. */
+  knowledge_bases_kept?: { uuid: string; title: string }[]
+}
+
+export function deleteFile(docUuid: string, { removeFromKnowledgeBases = false } = {}) {
+  const qs = removeFromKnowledgeBases ? '?remove_from_knowledge_bases=true' : ''
+  return apiFetch<DeleteFileResult>(`/api/files/${docUuid}${qs}`, { method: 'DELETE' })
 }
 
 export function renameFile(uuid: string, newName: string) {

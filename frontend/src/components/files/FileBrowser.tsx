@@ -15,8 +15,8 @@ import { MoveFolderDialog } from './MoveFolderDialog'
 import { MoveFileDialog } from './MoveFileDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
-import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DocumentUsage } from '../../api/files'
-import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile, fetchDocumentUsage, type DeleteFileResult, type DocumentUsage } from '../../api/files'
+import { DocumentUsageDialog, UsageSummaryList, UsageCheckFailedNote, RemoveFromKnowledgeBasesOption, describeDeleteEffects, mergeUsage, summarizeUsage, type UsageGroups } from './DocumentUsageDialog'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
@@ -90,6 +90,16 @@ async function collectUsage(docUuids: string[]): Promise<UsageGroups | undefined
     ok.push(r.value)
   }
   return mergeUsage(ok)
+}
+
+// Knowledge bases that still hold a copy after "also remove" — ones the user
+// cannot manage. Named, so the dialog's promise is never silently broken.
+function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
+  const kept = new Map<string, string>()
+  for (const r of results) for (const kb of r.knowledge_bases_kept ?? []) kept.set(kb.uuid, kb.title)
+  if (kept.size === 0) return null
+  const titles = [...kept.values()].map(t => `"${t}"`).join(', ')
+  return `Still in ${kept.size === 1 ? 'knowledge base' : 'knowledge bases'} ${titles} — it couldn't be removed there (you may not manage ${kept.size === 1 ? 'it' : 'them'}). Remove it from the knowledge base itself, or ask its owner.`
 }
 
 // The delete confirmation names what it deletes; past this many, "and N more".
@@ -314,6 +324,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     const moreNames = names.length - shownNames.length
     const usage = docUuids.length > 0 ? await collectUsage(docUuids) : null
     const oneDoc = docUuids.length === 1
+    const kbCount = usage ? usage.knowledge_bases.length : 0
+    let removeFromKbs = kbCount > 0
     const ok = await confirm({
       title: `Delete ${summary}?`,
       message: (
@@ -324,10 +336,9 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           {usage && usage.total > 0 && (
             <div style={{ marginTop: 8 }}>
               {oneDoc ? <><strong>{selectedDocs[0].title}</strong> is</> : 'These files are'} {summarizeUsage(usage)}.
-              {oneDoc
-                ? ' Deleting it removes it from each of these, and a workflow that pins it will fail until it is replaced.'
-                : ' Deleting them removes them from each of these, and a workflow that pins one will fail until it is replaced.'}
+              {' '}{describeDeleteEffects(usage, { many: !oneDoc, removeOffered: kbCount > 0 })}
               <UsageSummaryList usage={usage} />
+              {kbCount > 0 && <RemoveFromKnowledgeBasesOption count={kbCount} onChange={v => { removeFromKbs = v }} />}
             </div>
           )}
         </>
@@ -339,12 +350,15 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     setBulkDeleting(true)
     try {
       const promises: Promise<unknown>[] = []
+      const fileDeletes: Promise<DeleteFileResult>[] = []
       for (const uuid of selectedUuids) {
         const isFolder = folders.some(f => f.uuid === uuid)
         if (isFolder) promises.push(deleteFolder(uuid))
-        else promises.push(deleteFile(uuid))
+        else fileDeletes.push(deleteFile(uuid, { removeFromKnowledgeBases: removeFromKbs }))
       }
-      await Promise.all(promises)
+      const [, results] = await Promise.all([Promise.all(promises), Promise.all(fileDeletes)])
+      const kept = keptKnowledgeBasesMessage(results)
+      if (kept) toast(kept, 'info')
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
     } finally {
@@ -531,11 +545,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       const name = (item as { name?: string; title?: string } | undefined)?.name
         || (item as { title?: string } | undefined)?.title
         || (type === 'folder' ? 'this folder' : 'this file')
-      // Say what depends on a document before it goes: a knowledge base loses
-      // a source, an extraction its test case, a workflow its pinned input.
-      // `undefined` means the check failed; the dialog says so rather than
-      // passing it off as "used nowhere".
+      // Say what depends on a document before it goes, and what deleting does
+      // to each: a knowledge base keeps answering from its copy unless the
+      // user also removes it there. `undefined` means the check failed; the
+      // dialog says so rather than passing it off as "used nowhere".
       const usage: UsageGroups | null | undefined = type === 'doc' ? await collectUsage([uuid]) : null
+      const kbCount = usage ? usage.knowledge_bases.length : 0
+      let removeFromKbs = kbCount > 0
       const ok = await confirm({
         title: type === 'folder' ? 'Delete folder?' : 'Delete file?',
         message: type === 'folder' ? (
@@ -544,8 +560,9 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           </>
         ) : usage && usage.total > 0 ? (
           <>
-            <strong>{name}</strong> is {summarizeUsage(usage)}. Deleting it removes it from each of these, and a workflow that pins it will fail until it is replaced. This cannot be undone.
+            <strong>{name}</strong> is {summarizeUsage(usage)}. {describeDeleteEffects(usage, { removeOffered: kbCount > 0 })} This cannot be undone.
             <UsageSummaryList usage={usage} />
+            {kbCount > 0 && <RemoveFromKnowledgeBasesOption count={kbCount} onChange={v => { removeFromKbs = v }} />}
           </>
         ) : (
           <>
@@ -559,7 +576,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       if (!ok) return
       try {
         if (type === 'doc') {
-          await deleteFile(uuid)
+          const kept = keptKnowledgeBasesMessage([await deleteFile(uuid, { removeFromKnowledgeBases: removeFromKbs })])
+          if (kept) toast(kept, 'info')
         } else {
           await deleteFolder(uuid)
         }
