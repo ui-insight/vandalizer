@@ -568,7 +568,7 @@ def verification_status_email(
     status_labels = {
         "approved": ("Accepted", "An examiner checked it over and shared it with everyone here, with its measured score."),
         "rejected": ("Declined", "The examiner decided not to share this one."),
-        "returned": ("Sent back", "The examiner sent your submission back with feedback."),
+        "returned": ("Sent back", "The examiner sent it back with a note on what would get it there."),
         "in_review": ("Under Review", "An examiner has started reviewing your submission."),
     }
     label, default_body = status_labels.get(new_status, (new_status.title(), ""))

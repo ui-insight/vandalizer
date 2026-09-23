@@ -1839,7 +1839,7 @@ async def _notify_submitter(
         VerificationStatus.RETURNED.value: {
             "kind": "verification_returned",
             "title": f'"{item_name}" was sent back',
-            "body": reviewer_notes or "The examiner sent your submission back with feedback.",
+            "body": reviewer_notes or "The examiner sent it back with a note on what would get it there.",
         },
         VerificationStatus.IN_REVIEW.value: {
             "kind": "verification_in_review",

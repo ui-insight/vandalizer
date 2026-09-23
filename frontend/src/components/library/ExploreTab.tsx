@@ -664,6 +664,7 @@ export function ExploreTab() {
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Shared with everyone here</h2>
                     <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases — checked, scored, and free to copy</p>
+                    <p className="text-xs text-gray-500 mt-1">Have something that works for you? Share it from its ⋯ menu in Mine — it doesn't need to be finished.</p>
                   </div>
                 </div>
               </div>

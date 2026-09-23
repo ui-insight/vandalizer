@@ -179,6 +179,15 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
 
   return (
     <div>
+      {/* The bar, stated. Without it each examiner supplies their own, and the
+          private standard is always "perfect". */}
+      {view === 'pending' && (
+        <p className="mb-3 text-xs text-gray-600 border-l-2 border-gray-300 pl-3">
+          <span className="font-semibold text-gray-800">The bar:</span> useful to someone here, and honest about what it does.
+          The score travels with it and can be low. Send back with a note when a small change would get it there.
+        </p>
+      )}
+
       {/* Search + view toggle + status filters */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
@@ -379,7 +388,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                               <textarea
                                 value={reviewNotes}
                                 onChange={(e) => setReviewNotes(e.target.value)}
-                                placeholder="Review notes (optional)..."
+                                placeholder="What would get it there? Shown to the author. (optional)"
                                 rows={2}
                                 className="text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                               />

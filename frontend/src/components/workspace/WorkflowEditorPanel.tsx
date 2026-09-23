@@ -8484,7 +8484,7 @@ function ValidateTab({
                       onClose={() => setShowSubmitDialog(false)}
                       onSubmitted={() => {
                         setSubmitLibraryResult('success')
-                        toast('Submitted for verification', 'success')
+                        toast('Sent to the examiners — you\'ll hear back when someone has looked', 'success')
                       }}
                     />
                   )}

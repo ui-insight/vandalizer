@@ -1160,7 +1160,7 @@ def evaluate_submission_gates(item_kind: str, latest: dict | None, quality_confi
     if not latest:
         if enforced:
             issues.append(
-                "This item must be validated before it can be shared with everyone. Run validation first."
+                "This item must be validated before it can be shared with everyone. Run validation first, or choose \u201cGet a second pair of eyes\u201d to have an examiner validate it for you."
             )
         else:
             observations.append(

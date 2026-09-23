@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FocusTrap } from 'focus-trap-react'
-import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload } from 'lucide-react'
+import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload, Users, Eye } from 'lucide-react'
 import { submitForVerification } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLabel } from '../../lib/catalogLabels'
@@ -25,21 +25,32 @@ interface Props {
   itemTitle?: string
   onClose: () => void
   onSubmitted: () => void
+  /** When the caller can share this item with the user's team (no examiner
+   *  involved), the first step offers that beside the examiner paths. */
+  onShareWithTeam?: () => void
 }
 
-// Three steps, one required field. The optional material (how to run it,
-// what to look for, example inputs) lives on one step and says it is optional,
-// so the shape of the form does not overstate what sharing asks of you.
-type Step = 'basics' | 'details' | 'review'
+// The first step is what you want, not a form. "Get a second pair of eyes"
+// is the backend's pending_admin_validation path, promoted from an amber
+// opt-out checkbox on the last step to a door on the first one — asking for
+// help should feel like a normal thing to want, not an irregularity.
+type Intent = 'everyone' | 'help'
+
+// Then one required field. The optional material (how to run it, what to
+// look for, example inputs) lives on one step and says it is optional, so
+// the shape of the form does not overstate what sharing asks of you.
+type Step = 'intent' | 'basics' | 'details' | 'review'
 const STEPS: { key: Step; label: string }[] = [
+  { key: 'intent', label: 'What do you want?' },
   { key: 'basics', label: 'Basics' },
   { key: 'details', label: 'Details (optional)' },
   { key: 'review', label: 'Review' },
 ]
 
-export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, onSubmitted }: Props) {
+export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, onSubmitted, onShareWithTeam }: Props) {
   const { user } = useAuth()
-  const [step, setStep] = useState<Step>('basics')
+  const [step, setStep] = useState<Step>('intent')
+  const [intent, setIntent] = useState<Intent | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -55,7 +66,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [expectedOutputs, setExpectedOutputs] = useState('')
   const [dependencies, setDependencies] = useState('')
   const [intendedUseTags, setIntendedUseTags] = useState('')
-  const [skipValidation, setSkipValidation] = useState(false)
+  const skipValidation = intent === 'help'
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -65,8 +76,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
-  const canGoNext = stepIndex < STEPS.length - 1
+  const canGoNext = stepIndex < STEPS.length - 1 && (step !== 'intent' || intent !== null)
   const isLastStep = stepIndex === STEPS.length - 1
+  const chooseIntent = (i: Intent) => {
+    setIntent(i)
+    setStep('basics')
+  }
 
   const goNext = () => {
     if (canGoNext) setStep(STEPS[stepIndex + 1].key)
@@ -139,8 +154,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           {STEPS.map((s, i) => (
             <div key={s.key} className="flex items-center gap-1">
               <button
+                type="button"
+                // Past the first step only once a door is chosen: jumping to
+                // Review with no intent would submit as "everyone" unasked.
+                disabled={intent === null && s.key !== 'intent'}
                 onClick={() => setStep(s.key)}
-                className={`text-xs font-medium px-2 py-1 rounded ${
+                className={`text-xs font-medium px-2 py-1 rounded disabled:opacity-40 disabled:cursor-not-allowed ${
                   step === s.key
                     ? 'bg-gray-900 text-white'
                     : i < stepIndex
@@ -161,6 +180,53 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
             <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{kindLabel}</span>
             {itemTitle && <span className="font-medium text-gray-700">{itemTitle}</span>}
           </div>
+
+          {step === 'intent' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-700">
+                Sharing puts this {kindLabel.toLowerCase()} where colleagues can copy it. It doesn't need to be finished, and the score it carries can be low — it just has to be useful to someone and honest about what it does.
+              </p>
+              <div className="grid gap-2">
+                {onShareWithTeam && (
+                  <button
+                    type="button"
+                    onClick={() => { onClose(); onShareWithTeam() }}
+                    className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-3.5 text-left hover:border-gray-400 hover:bg-gray-50"
+                  >
+                    <Users className="h-5 w-5 mt-0.5 text-gray-500 shrink-0" aria-hidden="true" />
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-900">Share with my team</span>
+                      <span className="block text-xs text-gray-600 mt-0.5">Just your team, right now. No examiner involved.</span>
+                    </span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => chooseIntent('everyone')}
+                  aria-pressed={intent === 'everyone'}
+                  className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-3.5 text-left hover:border-gray-400 hover:bg-gray-50"
+                >
+                  <ShieldCheck className="h-5 w-5 mt-0.5 text-green-600 shrink-0" aria-hidden="true" />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900">Share with everyone — it works for me</span>
+                    <span className="block text-xs text-gray-600 mt-0.5">An examiner looks it over and accepts it. Its score, if it has one, travels with it.</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => chooseIntent('help')}
+                  aria-pressed={intent === 'help'}
+                  className="flex items-start gap-3 rounded-lg border border-gray-200 bg-white p-3.5 text-left hover:border-gray-400 hover:bg-gray-50"
+                >
+                  <Eye className="h-5 w-5 mt-0.5 text-blue-600 shrink-0" aria-hidden="true" />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900">Get a second pair of eyes</span>
+                    <span className="block text-xs text-gray-600 mt-0.5">Ask an examiner to look at it and run a validation for you. Takes a little longer; you'll get a score and notes back.</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {step === 'basics' && (
             <>
@@ -370,23 +436,15 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 )}
               </dl>
 
-              {/* Submit-without-validation opt-in (Phase B) */}
-              <label className="flex items-start gap-2 cursor-pointer rounded-md bg-amber-50 border border-amber-200 px-3.5 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={skipValidation}
-                  onChange={(e) => setSkipValidation(e.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  <span className="block text-xs font-semibold text-amber-900">
-                    Share without a validation run — ask the examiner to validate it
-                  </span>
-                  <span className="block text-[11px] leading-snug text-amber-800 mt-0.5">
-                    The examiner will run a validation to get a score before accepting, so it takes longer. Running Validate &amp; improve yourself first is quicker and puts your own score on the entry.
-                  </span>
+              {/* What was chosen on step 1, in one line, with the way back. */}
+              <div className="flex items-start justify-between gap-3 rounded-md bg-gray-50 border border-gray-200 px-3.5 py-2.5">
+                <span className="text-xs text-gray-700">
+                  {skipValidation
+                    ? <><span className="font-semibold">Second pair of eyes</span> — an examiner will look it over and run a validation, then get back to you with a score and notes.</>
+                    : <><span className="font-semibold">Share with everyone</span> — an examiner looks it over and accepts it. Its current score travels with it.</>}
                 </span>
-              </label>
+                <button type="button" onClick={() => setStep('intent')} className="text-xs text-gray-600 underline shrink-0">Change</button>
+              </div>
 
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
             </div>
@@ -420,12 +478,13 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
-                {submitting ? 'Sharing...' : skipValidation ? 'Share (examiner will validate)' : shareLabel}
+                {submitting ? 'Sending...' : skipValidation ? 'Ask for a look' : shareLabel}
               </button>
             ) : (
               <button
                 onClick={goNext}
-                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800"
+                disabled={!canGoNext}
+                className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-gray-900 rounded-md hover:bg-gray-800 disabled:opacity-50"
               >
                 Next
                 <ChevronRight className="h-4 w-4" />

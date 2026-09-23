@@ -573,8 +573,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           onClose={() => setShowVerifyModal(false)}
           onSubmitted={() => {
             setShowVerifyModal(false)
-            toast('Submitted for verification', 'success')
+            toast('Sent to the examiners — you\'ll hear back when someone has looked', 'success')
           }}
+          onShareWithTeam={scope === 'mine' ? () => onShare(item.id) : undefined}
         />
       )}
     </div>
