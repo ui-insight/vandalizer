@@ -71,10 +71,10 @@ export function CatalogCoverageTab() {
       <div className="mb-4">
         <div className="flex items-center gap-2 mb-1">
           <h2 className="text-base font-semibold text-gray-900">Validation coverage</h2>
-          <span className="text-xs text-gray-500">({total} verified items)</span>
+          <span className="text-xs text-gray-500">({total} shared items)</span>
         </div>
         <p className="text-xs text-gray-500">
-          Verified catalog items by validation coverage. Items without a pinned baseline have no drift contract — clicking <strong>Establish baseline</strong> creates one retroactively.
+          Shared items by validation coverage. An item without a pinned baseline is not monitored for drift — <strong>Establish baseline</strong> pins one from its latest validation.
         </p>
       </div>
 
@@ -123,7 +123,7 @@ export function CatalogCoverageTab() {
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading…</div>
       ) : items.length === 0 ? (
         <div className="text-sm text-gray-500 py-12 text-center">
-          {coverage ? `No items with coverage "${COVERAGE_LABEL[coverage]}".` : 'No verified items.'}
+          {coverage ? `No items with coverage "${COVERAGE_LABEL[coverage]}".` : 'No shared items.'}
         </div>
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">

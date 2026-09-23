@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink, Pin, Wrench, UserCheck } from 'lucide-react'
-import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
-import type { VerificationRequest, VerificationStatus, VerifiedCollection } from '../../types/library'
+import { listVerificationQueue, myVerificationRequests, updateVerificationStatus } from '../../api/library'
+import type { VerificationRequest, VerificationStatus } from '../../types/library'
 import { AuthorChip } from '../shared/AuthorChip'
-import { listOrganizationsFlat } from '../../api/organizations'
-import type { Organization } from '../../api/organizations'
 import { useAuth } from '../../hooks/useAuth'
 import { ExaminerValidationDrawer } from './ExaminerValidationDrawer'
 
@@ -19,11 +17,11 @@ function statusBadge(status: VerificationStatus) {
     case 'in_review':
       return { label: 'In Review', className: 'bg-yellow-50 text-yellow-700 border-yellow-200' }
     case 'approved':
-      return { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200' }
+      return { label: 'Accepted', className: 'bg-green-50 text-green-700 border-green-200' }
     case 'rejected':
-      return { label: 'Rejected', className: 'bg-red-50 text-red-700 border-red-200' }
+      return { label: 'Declined', className: 'bg-red-50 text-red-700 border-red-200' }
     case 'returned':
-      return { label: 'Returned', className: 'bg-orange-50 text-orange-700 border-orange-200' }
+      return { label: 'Sent back', className: 'bg-orange-50 text-orange-700 border-orange-200' }
     default:
       return { label: status, className: 'bg-gray-50 text-gray-700 border-gray-200' }
   }
@@ -71,17 +69,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
-  const [orgs, setOrgs] = useState<Organization[]>([])
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [reviewOrgIds, setReviewOrgIds] = useState<string[]>([])
-  const [reviewCollectionIds, setReviewCollectionIds] = useState<string[]>([])
   const [drawerRequest, setDrawerRequest] = useState<VerificationRequest | null>(null)
-
-  // Load orgs and collections for assignment at approval time
-  useEffect(() => {
-    listOrganizationsFlat().then(d => setOrgs(d.organizations)).catch(() => {})
-    listCollections().then(d => setCollections(d.collections)).catch(() => {})
-  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -125,13 +113,12 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
   }, [focusRequestUuid, loading, requests])
 
   const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review' | 'returned') => {
-    const oIds = action === 'approved' && reviewOrgIds.length > 0 ? reviewOrgIds : undefined
-    const cIds = action === 'approved' && reviewCollectionIds.length > 0 ? reviewCollectionIds : undefined
-    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined, oIds, cIds)
+    // Publishing is one decision. Organization visibility and collection
+    // membership are curated afterwards on the Catalog tab, where that work
+    // already lives, rather than bolted onto the button.
+    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined)
     setReviewingId(null)
     setReviewNotes('')
-    setReviewOrgIds([])
-    setReviewCollectionIds([])
     refresh()
   }
 
@@ -201,11 +188,11 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search requests..."
-            aria-label="Search verification requests"
+            aria-label="Search submissions"
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
-        <div role="group" aria-label="Verification views" className="flex items-center gap-2">
+        <div role="group" aria-label="Shared items views" className="flex items-center gap-2">
           <button
             type="button"
             aria-pressed={view === 'pending'}
@@ -216,7 +203,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            Review Queue
+            Requests
           </button>
           <button
             type="button"
@@ -241,7 +228,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
             ['submitted', 'Submitted'],
             ['in_review', 'In Review'],
             ...(view === 'pending' ? [['pending_admin_validation' as StatusFilter, 'Needs validation help'] as [StatusFilter, string]] : []),
-            ...(view === 'mine' ? [['returned' as StatusFilter, 'Returned'] as [StatusFilter, string]] : []),
+            ...(view === 'mine' ? [['returned' as StatusFilter, 'Sent back'] as [StatusFilter, string]] : []),
           ] as [StatusFilter, string][]).map(([val, label]) => (
             <button
               key={val}
@@ -381,7 +368,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                                 </button>
                               )}
                               <button
-                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
+                                onClick={() => setReviewingId(req.uuid)}
                                 className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
                               >
                                 Review
@@ -396,94 +383,53 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                                 rows={2}
                                 className="text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                               />
-                              {/* Organization visibility */}
-                              {orgs.length > 0 && (
-                                <div>
-                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Organization Visibility</div>
-                                  <div className="max-h-24 overflow-y-auto space-y-0.5">
-                                    {orgs.map(o => (
-                                      <label key={o.uuid} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
-                                        <input
-                                          type="checkbox"
-                                          checked={reviewOrgIds.includes(o.uuid)}
-                                          onChange={(e) => {
-                                            setReviewOrgIds(prev =>
-                                              e.target.checked ? [...prev, o.uuid] : prev.filter(id => id !== o.uuid)
-                                            )
-                                          }}
-                                          className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
-                                        />
-                                        <span className="truncate">{o.name}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {/* Collections assignment */}
-                              {collections.length > 0 && (
-                                <div>
-                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Collections</div>
-                                  <div className="max-h-24 overflow-y-auto space-y-0.5">
-                                    {collections.map(c => (
-                                      <label key={c.id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
-                                        <input
-                                          type="checkbox"
-                                          checked={reviewCollectionIds.includes(c.id)}
-                                          onChange={(e) => {
-                                            setReviewCollectionIds(prev =>
-                                              e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id)
-                                            )
-                                          }}
-                                          className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
-                                        />
-                                        <span className="truncate">{c.title}</span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
+                              {/* Baseline note in reviewer language: what publishing does,
+                                  not a warning about a subsystem. Absence is information, not
+                                  a reason to hesitate — it can be pinned later from the Catalog tab. */}
                               {(req.validation_snapshot || req.examiner_baseline_additions) ? (
                                 <div className="text-[10px] text-gray-500 inline-flex items-center gap-1">
                                   <Pin className="h-3 w-3" />
-                                  Approving will pin {req.examiner_baseline_additions && req.validation_snapshot ? 'merged' : req.examiner_baseline_additions ? 'examiner-curated' : 'submitter'} baseline.
+                                  Accepting pins the {req.examiner_baseline_additions && req.validation_snapshot ? 'merged' : req.examiner_baseline_additions ? 'examiner-curated' : 'submitter\'s'} validation as the baseline monitoring compares against.
                                 </div>
                               ) : (
-                                <div className="text-[10px] text-amber-700 inline-flex items-center gap-1">
+                                <div className="text-[10px] text-gray-500 inline-flex items-center gap-1">
                                   <Pin className="h-3 w-3" />
-                                  No baseline to pin — approving leaves catalog entry without a drift contract.
+                                  No validation run yet — the entry won't be monitored for drift until one is pinned. You can pin one later from the Catalog tab.
                                 </div>
                               )}
+                              {/* Two real outcomes: accept it, or send it back with notes.
+                                  Declining outright is rare enough to sit below the row. */}
                               <div className="flex gap-1">
                                 <button
                                   onClick={() => handleAction(req.uuid, 'approved')}
                                   className="flex-1 px-2 py-1 text-xs font-medium rounded bg-green-600 text-white hover:bg-green-700"
                                 >
-                                  Approve
-                                </button>
-                                <button
-                                  onClick={() => handleAction(req.uuid, 'rejected')}
-                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-red-600 text-white hover:bg-red-700"
-                                >
-                                  Reject
+                                  Accept
                                 </button>
                                 <button
                                   onClick={() => handleAction(req.uuid, 'returned')}
                                   className="flex-1 px-2 py-1 text-xs font-medium rounded bg-orange-500 text-white hover:bg-orange-600"
                                 >
-                                  Return
+                                  Send back
                                 </button>
                                 <button
                                   onClick={() => {
                                     setReviewingId(null)
                                     setReviewNotes('')
-                                    setReviewOrgIds([])
-                                    setReviewCollectionIds([])
                                   }}
                                   className="px-2 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
                                 >
                                   Cancel
                                 </button>
                               </div>
+                              <button
+                                type="button"
+                                onClick={() => handleAction(req.uuid, 'rejected')}
+                                className="self-start text-[11px] text-red-700 hover:underline"
+                                title="Close this request without sharing it. Prefer Send back when a revision could get it there."
+                              >
+                                Decline instead
+                              </button>
                             </div>
                           )}
                         </div>

@@ -8,7 +8,7 @@ describe('OptimizedBadge', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('says the settings are applied, when, and that it is not Verified', () => {
+  it('says the settings are applied, when, and that it is not Checked', () => {
     render(<OptimizedBadge kb={{ optimization: {
       state: 'applied', applied_at: '2026-08-01T12:00:00Z', stale: false, stale_reasons: [],
       tuned_keys: ['k', 'model'],
@@ -18,7 +18,7 @@ describe('OptimizedBadge', () => {
     expect(title).toContain('APPLIED')
     expect(title).toContain('applied ' + new Date('2026-08-01T12:00:00Z').toLocaleDateString())
     expect(title).toContain('Tuned: k, model')
-    expect(title).toContain('Not the same as Verified')
+    expect(title).toContain('Not the same as Checked')
   })
 
   it('marks a stale optimization and repeats the reasons', () => {
@@ -61,10 +61,10 @@ describe('OptimizedBadge', () => {
 })
 
 describe('VerifiedBadge', () => {
-  it('explains that Verified is about content, not settings', () => {
+  it('explains that Checked is about looked-over content, not settings', () => {
     render(<VerifiedBadge />)
-    const title = screen.getByText('Verified').closest('span')!.getAttribute('title')!
-    expect(title).toContain('administrator published')
+    const title = screen.getByText('Checked').closest('span')!.getAttribute('title')!
+    expect(title).toContain('examiner looked')
     expect(title).toContain('Not the same as Optimized')
   })
 })

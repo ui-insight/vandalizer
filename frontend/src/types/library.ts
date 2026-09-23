@@ -181,6 +181,8 @@ export interface VerifiedCatalogItem {
   consistency?: number | null
   /** Distinct people who added this item to a library or adopted this KB. */
   adoption_count?: number
+  /** Bundled starter example from the seed files — nobody here shared it. */
+  starter?: boolean
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
   // KB-specific fields

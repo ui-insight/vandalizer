@@ -198,6 +198,7 @@ export function ItemDetailModal({
               score={item.quality_score}
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
+              variant="catalog"
             />
             <CatalogSignals item={item} className="text-white/70" />
             {item.validation_run_count > 0 && (
@@ -401,6 +402,7 @@ function CatalogCard({
               score={item.quality_score}
               asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
+              variant="catalog"
             />
             <CatalogSignals item={item} className="text-[10px] text-gray-500" />
           </div>
@@ -791,8 +793,8 @@ export function ExploreTab() {
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Explore the Catalog</h2>
-                    <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases from the catalog, ready to use</p>
+                    <h2 className="text-xl font-bold text-gray-900">Shared with everyone here</h2>
+                    <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases — checked, scored, and free to copy</p>
                   </div>
                 </div>
               </div>
@@ -916,7 +918,7 @@ export function ExploreTab() {
               <div className="text-center py-20">
                 <ShieldCheck className="h-14 w-14 text-gray-200 mx-auto mb-4" />
                 <h3 className="text-base font-semibold text-gray-700 mb-1">
-                  {hasActiveFilters ? 'No matching items' : 'No verified items yet'}
+                  {hasActiveFilters ? 'No matching items' : 'Nothing shared yet'}
                 </h3>
                 <p className="text-sm text-gray-500 max-w-sm mx-auto">
                   {hasActiveFilters

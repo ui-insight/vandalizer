@@ -6,13 +6,16 @@ import type { VerifiedCatalogItem } from '../../types/library'
  * and how many people already rely on it. Each renders only when the backend
  * actually measured it — an absent chip is "not measured", never "zero".
  */
-export function catalogSignals(item: Pick<VerifiedCatalogItem, 'test_case_count' | 'consistency' | 'adoption_count' | 'quality_asserted'>): string[] {
+type SignalItem = Pick<VerifiedCatalogItem, 'test_case_count' | 'consistency' | 'adoption_count' | 'quality_asserted' | 'starter'>
+
+export function catalogSignals(item: SignalItem): string[] {
   const out: string[] = []
+  if (item.starter) out.push('Starter example')
   if (!item.quality_asserted && item.test_case_count && item.test_case_count > 0) {
     out.push(`on ${item.test_case_count} case${item.test_case_count === 1 ? '' : 's'}`)
   }
   if (!item.quality_asserted && item.consistency != null) {
-    out.push(`${Math.round(item.consistency * 100)}% consistent`)
+    out.push(`same answer ${Math.round(item.consistency * 100)}% of the time`)
   }
   if (item.adoption_count && item.adoption_count > 0) {
     out.push(item.adoption_count === 1 ? '1 person uses it' : `${item.adoption_count} people use it`)
@@ -21,7 +24,7 @@ export function catalogSignals(item: Pick<VerifiedCatalogItem, 'test_case_count'
 }
 
 export function CatalogSignals({ item, className, style }: {
-  item: Pick<VerifiedCatalogItem, 'test_case_count' | 'consistency' | 'adoption_count' | 'quality_asserted'>
+  item: SignalItem
   className?: string
   style?: React.CSSProperties
 }) {

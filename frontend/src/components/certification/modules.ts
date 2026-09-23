@@ -726,9 +726,9 @@ export const MODULES: ModuleDefinition[] = [
     number: 10,
     title: 'Collaboration & Governance',
     subtitle: 'Share and Standardize',
-    description: 'The final module before your Vandal Workflow Architect certification. Demonstrate that you can organize, verify, and share production-ready workflows across your team. Complete this and you earn your VWA credential.',
+    description: 'The final module before your Vandal Workflow Architect certification. Demonstrate that you can organize your work, share it with everyone through an examiner\'s check, and read what a shared entry\'s score, consistency and adoption actually tell you. Complete this and you earn your VWA credential.',
     objectives: [
-      'Submit a workflow for verification',
+      'Share a workflow with everyone',
       'Use workflows across personal and team contexts',
       'No new documents needed - uses workflows you have already built',
     ],
@@ -741,21 +741,21 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Organizing for reuse',
         objective: 'After this lesson, you\'ll understand the three tiers of workflow organization and when to use each.',
-        content: 'As your team builds more workflows, organization becomes critical. Use personal work for drafting, then move the workflows your team should reuse into shared team libraries and verified collections.\n\nThink about organization in terms of ownership and audience:\n\u2022 **Personal work** \u2014 early drafts, experiments, and one-off variations.\n\u2022 **Team libraries** \u2014 shared workflows your group actively maintains.\n\u2022 **Verified collections** \u2014 approved workflows that set team standards.',
+        content: 'As your team builds more workflows, organization becomes critical. Use personal work for drafting, then move the workflows your team should reuse into shared team libraries, and share the ones the whole institution could use with everyone.\n\nThink about organization in terms of ownership and audience:\n\u2022 **Personal work** \u2014 early drafts, experiments, and one-off variations.\n\u2022 **Team libraries** \u2014 shared workflows your group actively maintains.\n\u2022 **Everyone** \u2014 workflows an examiner has checked over and shared with everyone at your institution, with a measured score attached.',
         variant: 'concept',
       },
       {
-        title: 'The verification workflow',
-        objective: 'After this lesson, you\'ll understand what "verified" communicates to your team and how to use it as a governance tool.',
-        content: 'Verification is a governance practice with two halves. You submit a workflow to the verification queue; an examiner reviews it and marks it verified. The "verified" badge signals to your team that:\n\n1. The workflow has been tested on representative documents.\n2. A validation plan exists and passes consistently.\n3. The output format meets the team\'s requirements.\n4. The workflow is ready for production use.\n\nSubmitting is the part you control, and it\'s what completes this module. Examiner review happens on its own schedule \u2014 you\'ll get a notification when the decision lands.',
+        title: 'Sharing with everyone',
+        objective: 'After this lesson, you\'ll know what a "Checked" shared entry does and doesn\'t promise, and how to read one.',
+        content: 'Sharing with everyone has two halves. You ask to share a workflow; an examiner checks it over and accepts it. The **Checked** badge on the shared entry then tells a colleague four measured things:\n\n1. **Score** \u2014 how it did on its validation cases, and how many cases that was.\n2. **Consistency** \u2014 whether it gave the same answers across repeated runs.\n3. **Adoption** \u2014 how many people already use it.\n4. **When it was last checked** \u2014 monitoring re-runs the baseline and flags a drop.\n\nWhat it does *not* claim: that the output format fits your team, or that it is "production-ready" for your process. Those are your calls to make from the numbers \u2014 which is why the numbers, not the badge, are the point. A workflow at 84% that four colleagues rely on is a good candidate; a perfect score nobody uses tells you less.\n\nSharing is the part you control, and it\'s what completes this module. Examiner review happens on its own schedule \u2014 you\'ll get a notification when it lands.',
         variant: 'concept',
         knowledgeCheck: {
-          question: 'What does marking a workflow as "verified" communicate to your team?',
+          question: 'What does a "Checked" shared entry actually tell you?',
           options: [
-            { text: 'The workflow is locked and cannot be edited by other team members', correct: false, explanation: 'Verified is not a lock. It\'s a signal about quality, not a permission restriction.' },
-            { text: 'The workflow has been tested, validated, and is approved for production use', correct: true, explanation: 'Correct! Verified is a team communication tool. It says: this workflow has been through quality checks and is ready to rely on.' },
-            { text: 'The workflow was created by an admin-level user', correct: false, explanation: 'Any team member can submit a workflow for verification. An examiner approves it based on the workflow\'s quality, not the creator\'s role.' },
-            { text: 'The workflow only uses LLM models approved by your institution', correct: false, explanation: 'Model approval is a separate concern. Verified is about whether the workflow\'s output meets your team\'s quality bar.' },
+            { text: 'The workflow is locked and cannot be edited by other team members', correct: false, explanation: 'Checked is not a lock. Anyone can copy a shared item and edit their copy.' },
+            { text: 'An examiner looked it over, and its score, consistency and adoption are shown so you can judge fit yourself', correct: true, explanation: 'Correct. Checked means someone looked at it and it was measured, not endorsed for every use. The numbers on the entry are what you decide from.' },
+            { text: 'The workflow was created by an admin-level user', correct: false, explanation: 'Any team member can ask to share a workflow with everyone. An examiner looks it over and accepts it based on the workflow\'s quality, not the creator\'s role.' },
+            { text: 'The workflow only uses LLM models approved by your institution', correct: false, explanation: 'Model approval is a separate concern. Checked is about the look-over and the measurements, not the model.' },
           ],
         },
       },
@@ -766,12 +766,12 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Establish your workflow governance',
-        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes.\n5. Submit the workflow for verification. That completes this module — an examiner reviews it on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
+        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes.\n5. Share the workflow with everyone (\u22ef \u2192 Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
         variant: 'walkthrough',
       },
       {
         title: 'Building a culture of reuse',
-        content: 'The highest-performing teams maintain a library of verified workflows that cover common document types, then adapt and extend them as needed.\n\nBy completing this module, you\'ve demonstrated every skill in the Vandal Workflow Architect program: understanding AI, decomposing processes, designing pipelines, building extractions, chaining multi-step workflows, using advanced nodes, producing deliverables, validating quality, processing at scale, and governing shared workflows.\n\nYou\'re now a certified VWA \u2014 the person on your team who knows how to turn any document-heavy process into a reliable, AI-powered pipeline. That\'s a rare and valuable skill.',
+        content: 'The highest-performing teams draw on the pool of checked, shared workflows that cover common document types, then adapt and extend them as needed.\n\nBy completing this module, you\'ve demonstrated every skill in the Vandal Workflow Architect program: understanding AI, decomposing processes, designing pipelines, building extractions, chaining multi-step workflows, using advanced nodes, producing deliverables, validating quality, processing at scale, and governing shared workflows.\n\nYou\'re now a certified VWA \u2014 the person on your team who knows how to turn any document-heavy process into a reliable, AI-powered pipeline. That\'s a rare and valuable skill.',
         variant: 'insight',
         knowledgeCheck: {
           question: 'A colleague asks how to verify that budget totals are correct in a workflow. What\'s the right approach?',
@@ -785,12 +785,12 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Worked example: one workflow, two offices',
-        content: 'The pre-award office builds \u201cSubaward Intake\u201d and it works well. The post-award office hears about it. What happens next decides whether this becomes shared infrastructure or a rumor.\n\n**Without governance** \u2014 someone emails a description, post-award rebuilds it from memory as \u201csubaward_test_v2_FINAL\u201d, the two copies drift, and six months later nobody knows which extracts the right indirect-cost field.\n\n**With the practices from this module** \u2014\n1. The workflow is named to say what it does: \u201cSubaward Intake \u2014 Terms & Deviations\u201d, with a description naming its expected input.\n2. It\u2019s shared to the team library \u2014 one copy, visible to both offices.\n3. An administrator reviews it against a real agreement and marks it **verified** \u2014 the badge that says \u201ctested, trusted, use this one.\u201d\n4. Post-award improves the deviation prompt \u2014 in the shared copy, so pre-award benefits the same day.\n\nThe rule of thumb it illustrates: share the workflow, not a description of it \u2014 and let verification, not word of mouth, mark which copy is the standard.',
+        content: 'The pre-award office builds \u201cSubaward Intake\u201d and it works well. The post-award office hears about it. What happens next decides whether this becomes shared infrastructure or a rumor.\n\n**Without governance** \u2014 someone emails a description, post-award rebuilds it from memory as \u201csubaward_test_v2_FINAL\u201d, the two copies drift, and six months later nobody knows which extracts the right indirect-cost field.\n\n**With the practices from this module** \u2014\n1. The workflow is named to say what it does: \u201cSubaward Intake \u2014 Terms & Deviations\u201d, with a description naming its expected input.\n2. It\u2019s shared to the team library \u2014 one copy, visible to both offices.\n3. It\u2019s shared with everyone, and an examiner looks it over against a real agreement and accepts it \u2014 the entry now carries its score, how consistent it is, and how many people use it.\n4. Post-award improves the deviation prompt \u2014 in the shared copy, so pre-award benefits the same day.\n\nThe rule of thumb it illustrates: share the workflow, not a description of it \u2014 and let the shared entry\u2019s score and adoption, not word of mouth, show which copy is the one to use.',
         variant: 'walkthrough',
       },
       {
         title: 'Glossary & Review',
-        content: 'Personal work \u2014 Workflows and resources that only you can see and edit. The right place for experiments, drafts, and one-off variations. Graduate your best work to the team context when it\'s ready to share.\n\nVerified \u2014 A governance flag that communicates quality. You\'ve now submitted a workflow to the verification queue; once an examiner approves it, that badge tells your team the workflow has been tested, validated, and approved for production use. It\'s a team communication tool, not a technical lock.\n\nExport (.vandalizer.json) \u2014 A portable file containing your workflow\'s complete definition: steps, tasks, field configurations, prompts. It can be imported into any Vandalizer instance and is the standard format for cross-team sharing.\n\nTeam \u2014 A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member. Verified workflows in the team context become the standards your whole team builds on.',
+        content: 'Personal work \u2014 Workflows and resources that only you can see and edit. The right place for experiments, drafts, and one-off variations. Graduate your best work to the team context when it\'s ready to share.\n\nChecked \u2014 The badge on a shared entry. You\'ve now asked to share a workflow with everyone; once an examiner accepts it, the entry carries its score, how many cases that was measured on, its consistency across runs, and how many people use it. It says the item was looked at and measured \u2014 not that it fits every team\'s process. Not a technical lock.\n\nExport (.vandalizer.json) \u2014 A portable file containing your workflow\'s complete definition: steps, tasks, field configurations, prompts. It can be imported into any Vandalizer instance and is the standard format for cross-team sharing.\n\nTeam \u2014 A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member. Shared workflows your team adopts become the standards you build on.',
         variant: 'key-terms',
       },
     ],

@@ -823,7 +823,7 @@ export default function Landing() {
                   {
                     n: 2,
                     title: 'Select Tasks',
-                    desc: 'Choose from pre-built "Verified" workflows or create custom extraction logic.',
+                    desc: 'Start from a starter example or create custom extraction logic.',
                   },
                   {
                     n: 3,

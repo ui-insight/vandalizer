@@ -5,7 +5,7 @@ import { getCatalogStatus, type CatalogStatus } from '../../api/admin'
 const DISMISS_KEY_PREFIX = 'vandalizer:catalog-banner-dismissed:'
 
 /**
- * Amber banner shown on the Admin page when the bundled verified catalog is
+ * Amber banner shown on the Admin page when the bundled starter examples are
  * newer than what's applied. Mirrors UpdateBanner, but the action is in-app:
  * it points the admin at the Catalog tab to preview and apply.
  */
@@ -45,7 +45,7 @@ export function CatalogUpdateBanner({ onView }: { onView?: () => void }) {
           Catalog update available: {status.bundled_version}
         </div>
         <div className="text-amber-800">
-          Your verified catalog is at {status.applied_version || 'none'}. Review what changes
+          Your starter examples are at {status.applied_version || 'none'}. Review what changes
           (including any items that will be retired) and apply it from the Catalog tab.
         </div>
         {onView && (

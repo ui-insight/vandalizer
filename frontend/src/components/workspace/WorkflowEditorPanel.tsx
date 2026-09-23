@@ -784,7 +784,7 @@ export function WorkflowEditorPanel() {
                 <span
                   title={
                     (workflow as Workflow & { verified?: boolean }).verified
-                      ? 'Verified workflow — make a copy to edit'
+                      ? 'Shared with everyone — make a copy to edit'
                       : 'Shared with you — make a copy to edit'
                   }
                   onClick={() => { void handleMakeCopy() }}

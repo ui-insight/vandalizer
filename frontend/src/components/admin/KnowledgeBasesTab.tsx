@@ -215,7 +215,7 @@ function KBRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 14, fontWeight: 500, color: '#111827' }}>{kb.title}</span>
             {kb.verified && (
-              <span title="Verified" style={{ display: 'inline-flex', color: '#16a34a' }}>
+              <span title="Checked — shared with everyone" style={{ display: 'inline-flex', color: '#16a34a' }}>
                 <CheckCircle2 size={14} />
               </span>
             )}

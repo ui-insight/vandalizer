@@ -670,10 +670,17 @@ async def list_verified_items(
 
     name_map: dict[str, str] = {}
     creator_map: dict[tuple[str, str], str] = {}
+    # Bundled starter examples carry the seed marker the catalog seeder writes;
+    # the listing says so per item, since nobody *here* shared those. Copies
+    # ("Add to my library") carry the marker too, so the system owner is what
+    # makes one a starter — a colleague's edited copy is their own share.
+    starter_ids: set[str] = set()
     if wf_ids:
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
+            if (wf.resource_config or {}).get("seed_id") and wf.user_id == "system":
+                starter_ids.add(str(wf.id))
             creator_id = wf.created_by_user_id or wf.user_id
             if creator_id:
                 creator_map[(LibraryItemKind.WORKFLOW.value, str(wf.id))] = creator_id
@@ -683,12 +690,16 @@ async def list_verified_items(
         for ss in ssets:
             name_map[str(ss.id)] = ss.title
             ss_map[str(ss.id)] = ss
+            if (ss.extraction_config or {}).get("seed_id") and ss.user_id == "system":
+                starter_ids.add(str(ss.id))
             if ss.user_id:
                 creator_map[(LibraryItemKind.SEARCH_SET.value, str(ss.id))] = ss.user_id
     if kb_ids:
         kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
         for kb in kbs:
             name_map[str(kb.id)] = kb.title
+            if (kb.resource_config or {}).get("seed_id") and kb.user_id == "system":
+                starter_ids.add(str(kb.id))
             if kb.user_id:
                 creator_map[(LibraryItemKind.KNOWLEDGE_BASE.value, str(kb.id))] = kb.user_id
 
@@ -823,6 +834,7 @@ async def list_verified_items(
             "test_case_count": meta.test_case_count if meta else 0,
             "consistency": meta.consistency if meta else None,
             "adoption_count": adoption_map.get((item.kind.value, item_id_str), 0),
+            "starter": item_id_str in starter_ids,
             # The catalog is where an unfamiliar user picks something to trust,
             # so a regression nobody has reviewed has to travel with the row.
             "regression_pending_review": bool(meta and meta.regression_pending_review),
@@ -1775,7 +1787,7 @@ async def _notify_examiners(req: VerificationRequest) -> None:
                 user_id=reviewer.user_id,
                 kind="verification_submitted",
                 title=f'New submission: "{item_name}"',
-                body=f"{submitter_display} submitted a {req.item_kind.replace('_', ' ')} for verification.",
+                body=f"{submitter_display} asked to share a {req.item_kind.replace('_', ' ')} with everyone.",
                 link=f"/verification?request={req.uuid}",
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
@@ -1816,18 +1828,18 @@ async def _notify_submitter(
     status_config = {
         VerificationStatus.APPROVED.value: {
             "kind": "verification_approved",
-            "title": f'"{item_name}" has been approved',
-            "body": reviewer_notes or "Your submission has been verified and added to the catalog.",
+            "title": f'"{item_name}" is now shared with everyone',
+            "body": reviewer_notes or "An examiner checked it over and shared it with everyone here, with its measured score.",
         },
         VerificationStatus.REJECTED.value: {
             "kind": "verification_rejected",
-            "title": f'"{item_name}" was not approved',
-            "body": reviewer_notes or "Your submission did not meet verification requirements.",
+            "title": f'"{item_name}" was declined',
+            "body": reviewer_notes or "The examiner decided not to share this one.",
         },
         VerificationStatus.RETURNED.value: {
             "kind": "verification_returned",
-            "title": f'"{item_name}" needs revision',
-            "body": reviewer_notes or "Your submission has been returned with feedback.",
+            "title": f'"{item_name}" was sent back',
+            "body": reviewer_notes or "The examiner sent your submission back with feedback.",
         },
         VerificationStatus.IN_REVIEW.value: {
             "kind": "verification_in_review",

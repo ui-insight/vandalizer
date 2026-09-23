@@ -4,6 +4,7 @@ import { FocusTrap } from 'focus-trap-react'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload } from 'lucide-react'
 import { submitForVerification } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
+import { useShareLabel } from '../../lib/catalogLabels'
 import type { LibraryItemKind } from '../../types/library'
 
 const CATEGORIES = [
@@ -26,11 +27,13 @@ interface Props {
   onSubmitted: () => void
 }
 
-type Step = 'basics' | 'details' | 'testing' | 'review'
+// Three steps, one required field. The optional material (how to run it,
+// what to look for, example inputs) lives on one step and says it is optional,
+// so the shape of the form does not overstate what sharing asks of you.
+type Step = 'basics' | 'details' | 'review'
 const STEPS: { key: Step; label: string }[] = [
   { key: 'basics', label: 'Basics' },
-  { key: 'details', label: 'Details' },
-  { key: 'testing', label: 'Testing' },
+  { key: 'details', label: 'Details (optional)' },
   { key: 'review', label: 'Review' },
 ]
 
@@ -105,6 +108,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   }
 
   const kindLabel = itemKind === 'workflow' ? 'Workflow' : itemKind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
+  const shareLabel = useShareLabel()
 
   return createPortal(
     // Stop propagation at the overlay: this modal is portaled to document.body, but
@@ -118,12 +122,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
       onMouseDown={(e) => e.stopPropagation()}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label="Submit for Verification" className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label={shareLabel} className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-green-600" aria-hidden="true" />
-            <h3 className="text-base font-semibold text-gray-900">Submit for Verification</h3>
+            <h3 className="text-base font-semibold text-gray-900">{shareLabel}</h3>
           </div>
           <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
@@ -258,7 +262,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
             </>
           )}
 
-          {step === 'testing' && (
+          {step === 'details' && (
             <>
               <div>
                 <label htmlFor="vsm-example-inputs" className="block text-sm font-medium text-gray-700 mb-1">Example Inputs</label>
@@ -376,10 +380,10 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
                 <span>
                   <span className="block text-xs font-semibold text-amber-900">
-                    Submit without validation — request reviewer help
+                    Share without a validation run — ask the examiner to validate it
                   </span>
                   <span className="block text-[11px] leading-snug text-amber-800 mt-0.5">
-                    Reviewer will establish a validation baseline before approval. May take longer to review and could be returned for rework. Most submissions should be validated by the submitter first.
+                    The examiner will run a validation to get a score before accepting, so it takes longer. Running Validate &amp; improve yourself first is quicker and puts your own score on the entry.
                   </span>
                 </span>
               </label>
@@ -416,7 +420,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
-                {submitting ? 'Submitting...' : skipValidation ? 'Submit (reviewer will validate)' : 'Submit for Verification'}
+                {submitting ? 'Sharing...' : skipValidation ? 'Share (examiner will validate)' : shareLabel}
               </button>
             ) : (
               <button

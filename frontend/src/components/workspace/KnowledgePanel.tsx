@@ -23,6 +23,7 @@ import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { ExplainerPill } from './AutomationsPanel'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
+import { ShareLabel } from '../../lib/catalogLabels'
 import { useConfirm } from '../shared/useConfirm'
 import { SharedKBDeleteDialog, type SharedKBDeleteChoice } from '../shared/SharedKBDeleteDialog'
 import { OptimizedBadge, VerifiedBadge } from '../knowledge/KBTrustBadges'
@@ -31,7 +32,7 @@ type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'mine', label: 'My KBs' },
   { key: 'team', label: 'Team' },
-  { key: 'explore', label: 'Explore Knowledge Bases' },
+  { key: 'explore', label: 'Everyone' },
 ]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -601,12 +602,12 @@ export function KnowledgePanel() {
       setVerifyDescription('')
       setVerifyCategory('')
       setVerificationSubmitted(true)
-      toast('Submitted for verification', 'success')
+      toast('Sent — an examiner will look it over', 'success')
       if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
       refresh()
     } catch (err) {
-      console.error('Failed to submit for verification:', err)
-      toast(err instanceof Error ? err.message : 'Failed to submit for verification', 'error')
+      console.error('Failed to share with everyone:', err)
+      toast(err instanceof Error ? err.message : 'Failed to share with everyone', 'error')
     } finally {
       setSubmittingVerify(false)
     }
@@ -630,7 +631,7 @@ export function KnowledgePanel() {
         border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
       }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
-          Submit for Verification
+          <ShareLabel />
         </div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
           {verifyKB.title}
@@ -1162,7 +1163,7 @@ export function KnowledgePanel() {
                     }}
                   >
                     <Send size={13} />
-                    Submit for Verification
+                    <ShareLabel />
                   </button>
                 )
               )}
@@ -1926,7 +1927,7 @@ export function KnowledgePanel() {
                     title: 'Remove from My KBs?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore Knowledge Bases.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from the Everyone tab.
                       </>
                     ),
                     confirmLabel: 'Remove',
@@ -1948,7 +1949,7 @@ export function KnowledgePanel() {
             emptyComponent={!isProjectScoped && activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
             emptyMessage={
               isProjectScoped
-                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or in Explore Knowledge Bases, or switch to "Show all".`
+                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or from the Everyone tab, or switch to "Show all".`
                 : activeTab === 'team'
                   ? 'No knowledge bases shared with your team yet.'
                   : 'No knowledge bases found.'

@@ -94,7 +94,7 @@ export function CatalogTab() {
     <div className="max-w-3xl space-y-6 p-1">
       <div className="flex items-center gap-2">
         <PackageOpen className="h-5 w-5 text-gray-700" />
-        <h2 className="text-lg font-semibold text-gray-900">Verified Catalog</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Starter examples</h2>
       </div>
 
       {/* Version summary */}

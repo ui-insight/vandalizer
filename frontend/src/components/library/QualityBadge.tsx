@@ -15,8 +15,8 @@ const regressionColor = { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
 // renders in the neutral style whatever the tier word says, so a seeded
 // "excellent" cannot pass for one a validation run earned.
 const ASSERTED_TITLE =
-  'This tier was assigned by the catalog author; no measured validation backs it yet. ' +
-  'Validate the item to measure it.'
+  'The rating came with the starter example from its author. Nobody here has run a ' +
+  'validation on it yet — validate it to get a measured score.'
 
 const REGRESSION_TITLE =
   'Automatic revalidation scored this materially lower than before. ' +
@@ -28,6 +28,7 @@ export function QualityBadge({
   title,
   regressionPending = false,
   asserted = false,
+  variant = 'quality',
 }: {
   tier: string | null
   score: number | null
@@ -35,6 +36,9 @@ export function QualityBadge({
   regressionPending?: boolean
   /** The tier is a catalog assertion with no measured score — see ASSERTED_TITLE. */
   asserted?: boolean
+  /** 'catalog': the badge on a shared entry, where a score means an examiner
+   *  checked it — leads with "Checked" instead of "Quality:". */
+  variant?: 'quality' | 'catalog'
 }) {
   const colors = regressionPending
     ? regressionColor
@@ -42,11 +46,12 @@ export function QualityBadge({
       ? tierColors[tier] || defaultColor
       : defaultColor
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
+  const catalog = variant === 'catalog'
   const baseLabel = tierLabel
     ? asserted
-      ? `Quality: ${tierLabel} (asserted)`
-      : `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
-    : 'Unvalidated'
+      ? `Rated ${tierLabel} by its author · not yet checked here`
+      : `${catalog ? 'Checked' : 'Quality:'} ${catalog ? '· ' : ''}${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
+    : catalog ? 'Not yet checked here' : 'Unvalidated'
   const label = regressionPending ? 'Regression pending review' : baseLabel
 
   return (

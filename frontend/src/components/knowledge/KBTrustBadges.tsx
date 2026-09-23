@@ -3,9 +3,11 @@ import type { KnowledgeBase, KBOptimizationStatus } from '../../types/knowledge'
 
 // The two trust chips on a KB card, and what they actually mean.
 //
-// Verified and Optimized look alike and answer different questions:
-//   Verified  — an administrator published this KB to the shared catalog.
-//               It vouches for the CONTENT. Says nothing about settings.
+// Checked and Optimized look alike and answer different questions:
+//   Checked   — an examiner looked this KB over and shared it with everyone
+//               here, with its measured score. It is about the CONTENT
+//               having been looked at. Says nothing about settings, and is
+//               not a promise that it fits every team's needs.
 //   Optimized — KB Autovalidate found retrieval settings that beat the
 //               defaults on this KB's own test questions, and they were
 //               APPLIED (they are what chat uses now). Says nothing about
@@ -16,7 +18,7 @@ import type { KnowledgeBase, KBOptimizationStatus } from '../../types/knowledge'
 // backend marks the status stale once those have changed materially.
 
 export const VERIFIED_KB_HOVER =
-  'Verified — an administrator published this knowledge base to the shared catalog, vouching for its content. Not the same as Optimized, which is about retrieval settings.'
+  'Checked — an examiner looked this knowledge base over and shared it with everyone here, with its measured score. Not the same as Optimized, which is about retrieval settings.'
 
 const fmtDate = (iso: string | null | undefined, withTime = false) => {
   if (!iso) return null
@@ -54,7 +56,7 @@ export function optimizedBadgeTitle(opt: KBOptimizationStatus, withTime = false)
       'The tuned settings may no longer be the best fit — re-run Validate & improve.'
     )
   }
-  return `${head} Not the same as Verified, which is about who curated the content.`
+  return `${head} Not the same as Checked, which is about someone having looked the content over.`
 }
 
 const chip = {
@@ -66,7 +68,7 @@ export function VerifiedBadge() {
   return (
     <span title={VERIFIED_KB_HOVER} style={{ ...chip, color: '#15803d', backgroundColor: '#dcfce7' }}>
       <ShieldCheck size={10} />
-      Verified
+      Checked
     </span>
   )
 }
