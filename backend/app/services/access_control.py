@@ -543,10 +543,21 @@ async def get_authorized_workflow(
     user: User,
     *,
     manage: bool = False,
+    validate: bool = False,
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
     share_token: str | None = None,
 ) -> "Workflow | None":
+    """Resolve *workflow_id* if *user* may access it at the requested level.
+
+    ``manage`` gates edits to the workflow itself (steps, config, deletion).
+    ``validate`` gates the validation artifacts hung off it — the plan, test
+    inputs, expected outputs, and starting a validation run. Everyone who can
+    manage can validate; additionally, an examiner may validate a workflow
+    while its verification request is open, because reviewing a submission
+    means grading it, and grading needs a plan and test data on the item.
+    Reviewers still cannot change the workflow they are reviewing.
+    """
     from app.models.workflow import Workflow
     from beanie import PydanticObjectId
 
@@ -560,7 +571,7 @@ async def get_authorized_workflow(
     access = team_access or await get_team_access_context(user)
     allowed = (
         can_manage_workflow(wf, user, access, allow_admin=allow_admin)
-        if manage
+        if (manage or validate)
         else can_view_workflow(wf, user, access, allow_admin=allow_admin)
     )
     if not allowed:
@@ -569,7 +580,7 @@ async def get_authorized_workflow(
             str(wf.id),
             user,
             access,
-            manage=manage,
+            manage=(manage or validate),
             allow_admin=allow_admin,
         )
     if not allowed and not manage:
@@ -581,6 +592,7 @@ async def get_authorized_workflow(
     if (
         not allowed
         and not manage
+        and not validate
         and share_token
         and wf.share_token
         and share_token == wf.share_token

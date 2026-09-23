@@ -645,7 +645,12 @@ async def _resolve_test_inputs(wf: Workflow) -> list[dict]:
         session_id = inp.get("session_id")
         if not session_id:
             continue
-        wr = await WorkflowResult.find_one({"session_id": session_id})
+        # Only this workflow's own results (or legacy rows that never recorded
+        # one): validation_inputs is writable at the validate level, so a
+        # session_id must not pull in another workflow's documents.
+        wr = await WorkflowResult.find_one(
+            {"session_id": session_id, "workflow": {"$in": [wf.id, None]}}
+        )
         if not wr:
             continue
         doc_uuids = (wr.input_context or {}).get("doc_uuids") or []

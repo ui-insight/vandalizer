@@ -202,16 +202,23 @@ async def list_workflows(
     )
     # One team-access lookup powers can_manage for every workflow in the page.
     team_access = await access_control.get_team_access_context(user)
-    return WorkflowPageResponse(
-        items=[
+    # The listing never reaches a submission's verification request, so the
+    # examiner carve-out is not visible here; the detail endpoint computes
+    # can_validate exactly, and that is the one the editor reads.
+    items = []
+    for wf in workflows:
+        can_manage = access_control.can_manage_workflow(wf, user, team_access)
+        items.append(
             WorkflowResponse(
                 id=str(wf.id), name=wf.name, description=wf.description,
                 user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
-                can_manage=access_control.can_manage_workflow(wf, user, team_access),
+                can_manage=can_manage,
+                can_validate=can_manage,
                 created_by=author_map.get(wf.created_by_user_id or wf.user_id),
             )
-            for wf in workflows
-        ],
+        )
+    return WorkflowPageResponse(
+        items=items,
         total=total,
         skip=skip,
         limit=limit,
@@ -1383,6 +1390,8 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
     try:
         checks = await svc.generate_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(checks=checks)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1767,7 +1776,7 @@ async def start_workflow_optimization(
       - apply_on_finish: bool (default false)
       - include_judge: bool (default true — workflow scoring is judge-based)
     """
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -1776,6 +1785,19 @@ async def start_workflow_optimization(
         body = await request.json()
     except Exception:
         body = {}
+
+    # Starting a run only needs validate rights (an examiner grading a
+    # submission), but applying the winner rewrites the workflow's config —
+    # that stays with whoever may edit the workflow.
+    apply_on_finish = bool(body.get("apply_on_finish", False))
+    if apply_on_finish and not await get_authorized_workflow(workflow_id, user, manage=True):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Only the workflow owner or a team admin can apply optimized "
+                "settings. Start the run without apply_on_finish to score it."
+            ),
+        )
 
     try:
         token_budget = int(body.get("token_budget", 0))
@@ -1791,7 +1813,6 @@ async def start_workflow_optimization(
     if max_candidates < 1 or max_candidates > 50:
         raise HTTPException(status_code=400, detail="max_candidates must be in [1, 50]")
 
-    apply_on_finish = bool(body.get("apply_on_finish", False))
     include_judge = bool(body.get("include_judge", True))
 
     # Fail fast on missing preconditions so the user gets an immediate,
@@ -1945,7 +1966,7 @@ async def cancel_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
 ):
     """Request cancellation. The worker checks this flag between trials."""
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
@@ -1955,6 +1976,9 @@ async def cancel_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
+    # A reviewer with validate access may stop their own run, not the owner's.
+    if run.user_id != user.user_id and not await get_authorized_workflow(workflow_id, user, manage=True):
+        raise HTTPException(status_code=403, detail="You can only cancel optimization runs you started")
     if run.status not in ("queued", "running"):
         return {"ok": True, "status": run.status, "note": "not running"}
     run.cancel_requested = True

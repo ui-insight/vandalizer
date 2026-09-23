@@ -38,6 +38,11 @@ class WorkflowResponse(BaseModel):
     # True when the caller can edit / delete / remove-from-team this workflow.
     # Mirrors can_manage_workflow: creator OR team owner/admin.
     can_manage: bool = True
+    # True when the caller may author validation artifacts (plan, test inputs,
+    # expected outputs) and start validation runs. Implied by can_manage;
+    # also granted to an examiner while the workflow's verification request
+    # is open, so a reviewer can grade a submission they cannot edit.
+    can_validate: bool = True
     created_by: Optional[AuthorRef] = None
 
 

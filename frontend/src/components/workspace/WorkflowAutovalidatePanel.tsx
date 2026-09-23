@@ -48,14 +48,20 @@ import { WhenToRunDisclosure } from '../shared/WhenToRunDisclosure'
 export function WorkflowAutovalidatePanel({
   workflowId,
   canManage = true,
+  canApply = canManage,
   testDataSummary,
   onOpenTestData,
 }: {
   workflowId: string
-  /** Whether the current user can manage this workflow. Gates the
+  /** Whether the current user may start a validation run on this workflow
+   * (owner, team admin, or an examiner reviewing its submission). Gates the
    * "Validate & improve" button so view-only users don't hit a backend 403.
    * Defaults to true so existing call sites keep working. */
   canManage?: boolean
+  /** Whether the current user may write a run's winner back to the workflow.
+   * An examiner can score a submission but never change it, so this is
+   * narrower than `canManage`. Defaults to `canManage`. */
+  canApply?: boolean
   /** Counts shown under the description so users can see what the run will
    * score against without expanding the setup section. */
   testDataSummary?: { inputs: number; expectedOutputs: number; checks: number }
@@ -319,6 +325,7 @@ export function WorkflowAutovalidatePanel({
           onRevert={handleRevert}
           applying={applying}
           reverting={reverting}
+          allowApply={canApply}
           selectedStepIds={selectedStepIds}
           onSelectionChange={setSelectedStepIds}
         />
@@ -327,6 +334,7 @@ export function WorkflowAutovalidatePanel({
       {showWizard && (
         <WorkflowAutovalidateWizard
           workflowId={workflowId}
+          canApply={canApply}
           onClose={() => setShowWizard(false)}
           onStarted={handleStarted}
         />
@@ -350,7 +358,7 @@ export function WorkflowAutovalidatePanel({
 const WORKFLOW_TRIAL_SORT_OPTIONS = makeStandardSortOptions<WorkflowOptimizationTrial>()
 
 function CompletedView({
-  run, onApply, onRevert, applying, reverting,
+  run, onApply, onRevert, applying, reverting, allowApply,
   selectedStepIds, onSelectionChange,
 }: {
   run: WorkflowOptimizationRun
@@ -358,6 +366,8 @@ function CompletedView({
   onRevert: () => void
   applying: boolean
   reverting: boolean
+  /** False for reviewers who may score the workflow but not change it. */
+  allowApply: boolean
   /** Phase 3: subset of step IDs to apply. Undefined / empty = apply all. */
   selectedStepIds: string[] | undefined
   onSelectionChange: (next: string[] | undefined) => void
@@ -404,8 +414,8 @@ function CompletedView({
   // re-run will overwrite this if the user re-applies.
   const isAlreadyApplied = false  // backend doesn't expose this yet; safe default
 
-  const canApply = !!run.best_config && !run.tied_with_baseline
-  const canRevert = run.previous_override !== undefined && run.previous_override !== null
+  const canApply = allowApply && !!run.best_config && !run.tied_with_baseline
+  const canRevert = allowApply && run.previous_override !== undefined && run.previous_override !== null
 
   // Trial tapped open in the plain-English explainer modal.
   const [selectedTrial, setSelectedTrial] = useState<WorkflowOptimizationTrial | null>(null)

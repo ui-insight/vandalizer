@@ -683,6 +683,10 @@ export function WorkflowEditorPanel() {
   }
 
   const canManage = workflow?.can_manage !== false
+  // Validation authoring is a step below managing: an examiner reviewing a
+  // submission may build its plan and test data and run validation without
+  // being able to edit the workflow. Older payloads omit the flag.
+  const canValidate = workflow?.can_validate ?? canManage
   const [duplicating, setDuplicating] = useState(false)
 
   // Persist the workflow-level default model (applied to every step that has no
@@ -1074,7 +1078,8 @@ export function WorkflowEditorPanel() {
               itemTitle={workflow?.name}
               selectedDocUuids={selectedDocUuids}
               bumpActivitySignal={bumpActivitySignal}
-              canManage={canManage}
+              canValidate={canValidate}
+              canApply={canManage}
               onValidated={() => {
                 refreshSparkline()
                 if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
@@ -6809,14 +6814,18 @@ function ValidateTab({
   selectedDocUuids,
   bumpActivitySignal,
   onValidated,
-  canManage,
+  canValidate,
+  canApply,
 }: {
   workflowId: string | null
   itemTitle?: string
   selectedDocUuids: string[]
   bumpActivitySignal: () => void
   onValidated?: () => void
-  canManage: boolean
+  /** May author the plan / test data and start validation runs. */
+  canValidate: boolean
+  /** May write an optimization winner back to the workflow (manage rights). */
+  canApply: boolean
 }) {
   const { toast } = useToast()
   const confirm = useConfirm()
@@ -7003,7 +7012,7 @@ function ValidateTab({
         setPlanStale(r.plan_stale ?? false)
         setOrphanedCheckIds(r.orphaned_check_ids ?? [])
         // Auto-generate plan if empty (zero-friction onboarding)
-        if (r.checks.length === 0) {
+        if (r.checks.length === 0 && canValidate) {
           setGenerating(true)
           generateValidationPlan(workflowId)
             .then(gen => setPlanChecks(gen.checks))
@@ -7021,7 +7030,7 @@ function ValidateTab({
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
     refreshExpectedOutputs()
-  }, [workflowId])
+  }, [workflowId, canValidate])
 
   const refreshExpectedOutputs = useCallback(async () => {
     if (!workflowId) return
@@ -7034,7 +7043,7 @@ function ValidateTab({
   }, [workflowId])
 
   const handleProposeTestCases = async () => {
-    if (!workflowId || !canManage) return
+    if (!workflowId || !canValidate) return
     setProposalsOpen(true)
     setProposalsLoading(true)
     setProposalsError(null)
@@ -7461,7 +7470,8 @@ function ValidateTab({
         {workflowId && (
           <WorkflowAutovalidatePanel
             workflowId={workflowId}
-            canManage={canManage}
+            canManage={canValidate}
+            canApply={canApply}
             testDataSummary={{
               inputs: inputs.length,
               expectedOutputs: expectedOutputs.length,
@@ -7698,7 +7708,7 @@ function ValidateTab({
                 Saved outputs from past runs. The optimizer compares trial configurations against these.
               </div>
             </div>
-            {canManage && (
+            {canValidate && (
               <button
                 onClick={handleProposeTestCases}
                 style={{
@@ -7719,9 +7729,9 @@ function ValidateTab({
               padding: '14px 16px', border: '2px dashed #e5e7eb', borderRadius: 8, marginTop: 4,
             }}>
               <div style={{ fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
-                {canManage
+                {canValidate
                   ? 'None saved yet. Run the workflow at least once, then "Suggest from history" to nominate candidates.'
-                  : 'None saved yet. Only the workflow owner or a team admin can add expected outputs.'}
+                  : 'None saved yet. Only the workflow owner, a team admin, or an examiner reviewing it can add expected outputs.'}
               </div>
             </div>
           ) : (
@@ -7760,7 +7770,7 @@ function ValidateTab({
                       </div>
                     )}
                   </div>
-                  {canManage && (
+                  {canValidate && (
                     <button
                       type="button"
                       aria-label="Remove expected output"
@@ -7788,7 +7798,7 @@ function ValidateTab({
                 Quality checks evaluated against the workflow's actual output.
               </div>
             </div>
-            {planChecks.length > 0 && canManage && (
+            {planChecks.length > 0 && canValidate && (
               <button
                 onClick={handleGenerate}
                 disabled={generating}
@@ -7808,7 +7818,7 @@ function ValidateTab({
           {planStale && !planLoading && !generating && planChecks.length > 0 && (
             <StalePlanBanner
               orphanedCount={orphanedCheckIds.length}
-              canManage={canManage}
+              canManage={canValidate}
               generating={generating}
               confirming={confirmingPlanFresh}
               onRegenerate={handleGenerate}
@@ -7846,7 +7856,8 @@ function ValidateTab({
                 ]}
                 ctaLabel="Generate Plan"
                 onStart={handleGenerate}
-                disabled={generating}
+                disabled={generating || !canValidate}
+                disabledReason={canValidate ? undefined : 'Only the workflow owner, a team admin, or an examiner reviewing it can create a validation plan'}
               />
             </div>
           ) : generating ? (

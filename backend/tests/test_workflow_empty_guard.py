@@ -157,6 +157,36 @@ async def test_generate_plan_rejects_workflow_with_no_steps():
     agent.run.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_generate_plan_names_the_permission_gap_for_view_only_users():
+    """A user who can open (and run) the workflow but may not author its plan
+    gets told that — not "Workflow not found" for a workflow they just ran."""
+    user = _make_user()
+    agent = MagicMock()
+
+    async def _authz(workflow_id, user, **kwargs):
+        # View passes, validate does not.
+        return None if kwargs.get("validate") else MagicMock()
+
+    with (
+        patch("app.services.workflow_service.get_authorized_workflow", new=AsyncMock(side_effect=_authz)),
+        patch("app.services.llm_service.create_chat_agent", new=AsyncMock(return_value=agent)),
+    ):
+        with pytest.raises(PermissionError, match="examiner reviewing"):
+            await generate_validation_plan("wf", user)
+
+    agent.run.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_generate_plan_still_404s_when_workflow_is_invisible():
+    user = _make_user()
+
+    with patch("app.services.workflow_service.get_authorized_workflow", new=AsyncMock(return_value=None)):
+        with pytest.raises(ValueError, match="Workflow not found"):
+            await generate_validation_plan("wf", user)
+
+
 # ---------------------------------------------------------------------------
 # Grading
 # ---------------------------------------------------------------------------

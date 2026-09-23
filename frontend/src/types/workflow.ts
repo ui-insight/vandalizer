@@ -91,6 +91,11 @@ export interface Workflow {
   };
   output_config?: { storage?: SaveOutputConfig; [key: string]: unknown };
   can_manage?: boolean;
+  // Whether the current user may author validation artifacts (plan, test
+  // inputs, expected outputs) and start validation runs. Implied by
+  // can_manage; also true for an examiner reviewing this workflow's open
+  // verification request. Absent on older payloads — fall back to can_manage.
+  can_validate?: boolean;
   created_by?: AuthorRef | null;
 }
 

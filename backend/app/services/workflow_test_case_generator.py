@@ -257,9 +257,9 @@ async def accept_proposals(
     """
     from app.services.workflow_service import _serialize_output, get_authorized_workflow
 
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
-        # Distinguish "no manage rights" from "doesn't exist / can't see it" so
+        # Distinguish "no validate rights" from "doesn't exist / can't see it" so
         # view-only users (team members, catalog viewers) get a clear 403
         # instead of a misleading "Workflow not found".
         if await get_authorized_workflow(workflow_id, user):

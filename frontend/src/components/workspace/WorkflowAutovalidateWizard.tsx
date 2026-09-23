@@ -38,6 +38,9 @@ import { TermDef } from '../shared/TermDef'
 
 interface Props {
   workflowId: string
+  /** False for reviewers who may score the workflow but not change it: the
+   * auto-apply option is hidden (and the backend rejects it anyway). */
+  canApply?: boolean
   onClose: () => void
   onStarted: (runUuid: string) => void
 }
@@ -58,7 +61,7 @@ const INITIAL_OPTIONS: WorkflowWizardOptions = {
   includeJudge: true,
 }
 
-export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: Props) {
+export function WorkflowAutovalidateWizard({ workflowId, canApply = true, onClose, onStarted }: Props) {
   const { toast } = useToast()
   const [expectedOutputs, setExpectedOutputs] = useState<ExpectedOutput[] | null>(null)
   const [userModel, setUserModel] = useState<ModelInfo | null>(null)
@@ -108,7 +111,7 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
     const payload: StartWorkflowOptimizationOptions = {
       token_budget: opts.includeJudge ? tokenBudgetFor(opts) : 0,
       max_candidates: candidatesFor(opts),
-      apply_on_finish: opts.applyOnFinish,
+      apply_on_finish: canApply && opts.applyOnFinish,
       include_judge: opts.includeJudge,
     }
     try {
@@ -220,8 +223,8 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
         <AdvancedStep
           candidates={candidatesFor(opts)}
           testCaseCount={expectedOutputs?.length ?? 0}
-          applyOnFinish={opts.applyOnFinish}
-          onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))}
+          applyOnFinish={canApply && opts.applyOnFinish}
+          onApplyOnFinish={canApply ? b => set(o => ({ ...o, applyOnFinish: b })) : undefined}
           includeJudge={opts.includeJudge}
           onIncludeJudge={b => set(o => ({ ...o, includeJudge: b }))}
         />
@@ -558,7 +561,8 @@ function AdvancedStep({
   candidates: number
   testCaseCount: number
   applyOnFinish: boolean
-  onApplyOnFinish: (b: boolean) => void
+  /** Undefined when the user may not apply — the toggle is not rendered. */
+  onApplyOnFinish?: (b: boolean) => void
   includeJudge: boolean
   onIncludeJudge: (b: boolean) => void
 }) {
@@ -571,12 +575,14 @@ function AdvancedStep({
         checked={includeJudge}
         onChange={onIncludeJudge}
       />
-      <Toggle
-        label="Apply optimized settings automatically when finished"
-        description="If unchecked, we'll show you results and you can apply manually. Apply is also blocked when the winner is statistically tied with your current config."
-        checked={applyOnFinish}
-        onChange={onApplyOnFinish}
-      />
+      {onApplyOnFinish && (
+        <Toggle
+          label="Apply optimized settings automatically when finished"
+          description="If unchecked, we'll show you results and you can apply manually. Apply is also blocked when the winner is statistically tied with your current config."
+          checked={applyOnFinish}
+          onChange={onApplyOnFinish}
+        />
+      )}
       <div style={{
         marginTop: 16, padding: '10px 12px',
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
