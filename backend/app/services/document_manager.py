@@ -340,8 +340,41 @@ class DocumentManager:
             meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
-        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        self._add_in_batches(collection, ids, documents, metadatas)
         return len(text_splits)
+
+    # ChromaDB refuses a single ``add`` larger than its client-reported maximum
+    # (5,461 on the bundled build — a SQLite bound-variable limit, not a tuning
+    # knob), and raises rather than writing what fits. Nothing enforced that
+    # ceiling, so ingestion simply worked until a document was long enough and
+    # then failed outright: at the default 1,000/200 chunking that is about
+    # 4.4 M characters, which no cap allowed a URL source to reach until
+    # ``kb_url_max_chars`` did. The fallback matters as much as the number —
+    # a client that cannot report a maximum gets a conservative one rather
+    # than an unbounded write.
+    _FALLBACK_MAX_ADD_BATCH = 5000
+
+    def _max_add_batch(self) -> int:
+        try:
+            reported = int(self.client.get_max_batch_size())
+        except Exception as e:  # noqa: BLE001 — any client that won't say gets the fallback
+            logger.warning(
+                "ChromaDB did not report a max batch size (%s); using %d",
+                e, self._FALLBACK_MAX_ADD_BATCH,
+            )
+            return self._FALLBACK_MAX_ADD_BATCH
+        return reported if reported >= 1 else self._FALLBACK_MAX_ADD_BATCH
+
+    def _add_in_batches(self, collection, ids, documents, metadatas) -> None:
+        """``collection.add`` split to respect ChromaDB's per-call maximum."""
+        size = self._max_add_batch()
+        for start in range(0, len(ids), size):
+            stop = start + size
+            collection.add(
+                ids=ids[start:stop],
+                documents=documents[start:stop],
+                metadatas=metadatas[start:stop],
+            )
 
     def query_documents(
         self,
@@ -467,7 +500,7 @@ class DocumentManager:
             meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
-        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        self._add_in_batches(collection, ids, documents, metadatas)
         return len(text_splits)
 
     def query_kb(

@@ -1785,6 +1785,30 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
 _REFRESH_COLLAPSE_RATIO = 0.25
 
 
+def _kb_text_cap() -> int:
+    """Characters of extracted text a KB source may carry.
+
+    Read at call time, not import time, so a deployment can raise or lower it
+    without a code change — and so tests can set it per case.
+    """
+    from app.config import Settings
+
+    return Settings().kb_url_max_chars
+
+
+def _kb_snapshot(text: str) -> str:
+    """The stored copy of a source's text.
+
+    Bounded by the same limit that bounded the ingest, so the snapshot is the
+    text that was indexed rather than a shorter copy of it. That identity is
+    load-bearing in two places: ``_reject_collapsed_refresh`` measures a
+    refetch against this snapshot and would read a capped one as the page
+    having shrunk, and the source inspector presents it as "the extracted
+    text" the answers were built from.
+    """
+    return text[:_kb_text_cap()]
+
+
 def _reject_collapsed_refresh(
     previous_text: str | None, new_text: str, last_collapsed_hash: str | None = None,
 ) -> str | None:
@@ -1855,7 +1879,7 @@ async def refresh_url_source(
     try:
         from app.services.web_fetcher import fetch_url
 
-        result = await fetch_url(source.url)
+        result = await fetch_url(source.url, max_chars=_kb_text_cap())
         reason = _reject_fetched_page(result)
         if reason is None:
             reason = _reject_collapsed_refresh(
@@ -1921,7 +1945,7 @@ async def refresh_url_source(
         await source.save()
         return source.error_message
 
-    source.content = raw_text[:500000]
+    source.content = _kb_snapshot(raw_text)
     source.url_title = result.title or source.url_title
     source.truncated = bool(result.truncated)
     source.warnings = list(result.advisories)
@@ -1952,7 +1976,7 @@ async def _ingest_url_source(
     try:
         from app.services.web_fetcher import fetch_url
 
-        result = await fetch_url(source.url)
+        result = await fetch_url(source.url, max_chars=_kb_text_cap())
         raw_text = result.text
 
         reject_reason = _reject_fetched_page(result)
@@ -1972,7 +1996,7 @@ async def _ingest_url_source(
                 # Not an error — the caller still wants the links off this page.
                 return result
 
-        source.content = raw_text[:500000]
+        source.content = _kb_snapshot(raw_text)
         source.url_title = result.title
         source.truncated = bool(result.truncated)
         # e.g. a fetched PDF whose hidden-text scrub could not run: the text
@@ -2044,7 +2068,7 @@ async def ingest_text_into_source(
         chunk_count = await asyncio.to_thread(
             dm.add_to_kb, kb.uuid, source.uuid, name, text,
         )
-        source.content = text[:500000]
+        source.content = _kb_snapshot(text)
         if label:
             source.url_title = label[:500]
         source.chunk_count = chunk_count

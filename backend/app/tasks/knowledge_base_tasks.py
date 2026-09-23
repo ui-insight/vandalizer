@@ -383,7 +383,13 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         # fallback for JS-rendered pages).
         from app.services.web_fetcher import fetch_url_sync
 
-        result = fetch_url_sync(url)  # raises ValueError for blocked URLs
+        from app.services.knowledge_service import _kb_snapshot, _kb_text_cap
+
+        # The KB limit, not the prompt-sized default: this text is chunked and
+        # embedded, never sent to a model, so length costs embedding time and
+        # nothing else. The default cut a 1.1 M-character federal regulation in
+        # half behind a warning the user could do nothing about.
+        result = fetch_url_sync(url, max_chars=_kb_text_cap())  # raises ValueError for blocked URLs
         raw_text = result.text
         url_title = result.title
 
@@ -417,7 +423,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             {"uuid": source_uuid},
             {
                 "$set": {
-                    "content": raw_text[:500000],
+                    "content": _kb_snapshot(raw_text),
                     "url_title": (url_title or "")[:500],
                     "truncated": bool(getattr(result, "truncated", False)),
                 }

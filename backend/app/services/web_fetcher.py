@@ -74,10 +74,10 @@ class WebFetchResult:
     # www.uidaho.edu). Crawlers dedup on this too, so the same page can't be
     # fetched once per spelling.
     final_url: Optional[str] = None
-    # True when the returned ``text`` was cut off at web_fetcher_max_chars (a
-    # genuinely huge page). Ingestion surfaces this so a partial source shows a
-    # warning instead of a clean "ready" — a truncated page yields wrong answers
-    # for anything past the cut. (Note: raw HTML being trimmed at
+    # True when the returned ``text`` was cut off at the caller's ``max_chars``
+    # (a genuinely huge page). Ingestion surfaces this so a partial source shows
+    # a warning instead of a clean "ready" — a truncated page yields wrong
+    # answers for anything past the cut. (Note: raw HTML being trimmed at
     # web_fetcher_max_html_chars would also set this, but that limit is sized so
     # real documents never hit it.)
     truncated: bool = False
@@ -281,14 +281,25 @@ async def fetch_url(
     *,
     settings: Optional[Settings] = None,
     allow_browser: Optional[bool] = None,
+    max_chars: Optional[int] = None,
 ) -> WebFetchResult:
     """Fetch *url* and return cleaned main-content text + raw HTML.
 
     Raises ``ValueError`` if the URL fails SSRF validation.  HTTP and
     network errors propagate as ``httpx`` exceptions so callers can
     surface them to the user.
+
+    ``max_chars`` caps the extracted text, defaulting to
+    ``settings.web_fetcher_max_chars``. It is a per-caller limit because the
+    callers are not alike: chat's "attach link" and the workflow Fetch step
+    send this text straight into a model prompt and genuinely cannot take a
+    megabyte of it, while knowledge-base ingestion chunks and embeds it, where
+    the only cost of length is embedding time. Sharing one cap meant the
+    prompt-sized limit silently decided how much of a federal regulation got
+    indexed — see ``Settings.kb_url_max_chars``.
     """
     settings = settings or Settings()
+    max_chars = settings.web_fetcher_max_chars if max_chars is None else max_chars
     if allow_browser is None:
         allow_browser = settings.web_fetcher_browser_enabled
 
@@ -330,7 +341,7 @@ async def fetch_url(
             pdf_text, pdf_title, pdf_links, pdf_advisories = _extract_pdf_response(
                 resp.content, url,
             )
-            pdf_text, pdf_truncated = _cap(pdf_text, settings.web_fetcher_max_chars)
+            pdf_text, pdf_truncated = _cap(pdf_text, max_chars)
             return WebFetchResult(
                 url=url,
                 title=pdf_title,
@@ -390,11 +401,11 @@ async def fetch_url(
                 title = _extract_title(rendered, url)
                 used_browser = True
 
-    text, text_truncated = _cap(text, settings.web_fetcher_max_chars)
+    text, text_truncated = _cap(text, max_chars)
     if text_truncated:
         logger.warning(
             "Extracted text for %s exceeded %d chars and was truncated",
-            url, settings.web_fetcher_max_chars,
+            url, max_chars,
         )
     return WebFetchResult(
         url=url,
@@ -413,9 +424,12 @@ def fetch_url_sync(
     *,
     settings: Optional[Settings] = None,
     allow_browser: Optional[bool] = None,
+    max_chars: Optional[int] = None,
 ) -> WebFetchResult:
     """Sync wrapper around :func:`fetch_url` for the Celery / workflow paths.
 
     Safe to call from threads with no running event loop (Celery workers).
     """
-    return asyncio.run(fetch_url(url, settings=settings, allow_browser=allow_browser))
+    return asyncio.run(fetch_url(
+        url, settings=settings, allow_browser=allow_browser, max_chars=max_chars,
+    ))

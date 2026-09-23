@@ -177,6 +177,25 @@ class Settings(BaseSettings):
     # the *text* limit silently drops the tail of the page before it is ever
     # parsed (e.g. a reg page cut off mid-document, losing later subparts).
     web_fetcher_max_html_chars: int = 8_000_000
+    # Cap on extracted text for a *knowledge base* URL source, which is much
+    # higher than web_fetcher_max_chars because the two limits protect against
+    # different things. 500 KB exists to keep a fetched page from swamping an
+    # LLM prompt (chat's "attach link", the workflow Fetch step) — a real
+    # constraint, since that text is sent whole to a model. KB ingestion sends
+    # nothing to a model: the text is chunked and embedded, so length costs
+    # embedding time and nothing else, and capping it silently drops the tail
+    # of exactly the documents a research administrator works from. The
+    # Federal Register's "Guidance for Federal Financial Assistance" (the 2 CFR
+    # 200 rewrite) extracts to ~1.1 M characters, so 500 KB lost 54% of it,
+    # including four whole subparts, behind a warning the user could do
+    # nothing about (support ticket).
+    #
+    # 5 M is roughly 4x the longest federal regulation we have measured, and
+    # ~6,250 chunks — see DocumentManager._add_in_batches for why the number of
+    # chunks, not the number of characters, is the thing that actually breaks.
+    # Past it the old truncation warning still fires, as the genuine extreme
+    # case it was written for.
+    kb_url_max_chars: int = 5_000_000
     web_fetcher_timeout_seconds: int = 30
 
     # Minimum characters of extracted content for an auto-discovered crawl page
