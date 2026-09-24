@@ -1150,6 +1150,56 @@ class TestKnowledgeDocSources:
         # The refresh must not run inline — the service isn't touched here.
         mock_svc.refresh_url_source.assert_not_called()
 
+    async def _post_reprocess(self, client, src, reprocess):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource.find_one", AsyncMock(return_value=src)),
+            patch("app.services.kb_source_reprocess.reprocess_source", reprocess),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            return await client.post(
+                "/api/knowledge/kb-uuid-1/source/src-1/reprocess",
+                cookies=cookies,
+                headers=headers,
+            )
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_reports_what_it_queued(self, client):
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="error")
+        body = {"ok": True, "status": "queued", "mode": "reindex", "source_uuid": "src-1"}
+        reprocess = AsyncMock(return_value=body)
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 200
+        assert resp.json() == body
+        assert reprocess.await_args.args[1] is src
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_refusal_carries_its_status_and_reason(self, client):
+        from app.services.kb_source_reprocess import ReprocessRefused
+
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="processing")
+        reprocess = AsyncMock(side_effect=ReprocessRefused(409, "This source is already being processed"))
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "This source is already being processed"
+
+    @pytest.mark.asyncio
+    async def test_reprocess_unknown_source_is_404(self, client):
+        resp = await self._post_reprocess(client, None, AsyncMock())
+        assert resp.status_code == 404
+
     @pytest.mark.asyncio
     async def test_refresh_source_rejects_document_sources(self, client):
         user = _make_user()

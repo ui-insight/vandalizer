@@ -580,6 +580,11 @@ def perform_extraction_and_update(
             ingestion_warnings.append("hidden_text_unchecked")
         if extension == "pdf" and raw_text and is_sparse_extraction(raw_text, num_pages):
             ingestion_warnings.append("sparse_text")
+        # Pages that show content no reader got text from. Used to vanish:
+        # the document was complete here while the viewer showed every page.
+        unread_pages = [int(p) for p in (ocr_report.get("unread_pages") or [])]
+        if unread_pages:
+            ingestion_warnings.append("unread_pages")
         if ingestion_warnings:
             logger.warning(
                 "Document %s ingested with warnings %s (pages=%s, chars=%d)",
@@ -668,6 +673,7 @@ def perform_extraction_and_update(
             "text_markers": text_markers,
             "extraction_nonletter_ratio": extraction_ratio,
             "ingestion_warnings": ingestion_warnings,
+            "unread_pages": unread_pages,
             "error_message": None,
             # The refusal this run was retrying is resolved: the document has
             # a stored reading again, and the next retry starts from its

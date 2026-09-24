@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
 import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
@@ -11,6 +11,7 @@ import { listOrganizationsFlat } from '../../api/organizations'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
+import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
@@ -209,6 +210,29 @@ export function KnowledgePanel() {
   )
   const inFlightCount = inFlightSources.length
 
+  // Sources the user reprocessed (or refreshed) here, followed until they
+  // settle so the outcome is announced — the row alone changes quietly.
+  const [reprocessing, setReprocessing] = useState<Record<string, TrackedReprocess>>({})
+  useEffect(() => { setReprocessing({}) }, [selectedKB?.uuid])
+  useEffect(() => {
+    if (!selectedKB || Object.keys(reprocessing).length === 0) return
+    const { remaining, settled } = settleReprocesses(reprocessing, selectedKB.sources ?? [])
+    if (settled.length === 0) return
+    setReprocessing(remaining)
+    for (const r of settled) {
+      const chunks = `${r.chunkCount} ${r.chunkCount === 1 ? 'chunk' : 'chunks'}`
+      if (r.unchanged) {
+        toast(`“${r.name}” re-fetched — the page is unchanged, so its ${chunks} were kept.`, 'success')
+      } else if (r.ok) {
+        toast(`“${r.name}” reprocessed — ${chunks}, indexed just now.`, 'success')
+      } else if (r.keptPrevious) {
+        toast(`Re-fetching “${r.name}” failed: ${r.error}. It still answers from its previous text; use Refresh to try again.`, 'error')
+      } else {
+        toast(`Reprocessing “${r.name}” failed: ${r.error}. Use Try again on the source to retry.`, 'error')
+      }
+    }
+  }, [selectedKB, reprocessing, toast])
+
   // Poll while the KB is building or any source is still indexing
   useEffect(() => {
     if (!selectedKB) return
@@ -377,6 +401,32 @@ export function KnowledgePanel() {
       .finally(() => setAddingUrls(false))
   }
 
+  const sourceName = (source: KnowledgeBaseSource) =>
+    source.custom_name || source.document_title || source.url_title || source.url || 'Source'
+
+  /** Run one source through the pipeline again — re-fetch a page, re-index a
+   * document's text, or re-read a document that has none. Also the row's
+   * "Try again" after a failure. */
+  const handleReprocessSource = async (source: KnowledgeBaseSource) => {
+    if (!selectedKB) return
+    try {
+      const { mode } = await api.reprocessKBSource(selectedKB.uuid, source.uuid)
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        status: 'building',
+        sources: prev.sources.map(s => s.uuid === source.uuid
+          ? { ...s, status: 'pending' as const, error_message: undefined } : s),
+      } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode, name: sourceName(source) } }))
+      toast(startMessage(mode, sourceName(source)), 'info')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to reprocess source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to reprocess source', 'error')
+    }
+  }
+
   const handleRefreshSource = async (source: KnowledgeBaseSource) => {
     if (!selectedKB) return
     try {
@@ -387,6 +437,7 @@ export function KnowledgePanel() {
         status: 'building',
         sources: prev.sources.map(s => s.uuid === source.uuid ? { ...s, status: 'pending' as const } : s),
       } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode: 'refetch', name: sourceName(source) } }))
       toast('Re-fetching page in background — previous text is kept if the fetch fails', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
@@ -1432,7 +1483,23 @@ export function KnowledgePanel() {
                           ) : null
                         })()}
                         {!isRenaming && source.error_message && (
-                          <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
+                          <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>
+                            {source.error_message}
+                            {canManageKB && source.status === 'error' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
+                                title="Run this source through extraction, chunking and embedding again"
+                                style={{
+                                  marginLeft: 8, padding: 0, background: 'transparent', border: 'none',
+                                  fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                                  color: '#7aa2f7', textDecoration: 'underline', cursor: 'pointer',
+                                }}
+                              >
+                                Try again
+                              </button>
+                            )}
+                          </div>
                         )}
                         {!isRenaming && isPartial && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
@@ -1482,9 +1549,7 @@ export function KnowledgePanel() {
                         })()}
                         {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
-                            {source.status === 'processing'
-                              ? 'Indexing… large documents can take a few minutes'
-                              : 'Waiting for document text to finish extracting…'}
+                            {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
@@ -1553,6 +1618,21 @@ export function KnowledgePanel() {
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                                 >
                                   <RefreshCw size={12} style={{ color: '#888' }} />
+                                </button>
+                              )}
+                              {source.source_type === 'document' && (
+                                <button
+                                  type="button"
+                                  aria-label="Reprocess source"
+                                  onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
+                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  title={
+                                    'Reprocess: re-chunk and re-embed this document (it is read again first if it has no readable text)'
+                                    + (source.processed_at ? `. Last indexed ${new Date(source.processed_at).toLocaleString()}` : '')
+                                  }
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                                >
+                                  <RotateCcw size={12} style={{ color: '#888' }} />
                                 </button>
                               )}
                               <button

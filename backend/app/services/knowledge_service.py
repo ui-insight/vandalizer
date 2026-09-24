@@ -1906,6 +1906,24 @@ def _reject_collapsed_refresh(
     )
 
 
+def _reject_crawled_navigation_page(result: WebFetchResult, url: str) -> str | None:
+    """The crawler's navigation-page gate, for refreshing a page it found.
+
+    A crawl only keeps pages with real content (see ``_crawl_from_source``);
+    a refresh must hold a crawled page to the same bar, or a page that has
+    since turned into a link hub gets embedded over the content it replaced.
+    A page added by hand is exempt, as it was on first ingest.
+    """
+    from app.config import Settings
+    from app.utils.page_quality import describe_low_value_page
+
+    return describe_low_value_page(
+        result.text,
+        len(_crawlable_links(result, url)),
+        min_chars=Settings().kb_crawl_min_content_chars,
+    )
+
+
 async def refresh_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
 ) -> str | None:
@@ -1956,6 +1974,8 @@ async def refresh_url_source(
             source.last_collapsed_hash = (
                 currency.content_fingerprint(result.text) if reason else None
             )
+        if reason is None and getattr(source, "parent_source_uuid", None):
+            reason = _reject_crawled_navigation_page(result, source.url)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
@@ -1997,18 +2017,24 @@ async def refresh_url_source(
     name = source.custom_name or result.title or source.url_title or source.url
     try:
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        # New chunks go in before the old ones come out, so a failed embed
+        # leaves the source answering from its previous text.
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, raw_text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, raw_text,
         )
     except Exception as e:
         logger.error(f"Error re-embedding refreshed KB source {source.uuid}: {e}")
-        source.status = "error"
-        source.error_message = f"Refresh failed while re-indexing: {e}"[:2000]
+        reason = f"Refresh failed while re-indexing: {e}"[:2000]
         source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
-        source.last_refresh_error = source.error_message
+        source.last_refresh_error = reason
+        if previous_status == "ready":
+            source.status = "ready"
+            source.error_message = f"Refresh failed while re-indexing — previous content kept: {e}"[:2000]
+        else:
+            source.status = "error"
+            source.error_message = reason
         await source.save()
-        return source.error_message
+        return reason
 
     source.content = _kb_snapshot(raw_text)
     source.url_title = result.title or source.url_title
@@ -2129,9 +2155,8 @@ async def ingest_text_into_source(
             or "Text Source"
         )
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, text,
         )
         source.content = _kb_snapshot(text)
         if label:

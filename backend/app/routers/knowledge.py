@@ -902,6 +902,37 @@ async def refresh_source(
     return {"ok": True, "status": "queued", "source_uuid": source.uuid}
 
 
+@router.post("/{uuid}/source/{source_uuid}/reprocess")
+@limiter.limit("10/minute")
+async def reprocess_source(
+    request: Request, uuid: str, source_uuid: str, user: User = Depends(get_current_user),
+):
+    """Run one source through extraction, chunking and embedding again, in place.
+
+    Web sources re-fetch (the same work as ``/refresh``). Document sources
+    re-index the document's text, re-reading the document first only when it
+    has no usable text. The response's ``mode`` says which: ``refetch``,
+    ``reindex``, ``reextract``, or ``waiting`` (an extraction already running
+    will index it). The source reports ``pending``/``processing`` until it
+    lands, then ``ready`` with its new chunk count and dates, or ``error``
+    with the reason. 409 while already in progress.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+    from app.services.kb_source_reprocess import ReprocessRefused, reprocess_source as _reprocess
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        return await _reprocess(kb, source, user)
+    except ReprocessRefused as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
 @router.post("/{uuid}/refresh-web-sources")
 @limiter.limit("5/minute")
 async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(get_current_user)):
