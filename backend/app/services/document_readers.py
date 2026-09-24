@@ -135,6 +135,103 @@ def extract_text_from_pdf(pdf_path: str, report: dict | None = None) -> str:
     return scrubbed
 
 
+# A table cell holding only a number: 35,767 / $724,298.58 / (1,200.00) / 12.5%
+_NUMERIC_CELL = re.compile(r"[(\-−]?[$€£]?\s?\d[\d,]*(?:\.\d+)?%?\)?")
+
+
+def _is_numeric_cell(text: str) -> bool:
+    return bool(_NUMERIC_CELL.fullmatch(text.strip()))
+
+
+def _page_text_with_table_rows(page) -> str:
+    """PyMuPDF's page text, with each table row kept on one line.
+
+    ``get_text("text")`` emits a borderless table one cell per line, so the
+    column headers end up far above the numbers and a row label is followed by
+    its first number — the leftmost column. Asked for "Total Revenue Actuals
+    Fiscal YTD" from a report laid out Current Month | Fiscal YTD | …, the
+    model read ``Total Revenue Actuals`` / ``35,767`` and returned the current
+    month; the fiscal YTD figure was four lines further down (support ticket).
+    This is the fallback reader, so it serves whatever misses the pdf-inspector
+    fast path (which already renders tables as Markdown) and gets no OCR text.
+
+    Lines sharing a baseline are joined, left to right with tabs between cells,
+    when they look like a table row: three or more cells, at least two of them
+    numbers. The line directly above a table's first row is joined the same way
+    when it has three or more cells, since that is its column header. Tabs,
+    not pipes, because quote verification and the hidden-text scrub both
+    collapse whitespace: a quote copied from the old one-cell-per-line text
+    still matches. A page with fewer than two such rows is returned exactly as
+    ``get_text("text")`` gives it, so prose and multi-column articles are
+    untouched.
+    """
+    import pymupdf
+
+    plain = page.get_text("text")
+    lines: list[dict] = []
+    for block in page.get_text("dict", flags=pymupdf.TEXTFLAGS_TEXT).get("blocks", []):
+        for line in block.get("lines", []):
+            text = "".join(span.get("text", "") for span in line.get("spans", []))
+            if not text.strip():
+                continue
+            x0, y0, x1, y1 = line["bbox"]
+            lines.append({"text": text, "x0": x0, "yc": (y0 + y1) / 2, "h": max(y1 - y0, 1.0)})
+    if not lines:
+        return plain
+
+    # Group lines into visual rows by vertical centre.
+    bands: list[list[int]] = []
+    for idx in sorted(range(len(lines)), key=lambda i: lines[i]["yc"]):
+        ln = lines[idx]
+        if bands:
+            ref = lines[bands[-1][0]]
+            if abs(ln["yc"] - ref["yc"]) <= 0.5 * min(ln["h"], ref["h"]):
+                bands[-1].append(idx)
+                continue
+        bands.append([idx])
+
+    def cells(band: list[int]) -> list[dict]:
+        return sorted((lines[i] for i in band), key=lambda ln: ln["x0"])
+
+    is_row = [
+        len(band) >= 3 and sum(_is_numeric_cell(lines[i]["text"]) for i in band) >= 2
+        for band in bands
+    ]
+    if sum(is_row) < 2:
+        return plain
+
+    joined = list(is_row)
+    table_left = min(lines[i]["x0"] for b, band in enumerate(bands) if is_row[b] for i in band)
+    header_prefix: dict[int, str] = {}
+    for b in range(1, len(bands)):
+        if is_row[b] and not is_row[b - 1] and len(bands[b - 1]) >= 3:
+            joined[b - 1] = True
+            # A header over a label column has no cell above the labels; an
+            # empty leading cell keeps its titles over the right numbers.
+            if cells(bands[b - 1])[0]["x0"] > table_left + 10:
+                header_prefix[b - 1] = "\t"
+
+    band_of = {i: b for b, band in enumerate(bands) for i in band}
+    out: list[str] = []
+    emitted: set[int] = set()
+
+    def emit(b: int) -> None:
+        emitted.add(b)
+        out.append(header_prefix.get(b, "") + "\t".join(c["text"].strip() for c in cells(bands[b])))
+
+    for idx, ln in enumerate(lines):
+        b = band_of[idx]
+        if not joined[b]:
+            out.append(ln["text"])
+        elif b not in emitted:
+            # A content stream written column by column reaches the rows'
+            # label column before the header cells: the header goes first.
+            if b > 0 and joined[b - 1] and not is_row[b - 1] and (b - 1) not in emitted:
+                emit(b - 1)
+            emit(b)
+    return "\n".join(out) + "\n"
+
+
 def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
     """Extract PDF text via PyMuPDF, returning text plus per-page char offsets.
 
@@ -164,7 +261,7 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
 
     with doc:
         for i, page in enumerate(doc, start=1):
-            page_text = page.get_text("text")
+            page_text = _page_text_with_table_rows(page)
             field_lines: list[str] = []
             for widget in page.widgets() or []:
                 value = (widget.field_value or "").strip()
