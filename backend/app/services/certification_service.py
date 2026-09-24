@@ -807,9 +807,9 @@ async def _validate_governance(user_id: str) -> dict:
     # if the request record is missing (pre-queue verifications, seeded items).
     verified_count = max(approved_count, sum(1 for wf in workflows if wf.verified))
 
-    detail = f"Submitted {submitted_count} workflow(s) for verification (need 1+)"
+    detail = f"Shared {submitted_count} workflow(s) with everyone (need 1+)"
     if submitted_count:
-        detail += f" — {verified_count} approved so far; approval is not required to pass"
+        detail += f" — {verified_count} accepted by an examiner so far; that is not required to pass"
     checks.append({"name": "Asked to share with everyone", "passed": submitted_count >= 1, "detail": detail})
 
     passed = all(c["passed"] for c in checks)
