@@ -41,6 +41,13 @@ _PDF_INSPECTOR_MIN_CONFIDENCE = 0.8
 # Real content — even faint anti-aliased text — pulls pixels well below this.
 _BLANK_PAGE_INK_THRESHOLD = 250
 
+# A page whose reading holds fewer characters than this while a picture covers
+# at least this fraction of it is a picture of content — a scanned or pasted
+# page — with at most a page label or stamp read off the top. The reading
+# missed the page, even though it is not empty.
+_UNREAD_PAGE_MAX_CHARS = 40
+_UNREAD_PAGE_IMAGE_COVERAGE = 0.5
+
 
 # A table cell that is exactly the pandas/openpyxl NaN sentinel, and nothing
 # else. Anchored to cell boundaries so real words survive: a blind
@@ -135,7 +142,59 @@ def extract_text_from_pdf(pdf_path: str, report: dict | None = None) -> str:
     return scrubbed
 
 
-def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
+def _pymupdf_page_text(page) -> str:
+    """One page's text layer via PyMuPDF, with any filled form fields."""
+    page_text = page.get_text("text")
+    field_lines: list[str] = []
+    for widget in page.widgets() or []:
+        value = (widget.field_value or "").strip()
+        if not value:
+            continue
+        label = (widget.field_label or widget.field_name or "").strip()
+        field_lines.append(f"- {label}: {value}" if label else f"- {value}")
+    if field_lines:
+        page_text = (page_text or "") + "\n[Form fields]\n" + "\n".join(field_lines)
+    return page_text or ""
+
+
+def _page_has_unread_content(page, text: str) -> bool:
+    """True when ``page`` shows content that its reading ``text`` does not hold.
+
+    A page left out of the text used to vanish without a trace: the document
+    was stored as complete while the viewer showed every page (support
+    ticket: a budget ledger's totals page missing from a 2-page PDF). Blank
+    pages are not content; pictures and ink are. Never raises — a page that
+    cannot be inspected is not reported, as before.
+    """
+    import pymupdf
+
+    try:
+        stripped = (text or "").strip()
+        if len(stripped) >= _UNREAD_PAGE_MAX_CHARS:
+            return False
+        area = abs(page.rect) or 1.0
+        covered = 0.0
+        for info in page.get_image_info() or []:
+            bbox = info.get("bbox")
+            if bbox:
+                covered += abs(pymupdf.Rect(bbox) & page.rect)
+        if covered / area >= _UNREAD_PAGE_IMAGE_COVERAGE:
+            return True
+        if stripped:
+            # A short page of real text with no picture over it is just short.
+            return False
+        if page.get_images(full=True):
+            return True
+        pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
+        return bool(pix.samples) and min(pix.samples) < _BLANK_PAGE_INK_THRESHOLD
+    except Exception as e:  # noqa: BLE001 — a coverage check must never fail a read
+        logger.warning(
+            "Could not check page %s for unread content: %s", getattr(page, "number", "?"), e,
+        )
+        return False
+
+
+def _pymupdf_extract_with_pages(pdf_path: str, report: dict | None = None) -> tuple[str, list[dict]]:
     """Extract PDF text via PyMuPDF, returning text plus per-page char offsets.
 
     Markers are ``[{"char_offset": int, "kind": "page", "value": page_number}]``
@@ -145,6 +204,10 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
     PyMuPDF preserves reading order in multi-column layouts and exposes form
     field values that PyPDF2 misses (NIH biosketches, NSF Current & Pending
     forms, etc. are common research-admin uploads).
+
+    ``report``, when given, receives ``unread_pages`` — 1-indexed pages that
+    show content this reading does not hold (an image of a page with no text
+    layer). Those pages are missing from the text, and the task warns so.
     """
     import pymupdf
 
@@ -162,18 +225,12 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
         # the builtin so a missing file looks like a missing file everywhere.
         raise FileNotFoundError(str(e)) from e
 
+    unread: list[int] = []
     with doc:
         for i, page in enumerate(doc, start=1):
-            page_text = page.get_text("text")
-            field_lines: list[str] = []
-            for widget in page.widgets() or []:
-                value = (widget.field_value or "").strip()
-                if not value:
-                    continue
-                label = (widget.field_label or widget.field_name or "").strip()
-                field_lines.append(f"- {label}: {value}" if label else f"- {value}")
-            if field_lines:
-                page_text = (page_text or "") + "\n[Form fields]\n" + "\n".join(field_lines)
+            page_text = _pymupdf_page_text(page)
+            if _page_has_unread_content(page, page_text):
+                unread.append(i)
 
             if not page_text:
                 continue
@@ -186,6 +243,13 @@ def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
             parts.append(page_text)
             cursor += len(page_text)
 
+    if unread:
+        logger.warning(
+            "PDF %s: page(s) %s show content with no readable text — "
+            "they are missing from the extracted text", pdf_path, unread,
+        )
+        if report is not None:
+            report["unread_pages"] = unread
     return "\n".join(parts), markers
 
 
@@ -1040,13 +1104,40 @@ def _local_markdown_extract_from_pdf(
         logger.warning("pdf-inspector extraction failed for %s: %s", pdf_path, e)
         return None
 
+    # The classification above is a lightweight pass; the full parse can still
+    # flag a page ("text here is unreliable, use OCR") and hands it back with
+    # empty Markdown. Skipping it dropped the page from the document without a
+    # word (support ticket: a budget ledger's totals page). A flagged page, or
+    # an empty one that is not blank, sends the whole document down the OCR
+    # path instead — the same answer the classifier gets when it flags a page
+    # up front — where OCR reads it, PyMuPDF backs OCR up, and a page neither
+    # can read is reported. ``pages_needing_ocr`` here is 1-indexed, unlike
+    # the classifier's.
+    flagged = sorted(
+        set(getattr(result, "pages_needing_ocr", None) or [])
+        | {p.page + 1 for p in result.pages if getattr(p, "needs_ocr", False)}
+    )
+    if flagged:
+        logger.info(
+            "pdf-inspector fast path declined for %s: page(s) %s need OCR",
+            pdf_path, flagged,
+        )
+        return None
+    empty = [p.page for p in result.pages if not (p.markdown or "").strip()]
+    if empty and not _pages_are_blank(pdf_path, empty):
+        logger.info(
+            "pdf-inspector fast path declined for %s: page(s) %s came back "
+            "empty but are not blank", pdf_path, [n + 1 for n in empty],
+        )
+        return None
+
     parts: list[str] = []
     markers: list[dict] = []
     cursor = 0
     for page in result.pages:
         page_text = page.markdown or ""
-        if not page_text:
-            continue
+        if not page_text.strip():
+            continue  # blank, checked above
         markers.append({"char_offset": cursor, "kind": "page", "value": page.page + 1})
         if parts:
             cursor += 1
@@ -1063,6 +1154,24 @@ def _local_markdown_extract_from_pdf(
         len(text), pdf_path, classification.confidence, result.pages_with_tables,
     )
     return text, markers
+
+
+def _pages_are_blank(pdf_path: str, pages: list[int]) -> bool:
+    """True when every 0-indexed page in ``pages`` holds nothing to read: no
+    text layer and nothing drawn. False when unsure — the caller then takes
+    the thorough path rather than dropping a page."""
+    try:
+        import pymupdf
+        with pymupdf.open(pdf_path) as doc:
+            for n in pages:
+                page = doc[n]
+                text = _pymupdf_page_text(page)
+                if text.strip() or _page_has_unread_content(page, text):
+                    return False
+    except Exception as e:
+        logger.warning("Could not check %s for blank pages: %s", pdf_path, e)
+        return False
+    return True
 
 
 def _text_layer_untrustworthy(classification) -> bool:
@@ -1308,7 +1417,7 @@ def _read_pdf_text_and_markers(
     # processing), a short-but-valid OCR result still beats losing the
     # extraction and crashing the task.
     try:
-        return _pymupdf_extract_with_pages(file_path)
+        return _pymupdf_extract_with_pages(file_path, report=report)
     except Exception as e:
         if ocr_text and ocr_text.strip():
             logger.warning(
