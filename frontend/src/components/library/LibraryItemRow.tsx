@@ -402,7 +402,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       />
                       <MenuItem
                         icon={<Share2 size={14} />}
-                        label="Send to team"
+                        label="Send to team…"
                         onClick={() => {
                           onShare(item.id)
                           setMenuOpen(false)

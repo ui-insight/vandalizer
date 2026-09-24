@@ -22,6 +22,10 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useTeams', () => ({
+  useTeams: () => ({ teams: [], currentTeam: null, loading: false }),
+}))
+
 vi.mock('../../contexts/ToastContext', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }))

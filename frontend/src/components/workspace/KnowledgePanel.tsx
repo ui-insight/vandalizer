@@ -6,6 +6,7 @@ import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useTeams } from '../../hooks/useTeams'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
@@ -53,6 +54,7 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
 export function KnowledgePanel() {
   const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
+  const { teams, currentTeam } = useTeams()
   const { toast } = useToast()
   const { knowledgeBases, create, remove, transferToTeam, refresh } = useKnowledgeBases()
   const projectPins = useProjectPins(activeProjectUuid)
@@ -471,6 +473,13 @@ export function KnowledgePanel() {
   }
 
   const [shareDialogKB, setShareDialogKB] = useState<KnowledgeBase | null>(null)
+  // Sharing a KB flips its flag within the team that owns it — there is no
+  // destination to choose, but the dialog should still say which team. Same
+  // resolution as the backend's notification: the KB's team, else current.
+  const shareTeamName = (kb: KnowledgeBase) =>
+    kb.team_id
+      ? teams.find((t) => t.id === kb.team_id || t.uuid === kb.team_id)?.name
+      : currentTeam?.name
 
   const handleToggleShare = async (kb: KnowledgeBase) => {
     // Sharing for the first time → prompt for a note.
@@ -494,7 +503,8 @@ export function KnowledgePanel() {
     const kbUuid = shareDialogKB.uuid
     try {
       await api.shareKnowledgeBase(kbUuid, comment || undefined)
-      toast('Shared with team', 'success')
+      const teamName = shareTeamName(shareDialogKB)
+      toast(teamName ? `Shared with ${teamName}` : 'Shared with team', 'success')
       if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
       refresh()
     } catch (err) {
@@ -617,6 +627,7 @@ export function KnowledgePanel() {
   const shareDialogJSX = shareDialogKB ? (
     <ShareWithTeamDialog
       itemName={shareDialogKB.title}
+      teamName={shareTeamName(shareDialogKB)}
       onCancel={() => setShareDialogKB(null)}
       onConfirm={confirmShareKB}
     />
