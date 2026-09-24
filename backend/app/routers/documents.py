@@ -212,7 +212,10 @@ async def retry_extraction(
     # reader and to nothing else, so setting them for a DOCX or a spreadsheet
     # would only record a requirement in the audit log that was never applied.
     is_pdf = (doc.extension or "").lower().lstrip(".") == "pdf"
-    force_ocr = is_pdf and (doc.task_status == "error" or low_quality)
+    # Pages no reader got text from are exactly what a retry is for: without
+    # OCR first it would take the same local reading and miss them again.
+    missed_pages = "unread_pages" in (doc.ingestion_warnings or [])
+    force_ocr = is_pdf and (doc.task_status == "error" or low_quality or missed_pages)
     ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
     if ocr_required:
         doc.text_layer_rejected = True
