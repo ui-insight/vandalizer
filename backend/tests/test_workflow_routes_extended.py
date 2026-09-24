@@ -1146,3 +1146,122 @@ class TestExpectedOutputRoutes:
             )
 
         assert resp.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Download file names: workflow name + run date and time, not the run id
+# ---------------------------------------------------------------------------
+
+class TestDownloadFileNames:
+    """Support ticket: "Budget Prediction Flow-cb8c7277.pdf" — the trailing
+    run id told the user nothing, and repeat runs of one workflow downloaded
+    as look-alike files. The name now carries the run's date and time in the
+    viewer's zone."""
+
+    # 21:30 UTC on 2 Sep 2026 is 02:30 PM in Los Angeles (PDT, UTC-7).
+    START = __import__("datetime").datetime(2026, 9, 2, 21, 30)
+
+    def _status(self, **extra):
+        return {
+            "status": "completed",
+            "final_output": {"output": "hello"},
+            "steps_output": {},
+            "workflow_name": "Budget Prediction Flow",
+            "document_title": None,
+            "start_time": self.START,
+        } | extra
+
+    def test_name_is_workflow_and_local_run_time(self):
+        from zoneinfo import ZoneInfo
+
+        from app.routers.workflows import _session_base_filename
+
+        name = _session_base_filename(self._status(), "cb8c7277deadbeef", ZoneInfo("America/Los_Angeles"))
+        assert name == "Budget Prediction Flow 2026-09-02 02-30 PM"
+
+    def test_without_a_zone_the_time_is_labelled_utc(self):
+        from app.routers.workflows import _session_base_filename
+
+        assert _session_base_filename(self._status(), "cb8c7277") == "Budget Prediction Flow 2026-09-02 09-30 PM UTC"
+
+    def test_document_title_is_kept_between_workflow_and_time(self):
+        from zoneinfo import ZoneInfo
+
+        from app.routers.workflows import _session_base_filename
+
+        name = _session_base_filename(
+            self._status(document_title="Smith Award.pdf"), "cb8c7277", ZoneInfo("America/Los_Angeles"),
+        )
+        assert name == "Budget Prediction Flow - Smith Award 2026-09-02 02-30 PM"
+
+    def test_two_runs_an_hour_apart_get_different_names(self):
+        import datetime
+
+        from app.routers.workflows import _session_base_filename
+
+        later = self.START + datetime.timedelta(hours=1)
+        assert _session_base_filename(self._status(), "a") != _session_base_filename(
+            self._status(start_time=later), "b",
+        )
+
+    def test_a_run_with_no_start_time_falls_back_to_the_run_id(self):
+        from app.routers.workflows import _session_base_filename
+
+        assert _session_base_filename(self._status(start_time=None), "cb8c7277deadbeef") == "Budget Prediction Flow-cb8c7277"
+
+    def test_an_unknown_zone_is_ignored(self):
+        from app.routers.workflows import _download_zone
+
+        assert _download_zone("Not/A_Zone") is None
+        assert _download_zone("../../etc/passwd") is None
+        assert _download_zone("America") is None
+        assert _download_zone("a" * 300) is None
+        assert _download_zone(None) is None
+
+    async def test_download_header_uses_the_requested_zone(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow_status = AsyncMock(return_value=self._status())
+
+            resp = await client.get(
+                "/api/workflows/download?session_id=cb8c7277deadbeef&format=text&tz=America/Los_Angeles",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-disposition"] == (
+            'attachment; filename="Budget Prediction Flow 2026-09-02 02-30 PM.txt"'
+        )
+
+    async def test_batch_members_carry_document_and_run_time(self, client):
+        import io
+        import zipfile
+
+        user = _make_user()
+        cookies, headers = _auth()
+        runs = [
+            self._status(session_id="s1", document_title="Smith Award.pdf"),
+            self._status(session_id="s2", document_title="Jones Award.pdf"),
+        ]
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_batch_completed_outputs = AsyncMock(return_value=runs)
+
+            resp = await client.get(
+                "/api/workflows/batch-download?batch_id=b1&format=text&tz=America/Los_Angeles",
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert sorted(zipfile.ZipFile(io.BytesIO(resp.content)).namelist()) == [
+            "Budget Prediction Flow - Jones Award 2026-09-02 02-30 PM.txt",
+            "Budget Prediction Flow - Smith Award 2026-09-02 02-30 PM.txt",
+        ]

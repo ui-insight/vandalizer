@@ -11,6 +11,9 @@ from app.services import access_control
 INGESTION_WARNING_LABELS = {
     "partial_ocr": "only part of this document could be converted",
     "sparse_text": "far less text than its page count suggests",
+    # A page showing content — typically an image of a page with no text
+    # layer — that no reader got text from, so it is missing from the text.
+    "unread_pages": "some pages could not be read and are missing from its text",
     # Emitted by the extraction path from `is_extraction_low_quality`, which
     # reads the stored nonletter ratio rather than these codes. Without an
     # entry here `ingestion_warnings()` filtered it straight back out, so the
@@ -48,7 +51,19 @@ def warning_text_for_codes(codes: list[str]) -> str:
 
 def ingestion_warning_text(doc: SmartDocument) -> str:
     """The warnings as one readable clause, or "" when there are none."""
-    labels = [INGESTION_WARNING_LABELS[c] for c in ingestion_warnings(doc)]
+    labels = []
+    for code in ingestion_warnings(doc):
+        pages = getattr(doc, "unread_pages", None) or []
+        if code == "unread_pages" and pages:
+            # Name the pages: "which page?" is the user's next question, and
+            # the viewer shows them all.
+            listed = ", ".join(str(p) for p in pages[:10]) + (", …" if len(pages) > 10 else "")
+            if len(pages) == 1:
+                labels.append(f"page {listed} could not be read and is missing from its text")
+            else:
+                labels.append(f"pages {listed} could not be read and are missing from its text")
+        else:
+            labels.append(INGESTION_WARNING_LABELS[code])
     return "; ".join(labels)
 
 
@@ -57,7 +72,7 @@ def ingestion_warning_text(doc: SmartDocument) -> str:
 #: contain EXTRA unvetted content, the inverse risk — telling the user content
 #: may be missing (and to retry extraction for "the full text") would assert
 #: the opposite of what happened.
-COMPLETENESS_WARNING_CODES = frozenset({"partial_ocr", "sparse_text", "low_quality_text"})
+COMPLETENESS_WARNING_CODES = frozenset({"partial_ocr", "sparse_text", "low_quality_text", "unread_pages"})
 
 
 def is_partially_ingested(doc: SmartDocument) -> bool:

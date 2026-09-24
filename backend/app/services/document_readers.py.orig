@@ -221,21 +221,13 @@ def _page_text_with_table_rows(page) -> str:
     band_of = {i: b for b, band in enumerate(bands) for i in band}
     out: list[str] = []
     emitted: set[int] = set()
-
-    def emit(b: int) -> None:
-        emitted.add(b)
-        out.append(header_prefix.get(b, "") + "\t".join(c["text"].strip() for c in cells(bands[b])))
-
     for idx, ln in enumerate(lines):
         b = band_of[idx]
         if not joined[b]:
             out.append(ln["text"])
         elif b not in emitted:
-            # A content stream written column by column reaches the rows'
-            # label column before the header cells: the header goes first.
-            if b > 0 and joined[b - 1] and not is_row[b - 1] and (b - 1) not in emitted:
-                emit(b - 1)
-            emit(b)
+            emitted.add(b)
+            out.append(header_prefix.get(b, "") + "\t".join(c["text"].strip() for c in cells(bands[b])))
     return "\n".join(out) + "\n"
 
 
@@ -280,9 +272,8 @@ def _page_has_unread_content(page, text: str) -> bool:
         if stripped:
             # A short page of real text with no picture over it is just short.
             return False
-        # Not page.get_images(): it lists every image in the page's resources,
-        # including shared ones the page never draws, so a blank page in such a
-        # PDF would be flagged. Drawn images show up as ink below.
+        if page.get_images(full=True):
+            return True
         pix = page.get_pixmap(colorspace=pymupdf.csGRAY, alpha=False)
         return bool(pix.samples) and min(pix.samples) < _BLANK_PAGE_INK_THRESHOLD
     except Exception as e:  # noqa: BLE001 — a coverage check must never fail a read
