@@ -3,10 +3,12 @@ import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucid
 import {
   listKBTestQueries,
   getKBQuality,
+  getKBValidationGrader,
   runKBValidationAsync,
   downloadKBValidationRunExport,
   type KBTestQuery,
   type KBValidationExportFormat,
+  type KBValidationGrader,
   type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
@@ -104,6 +106,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // showing the idle "Run Validation" button as if nothing were happening.
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  // Questions ticked on Test Queries and handed to Run now by "Run selected",
+  // where the count and category mix are shown before the run starts.
+  const [handedSelection, setHandedSelection] = useState<string[] | null>(null)
+  // A "Run selected" hand-off applies to the visit it opened; choosing a tab
+  // from the strip starts clean, so a later Run visit opens on the full set.
+  const selectTab = (id: Tab) => {
+    setHandedSelection(null)
+    setTab(id)
+  }
+  // The system-wide grader, named on the Run tab before a run starts.
+  const [grader, setGrader] = useState<KBValidationGrader | null>(null)
   // Bumped whenever a run finishes so the History tab refetches even if it's
   // already mounted (it otherwise only loads on mount, so a freshly persisted
   // run wouldn't appear until a full page reload).
@@ -125,7 +138,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
       : e.key === 'Home' ? 0
       : n - 1
-    setTab(TAB_LABELS[next].id)
+    selectTab(TAB_LABELS[next].id)
     tabRefs.current[next]?.focus()
   }
 
@@ -249,6 +262,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     setLoading(true)
     Promise.all([refreshQueries(), refreshHistory()]).finally(() => setLoading(false))
   }, [refreshQueries, refreshHistory])
+
+  // Re-read on entry to the Run tab: an admin can change the grader at any time.
+  useEffect(() => {
+    if (tab !== 'run') return
+    let cancelled = false
+    getKBValidationGrader(kbUuid)
+      .then(g => { if (!cancelled) setGrader(g) })
+      .catch(() => { /* optional context; the run works without it */ })
+    return () => { cancelled = true }
+  }, [tab, kbUuid])
 
   // Re-pull the test-query list on every entry to the Test Queries tab. The
   // Validate-tab wizard generates and persists queries server-side, so the
@@ -411,7 +434,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
               tabIndex={active ? 0 : -1}
               ref={el => { tabRefs.current[idx] = el }}
               onKeyDown={e => onTabKeyDown(e, idx)}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
               style={{
                 fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -460,22 +483,25 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           onChange={refreshQueries}
           running={running}
           onRunSelected={uuids => {
-            // A smoke test: judge only, no baseline, so it costs what the
-            // handful of questions costs. Results land on the Run tab.
+            // Review before running: Run now opens on this selection (judge
+            // only, so it costs what the handful of questions costs) and
+            // states the count and categories; the user starts it there.
+            setHandedSelection(uuids)
             setTab('run')
-            void runValidation('judge', uuids)
           }}
         />
       ) : tab === 'run' ? (
         <KBValidationRunTab
           kbReady={kbReady}
           canManage={canManage}
-          numQueries={queries.length}
+          queries={queries}
+          selectedUuids={handedSelection}
           latestRun={latestRun}
           running={running}
           error={runError}
           onRun={runValidation}
           onExport={latestRunUuid ? exportLatestRun : undefined}
+          grader={grader}
         />
       ) : (
         <KBQualityHistoryTab

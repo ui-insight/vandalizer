@@ -13,7 +13,7 @@ const NEEDS_DOC = /Select a document in the library first/
 describe('describeTestStepInput', () => {
   it('tests an API Node with no document selected (the ticket)', () => {
     expect(describeTestStepInput({ ...base, taskName: 'APINode' })).toEqual({
-      docUuids: [], blockedHint: null,
+      docUuids: [], candidates: [], blockedHint: null,
     })
   })
 
@@ -31,19 +31,37 @@ describe('describeTestStepInput', () => {
 
   it('lets fixed documents stand in for the selection, as a run does', () => {
     expect(describeTestStepInput({ ...base, fixedDocUuids: ['fixed-1'] })).toEqual({
-      docUuids: ['fixed-1'], blockedHint: null,
+      docUuids: ['fixed-1'], candidates: ['fixed-1'], blockedHint: null,
     })
   })
 
-  it('prefers the selection over the fixed documents, and uses only the first', () => {
+  it('prefers the selection over the fixed documents, and defaults to the first', () => {
     expect(describeTestStepInput({
       ...base, selectedDocUuids: ['sel-1', 'sel-2'], fixedDocUuids: ['fixed-1'],
-    })).toEqual({ docUuids: ['sel-1'], blockedHint: null })
+    })).toEqual({ docUuids: ['sel-1'], candidates: ['sel-1', 'sel-2'], blockedHint: null })
+  })
+
+  it('tests the document picked under "Test against" — still just one', () => {
+    expect(describeTestStepInput({
+      ...base, selectedDocUuids: ['sel-1', 'sel-2', 'sel-3'], chosenDocUuid: 'sel-3',
+    }).docUuids).toEqual(['sel-3'])
+  })
+
+  it('falls back to the first when the picked document is no longer a candidate', () => {
+    expect(describeTestStepInput({
+      ...base, selectedDocUuids: ['sel-1', 'sel-2'], chosenDocUuid: 'deselected',
+    }).docUuids).toEqual(['sel-1'])
+  })
+
+  it('can pick among the fixed documents when nothing is selected', () => {
+    expect(describeTestStepInput({
+      ...base, fixedDocUuids: ['fixed-1', 'fixed-2'], chosenDocUuid: 'fixed-2',
+    }).docUuids).toEqual(['fixed-2'])
   })
 
   it('never demands a document from a no-input workflow', () => {
     expect(describeTestStepInput({ ...base, triggerType: 'no_input' })).toEqual({
-      docUuids: [], blockedHint: null,
+      docUuids: [], candidates: [], blockedHint: null,
     })
   })
 

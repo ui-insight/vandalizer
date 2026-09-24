@@ -77,6 +77,7 @@ import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import type { ReviewDetail } from '../../api/reviews'
 import { ColdStartHero } from '../shared/ColdStartHero'
 import { TermDef } from '../shared/TermDef'
+import { splitFieldTerms } from '../../utils/extractionTerms'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -206,7 +207,7 @@ const TEST_STEP_NO_DOCUMENT_TYPES = new Set([
 ])
 
 const TEST_STEP_NEEDS_DOCUMENT_HINT =
-  'Select a document in the library first — this step is tested against the first selected document.'
+  'Select a document in the library first — this step is tested against one selected document.'
 
 function testStepTooltip(usesDocument: boolean): string {
   return [
@@ -215,13 +216,13 @@ function testStepTooltip(usesDocument: boolean): string {
     '',
     'What it does:',
     '• Runs only this step with its current configuration',
-    ...(usesDocument ? ['• Uses the first selected document as input'] : []),
+    ...(usesDocument ? ['• Uses one document as input — the one chosen under "Test against"'] : []),
     '• Makes real LLM / network calls (spends real tokens)',
     '• Shows the raw output below',
     '',
     "What it doesn't do:",
     '• Run upstream steps to build context',
-    ...(usesDocument ? ['• Iterate over all selected documents (only the first is used)'] : []),
+    ...(usesDocument ? ['• Iterate over all selected documents (one test, one document)'] : []),
     '• Persist the result — close the panel and it’s gone',
   ].join('\n')
 }
@@ -2737,10 +2738,8 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addTag = (value: string) => {
-    const trimmed = value.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      onChange([...tags, trimmed])
-    }
+    const newTags = splitFieldTerms(value, tags)
+    if (newTags.length) onChange([...tags, ...newTags])
     setInputValue('')
   }
 
@@ -2757,7 +2756,7 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
     const pasted = e.clipboardData.getData('text')
     if (pasted.includes(',')) {
       e.preventDefault()
-      const newTags = pasted.split(',').map(s => s.trim()).filter(s => s && !tags.includes(s))
+      const newTags = splitFieldTerms(pasted, tags)
       if (newTags.length) onChange([...tags, ...newTags])
     }
   }
@@ -2851,6 +2850,18 @@ export function describeRunInput(input: {
   return { missing: true, hint: 'Select a document to run this workflow' }
 }
 
+/** Which document a Test Step result came from, shown under its heading. */
+function TestedAgainst({ title }: { title: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '-2px 0 8px', fontSize: 12, color: '#6b7280' }}>
+      <FileText style={{ width: 12, height: 12, flexShrink: 0 }} />
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        Tested against <b style={{ color: '#374151' }}>{title}</b>
+      </span>
+    </div>
+  )
+}
+
 /**
  * The documents a step test should run on, and the hint to show when it can't
  * run for lack of one.
@@ -2868,18 +2879,26 @@ export function describeTestStepInput(input: {
   triggerType: string | undefined
   selectedDocUuids: string[]
   fixedDocUuids: string[]
-}): { docUuids: string[]; blockedHint: string | null } {
-  const { taskName, triggerType, selectedDocUuids, fixedDocUuids } = input
-  // Only the first document is ever used, and the fixed documents stand in
-  // for a selection exactly as they do for the Run button.
-  const docUuids = (selectedDocUuids.length > 0 ? selectedDocUuids : fixedDocUuids).slice(0, 1)
-  if (TEST_STEP_NO_DOCUMENT_TYPES.has(taskName)) return { docUuids, blockedHint: null }
+  /** The document picked under "Test against"; ignored once it is no longer a candidate. */
+  chosenDocUuid?: string | null
+}): { docUuids: string[]; candidates: string[]; blockedHint: string | null } {
+  const { taskName, triggerType, selectedDocUuids, fixedDocUuids, chosenDocUuid } = input
+  // A test runs on one document, so it stays one cheap call however many are
+  // selected. It used to be silently the first, and with several selected
+  // people went looking for the other results (support ticket); the author now
+  // picks which, defaulting to the first. The fixed documents stand in for a
+  // selection exactly as they do for the Run button.
+  const candidates = selectedDocUuids.length > 0 ? selectedDocUuids : fixedDocUuids
+  const docUuids = chosenDocUuid && candidates.includes(chosenDocUuid)
+    ? [chosenDocUuid]
+    : candidates.slice(0, 1)
+  if (TEST_STEP_NO_DOCUMENT_TYPES.has(taskName)) return { docUuids, candidates, blockedHint: null }
   // A "no input" workflow never has documents, so asking for one is a demand
   // the author cannot meet. The step runs on an empty input, which is what it
   // will get in a real run too.
-  if (triggerType === 'no_input') return { docUuids, blockedHint: null }
-  if (docUuids.length > 0) return { docUuids, blockedHint: null }
-  return { docUuids, blockedHint: TEST_STEP_NEEDS_DOCUMENT_HINT }
+  if (triggerType === 'no_input') return { docUuids, candidates, blockedHint: null }
+  if (docUuids.length > 0) return { docUuids, candidates, blockedHint: null }
+  return { docUuids, candidates, blockedHint: TEST_STEP_NEEDS_DOCUMENT_HINT }
 }
 
 // Explain a failed input/output-config save. The backend answers PATCH on a
@@ -3197,7 +3216,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   const stepInputSummary = stepInput.sources
     .map(src => INPUT_SOURCE_LABELS[src])
     .join(' + ')
-  const fixedDocUuids = ((inputCfg?.fixed_documents as FixedDocument[]) || []).map(d => d.uuid)
+  const fixedDocuments = (inputCfg?.fixed_documents as FixedDocument[]) || []
+  const fixedDocUuids = fixedDocuments.map(d => d.uuid)
+  const { selectedDocNames } = useWorkspace()
 
   // Credentials (API Node auth_strategy picker)
   const [credentials, setCredentials] = useState<Credential[] | null>(null)
@@ -3316,6 +3337,9 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
   const [testResult, setTestResult] = useState<unknown>(null)
   const [testWarning, setTestWarning] = useState<string | null>(null)
   const [testError, setTestError] = useState<string | null>(null)
+  // Picked under "Test against"; the document the shown result came from.
+  const [testDocUuid, setTestDocUuid] = useState<string | null>(null)
+  const [testedDocTitle, setTestedDocTitle] = useState<string | null>(null)
   // Set by handleUpdate when a required field is blank; cleared on the next save attempt.
   const [saveError, setSaveError] = useState<string | null>(null)
   const testIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -3357,7 +3381,13 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     triggerType: inputCfg?.trigger_type as string | undefined,
     selectedDocUuids,
     fixedDocUuids,
+    chosenDocUuid: testDocUuid,
   })
+  const testUsesDocument = !TEST_STEP_NO_DOCUMENT_TYPES.has(task.name)
+  const testDocTitle = (uuid: string) =>
+    selectedDocNames[uuid]
+    || fixedDocuments.find(d => d.uuid === uuid)?.title
+    || `Document ${testInput.candidates.indexOf(uuid) + 1}`
   // Whichever reason applies is what the button's tooltip says — a disabled
   // control that doesn't explain itself is the ticket this came from.
   const testBlockedHint = promptMissing ? PROMPT_MISSING_HINT : testInput.blockedHint
@@ -3397,6 +3427,8 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
     setTestResult(null)
     setTestWarning(null)
     setTestError(null)
+    // Captured now, so the label stays right if the selection changes after.
+    setTestedDocTitle(testUsesDocument && testInput.docUuids[0] ? testDocTitle(testInput.docUuids[0]) : null)
     setTestMessage(TEST_MESSAGES[0])
 
     // Cycle messages
@@ -5056,6 +5088,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                     Download
                   </button>
                 </div>
+                {testedDocTitle && <TestedAgainst title={testedDocTitle} />}
                 {testWarning && (
                   <div role="status" style={{
                     display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8,
@@ -5093,6 +5126,7 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
                   <XCircle style={{ width: 14, height: 14 }} />
                   {testError}
                 </div>
+                {testedDocTitle && <TestedAgainst title={testedDocTitle} />}
               </div>
             )}
           </div>
@@ -5232,16 +5266,42 @@ function TaskEditModal({ task, step, selectedDocUuids, workflow, workflowId, onC
         </div>
       )}
 
+      {TEST_STEP_SUPPORTED_TYPES.has(task.name) && testUsesDocument && testInput.candidates.length > 1 && (
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px 0',
+          borderTop: '1px solid #e5e7eb', fontSize: 12, color: '#374151', fontWeight: 600,
+        }}>
+          Test against
+          <select
+            value={testInput.docUuids[0] ?? ''}
+            onChange={e => setTestDocUuid(e.target.value)}
+            disabled={testing}
+            style={{
+              flex: 1, minWidth: 0, padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', color: '#374151',
+            }}
+          >
+            {testInput.candidates.map(uuid => (
+              <option key={uuid} value={uuid}>{testDocTitle(uuid)}</option>
+            ))}
+          </select>
+          <span style={{ fontWeight: 400, color: '#6b7280', whiteSpace: 'nowrap' }}>
+            1 of {testInput.candidates.length} documents
+          </span>
+        </label>
+      )}
+
       {/* Bottom toolbar */}
       <div style={{
-        padding: '12px 20px', borderTop: '1px solid #e5e7eb', flexShrink: 0,
-        display: 'flex', gap: 8,
+        padding: '12px 20px', flexShrink: 0, display: 'flex', gap: 8,
+        borderTop: TEST_STEP_SUPPORTED_TYPES.has(task.name) && testUsesDocument && testInput.candidates.length > 1
+          ? undefined : '1px solid #e5e7eb',
       }}>
         {TEST_STEP_SUPPORTED_TYPES.has(task.name) && (
           <button
             onClick={handleTestStep}
             disabled={testDisabled}
-            title={testBlockedHint ?? testStepTooltip(!TEST_STEP_NO_DOCUMENT_TYPES.has(task.name))}
+            title={testBlockedHint ?? testStepTooltip(testUsesDocument)}
             style={{
               flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
