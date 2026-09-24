@@ -761,12 +761,12 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Sharing workflows across teams',
-        content: 'Workflows can be shared in two ways:\n\n\u2022 **Within the same team** \u2014 Duplicate or adapt workflows inside the team workspace and library.\n\u2022 **Cross-team sharing via export/import** \u2014 Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nSharing verified workflows establishes organizational standards.',
+        content: 'Workflows can be shared in two ways:\n\n\u2022 **Within the same team** \u2014 Duplicate or adapt workflows inside the team workspace and library.\n\u2022 **Cross-team sharing via export/import** \u2014 Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nShared, checked workflows that teams reuse are how organizational standards form.',
         variant: 'concept',
       },
       {
         title: 'Establish your workflow governance',
-        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes.\n5. Share the workflow with everyone (\u22ef \u2192 Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
+        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes \u2014 its score is what the shared entry will show.\n5. Share the workflow with everyone (\u22ef \u2192 Share with everyone). That completes this module — an examiner looks it over on their own schedule, and your certification does not wait on them.\n6. Try exporting and importing the workflow.\n7. You now have a submitted, portable, well-documented workflow.',
         variant: 'walkthrough',
       },
       {
@@ -774,12 +774,12 @@ export const MODULES: ModuleDefinition[] = [
         content: 'The highest-performing teams draw on the pool of checked, shared workflows that cover common document types, then adapt and extend them as needed.\n\nBy completing this module, you\'ve demonstrated every skill in the Vandal Workflow Architect program: understanding AI, decomposing processes, designing pipelines, building extractions, chaining multi-step workflows, using advanced nodes, producing deliverables, validating quality, processing at scale, and governing shared workflows.\n\nYou\'re now a certified VWA \u2014 the person on your team who knows how to turn any document-heavy process into a reliable, AI-powered pipeline. That\'s a rare and valuable skill.',
         variant: 'insight',
         knowledgeCheck: {
-          question: 'A colleague asks how to verify that budget totals are correct in a workflow. What\'s the right approach?',
+          question: 'Your workflow passes its validation plan from Module 8. A colleague asks whether that makes it "Checked". What\'s the difference?',
           options: [
-            { text: 'Write a Prompt node that instructs the LLM to add up the extracted numbers', correct: false, explanation: 'LLMs frequently make arithmetic errors. Never rely on a Prompt node for math \u2014 that\'s Module 2\'s key lesson.' },
-            { text: 'Use consensus repetition so three extractions vote on the correct total', correct: false, explanation: 'Consensus repetition improves extraction accuracy, but it won\'t fix arithmetic \u2014 three LLMs making the same math error still agree.' },
-            { text: 'Use a Code Execution node after extraction \u2014 code is reliable for math, LLMs aren\'t', correct: true, explanation: 'Correct! This applies the core principle from Module 3: use code for computation, AI for language. Code always gets math right.' },
-            { text: 'Extract the numbers and manually verify them after the workflow runs', correct: false, explanation: 'Manual verification defeats the purpose of a workflow. Building the check into the pipeline is the right architectural move.' },
+            { text: 'They are the same thing \u2014 passing validation makes a workflow Checked', correct: false, explanation: 'Validation is a test you run on your own workflow. Checked only appears after you share it with everyone and an examiner accepts it.' },
+            { text: 'Validation is your own test: its cases and the score it gets on them. Checked means you shared it with everyone and an examiner accepted it, and the shared entry shows that score to others', correct: true, explanation: 'Correct. Validation measures the workflow; Checked is what a shared entry carries once an examiner has looked it over. The score on a Checked entry comes from the validation cases.' },
+            { text: 'Checked replaces validation \u2014 once an examiner accepts the workflow, its validation cases no longer matter', correct: false, explanation: 'The cases are where the score on a Checked entry comes from, and monitoring re-runs them to flag a drop. Checked does not retire them.' },
+            { text: 'Checked means an examiner certified the workflow as production-ready for every team', correct: false, explanation: 'Checked makes no production-ready claim. It says the workflow was looked over and measured; whether it fits your process is your call, from the numbers.' },
           ],
         },
       },
@@ -790,7 +790,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Glossary & Review',
-        content: 'Personal work \u2014 Workflows and resources that only you can see and edit. The right place for experiments, drafts, and one-off variations. Graduate your best work to the team context when it\'s ready to share.\n\nChecked \u2014 The badge on a shared entry. You\'ve now asked to share a workflow with everyone; once an examiner accepts it, the entry carries its score, how many cases that was measured on, its consistency across runs, and how many people use it. It says the item was looked at and measured \u2014 not that it fits every team\'s process. Not a technical lock.\n\nExport (.vandalizer.json) \u2014 A portable file containing your workflow\'s complete definition: steps, tasks, field configurations, prompts. It can be imported into any Vandalizer instance and is the standard format for cross-team sharing.\n\nTeam \u2014 A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member. Shared workflows your team adopts become the standards you build on.',
+        content: 'Personal work \u2014 Workflows and resources that only you can see and edit. The right place for experiments, drafts, and one-off variations. Graduate your best work to the team context when it\'s ready to share.\n\nValidation \u2014 Your own test of a workflow (Module 8): cases with expected answers, and the score it gets on them. It measures the workflow; on its own it doesn\'t make anything Checked.\n\nChecked \u2014 The badge on a shared entry. You\'ve now asked to share a workflow with everyone; once an examiner accepts it, the entry carries its score, how many cases that was measured on, its consistency across runs, and how many people use it. It says the item was looked at and measured \u2014 not that it fits every team\'s process. Not a technical lock.\n\nExport (.vandalizer.json) \u2014 A portable file containing your workflow\'s complete definition: steps, tasks, field configurations, prompts. It can be imported into any Vandalizer instance and is the standard format for cross-team sharing.\n\nTeam \u2014 A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member. Shared workflows your team adopts become the standards you build on.',
         variant: 'key-terms',
       },
     ],
