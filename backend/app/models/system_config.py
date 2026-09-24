@@ -175,6 +175,12 @@ class SystemConfig(Document):
     # product picks a model for the user, and an unattended pick could send a
     # confidential document to an external provider. See services/model_routing.
     long_document_model: str = ""
+    # The model that grades validation runs (the LLM judge), for everyone. A
+    # score is only comparable with another scored by the same grader, and the
+    # grader used to be whichever chat model the person pressing Run had picked
+    # (support ticket: one KB, one question set, a different grader a day
+    # apart). Empty = the system default model.
+    validation_judge_model: str = ""
 
     # Legacy fields kept for backwards compatibility
     extraction_model: str = ""

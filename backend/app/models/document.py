@@ -59,8 +59,13 @@ class SmartDocument(Document):
     #   "sparse_text"  — far too few characters for the PDF's page count. A
     #                    400-page scan yielding 150 characters clears the
     #                    whole-document minimum and is still a failure.
+    #   "unread_pages" — pages that show content (an image of a page, with no
+    #                    text layer) that no reader got text from; they are
+    #                    missing from raw_text. Numbers in ``unread_pages``.
     # None/[] = measured and clean, or never measured (legacy documents).
     ingestion_warnings: list[str] = []
+    # 1-indexed PDF pages behind the "unread_pages" warning.
+    unread_pages: list[int] = []
 
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for

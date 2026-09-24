@@ -682,6 +682,7 @@ async def get_workflow_status(
         "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
         "document_title": result.document_title,
+        "start_time": result.start_time,
     }
 
 
@@ -988,6 +989,7 @@ async def get_batch_completed_outputs(
             "output_step_names": r.output_step_names,
             "workflow_name": workflow_name,
             "document_title": r.document_title,
+            "start_time": r.start_time,
         })
     return outputs
 

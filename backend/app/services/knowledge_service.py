@@ -1031,6 +1031,43 @@ async def set_source_reference(
     return source
 
 
+async def set_source_amends(
+    kb: KnowledgeBase,
+    source_uuid: str,
+    amends_source_uuids: list[str],
+) -> KnowledgeBaseSource | None:
+    """Record which sources in ``kb`` this source revises. Replaces the list.
+
+    Raises ValueError for a uuid that is this source or not a source of this
+    KB, so a typo can't silently point at nothing. Metadata only: chunks are
+    untouched; retrieval reads the relation at query time.
+    """
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    )
+    if not source:
+        return None
+
+    wanted = list(dict.fromkeys(u for u in amends_source_uuids if u))
+    if source_uuid in wanted:
+        raise ValueError("A source cannot amend itself")
+    if wanted:
+        found = {
+            s.uuid
+            for s in await KnowledgeBaseSource.find(
+                {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": wanted}},
+            ).to_list()
+        }
+        missing = [u for u in wanted if u not in found]
+        if missing:
+            raise ValueError(f"Not a source of this knowledge base: {', '.join(missing)}")
+
+    source.amends_source_uuids = wanted
+    await source.save()
+    return source
+
+
 async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = False) -> bool:
     """Remove a source and its chunks. With ``strict``, a failure to delete the
     chunks raises and the source row is kept — the caller reports the KB as
@@ -1050,6 +1087,13 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = F
         if strict:
             raise
     await source.delete()
+    # Nothing may go on claiming to amend a source that is gone.
+    try:
+        await KnowledgeBaseSource.find(
+            {"knowledge_base_uuid": kb.uuid, "amends_source_uuids": source_uuid},
+        ).update({"$pull": {"amends_source_uuids": source_uuid}})
+    except Exception as e:
+        logger.warning("Could not clear amends links to removed source %s: %s", source_uuid, e)
     await recalculate_stats(kb)
     return True
 
@@ -1576,6 +1620,10 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
                     content = doc.raw_text or None
                 ingestion_warnings = document_service.ingestion_warnings(doc)
         exported_sources.append({
+            # The importer mints new uuids; these two let it rebuild the
+            # amends links between the new sources.
+            "uuid": s.uuid,
+            "amends_source_uuids": list(getattr(s, "amends_source_uuids", None) or []),
             "source_type": s.source_type,
             "document_uuid": s.document_uuid,
             "document_title": document_title,
@@ -1638,6 +1686,8 @@ async def import_knowledge_base(
 
     imported = 0
     dm = _get_dm()
+    new_uuid_for: dict[str, str] = {}
+    amends_to_link: list[tuple[KnowledgeBaseSource, list[str]]] = []
 
     for src in payload.get("sources", []) or []:
         source_type = src.get("source_type")
@@ -1662,6 +1712,10 @@ async def import_knowledge_base(
         if not await _insert_source_unless_duplicate(new_src):
             continue
         imported += 1
+        if src.get("uuid"):
+            new_uuid_for[src["uuid"]] = new_src.uuid
+        if src.get("amends_source_uuids"):
+            amends_to_link.append((new_src, list(src["amends_source_uuids"])))
 
         if content and content.strip():
             label = (
@@ -1692,6 +1746,14 @@ async def import_knowledge_base(
         else:
             new_src.status = "error"
             new_src.error_message = "Imported source had no content and no URL to re-fetch"
+            await new_src.save()
+
+    # Links are by uuid, and every imported source got a new one. A link to a
+    # source that did not come across is dropped.
+    for new_src, old_targets in amends_to_link:
+        mapped = [new_uuid_for[u] for u in old_targets if u in new_uuid_for]
+        if mapped:
+            new_src.amends_source_uuids = mapped
             await new_src.save()
 
     await recalculate_stats(kb)
@@ -1844,6 +1906,24 @@ def _reject_collapsed_refresh(
     )
 
 
+def _reject_crawled_navigation_page(result: WebFetchResult, url: str) -> str | None:
+    """The crawler's navigation-page gate, for refreshing a page it found.
+
+    A crawl only keeps pages with real content (see ``_crawl_from_source``);
+    a refresh must hold a crawled page to the same bar, or a page that has
+    since turned into a link hub gets embedded over the content it replaced.
+    A page added by hand is exempt, as it was on first ingest.
+    """
+    from app.config import Settings
+    from app.utils.page_quality import describe_low_value_page
+
+    return describe_low_value_page(
+        result.text,
+        len(_crawlable_links(result, url)),
+        min_chars=Settings().kb_crawl_min_content_chars,
+    )
+
+
 async def refresh_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
 ) -> str | None:
@@ -1894,6 +1974,8 @@ async def refresh_url_source(
             source.last_collapsed_hash = (
                 currency.content_fingerprint(result.text) if reason else None
             )
+        if reason is None and getattr(source, "parent_source_uuid", None):
+            reason = _reject_crawled_navigation_page(result, source.url)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
@@ -1935,18 +2017,24 @@ async def refresh_url_source(
     name = source.custom_name or result.title or source.url_title or source.url
     try:
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        # New chunks go in before the old ones come out, so a failed embed
+        # leaves the source answering from its previous text.
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, raw_text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, raw_text,
         )
     except Exception as e:
         logger.error(f"Error re-embedding refreshed KB source {source.uuid}: {e}")
-        source.status = "error"
-        source.error_message = f"Refresh failed while re-indexing: {e}"[:2000]
+        reason = f"Refresh failed while re-indexing: {e}"[:2000]
         source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
-        source.last_refresh_error = source.error_message
+        source.last_refresh_error = reason
+        if previous_status == "ready":
+            source.status = "ready"
+            source.error_message = f"Refresh failed while re-indexing — previous content kept: {e}"[:2000]
+        else:
+            source.status = "error"
+            source.error_message = reason
         await source.save()
-        return source.error_message
+        return reason
 
     source.content = _kb_snapshot(raw_text)
     source.url_title = result.title or source.url_title
@@ -2067,9 +2155,8 @@ async def ingest_text_into_source(
             or "Text Source"
         )
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, text,
         )
         source.content = _kb_snapshot(text)
         if label:

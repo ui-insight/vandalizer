@@ -466,6 +466,27 @@ class TestRetryExtractionRoute:
         mock_log_event.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_document_with_unread_pages_is_re_read_with_ocr(self, client):
+        """A complete document whose pages no reader got text from: a retry
+        that took the same local reading would miss the same pages."""
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
+        doc.ingestion_warnings = ["unread_pages"]
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is True
+        assert mock_dispatch.call_args.kwargs["ocr_required"] is False
+
+    @pytest.mark.asyncio
+    async def test_healthy_complete_document_is_not_forced_to_ocr(self, client):
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1", task_status="complete")
+        doc.ingestion_warnings = []
+        resp, mock_dispatch, _ = await self._post(client, doc)
+
+        assert resp.status_code == 200
+        assert mock_dispatch.call_args.kwargs["force_ocr"] is False
+
+    @pytest.mark.asyncio
     async def test_low_quality_document_is_re_read_with_ocr(self, client):
         """The garbled text layer that motivated #858 succeeds — the document
         is not in an error state, it just holds mojibake — so the error status
