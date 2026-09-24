@@ -138,6 +138,19 @@ export function refreshKBSource(uuid: string, sourceUuid: string) {
   )
 }
 
+/** What a Reprocess queued: a web page re-fetch, a re-index of a document's
+ *  text, a re-read of a document with no usable text, or a wait on an
+ *  extraction that is already running. */
+export type KBSourceReprocessMode = 'refetch' | 'reindex' | 'reextract' | 'waiting'
+
+/** Run one source through extraction, chunking and embedding again, in place (background). */
+export function reprocessKBSource(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; mode: KBSourceReprocessMode; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/reprocess`,
+    { method: 'POST' },
+  )
+}
+
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
 }
