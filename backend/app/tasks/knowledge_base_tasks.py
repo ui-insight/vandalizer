@@ -83,8 +83,13 @@ def _source_label(source: dict, doc: dict | None = None) -> str:
     max_retries=3,
     default_retry_delay=10,
 )
-def kb_ingest_document(self, source_uuid: str) -> None:
-    """Fetch a SmartDocument's raw_text, chunk and embed into the KB collection."""
+def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
+    """Fetch a SmartDocument's raw_text, chunk and embed into the KB collection.
+
+    ``retrieved=False`` is a Reprocess that re-indexes the document's stored
+    text without re-reading the file: the chunks are new, the text is not, so
+    the source's retrieval dates stay where they were.
+    """
     from app.services.document_manager import get_document_manager
 
     db = _get_db()
@@ -159,12 +164,22 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             return
 
         dm = get_document_manager()
+        # Project (implicit) KBs key chunks by document_uuid, as kb_reingest
+        # does; a Reprocess of a project source must replace those chunks,
+        # not add a second copy beside them under the source's uuid.
+        kb_doc = db.knowledge_bases.find_one({"uuid": kb_uuid}, {"implicit": 1}) or {}
+        document_uuid = source.get("document_uuid")
+        source_id = (
+            document_uuid if kb_doc.get("implicit") is True and document_uuid else source_uuid
+        )
         # Idempotent: clear any chunks from a prior (partial) run so a Celery
         # autoretry can't double-add or collide on chunk ids.
         dm.delete_kb_source(kb_uuid, source_uuid)
+        if source_id != source_uuid:
+            dm.delete_kb_source(kb_uuid, source_id)
         chunk_count = dm.add_to_kb(
             kb_uuid=kb_uuid,
-            source_id=source_uuid,
+            source_id=source_id,
             source_name=doc.get("title", ""),
             raw_text=raw_text,
             text_markers=doc.get("text_markers") or [],
@@ -176,10 +191,18 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
+                    # A Reprocess of a failed source succeeds here; the old
+                    # failure must not linger under a ready row.
+                    "error_message": None,
                     # Kept so the source still has a name if the document is
                     # later deleted from Files — the chunks outlive it.
                     "document_title": doc.get("title") or None,
-                    **currency.ingestion_stamp(raw_text),
+                    **currency.ingestion_stamp(
+                        raw_text, retrieved=retrieved,
+                        retrieved_at=None if retrieved else (
+                            source.get("content_retrieved_at") or source.get("processed_at")
+                        ),
+                    ),
                 }
             },
         )
