@@ -535,3 +535,83 @@ class TestKbReingest:
         kb_reingest("kb-missing")
 
         db.knowledge_base_sources.find.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# kb_ingest_document as a Reprocess target
+# ---------------------------------------------------------------------------
+
+
+class TestKbIngestDocumentReprocess:
+    def _run(self, *, source, kb_doc=None, retrieved=True):
+        from app.tasks.knowledge_base_tasks import kb_ingest_document
+
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = source
+        db.smart_document.find_one.return_value = _make_doc()
+        db.knowledge_base_sources.find.return_value = [source]
+        db.knowledge_bases.find_one.return_value = kb_doc or {"uuid": "kb-uuid"}
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 7
+        dm.replace_kb_source.return_value = 7
+        with patch("app.tasks.knowledge_base_tasks._get_db", return_value=db), \
+             patch("app.services.document_manager.get_document_manager", return_value=dm):
+            kb_ingest_document("src-uuid", retrieved=retrieved)
+        ready = [
+            c.args[1]["$set"] for c in db.knowledge_base_sources.update_one.call_args_list
+            if c.args[1]["$set"].get("status") == "ready"
+        ]
+        assert len(ready) == 1
+        return ready[0], dm
+
+    def test_success_clears_the_error_a_reprocess_was_fixing(self):
+        stamp, _ = self._run(source=_make_source(status="pending", error_message="OCR failed"))
+        assert stamp["error_message"] is None
+        assert stamp["chunk_count"] == 7
+
+    def test_reindex_moves_the_index_date_but_not_the_retrieval_date(self):
+        import datetime
+
+        read_at = datetime.datetime(2026, 8, 1, tzinfo=datetime.timezone.utc)
+        stamp, _ = self._run(
+            source=_make_source(content_retrieved_at=read_at), retrieved=False,
+        )
+        assert "last_ingested_at" in stamp and "processed_at" in stamp
+        assert "last_retrieved_at" not in stamp
+        assert stamp["content_retrieved_at"] == read_at
+
+    def test_project_kb_replaces_chunks_keyed_by_the_document(self):
+        _, dm = self._run(
+            source=_make_source(), kb_doc={"uuid": "kb-uuid", "implicit": True},
+        )
+        # Old chunks under both id conventions go; new ones use the document's.
+        deleted = {c.args[1] for c in dm.delete_kb_source.call_args_list}
+        assert deleted == {"src-uuid", "doc-uuid"}
+        assert dm.add_to_kb.call_args.kwargs["source_id"] == "doc-uuid"
+
+    def test_reindex_swaps_chunks_instead_of_deleting_first(self):
+        _, dm = self._run(source=_make_source(chunk_count=5), retrieved=False)
+        dm.replace_kb_source.assert_called_once()
+        assert dm.replace_kb_source.call_args.args[:2] == ("kb-uuid", "src-uuid")
+        dm.delete_kb_source.assert_not_called()
+        dm.add_to_kb.assert_not_called()
+
+    def test_failed_reindex_keeps_a_working_source_ready(self):
+        from app.tasks.knowledge_base_tasks import kb_ingest_document
+
+        source = _make_source(status="pending", chunk_count=5)
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = source
+        db.smart_document.find_one.return_value = _make_doc()
+        db.knowledge_base_sources.find.return_value = [source]
+        db.knowledge_bases.find_one.return_value = {"uuid": "kb-uuid"}
+        dm = MagicMock()
+        dm.replace_kb_source.side_effect = RuntimeError("embedder down")
+        with patch("app.tasks.knowledge_base_tasks._get_db", return_value=db), \
+             patch("app.services.document_manager.get_document_manager", return_value=dm), \
+             pytest.raises(RuntimeError):
+            kb_ingest_document("src-uuid", retrieved=False)
+        dm.delete_kb_source.assert_not_called()
+        last = db.knowledge_base_sources.update_one.call_args_list[-1].args[1]["$set"]
+        assert last["status"] == "ready"
+        assert "previous content kept" in last["error_message"]

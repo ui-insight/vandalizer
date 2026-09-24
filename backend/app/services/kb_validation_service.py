@@ -234,7 +234,11 @@ def _format_context_for_config(results: list[dict], cfg: RAGConfig) -> str:
         if cfg.source_label_visibility:
             meta = r.get("metadata") or {}
             source_name = meta.get("source_name", "Unknown") if isinstance(meta, dict) else "Unknown"
-            blocks.append(f"## Source: {source_name}\n{content}")
+            blocks.append(f"## Source: {source_name}{amendment_label(r)}\n{content}")
+        elif r.get("amends"):
+            # Names are hidden in this variant, but which text governs is not
+            # a label: without it the model cannot resolve a conflict.
+            blocks.append(f"[This passage amends an earlier source and governs where they conflict.]\n{content}")
         else:
             blocks.append(content)
     return "\n\n".join(blocks)
@@ -565,6 +569,177 @@ async def retrieve_kb_chunks(
     return results, cfg, tokens
 
 
+# ---------------------------------------------------------------------------
+# Amending sources
+# ---------------------------------------------------------------------------
+#
+# Support ticket: a KB held PAPPG Chapter IV and a supplement revising it. Asked
+# plainly, retrieval returned Chapter IV's reconsideration list (it *is* the
+# best semantic match) and never the supplement's "Chapter IV.D.2.b.(7) is
+# revised to…" line (similarity 0.34 vs 0.60 on MiniLM); naming the supplement
+# was the only way to reach it. A KB owner can now mark a source as amending
+# others. Whenever an amended source is retrieved, its amenders are searched
+# directly and their best passages ride along, labelled as governing.
+
+AMENDMENT_CHUNKS_PER_SOURCE = 2
+MAX_AMENDERS_PER_TURN = 3
+
+
+class AmendmentLinks(BaseModel):
+    """A KB's amends relation, keyed by the source ids chunks carry.
+
+    A crawled URL's chunks carry its children's uuids, not the parent's, so
+    both sides are expanded to crawl children.
+    """
+    # chunk source_id of an amended source -> amender uuids
+    amenders_of: dict[str, list[str]] = {}
+    # amender uuid -> every source_id whose chunks belong to it
+    search_ids: dict[str, list[str]] = {}
+    # chunk source_id of an amender -> names of what it amends
+    amends_names: dict[str, list[str]] = {}
+    # amender uuid -> its name
+    amender_name: dict[str, str] = {}
+
+    def is_empty(self) -> bool:
+        return not self.amenders_of
+
+
+def _source_display_name(src: KnowledgeBaseSource) -> str:
+    return (
+        src.custom_name or src.url_title or getattr(src, "document_title", None)
+        or src.url or src.document_uuid or src.uuid
+    )
+
+
+async def load_amendment_links(kb_uuid: str) -> AmendmentLinks:
+    """The KB's amends relation. Never raises: a failed lookup degrades the
+    turn to plain retrieval rather than failing it."""
+    try:
+        return await _load_amendment_links(kb_uuid)
+    except Exception as e:
+        logger.warning("Could not load amends links for KB %s: %s", kb_uuid, e)
+        return AmendmentLinks()
+
+
+async def _load_amendment_links(kb_uuid: str) -> AmendmentLinks:
+    amenders = await KnowledgeBaseSource.find(
+        {"knowledge_base_uuid": kb_uuid, "amends_source_uuids.0": {"$exists": True}},
+    ).to_list()
+    if not amenders:
+        return AmendmentLinks()
+
+    roots = {a.uuid for a in amenders} | {u for a in amenders for u in a.amends_source_uuids}
+    related = await KnowledgeBaseSource.find(
+        {
+            "knowledge_base_uuid": kb_uuid,
+            "$or": [{"uuid": {"$in": list(roots)}}, {"parent_source_uuid": {"$in": list(roots)}}],
+        },
+    ).to_list()
+    by_uuid = {s.uuid: s for s in related}
+    family: dict[str, list[str]] = {u: [u] for u in roots}
+    for s in related:
+        if s.parent_source_uuid in family:
+            family[s.parent_source_uuid].append(s.uuid)
+
+    links = AmendmentLinks()
+    for a in amenders:
+        targets = [u for u in a.amends_source_uuids if u in by_uuid]
+        if not targets:
+            continue
+        links.search_ids[a.uuid] = family.get(a.uuid, [a.uuid])
+        links.amender_name[a.uuid] = _source_display_name(a)
+        names = [_source_display_name(by_uuid[u]) for u in targets]
+        for sid in links.search_ids[a.uuid]:
+            links.amends_names.setdefault(sid, []).extend(names)
+        for t in targets:
+            for sid in family.get(t, [t]):
+                bucket = links.amenders_of.setdefault(sid, [])
+                if a.uuid not in bucket:
+                    bucket.append(a.uuid)
+    return links
+
+
+def _chunk_source_id(r: dict) -> Optional[str]:
+    meta = r.get("metadata") or {}
+    return meta.get("source_id") if isinstance(meta, dict) else None
+
+
+async def retrieve_amendment_chunks(
+    kb_uuid: str,
+    results: list[dict],
+    query: str,
+    links: AmendmentLinks,
+    *,
+    min_similarity: float = 0.0,
+) -> list[dict]:
+    """Best passages from the amenders of any source among ``results``.
+
+    A search restricted to each amender's own chunks, so a short revision
+    that loses to the text it revises on similarity still reaches the prompt.
+    """
+    if links.is_empty():
+        return []
+    triggered: list[str] = []
+    for r in results:
+        for amender in links.amenders_of.get(_chunk_source_id(r) or "", []):
+            if amender not in triggered:
+                triggered.append(amender)
+    if not triggered:
+        return []
+
+    dm = _get_dm()
+    hits: list[dict] = []
+    for amender in triggered[:MAX_AMENDERS_PER_TURN]:
+        ids = links.search_ids.get(amender) or [amender]
+        where = {"source_id": ids[0]} if len(ids) == 1 else {"source_id": {"$in": ids}}
+        try:
+            found = await asyncio.to_thread(
+                dm.query_kb, kb_uuid, query, AMENDMENT_CHUNKS_PER_SOURCE, min_similarity, where=where,
+            )
+        except Exception as e:
+            logger.warning("Amendment search failed for source %s in KB %s: %s", amender, kb_uuid, e)
+            continue
+        hits.extend(found)
+    return hits
+
+
+def annotate_amendments(results: list[dict], links: AmendmentLinks) -> list[dict]:
+    """Copies of ``results``, each chunk that amends or is amended by another
+    source marked with ``amends`` / ``amended_by`` names."""
+    if links.is_empty():
+        return results
+    out: list[dict] = []
+    for r in results:
+        sid = _chunk_source_id(r) or ""
+        marks: dict = {}
+        if sid in links.amends_names:
+            marks["amends"] = list(dict.fromkeys(links.amends_names[sid]))
+        amenders = links.amenders_of.get(sid)
+        if amenders:
+            marks["amended_by"] = [links.amender_name[a] for a in amenders if a in links.amender_name]
+        out.append({**r, **marks} if marks else r)
+    return out
+
+
+def amendment_label(r: dict) -> str:
+    """`` — amends: X`` / `` — amended by: Y`` for a snippet heading, or ''."""
+    parts = []
+    if r.get("amends"):
+        parts.append("amends: " + "; ".join(r["amends"]))
+    if r.get("amended_by"):
+        parts.append("amended by: " + "; ".join(r["amended_by"]))
+    return f" — {', '.join(parts)}" if parts else ""
+
+
+AMENDMENT_INSTRUCTION = (
+    "Some snippets come from a source that *amends* another source in this "
+    "knowledge base (marked \"amends: …\"), and some from a source that has "
+    "been amended (marked \"amended by: …\"). Where they conflict, the amending "
+    "source states the current rule: answer from it, and say that it changed "
+    "the earlier text."
+)
+
+
 async def _generate_kb_answer(
     kb_uuid: str,
     query: str,
@@ -596,6 +771,15 @@ async def _generate_kb_answer(
     results, cfg, tokens = await retrieve_kb_chunks(
         kb_uuid, query, model_name, config=cfg,
     )
+    links = await load_amendment_links(kb_uuid)
+    extra = await retrieve_amendment_chunks(
+        kb_uuid, results, query, links, min_similarity=cfg.min_similarity,
+    )
+    if extra:
+        present = {r.get("chunk_id") for r in results}
+        extra = [r for r in extra if r.get("chunk_id") not in present]
+        results = results[: max(0, cfg.k - len(extra))] + extra
+    results = annotate_amendments(results, links)
     # Empty *or* gated-empty: nothing cleared the relevance floor, so abstain
     # rather than generate. Reuses the existing empty-retrieval refusal.
     if not results:
@@ -603,6 +787,8 @@ async def _generate_kb_answer(
 
     context = _format_context_for_config(results, cfg)
     instruction = RAG_PROMPT_VARIANTS.get(cfg.prompt_variant, RAG_PROMPT_VARIANTS["default"])
+    if any(r.get("amends") or r.get("amended_by") for r in results):
+        instruction = f"{instruction}\n\n{AMENDMENT_INSTRUCTION}"
     # Cache key includes the prompt variant AND answer temperature so trial
     # variations don't collide on the same agent instance.
     purpose = f"kb_rag::{cfg.prompt_variant}::t{cfg.answer_temperature}"
