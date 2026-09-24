@@ -282,6 +282,16 @@ export function getTestStepStatus(taskId: string) {
   return apiFetch<{ status: string; result?: unknown; error?: string; warning?: string }>(`/api/workflows/steps/test/${taskId}`)
 }
 
+// The server names a download for the run's date and time; it needs the
+// viewer's zone to write the hour they would recognise.
+function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export function downloadResults(
   sessionId: string,
   format: string = 'json',
@@ -292,6 +302,8 @@ export function downloadResults(
   // The route authorizes with the share token when there is one; without it a
   // share-link recipient who is not on the owner's team 404s on their own run.
   if (opts?.shareToken) params.set('share_token', opts.shareToken)
+  const tz = browserTimeZone()
+  if (tz) params.set('tz', tz)
   return `/api/workflows/download?${params.toString()}`
 }
 
@@ -306,6 +318,8 @@ export function downloadBatchResults(
   const params = new URLSearchParams({ batch_id: batchId, format })
   if (opts?.parseStructured) params.set('parse_structured', 'true')
   if (opts?.shareToken) params.set('share_token', opts.shareToken)
+  const tz = browserTimeZone()
+  if (tz) params.set('tz', tz)
   return `/api/workflows/batch-download?${params.toString()}`
 }
 
