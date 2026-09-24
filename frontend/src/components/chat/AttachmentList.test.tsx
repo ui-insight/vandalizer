@@ -99,4 +99,20 @@ describe('AttachmentList', () => {
     const { container } = render(<AttachmentList selectedDocUuids={[]} fileAttachments={[]} />)
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('offers to share the chat setup only when asked to', () => {
+    const onShareSetup = vi.fn()
+    const { rerender } = render(
+      <AttachmentList knowledgeBases={[{ uuid: 'kb-1', title: 'Export Control' }]} />,
+    )
+    expect(screen.queryByText('Share chat setup')).not.toBeInTheDocument()
+    rerender(
+      <AttachmentList
+        knowledgeBases={[{ uuid: 'kb-1', title: 'Export Control' }]}
+        onShareSetup={onShareSetup}
+      />,
+    )
+    fireEvent.click(screen.getByText('Share chat setup'))
+    expect(onShareSetup).toHaveBeenCalledOnce()
+  })
 })

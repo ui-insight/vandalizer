@@ -137,6 +137,51 @@ async def poll_status(
     return result
 
 
+class TitlesRequest(BaseModel):
+    document_uuids: list[str] = []
+    folder_uuids: list[str] = []
+
+
+# A chat setup link attaches at most 3 knowledge bases, but its documents and
+# folders are whatever the sender had selected; this bounds the lookup.
+_MAX_TITLE_LOOKUPS = 100
+
+
+@router.post("/titles")
+async def resolve_titles(
+    body: TitlesRequest,
+    user: User = Depends(get_current_user),
+):
+    """Titles for the documents and folders the caller can view.
+
+    Opening a chat setup link re-attaches the sender's documents and folders
+    as chips, which need titles. ``poll_status`` would ship each document's
+    full text to get one. Anything the caller cannot view is left out, not
+    reported, so the response says nothing about what exists; the caller
+    counts what came back to tell the user some of the link was not shared
+    with them. Authorization matches the chat route's, so what resolves here
+    is what the chat will accept.
+    """
+    if len(body.document_uuids) + len(body.folder_uuids) > _MAX_TITLE_LOOKUPS:
+        raise HTTPException(status_code=400, detail=f"At most {_MAX_TITLE_LOOKUPS} items per request")
+    team_access = await access_control.get_team_access_context(user)
+    documents = []
+    for uuid in dict.fromkeys(body.document_uuids):
+        doc = await access_control.get_authorized_document(
+            uuid, user, team_access=team_access, allow_admin=True,
+        )
+        if doc:
+            documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
+    folders = []
+    for uuid in dict.fromkeys(body.folder_uuids):
+        folder = await access_control.get_authorized_folder(
+            uuid, user, team_access=team_access, allow_admin=True,
+        )
+        if folder:
+            folders.append({"uuid": folder.uuid, "title": folder.title})
+    return {"documents": documents, "folders": folders}
+
+
 # How long an in-progress extraction may go without a status write before a
 # retry is allowed to replace it. The in-flight guard below is the only thing
 # standing between a document and a second dispatch, and the shape this route

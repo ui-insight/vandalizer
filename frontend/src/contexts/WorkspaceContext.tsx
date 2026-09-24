@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useTeams } from '../hooks/useTeams'
+import { useToast } from './ToastContext'
+import { parseIdList } from '../lib/shareLink'
 import type { CrossFieldRunReport, ExtractionSourceMap, DocumentWarning } from '../api/extractions'
 
 type RightTab = 'assistant' | 'library'
@@ -289,6 +291,8 @@ type WorkspaceSearchState = {
   extraction: string | undefined
   automation: string | undefined
   kb: string | undefined
+  docs?: string
+  folders?: string
   project: string | undefined
 }
 
@@ -301,6 +305,8 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
     extraction: undefined,
     automation: undefined,
     kb: undefined,
+    docs: undefined,
+    folders: undefined,
     project: undefined,
   }
 }
@@ -311,6 +317,7 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate({ from: '/' })
+  const { toast } = useToast()
   const search = useSearch({ from: '/' })
   const { currentTeam } = useTeams()
 
@@ -560,38 +567,64 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }).catch(() => {})
   }, [activeProjectUuid])
 
-  // Activate a knowledge base from URL param (e.g. /?kb=<uuid>)
+  // Open a chat setup from the URL: /?kb=<uuid>[,<uuid>…][&docs=…][&folders=…].
+  // A single ?kb= is the knowledge base chip's share link; the lists come from
+  // "Copy chat setup link", so a co-worker gets the same knowledge bases,
+  // documents and folders attached without rebuilding the chat (support
+  // ticket). The link grants nothing: each item attaches only if the opener
+  // can already see it, and the ones that don't are counted, never named.
   useEffect(() => {
-    const kbParam = search.kb
-    if (!kbParam) return
-    // Clear the param from the URL, then activate
-    import('../api/knowledge').then(({ getKnowledgeBase }) => {
-      getKnowledgeBase(kbParam)
-        .then((kb) => {
-          setStoredRaw(KB_STORAGE_KEY, storedKBValue([{ uuid: kbParam, title: kb.title }]))
-          setActiveKBs([{ uuid: kbParam, title: kb.title }])
-          localStorage.setItem('workspace:mode', 'chat')
-          navigate({
-            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }),
-            replace: true,
-          })
-        })
-        .catch(() => {
-          // KB not found or not accessible — just clear the param
-          navigate({
-            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined }),
-            replace: true,
-          })
-        })
+    const kbUuids = parseIdList(search.kb).slice(0, MAX_ATTACHED_KBS)
+    const docUuids = parseIdList(search.docs)
+    const folderUuids = parseIdList(search.folders)
+    if (!kbUuids.length && !docUuids.length && !folderUuids.length) return
+    const clearParams = (openChat: boolean) => navigate({
+      search: (prev) => ({
+        ...emptyWorkspaceSearch(), ...prev, kb: undefined, docs: undefined, folders: undefined,
+        ...(openChat ? { mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined } : {}),
+      }),
+      replace: true,
+    })
+    Promise.all([import('../api/knowledge'), import('../api/documents')]).then(async ([{ getKnowledgeBase }, { resolveTitles }]) => {
+      const [kbResults, titles] = await Promise.all([
+        Promise.allSettled(kbUuids.map(uuid => getKnowledgeBase(uuid))),
+        docUuids.length || folderUuids.length
+          ? resolveTitles(docUuids, folderUuids).catch(() => ({ documents: [], folders: [] }))
+          : Promise.resolve({ documents: [], folders: [] }),
+      ])
+      const kbs: AttachedKB[] = []
+      kbResults.forEach((res, i) => {
+        if (res.status === 'fulfilled') kbs.push({ uuid: kbUuids[i], title: res.value.title })
+      })
+      const attached = kbs.length + titles.documents.length + titles.folders.length
+      const requested = kbUuids.length + docUuids.length + folderUuids.length
+      if (attached === 0) {
+        if (requested > 1) toast('None of the items in this chat link are shared with you. Ask the person who sent it to share them.', 'error')
+        clearParams(false)
+        return
+      }
+      // The link replaces whatever was attached: it is a setup, not an addition.
+      setStoredRaw(KB_STORAGE_KEY, kbs.length ? storedKBValue(kbs) : null)
+      setActiveKBs(kbs)
+      setSelectedDocUuids(titles.documents.map(d => d.uuid))
+      setSelectedDocNames(Object.fromEntries(titles.documents.map(d => [d.uuid, d.title])))
+      setSelectedFolderUuids(titles.folders.map(f => f.uuid))
+      setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
+      localStorage.setItem('workspace:mode', 'chat')
+      if (attached < requested) {
+        const missing = requested - attached
+        toast(
+          `${attached} of ${requested} items from this link are attached. ${missing === 1 ? 'The other one isn\u2019t' : `The other ${missing} aren\u2019t`} shared with you. Ask the person who sent it to share ${missing === 1 ? 'it' : 'them'}.`,
+          'info',
+        )
+      }
+      clearParams(true)
     }).catch(() => {
       // Chunk load failure for the lazy import — don't leak an unhandled
-      // rejection; clear the param so the URL doesn't keep retrying.
-      navigate({
-        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined }),
-        replace: true,
-      })
+      // rejection; clear the params so the URL doesn't keep retrying.
+      clearParams(false)
     })
-  }, [search.kb, navigate])
+  }, [search.kb, search.docs, search.folders, navigate, toast])
 
   // Activate a project scope from URL param (e.g. /?project=<uuid>)
   useEffect(() => {
@@ -651,7 +684,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     if (didRehydrateScope.current) return
     didRehydrateScope.current = true
 
-    const deepLink = !!(search.project || search.kb)
+    const deepLink = !!(search.project || search.kb || search.docs || search.folders)
     const storedProject = deepLink ? null : getStoredRaw(PROJECT_STORAGE_KEY)
     const storedKBUuids = deepLink || storedProject
       ? []
