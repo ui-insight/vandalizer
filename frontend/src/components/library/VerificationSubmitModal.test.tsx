@@ -30,13 +30,13 @@ describe('VerificationSubmitModal', () => {
     open()
     expect(screen.getByText('Share with everyone — it works for me')).toBeTruthy()
     expect(screen.getByText('Get a second pair of eyes')).toBeTruthy()
-    expect(screen.queryByText('Share with my team')).toBeNull()
+    expect(screen.queryByText('Share with a team')).toBeNull()
   })
 
-  it('"Share with my team" closes the wizard and hands off — no examiner involved', () => {
+  it('"Share with a team" closes the wizard and hands off — no examiner involved', () => {
     const onShareWithTeam = vi.fn()
     const { onClose } = open({ onShareWithTeam })
-    fireEvent.click(screen.getByText('Share with my team'))
+    fireEvent.click(screen.getByText('Share with a team'))
     expect(onClose).toHaveBeenCalled()
     expect(onShareWithTeam).toHaveBeenCalled()
     expect(submitForVerification).not.toHaveBeenCalled()

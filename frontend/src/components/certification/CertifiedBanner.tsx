@@ -1,6 +1,23 @@
-import { Award } from 'lucide-react'
+import { useState } from 'react'
+import { Award, Download, Loader2 } from 'lucide-react'
+import { downloadCertificate } from '../../api/certification'
 
 export function CertifiedBanner() {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    setError(null)
+    try {
+      await downloadCertificate()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Download failed')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   return (
     <div
       className="relative overflow-hidden p-8 text-center"
@@ -31,6 +48,18 @@ export function CertifiedBanner() {
         <p className="text-gray-500 text-xs mt-1">
           Recognized for mastery in AI-powered document workflow design for research administration
         </p>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          title="A one-page PDF with your name, certification date and level, ready to print"
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-highlight text-highlight-text text-sm font-bold hover:brightness-90 transition-all disabled:opacity-60"
+          style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+        >
+          {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+          Download certificate (PDF)
+        </button>
+        {error && <p className="text-red-400 text-xs mt-2" role="alert">{error}</p>}
       </div>
     </div>
   )
