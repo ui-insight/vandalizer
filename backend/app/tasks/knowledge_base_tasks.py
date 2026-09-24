@@ -172,18 +172,30 @@ def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
         source_id = (
             document_uuid if kb_doc.get("implicit") is True and document_uuid else source_uuid
         )
-        # Idempotent: clear any chunks from a prior (partial) run so a Celery
-        # autoretry can't double-add or collide on chunk ids.
-        dm.delete_kb_source(kb_uuid, source_uuid)
-        if source_id != source_uuid:
-            dm.delete_kb_source(kb_uuid, source_id)
-        chunk_count = dm.add_to_kb(
-            kb_uuid=kb_uuid,
-            source_id=source_id,
-            source_name=doc.get("title", ""),
-            raw_text=raw_text,
-            text_markers=doc.get("text_markers") or [],
-        )
+        if retrieved:
+            # Idempotent: clear any chunks from a prior (partial) run so a Celery
+            # autoretry can't double-add or collide on chunk ids.
+            dm.delete_kb_source(kb_uuid, source_uuid)
+            if source_id != source_uuid:
+                dm.delete_kb_source(kb_uuid, source_id)
+            chunk_count = dm.add_to_kb(
+                kb_uuid=kb_uuid,
+                source_id=source_id,
+                source_name=doc.get("title", ""),
+                raw_text=raw_text,
+                text_markers=doc.get("text_markers") or [],
+            )
+        else:
+            # A Reprocess of a working source: swap the chunks in, so a failed
+            # embed leaves it answering from the ones it had instead of none.
+            # replace_kb_source cleans up its own partial writes, so an
+            # autoretry is still idempotent.
+            chunk_count = dm.replace_kb_source(
+                kb_uuid, source_id, doc.get("title", ""), raw_text,
+                text_markers=doc.get("text_markers") or [],
+            )
+            if source_id != source_uuid:
+                dm.delete_kb_source(kb_uuid, source_uuid)
 
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
@@ -209,9 +221,18 @@ def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
 
     except Exception as e:
         logger.error("Error ingesting document source %s: %s", source_uuid, e)
+        if not retrieved and source.get("chunk_count"):
+            # The swap failed before the old chunks were dropped: the source
+            # still answers from them, so it is not an errored source.
+            failure = {
+                "status": "ready",
+                "error_message": f"Reprocess failed — previous content kept: {e}"[:2000],
+            }
+        else:
+            failure = {"status": "error", "error_message": str(e)[:2000]}
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
-            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            {"$set": failure},
         )
         # Bell the KB owner — but only once Celery is done retrying, so a
         # transient blip that succeeds on retry rings nothing.

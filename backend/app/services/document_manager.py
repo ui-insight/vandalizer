@@ -644,6 +644,7 @@ class DocumentManager:
         source_id: str,
         source_name: str,
         raw_text: str,
+        text_markers: Optional[list[dict]] = None,
     ) -> int:
         """Swap a source's chunks for ones built from ``raw_text``. Returns chunk count.
 
@@ -660,7 +661,10 @@ class DocumentManager:
 
         prefix = f"{source_id}_{uuid.uuid4().hex[:8]}"
         try:
-            count = self.add_to_kb(kb_uuid, source_id, source_name, raw_text, id_prefix=prefix)
+            count = self.add_to_kb(
+                kb_uuid, source_id, source_name, raw_text,
+                text_markers=text_markers, id_prefix=prefix,
+            )
             if old_ids:
                 collection.delete(ids=old_ids)
         except Exception:

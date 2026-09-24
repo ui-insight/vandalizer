@@ -553,6 +553,7 @@ class TestKbIngestDocumentReprocess:
         db.knowledge_bases.find_one.return_value = kb_doc or {"uuid": "kb-uuid"}
         dm = MagicMock()
         dm.add_to_kb.return_value = 7
+        dm.replace_kb_source.return_value = 7
         with patch("app.tasks.knowledge_base_tasks._get_db", return_value=db), \
              patch("app.services.document_manager.get_document_manager", return_value=dm):
             kb_ingest_document("src-uuid", retrieved=retrieved)
@@ -587,3 +588,30 @@ class TestKbIngestDocumentReprocess:
         deleted = {c.args[1] for c in dm.delete_kb_source.call_args_list}
         assert deleted == {"src-uuid", "doc-uuid"}
         assert dm.add_to_kb.call_args.kwargs["source_id"] == "doc-uuid"
+
+    def test_reindex_swaps_chunks_instead_of_deleting_first(self):
+        _, dm = self._run(source=_make_source(chunk_count=5), retrieved=False)
+        dm.replace_kb_source.assert_called_once()
+        assert dm.replace_kb_source.call_args.args[:2] == ("kb-uuid", "src-uuid")
+        dm.delete_kb_source.assert_not_called()
+        dm.add_to_kb.assert_not_called()
+
+    def test_failed_reindex_keeps_a_working_source_ready(self):
+        from app.tasks.knowledge_base_tasks import kb_ingest_document
+
+        source = _make_source(status="pending", chunk_count=5)
+        db = MagicMock()
+        db.knowledge_base_sources.find_one.return_value = source
+        db.smart_document.find_one.return_value = _make_doc()
+        db.knowledge_base_sources.find.return_value = [source]
+        db.knowledge_bases.find_one.return_value = {"uuid": "kb-uuid"}
+        dm = MagicMock()
+        dm.replace_kb_source.side_effect = RuntimeError("embedder down")
+        with patch("app.tasks.knowledge_base_tasks._get_db", return_value=db), \
+             patch("app.services.document_manager.get_document_manager", return_value=dm), \
+             pytest.raises(RuntimeError):
+            kb_ingest_document("src-uuid", retrieved=False)
+        dm.delete_kb_source.assert_not_called()
+        last = db.knowledge_base_sources.update_one.call_args_list[-1].args[1]["$set"]
+        assert last["status"] == "ready"
+        assert "previous content kept" in last["error_message"]
