@@ -1482,6 +1482,7 @@ async def get_config(
         "available_models": _sanitize_models(cfg.available_models),
         "default_model": cfg.default_model or "",
         "long_document_model": getattr(cfg, "long_document_model", "") or "",
+        "validation_judge_model": getattr(cfg, "validation_judge_model", "") or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
         "ocr_provider": cfg.ocr_provider or "raw",
@@ -1772,6 +1773,39 @@ async def set_long_document_model(
     return {"status": "ok", "long_document_model": cfg.long_document_model or ""}
 
 
+@router.put("/config/models/validation-judge")
+async def set_validation_judge_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    """Choose the model that grades every validation run. Empty = the default.
+
+    One grader for everyone, so a score is comparable with the last one; it
+    used to follow the chat model of whoever pressed Run.
+    """
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.validation_judge_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    await _audit(user, "set_validation_judge_model",
+                 f"Validation grader: {name or '(system default)'}")
+
+    return {"status": "ok", "validation_judge_model": cfg.validation_judge_model or ""}
+
+
 @router.put("/config/models/default")
 async def set_default_model(
     body: DefaultModelRequest,
@@ -1872,6 +1906,9 @@ async def update_model(
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
         cfg.default_model = body.name
+    # Same for the grader: a rename must not silently change who grades.
+    if getattr(cfg, "validation_judge_model", "") == prev_name and prev_name and body.name != prev_name:
+        cfg.validation_judge_model = body.name
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
@@ -1902,6 +1939,9 @@ async def delete_model(
     # Clear default_model if we just deleted it.
     if cfg.default_model and cfg.default_model == removed.get("name", ""):
         cfg.default_model = ""
+    # A deleted grader hands grading back to the default model.
+    if getattr(cfg, "validation_judge_model", "") and cfg.validation_judge_model == removed.get("name", ""):
+        cfg.validation_judge_model = ""
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()

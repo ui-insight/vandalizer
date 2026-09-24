@@ -54,7 +54,7 @@ class TestKbAsksForTheWholePage:
     async def test_refresh_requests_the_kb_limit_not_the_prompt_limit(self):
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 1_360
+        dm.replace_kb_source.return_value = 1_360
         fetch = AsyncMock(return_value=_result(LONG_TEXT))
 
         with patch("app.services.web_fetcher.fetch_url", fetch), \
@@ -69,14 +69,14 @@ class TestKbAsksForTheWholePage:
     async def test_the_whole_page_is_what_gets_embedded(self):
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 1_360
+        dm.replace_kb_source.return_value = 1_360
 
         with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(LONG_TEXT))), \
              patch.object(knowledge_service, "_get_dm", return_value=dm):
             await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
         # The text handed to the chunker is the page, entire.
-        embedded = dm.add_to_kb.call_args[0][3]
+        embedded = dm.replace_kb_source.call_args[0][3]
         assert len(embedded) == len(LONG_TEXT)
 
     @pytest.mark.asyncio
@@ -85,7 +85,7 @@ class TestKbAsksForTheWholePage:
         an ordinary regulation page."""
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 1_360
+        dm.replace_kb_source.return_value = 1_360
 
         with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(LONG_TEXT))), \
              patch.object(knowledge_service, "_get_dm", return_value=dm):
@@ -99,7 +99,7 @@ class TestKbAsksForTheWholePage:
         """Kept as the genuine extreme case, not the everyday one."""
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 6_000
+        dm.replace_kb_source.return_value = 6_000
 
         with patch("app.services.web_fetcher.fetch_url",
                    AsyncMock(return_value=_result(LONG_TEXT, truncated=True))), \
@@ -117,7 +117,7 @@ class TestSnapshotMatchesWhatWasIndexed:
         make the next refresh measure a shrink that never happened."""
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 1_360
+        dm.replace_kb_source.return_value = 1_360
 
         with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(LONG_TEXT))), \
              patch.object(knowledge_service, "_get_dm", return_value=dm):
@@ -134,11 +134,11 @@ class TestSnapshotMatchesWhatWasIndexed:
         the page against a length it never had."""
         src = _source(content="old", status="ready", chunk_count=3)
         dm = MagicMock()
-        dm.add_to_kb.return_value = 1_360
+        dm.replace_kb_source.return_value = 1_360
 
         with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(LONG_TEXT))), \
              patch.object(knowledge_service, "_get_dm", return_value=dm):
             await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
-        embedded = dm.add_to_kb.call_args[0][3]
+        embedded = dm.replace_kb_source.call_args[0][3]
         assert src.content == embedded

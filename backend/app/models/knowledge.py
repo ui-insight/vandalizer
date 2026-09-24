@@ -23,6 +23,11 @@ class KnowledgeBaseSource(Document):
     # from Files, and without this the row has nothing to show but its UUID.
     document_title: Optional[str] = None
     source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
+    # Sources in the same KB that this one revises (a supplement, policy
+    # notice or FAQ that amends a base document). Retrieval searches this
+    # source whenever one of those is retrieved, and tells the model this one
+    # governs where they conflict. Set by the KB owner; see set_source_amends.
+    amends_source_uuids: list[str] = Field(default_factory=list)
     content: Optional[str] = None
     # "skipped" is transient: the crawler marks a navigation page skipped and
     # then deletes the record, so it should not be seen on a stored source.
