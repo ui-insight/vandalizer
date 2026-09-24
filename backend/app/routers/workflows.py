@@ -397,7 +397,9 @@ def _download_zone(tz: str | None) -> ZoneInfo | None:
         return None
     try:
         return ZoneInfo(tz)
-    except (ZoneInfoNotFoundError, ValueError):
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        # OSError: a tzdata directory ("America") or an over-long key is
+        # opened as a file and fails there, not as "not found".
         return None
 
 

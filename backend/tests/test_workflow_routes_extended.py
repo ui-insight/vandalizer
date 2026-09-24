@@ -1214,6 +1214,8 @@ class TestDownloadFileNames:
 
         assert _download_zone("Not/A_Zone") is None
         assert _download_zone("../../etc/passwd") is None
+        assert _download_zone("America") is None
+        assert _download_zone("a" * 300) is None
         assert _download_zone(None) is None
 
     async def test_download_header_uses_the_requested_zone(self, client):
