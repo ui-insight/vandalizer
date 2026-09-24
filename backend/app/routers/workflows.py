@@ -3,12 +3,14 @@
 import asyncio
 import base64
 import csv
+import datetime
 import io
 import json
 import logging
 import re
 import tempfile
 import zipfile
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -384,21 +386,61 @@ MAX_BATCH_DOWNLOAD_RUNS = 250
 _ZIP_SPOOL_BYTES = 32 * 1024 * 1024
 
 
-def _session_base_filename(status: dict, session_id: str) -> str:
-    """Build a filesystem-safe base name (no extension) unique per session.
+def _download_zone(tz: str | None) -> ZoneInfo | None:
+    """The viewer's IANA time zone for naming a download, or None to use UTC.
 
-    Browsers cap auto-suffixing of duplicate downloads at ~5; past that, the same
-    Content-Disposition name causes older files to be overwritten. Embedding the
-    session id guarantees uniqueness across manual runs.
+    The server has no idea what time it is for the person clicking, and a
+    file named for a UTC hour would read as the wrong time of day. The
+    frontend sends the browser's zone; an unknown or missing one falls back.
+    """
+    if not tz:
+        return None
+    try:
+        return ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def _run_stamp(start_time, zone: ZoneInfo | None) -> str | None:
+    """``2026-09-02 02-30 PM`` in ``zone``, or ``… UTC`` without one.
+
+    Colons are not allowed in Windows file names, hence the dash in the time.
+    """
+    if isinstance(start_time, str):
+        try:
+            start_time = datetime.datetime.fromisoformat(start_time)
+        except ValueError:
+            return None
+    if not isinstance(start_time, datetime.datetime):
+        return None
+    if start_time.tzinfo is None:
+        # Mongo hands datetimes back naive; they were stored as UTC.
+        start_time = start_time.replace(tzinfo=datetime.timezone.utc)
+    if zone is None:
+        return start_time.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %I-%M %p UTC")
+    return start_time.astimezone(zone).strftime("%Y-%m-%d %I-%M %p")
+
+
+def _session_base_filename(status: dict, session_id: str, zone: ZoneInfo | None = None) -> str:
+    """Build a filesystem-safe base name (no extension) that says which run it is.
+
+    ``<workflow>[ - <document>] <run date and time>``, e.g. ``Budget Prediction
+    Flow 2026-09-02 02-30 PM``. The run id used to stand in for the time, which
+    kept names unique but meant nothing to the person holding several
+    downloads of the same workflow (support ticket). The time is to the minute
+    because the same workflow is often run several times a day. Two runs of one
+    workflow on one document in the same minute do share a name, and the
+    browser numbers the second. A run with no recorded start falls back to the
+    run id.
     """
     workflow_name = status.get("workflow_name")
     document_title = status.get("document_title")
-    name_parts: list[str] = [workflow_name or "results"]
+    raw_base = workflow_name or "results"
     if document_title:
         doc_stem = document_title.rsplit(".", 1)[0] if "." in document_title else document_title
-        name_parts.append(doc_stem)
-    name_parts.append(session_id[:8])
-    raw_base = "-".join(name_parts)
+        raw_base = f"{raw_base} - {doc_stem}"
+    stamp = _run_stamp(status.get("start_time"), zone)
+    raw_base = f"{raw_base} {stamp}" if stamp else f"{raw_base}-{session_id[:8]}"
     return "".join(c if c.isalnum() or c in " _-." else "_" for c in raw_base).strip() or f"results-{session_id[:8]}"
 
 
@@ -530,6 +572,7 @@ async def download_results(
     session_id: str,
     format: str = "json",
     parse_structured: bool = False,
+    tz: str | None = Query(default=None, description="IANA time zone for the run time in the file name"),
     user: User = Depends(get_current_user),
 ):
     """Download workflow results in specified format.
@@ -545,7 +588,7 @@ async def download_results(
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
-    base_filename = _session_base_filename(status, session_id)
+    base_filename = _session_base_filename(status, session_id, _download_zone(tz))
     content, media_type, ext, explicit_name = _render_workflow_output(status, format, parse_structured)
     filename = explicit_name or f"{base_filename}.{ext}"
     return StreamingResponse(
@@ -561,6 +604,7 @@ async def download_batch_results(
     format: str = "json",
     parse_structured: bool = False,
     share_token: str | None = Query(default=None),
+    tz: str | None = Query(default=None, description="IANA time zone for run times in member names"),
     user: User = Depends(get_current_user),
 ):
     """Bundle every completed run in a batch into a single ZIP.
@@ -591,6 +635,8 @@ async def download_batch_results(
             ),
         )
 
+    zone = _download_zone(tz)
+
     def _build_zip():
         """Render and compress every run.
 
@@ -607,7 +653,7 @@ async def download_batch_results(
                 content, _media_type, ext, explicit_name = _render_workflow_output(
                     status, format, parse_structured,
                 )
-                base = _session_base_filename(status, sid)
+                base = _session_base_filename(status, sid, zone)
                 if explicit_name:
                     # A step-supplied filename is static config, identical for
                     # every run in the batch, so on its own it says nothing about
