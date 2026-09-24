@@ -31,10 +31,14 @@ export function buildChatSetupUrl(setup: ChatSetup): string {
   return `${window.location.origin}/?${params.toString()}`
 }
 
-/** The ids in one chat setup param, de-duplicated, blanks dropped. */
-export function parseIdList(value: string | undefined): string[] {
-  if (!value) return []
-  return [...new Set(value.split(',').map(s => s.trim()).filter(Boolean))]
+/**
+ * The ids in one chat setup param, de-duplicated, blanks dropped. The router
+ * JSON-parses search values, so a hand-edited link can hand us a number,
+ * boolean, array or object here; coerce rather than crash the workspace.
+ */
+export function parseIdList(value: unknown): string[] {
+  if (value == null || value === '' || (typeof value === 'object' && !Array.isArray(value))) return []
+  return [...new Set(String(value).split(',').map(s => s.trim()).filter(Boolean))]
 }
 
 export function useShareLink() {

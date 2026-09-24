@@ -22,4 +22,12 @@ describe('chat setup links', () => {
     expect(parseIdList(' a, ,b,a ')).toEqual(['a', 'b'])
     expect(parseIdList(undefined)).toEqual([])
   })
+
+  it('survives values the router JSON-parsed out of a hand-edited link', () => {
+    expect(parseIdList(true)).toEqual(['true'])
+    expect(parseIdList(123)).toEqual(['123'])
+    expect(parseIdList(['a', 'b'])).toEqual(['a', 'b'])
+    expect(parseIdList({ a: 1 })).toEqual([])
+    expect(parseIdList(null)).toEqual([])
+  })
 })
