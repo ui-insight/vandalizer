@@ -8,6 +8,14 @@ describe('splitFieldTerms', () => {
     ])
   })
 
+  it('keeps a comma inside brackets or quotes as part of the term', () => {
+    expect(splitFieldTerms('Budget (direct, indirect), "Start date, if listed", PI Name')).toEqual([
+      'Budget (direct, indirect)',
+      '"Start date, if listed"',
+      'PI Name',
+    ])
+  })
+
   it('keeps a single term whole', () => {
     expect(splitFieldTerms('  Award Number ')).toEqual(['Award Number'])
   })
