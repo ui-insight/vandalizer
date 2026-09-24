@@ -18,6 +18,7 @@ import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBGridView } from '../knowledge/KBGridView'
 import { KBValidationPanel } from '../knowledge/KBValidationPanel'
 import { KBSourceInspectorModal } from '../knowledge/KBSourceInspectorModal'
+import { sourceDisplayName } from '../knowledge/sourceName'
 import { KBExploreTab } from '../knowledge/KBExploreTab'
 import { CreateKBModal } from '../knowledge/CreateKBModal'
 import { KBTrustBanner } from '../knowledge/KBTrustBanner'
@@ -1467,6 +1468,20 @@ export function KnowledgePanel() {
                             )}
                           </div>
                         )}
+                        {!isRenaming && (source.amends_source_uuids?.length ?? 0) > 0 && (() => {
+                          const names = source.amends_source_uuids!
+                            .map(u => selectedKB.sources.find(o => o.uuid === u))
+                            .filter((o): o is KnowledgeBaseSource => !!o)
+                            .map(sourceDisplayName)
+                          return names.length > 0 ? (
+                            <div
+                              style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              title={`Amends: ${names.join('; ')}`}
+                            >
+                              Amends: <span style={{ color: '#bcbcbc' }}>{names.join('; ')}</span>
+                            </div>
+                          ) : null
+                        })()}
                         {!isRenaming && source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>
                             {source.error_message}
@@ -1687,6 +1702,7 @@ export function KnowledgePanel() {
           <KBSourceInspectorModal
             kbUuid={selectedKB.uuid}
             source={inspectingSource}
+            otherSources={selectedKB.sources}
             onClose={() => setInspectingSource(null)}
             onUpdated={() => { if (selectedKB) loadDetail(selectedKB.uuid) }}
           />
