@@ -104,6 +104,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // showing the idle "Run Validation" button as if nothing were happening.
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  // Questions ticked on Test Queries and handed to Run now by "Run selected",
+  // where the count and category mix are shown before the run starts.
+  const [handedSelection, setHandedSelection] = useState<string[] | null>(null)
+  // A "Run selected" hand-off applies to the visit it opened; choosing a tab
+  // from the strip starts clean, so a later Run visit opens on the full set.
+  const selectTab = (id: Tab) => {
+    setHandedSelection(null)
+    setTab(id)
+  }
   // Bumped whenever a run finishes so the History tab refetches even if it's
   // already mounted (it otherwise only loads on mount, so a freshly persisted
   // run wouldn't appear until a full page reload).
@@ -125,7 +134,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
       : e.key === 'Home' ? 0
       : n - 1
-    setTab(TAB_LABELS[next].id)
+    selectTab(TAB_LABELS[next].id)
     tabRefs.current[next]?.focus()
   }
 
@@ -411,7 +420,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
               tabIndex={active ? 0 : -1}
               ref={el => { tabRefs.current[idx] = el }}
               onKeyDown={e => onTabKeyDown(e, idx)}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
               style={{
                 fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -460,17 +469,19 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           onChange={refreshQueries}
           running={running}
           onRunSelected={uuids => {
-            // A smoke test: judge only, no baseline, so it costs what the
-            // handful of questions costs. Results land on the Run tab.
+            // Review before running: Run now opens on this selection (judge
+            // only, so it costs what the handful of questions costs) and
+            // states the count and categories; the user starts it there.
+            setHandedSelection(uuids)
             setTab('run')
-            void runValidation('judge', uuids)
           }}
         />
       ) : tab === 'run' ? (
         <KBValidationRunTab
           kbReady={kbReady}
           canManage={canManage}
-          numQueries={queries.length}
+          queries={queries}
+          selectedUuids={handedSelection}
           latestRun={latestRun}
           running={running}
           error={runError}

@@ -11,6 +11,8 @@ Also covers the KBTestQuery field additions for the LLM-as-judge feature.
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.models.kb_test_query import KBTestQuery
@@ -1442,8 +1444,13 @@ async def test_resolve_rag_config_keeps_override_model_when_system_config_unavai
 def _run_kb_validation_patches(fake_kb, judge_payload, persisted: dict):
     """Everything run_kb_validation touches, stubbed. Returns a list of
     context managers plus the mocks the test asserts on."""
-    tq = MagicMock()
-    tq.uuid, tq.query, tq.expected_answer, tq.category = "q1", "Q?", "A", None
+    # Explicit fields: the run snapshots its questions, and a bare
+    # MagicMock's auto-attrs cannot be serialized into that record.
+    tq = SimpleNamespace(
+        uuid="q1", query="Q?", expected_answer="A", category=None, external_id=None,
+        expected_answer_contains=None, expected_source_labels=[], notes=None,
+        import_batch_label=None,
+    )
     find = MagicMock()
     find.to_list = AsyncMock(return_value=[tq])
 

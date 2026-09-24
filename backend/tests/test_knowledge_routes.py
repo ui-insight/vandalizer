@@ -2429,6 +2429,14 @@ class TestTestQueryImport:
         assert existing_by_id.category == "summary"
         assert existing_by_id.expected_source_labels == ["Doc B"]
         assert existing_by_id.updated_at is not None
+        # Both rows this file wrote join one batch, returned so the client
+        # can select exactly this import; the skipped row is left alone.
+        batch_id = body["import_batch_id"]
+        assert batch_id
+        assert created[0].import_batch_id == batch_id
+        assert existing_by_id.import_batch_id == batch_id
+        assert created[0].import_batch_label == existing_by_id.import_batch_label == "set.csv"
+        assert getattr(existing_dup, "import_batch_id", None) is None
 
     @pytest.mark.asyncio
     async def test_import_reports_row_errors_without_failing(self, client):
