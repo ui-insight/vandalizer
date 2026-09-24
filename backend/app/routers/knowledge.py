@@ -291,6 +291,7 @@ def _source_response(
         url_title=s.url_title or "",
         custom_name=s.custom_name,
         source_reference=getattr(s, "source_reference", None),
+        amends_source_uuids=list(getattr(s, "amends_source_uuids", None) or []),
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
@@ -1002,9 +1003,11 @@ async def update_source(
 ):
     """Update a single source within a KB.
 
-    Send ``custom_name`` to set a user-facing label, or ``source_reference`` to
-    set the verifiable provenance shown as "Source: …". Only fields explicitly
-    present in the request are applied; an empty string clears that field.
+    Send ``custom_name`` to set a user-facing label, ``source_reference`` to
+    set the verifiable provenance shown as "Source: …", or
+    ``amends_source_uuids`` to say which sources in this KB this one revises.
+    Only fields explicitly present in the request are applied; an empty string
+    (or list) clears that field.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
@@ -1017,6 +1020,11 @@ async def update_source(
         source = await svc.update_source_name(kb, source_uuid, req.custom_name)
     if "source_reference" in fields_set:
         source = await svc.set_source_reference(kb, source_uuid, req.source_reference)
+    if "amends_source_uuids" in fields_set:
+        try:
+            source = await svc.set_source_amends(kb, source_uuid, req.amends_source_uuids or [])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
     titles = await _resolve_document_titles([source])

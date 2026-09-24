@@ -1031,6 +1031,43 @@ async def set_source_reference(
     return source
 
 
+async def set_source_amends(
+    kb: KnowledgeBase,
+    source_uuid: str,
+    amends_source_uuids: list[str],
+) -> KnowledgeBaseSource | None:
+    """Record which sources in ``kb`` this source revises. Replaces the list.
+
+    Raises ValueError for a uuid that is this source or not a source of this
+    KB, so a typo can't silently point at nothing. Metadata only: chunks are
+    untouched; retrieval reads the relation at query time.
+    """
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    )
+    if not source:
+        return None
+
+    wanted = list(dict.fromkeys(u for u in amends_source_uuids if u))
+    if source_uuid in wanted:
+        raise ValueError("A source cannot amend itself")
+    if wanted:
+        found = {
+            s.uuid
+            for s in await KnowledgeBaseSource.find(
+                {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": wanted}},
+            ).to_list()
+        }
+        missing = [u for u in wanted if u not in found]
+        if missing:
+            raise ValueError(f"Not a source of this knowledge base: {', '.join(missing)}")
+
+    source.amends_source_uuids = wanted
+    await source.save()
+    return source
+
+
 async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = False) -> bool:
     """Remove a source and its chunks. With ``strict``, a failure to delete the
     chunks raises and the source row is kept — the caller reports the KB as
@@ -1050,6 +1087,13 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = F
         if strict:
             raise
     await source.delete()
+    # Nothing may go on claiming to amend a source that is gone.
+    try:
+        await KnowledgeBaseSource.find(
+            {"knowledge_base_uuid": kb.uuid, "amends_source_uuids": source_uuid},
+        ).update({"$pull": {"amends_source_uuids": source_uuid}})
+    except Exception as e:
+        logger.warning("Could not clear amends links to removed source %s: %s", source_uuid, e)
     await recalculate_stats(kb)
     return True
 
@@ -1576,6 +1620,10 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
                     content = doc.raw_text or None
                 ingestion_warnings = document_service.ingestion_warnings(doc)
         exported_sources.append({
+            # The importer mints new uuids; these two let it rebuild the
+            # amends links between the new sources.
+            "uuid": s.uuid,
+            "amends_source_uuids": list(getattr(s, "amends_source_uuids", None) or []),
             "source_type": s.source_type,
             "document_uuid": s.document_uuid,
             "document_title": document_title,
@@ -1638,6 +1686,8 @@ async def import_knowledge_base(
 
     imported = 0
     dm = _get_dm()
+    new_uuid_for: dict[str, str] = {}
+    amends_to_link: list[tuple[KnowledgeBaseSource, list[str]]] = []
 
     for src in payload.get("sources", []) or []:
         source_type = src.get("source_type")
@@ -1662,6 +1712,10 @@ async def import_knowledge_base(
         if not await _insert_source_unless_duplicate(new_src):
             continue
         imported += 1
+        if src.get("uuid"):
+            new_uuid_for[src["uuid"]] = new_src.uuid
+        if src.get("amends_source_uuids"):
+            amends_to_link.append((new_src, list(src["amends_source_uuids"])))
 
         if content and content.strip():
             label = (
@@ -1692,6 +1746,14 @@ async def import_knowledge_base(
         else:
             new_src.status = "error"
             new_src.error_message = "Imported source had no content and no URL to re-fetch"
+            await new_src.save()
+
+    # Links are by uuid, and every imported source got a new one. A link to a
+    # source that did not come across is dropped.
+    for new_src, old_targets in amends_to_link:
+        mapped = [new_uuid_for[u] for u in old_targets if u in new_uuid_for]
+        if mapped:
+            new_src.amends_source_uuids = mapped
             await new_src.save()
 
     await recalculate_stats(kb)

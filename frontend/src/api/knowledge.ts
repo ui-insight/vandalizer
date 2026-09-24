@@ -151,6 +151,7 @@ export interface KBSourceResponse {
   url_title?: string | null
   custom_name?: string | null
   source_reference?: string | null
+  amends_source_uuids?: string[]
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number
@@ -173,6 +174,14 @@ export function setKBSourceReference(uuid: string, sourceUuid: string, sourceRef
   return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'PATCH',
     body: JSON.stringify({ source_reference: sourceReference }),
+  })
+}
+
+/** Replace the list of sources in this KB that a source amends. Pass `[]` to clear. */
+export function setKBSourceAmends(uuid: string, sourceUuid: string, amendsSourceUuids: string[]) {
+  return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ amends_source_uuids: amendsSourceUuids }),
   })
 }
 
