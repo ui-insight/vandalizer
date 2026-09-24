@@ -3,6 +3,8 @@ and LLM-as-judge answer evaluation (with optional baseline ablation for lift mea
 """
 
 import asyncio
+import hashlib
+import json
 import logging
 from contextvars import ContextVar
 from typing import Callable, Optional
@@ -232,7 +234,11 @@ def _format_context_for_config(results: list[dict], cfg: RAGConfig) -> str:
         if cfg.source_label_visibility:
             meta = r.get("metadata") or {}
             source_name = meta.get("source_name", "Unknown") if isinstance(meta, dict) else "Unknown"
-            blocks.append(f"## Source: {source_name}\n{content}")
+            blocks.append(f"## Source: {source_name}{amendment_label(r)}\n{content}")
+        elif r.get("amends"):
+            # Names are hidden in this variant, but which text governs is not
+            # a label: without it the model cannot resolve a conflict.
+            blocks.append(f"[This passage amends an earlier source and governs where they conflict.]\n{content}")
         else:
             blocks.append(content)
     return "\n\n".join(blocks)
@@ -563,6 +569,177 @@ async def retrieve_kb_chunks(
     return results, cfg, tokens
 
 
+# ---------------------------------------------------------------------------
+# Amending sources
+# ---------------------------------------------------------------------------
+#
+# Support ticket: a KB held PAPPG Chapter IV and a supplement revising it. Asked
+# plainly, retrieval returned Chapter IV's reconsideration list (it *is* the
+# best semantic match) and never the supplement's "Chapter IV.D.2.b.(7) is
+# revised to…" line (similarity 0.34 vs 0.60 on MiniLM); naming the supplement
+# was the only way to reach it. A KB owner can now mark a source as amending
+# others. Whenever an amended source is retrieved, its amenders are searched
+# directly and their best passages ride along, labelled as governing.
+
+AMENDMENT_CHUNKS_PER_SOURCE = 2
+MAX_AMENDERS_PER_TURN = 3
+
+
+class AmendmentLinks(BaseModel):
+    """A KB's amends relation, keyed by the source ids chunks carry.
+
+    A crawled URL's chunks carry its children's uuids, not the parent's, so
+    both sides are expanded to crawl children.
+    """
+    # chunk source_id of an amended source -> amender uuids
+    amenders_of: dict[str, list[str]] = {}
+    # amender uuid -> every source_id whose chunks belong to it
+    search_ids: dict[str, list[str]] = {}
+    # chunk source_id of an amender -> names of what it amends
+    amends_names: dict[str, list[str]] = {}
+    # amender uuid -> its name
+    amender_name: dict[str, str] = {}
+
+    def is_empty(self) -> bool:
+        return not self.amenders_of
+
+
+def _source_display_name(src: KnowledgeBaseSource) -> str:
+    return (
+        src.custom_name or src.url_title or getattr(src, "document_title", None)
+        or src.url or src.document_uuid or src.uuid
+    )
+
+
+async def load_amendment_links(kb_uuid: str) -> AmendmentLinks:
+    """The KB's amends relation. Never raises: a failed lookup degrades the
+    turn to plain retrieval rather than failing it."""
+    try:
+        return await _load_amendment_links(kb_uuid)
+    except Exception as e:
+        logger.warning("Could not load amends links for KB %s: %s", kb_uuid, e)
+        return AmendmentLinks()
+
+
+async def _load_amendment_links(kb_uuid: str) -> AmendmentLinks:
+    amenders = await KnowledgeBaseSource.find(
+        {"knowledge_base_uuid": kb_uuid, "amends_source_uuids.0": {"$exists": True}},
+    ).to_list()
+    if not amenders:
+        return AmendmentLinks()
+
+    roots = {a.uuid for a in amenders} | {u for a in amenders for u in a.amends_source_uuids}
+    related = await KnowledgeBaseSource.find(
+        {
+            "knowledge_base_uuid": kb_uuid,
+            "$or": [{"uuid": {"$in": list(roots)}}, {"parent_source_uuid": {"$in": list(roots)}}],
+        },
+    ).to_list()
+    by_uuid = {s.uuid: s for s in related}
+    family: dict[str, list[str]] = {u: [u] for u in roots}
+    for s in related:
+        if s.parent_source_uuid in family:
+            family[s.parent_source_uuid].append(s.uuid)
+
+    links = AmendmentLinks()
+    for a in amenders:
+        targets = [u for u in a.amends_source_uuids if u in by_uuid]
+        if not targets:
+            continue
+        links.search_ids[a.uuid] = family.get(a.uuid, [a.uuid])
+        links.amender_name[a.uuid] = _source_display_name(a)
+        names = [_source_display_name(by_uuid[u]) for u in targets]
+        for sid in links.search_ids[a.uuid]:
+            links.amends_names.setdefault(sid, []).extend(names)
+        for t in targets:
+            for sid in family.get(t, [t]):
+                bucket = links.amenders_of.setdefault(sid, [])
+                if a.uuid not in bucket:
+                    bucket.append(a.uuid)
+    return links
+
+
+def _chunk_source_id(r: dict) -> Optional[str]:
+    meta = r.get("metadata") or {}
+    return meta.get("source_id") if isinstance(meta, dict) else None
+
+
+async def retrieve_amendment_chunks(
+    kb_uuid: str,
+    results: list[dict],
+    query: str,
+    links: AmendmentLinks,
+    *,
+    min_similarity: float = 0.0,
+) -> list[dict]:
+    """Best passages from the amenders of any source among ``results``.
+
+    A search restricted to each amender's own chunks, so a short revision
+    that loses to the text it revises on similarity still reaches the prompt.
+    """
+    if links.is_empty():
+        return []
+    triggered: list[str] = []
+    for r in results:
+        for amender in links.amenders_of.get(_chunk_source_id(r) or "", []):
+            if amender not in triggered:
+                triggered.append(amender)
+    if not triggered:
+        return []
+
+    dm = _get_dm()
+    hits: list[dict] = []
+    for amender in triggered[:MAX_AMENDERS_PER_TURN]:
+        ids = links.search_ids.get(amender) or [amender]
+        where = {"source_id": ids[0]} if len(ids) == 1 else {"source_id": {"$in": ids}}
+        try:
+            found = await asyncio.to_thread(
+                dm.query_kb, kb_uuid, query, AMENDMENT_CHUNKS_PER_SOURCE, min_similarity, where=where,
+            )
+        except Exception as e:
+            logger.warning("Amendment search failed for source %s in KB %s: %s", amender, kb_uuid, e)
+            continue
+        hits.extend(found)
+    return hits
+
+
+def annotate_amendments(results: list[dict], links: AmendmentLinks) -> list[dict]:
+    """Copies of ``results``, each chunk that amends or is amended by another
+    source marked with ``amends`` / ``amended_by`` names."""
+    if links.is_empty():
+        return results
+    out: list[dict] = []
+    for r in results:
+        sid = _chunk_source_id(r) or ""
+        marks: dict = {}
+        if sid in links.amends_names:
+            marks["amends"] = list(dict.fromkeys(links.amends_names[sid]))
+        amenders = links.amenders_of.get(sid)
+        if amenders:
+            marks["amended_by"] = [links.amender_name[a] for a in amenders if a in links.amender_name]
+        out.append({**r, **marks} if marks else r)
+    return out
+
+
+def amendment_label(r: dict) -> str:
+    """`` — amends: X`` / `` — amended by: Y`` for a snippet heading, or ''."""
+    parts = []
+    if r.get("amends"):
+        parts.append("amends: " + "; ".join(r["amends"]))
+    if r.get("amended_by"):
+        parts.append("amended by: " + "; ".join(r["amended_by"]))
+    return f" — {', '.join(parts)}" if parts else ""
+
+
+AMENDMENT_INSTRUCTION = (
+    "Some snippets come from a source that *amends* another source in this "
+    "knowledge base (marked \"amends: …\"), and some from a source that has "
+    "been amended (marked \"amended by: …\"). Where they conflict, the amending "
+    "source states the current rule: answer from it, and say that it changed "
+    "the earlier text."
+)
+
+
 async def _generate_kb_answer(
     kb_uuid: str,
     query: str,
@@ -594,6 +771,15 @@ async def _generate_kb_answer(
     results, cfg, tokens = await retrieve_kb_chunks(
         kb_uuid, query, model_name, config=cfg,
     )
+    links = await load_amendment_links(kb_uuid)
+    extra = await retrieve_amendment_chunks(
+        kb_uuid, results, query, links, min_similarity=cfg.min_similarity,
+    )
+    if extra:
+        present = {r.get("chunk_id") for r in results}
+        extra = [r for r in extra if r.get("chunk_id") not in present]
+        results = results[: max(0, cfg.k - len(extra))] + extra
+    results = annotate_amendments(results, links)
     # Empty *or* gated-empty: nothing cleared the relevance floor, so abstain
     # rather than generate. Reuses the existing empty-retrieval refusal.
     if not results:
@@ -601,6 +787,8 @@ async def _generate_kb_answer(
 
     context = _format_context_for_config(results, cfg)
     instruction = RAG_PROMPT_VARIANTS.get(cfg.prompt_variant, RAG_PROMPT_VARIANTS["default"])
+    if any(r.get("amends") or r.get("amended_by") for r in results):
+        instruction = f"{instruction}\n\n{AMENDMENT_INSTRUCTION}"
     # Cache key includes the prompt variant AND answer temperature so trial
     # variations don't collide on the same agent instance.
     purpose = f"kb_rag::{cfg.prompt_variant}::t{cfg.answer_temperature}"
@@ -1508,6 +1696,56 @@ def _query_identity(tq) -> dict:
         "notes": getattr(tq, "notes", None) or "",
         "expected_answer": getattr(tq, "expected_answer", None) or "",
         "category": getattr(tq, "category", None),
+        "expected_sources": list(getattr(tq, "expected_source_labels", None) or []),
+    }
+
+
+# Category label for questions without one, in counts and the Run tab summary.
+UNCATEGORIZED = "uncategorized"
+
+
+def question_set_snapshot(test_queries: list) -> dict:
+    """Freeze the exact questions a run measured.
+
+    Test sets change between runs — an import adds rows, an edit rewrites an
+    expected answer — and two scores are only comparable when they measured
+    the same questions against the same expectations. The snapshot keeps each
+    question as it stood at run time, and ``fingerprint`` hashes that content
+    so History can flag a run whose set differs from the one before it
+    without diffing hundreds of rows.
+
+    The fingerprint covers identity and every field that changes what a run
+    grades (question, expected answer and substring, category, source
+    labels). Import-batch provenance and notes are recorded but not hashed:
+    re-importing an unchanged file must not read as a different set.
+    """
+    questions = []
+    categories: dict[str, int] = {}
+    for tq in sorted(test_queries, key=lambda q: getattr(q, "uuid", "") or ""):
+        category = getattr(tq, "category", None)
+        categories[category or UNCATEGORIZED] = categories.get(category or UNCATEGORIZED, 0) + 1
+        questions.append({
+            "query_uuid": getattr(tq, "uuid", "") or "",
+            "external_id": getattr(tq, "external_id", None),
+            "query": tq.query,
+            "expected_answer": getattr(tq, "expected_answer", None),
+            "expected_answer_contains": getattr(tq, "expected_answer_contains", None),
+            "category": category,
+            "expected_source_labels": list(getattr(tq, "expected_source_labels", None) or []),
+            "import_batch_label": getattr(tq, "import_batch_label", None),
+        })
+    hashed = [
+        {k: v for k, v in q.items() if k != "import_batch_label"}
+        for q in questions
+    ]
+    digest = hashlib.sha256(
+        json.dumps(hashed, sort_keys=True, ensure_ascii=False).encode("utf-8"),
+    ).hexdigest()
+    return {
+        "fingerprint": digest[:12],
+        "count": len(questions),
+        "category_counts": dict(sorted(categories.items())),
+        "questions": questions,
     }
 
 
@@ -1718,6 +1956,12 @@ async def run_kb_validation(
     if not kb:
         raise ValueError("Knowledge base not found")
 
+    # The KB as this run finds it — sources, their versions, chunk counts —
+    # taken before anything is measured, so the record matches what was
+    # queried even if a source changes while the run is in flight.
+    from app.services.kb_source_snapshot import snapshot_kb_sources
+    kb_sources = await snapshot_kb_sources(kb_uuid)
+
     # Run health and coverage checks in parallel
     health_task = check_source_health(kb_uuid)
     coverage_task = check_chunk_coverage(kb_uuid)
@@ -1752,6 +1996,7 @@ async def run_kb_validation(
     # LLM judge — gated by skip_judge AND presence of expected_answer on any query.
     judge_payload: dict | None = None
     judge_model_used: str | None = None
+    judge_model_fallback: dict | None = None
     judge_variance: float | None = None
     # The model that generated the graded answers — set only when the judge
     # actually ran; a retrieval-only run has no task model to attribute.
@@ -1760,19 +2005,26 @@ async def run_kb_validation(
     answer_model_fallback: dict | None = None
     if test_queries and not skip_judge and any(getattr(q, "expected_answer", None) for q in test_queries):
         try:
-            # Resolve the judge model. get_user_model_name validates the user's
-            # stored selection against available_models and falls back to the
-            # system default when stale — a stale pick has no resolvable
-            # endpoint and routes to an unreachable public default host.
-            from app.services.config_service import get_user_model_name
-            judge_model_used = await get_user_model_name(user_id)
-            if judge_model_used:
+            # The grader is one system-wide setting, never the runner's chat
+            # model: scores are compared run to run, and a grader that changed
+            # with whoever pressed Run made those comparisons silently unequal.
+            # The answering side is unchanged: an applied override's model,
+            # else the runner's model. get_user_model_name validates a stored
+            # selection and falls back to the system default when it is stale
+            # (a stale pick has no resolvable endpoint).
+            from app.services.config_service import (
+                get_user_model_name,
+                get_validation_judge_model,
+            )
+            judge_model_used, judge_model_fallback = await get_validation_judge_model()
+            answer_fallback_model = await get_user_model_name(user_id)
+            if judge_model_used and answer_fallback_model:
                 # Resolve the answer config once so the persisted run can
                 # state which model actually generated the graded answers.
                 answer_cfg = await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
                 if model:
                     answer_cfg = answer_cfg.with_overrides(model=model)
-                effective_answer_model = answer_cfg.model or judge_model_used
+                effective_answer_model = answer_cfg.model or answer_fallback_model
                 # The applied override may name a model that System Config no
                 # longer has; resolution drops it and the user's model answers
                 # instead. Say so on the run, so the score is not read as the
@@ -1794,8 +2046,8 @@ async def run_kb_validation(
                 # same answer model as the KB answer (an applied override's
                 # model, else the user's), so lift measures the KB, not a swap.
                 judge_payload = await judge_test_queries(
-                    kb_uuid, test_queries, judge_model_used, mode=mode,
-                    answer_config=answer_cfg,
+                    kb_uuid, test_queries, answer_fallback_model, mode=mode,
+                    answer_config=answer_cfg, judge_model=judge_model_used,
                 )
                 # First-run variance sample: only when no prior ValidationRun exists for this KB.
                 from app.models.validation_run import ValidationRun
@@ -1896,13 +2148,27 @@ async def run_kb_validation(
         "score_formula": scoring["formula"],
         "num_test_queries": len(test_queries),
         "num_sources": health["total"],
+        # Sources, their versions (content hash + retrieved/indexed dates)
+        # and chunk counts at run time, so the run stays reproducible and
+        # comparable after the KB changes. See kb_source_snapshot.
+        "kb_sources": kb_sources,
+        # The applied retrieval override the run answered under.
+        "rag_config_override": (
+            dict(kb.rag_config_override) if isinstance(kb.rag_config_override, dict) else None
+        ),
         # Match the shape expected by persist_validation_run
         "sources": [{"label": s["name"], "status": s["status"]} for s in health["details"]],
         "num_runs": 1,
         "mode": mode,
         "judge_model": judge_model_used,
+        # Set when the configured grader was no longer in System Config and
+        # the default graded instead: {"configured", "used", "reason"}.
+        "judge_model_fallback": judge_model_fallback if judge_payload else None,
         # Set on a run over hand-picked queries: {"selected": n, "total": N}.
         "query_selection": query_selection,
+        # The exact questions this run measured, frozen at run time, with a
+        # fingerprint so History can tell runs over different sets apart.
+        "question_set": question_set_snapshot(test_queries),
         # Which model generated the graded answers, and whether it is the one
         # the applied override asked for.
         "answer_model": effective_answer_model if judge_payload else None,
@@ -1927,6 +2193,7 @@ async def run_kb_validation(
             {
                 "requested_model": model,
                 "judge_model": judge_model_used,
+                "judge_model_fallback": judge_model_fallback,
                 "answer_temperature": answer_cfg.answer_temperature if answer_cfg else None,
                 "answer_model_fallback": answer_model_fallback,
             }

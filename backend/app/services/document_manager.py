@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -466,12 +467,17 @@ class DocumentManager:
         source_name: str,
         raw_text: str,
         text_markers: Optional[list[dict]] = None,
+        id_prefix: Optional[str] = None,
     ) -> int:
         """Chunk text, embed, and add to a KB collection. Returns chunk count.
 
         ``text_markers`` lets KB ingestion preserve page/sheet citations the
         same way per-user ingestion does. Sources without markers (web URLs,
         plaintext) just omit the page metadata.
+
+        ``id_prefix`` replaces ``source_id`` in the chunk ids (metadata still
+        carries ``source_id``), so :meth:`replace_kb_source` can write a new
+        set of chunks beside the old one instead of colliding with it.
         """
         text_splits = _split_text_with_offsets(raw_text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
@@ -488,7 +494,7 @@ class DocumentManager:
         documents = []
         metadatas = []
         for i, (chunk, offset) in enumerate(text_splits):
-            ids.append(f"{source_id}_chunk_{i}")
+            ids.append(f"{id_prefix or source_id}_chunk_{i}")
             documents.append(chunk)
             meta: dict = {
                 "source_id": source_id,
@@ -631,6 +637,46 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
             return False
+
+    def replace_kb_source(
+        self,
+        kb_uuid: str,
+        source_id: str,
+        source_name: str,
+        raw_text: str,
+        text_markers: Optional[list[dict]] = None,
+    ) -> int:
+        """Swap a source's chunks for ones built from ``raw_text``. Returns chunk count.
+
+        Delete-then-add left a window in which the source had no chunks, and
+        a failed embed after the delete left it with none at all. Worse, a
+        delete that failed quietly let the add skip every deterministic id,
+        so the old text stayed indexed while the source was marked refreshed.
+        This writes the new chunks under fresh ids first and removes the old
+        ones only once the new set is in. If this raises, the old chunks are
+        still the ones indexed (the new ones are cleaned up best-effort).
+        """
+        collection = self.get_kb_collection(kb_uuid)
+        old_ids = collection.get(where={"source_id": source_id}, include=[]).get("ids") or []
+
+        prefix = f"{source_id}_{uuid.uuid4().hex[:8]}"
+        try:
+            count = self.add_to_kb(
+                kb_uuid, source_id, source_name, raw_text,
+                text_markers=text_markers, id_prefix=prefix,
+            )
+            if old_ids:
+                collection.delete(ids=old_ids)
+        except Exception:
+            try:
+                new_ids = collection.get(where={"source_id": source_id}, include=[]).get("ids") or []
+                stale = [i for i in new_ids if i.startswith(f"{prefix}_chunk_")]
+                if stale:
+                    collection.delete(ids=stale)
+            except Exception as cleanup_error:
+                logger.error(f"Error cleaning up partial chunks for KB source {source_id}: {cleanup_error}")
+            raise
+        return count
 
     def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
         """Rewrite source_name on every chunk for this source.

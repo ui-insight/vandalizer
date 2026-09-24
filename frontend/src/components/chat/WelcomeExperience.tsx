@@ -87,7 +87,7 @@ export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomePro
         <ValueCard
           icon={<Target size={20} />}
           title="Know your extractions are right before you trust them"
-          description="Run Validate & improve on any extraction to score it against test cases and get a one-click recipe to improve accuracy. Typically 5–15 minutes and roughly $1–$5 in LLM token usage (an estimate, not a charge to you) — and nothing changes until you click Apply."
+          description="Run Validate & improve on any extraction to score it against test cases and get a one-click recipe to improve accuracy. Typically 5–15 minutes for small extractions and up to 60–90 minutes for large ones, running on the server while you work, at roughly $1–$5 in LLM token usage (an estimate, not a charge to you) — and nothing changes until you click Apply."
         />
         <ValueCard
           icon={<Zap size={20} />}

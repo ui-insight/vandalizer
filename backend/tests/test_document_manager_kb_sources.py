@@ -12,6 +12,8 @@ current from then on (#887 follow-up).
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from app.services.document_manager import DocumentManager
 
 
@@ -115,3 +117,99 @@ class TestChromaAddBatching:
         mgr.client.get_max_batch_size.side_effect = None
         mgr.client.get_max_batch_size.return_value = 0
         assert mgr._max_add_batch() == DocumentManager._FALLBACK_MAX_ADD_BATCH
+
+
+class _FakeCollection:
+    """Just enough of a Chroma collection to watch chunks come and go."""
+
+    def __init__(self):
+        self.rows: dict[str, dict] = {}
+        self.fail_add_after: int | None = None
+        self.fail_delete = False
+
+    def add(self, ids, documents, metadatas):
+        for i, doc, meta in zip(ids, documents, metadatas):
+            if self.fail_add_after is not None and len(self.rows) >= self.fail_add_after:
+                raise RuntimeError("embedding service went away")
+            self.rows.setdefault(i, {"document": doc, "metadata": meta})
+
+    def get(self, where, include=None):
+        return {"ids": [i for i, r in self.rows.items() if r["metadata"]["source_id"] == where["source_id"]]}
+
+    def delete(self, ids=None, where=None):
+        if self.fail_delete:
+            raise RuntimeError("chroma compaction in progress")
+        for i in list(ids or []):
+            self.rows.pop(i, None)
+
+    def text_of(self, source_id):
+        return [r["document"] for r in self.rows.values() if r["metadata"]["source_id"] == source_id]
+
+
+class TestReplaceKbSource:
+    """A refresh used to delete a source's chunks and then embed the new text.
+
+    The source had no chunks for the length of the embed, a failed embed left
+    it with none, and a delete that failed quietly let ``add`` skip every
+    deterministic id — the old text stayed indexed under a source marked
+    refreshed (#726 follow-up).
+    """
+
+    def _manager(self) -> DocumentManager:
+        mgr = _manager()
+        mgr.chunk_size = 1000
+        mgr.chunk_overlap = 200
+        mgr.client = MagicMock()
+        mgr.client.get_max_batch_size.return_value = 1000
+        return mgr
+
+    def _seeded(self, mgr):
+        collection = _FakeCollection()
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            mgr.add_to_kb("kb1", "src-1", "APM 45.14", "old policy text. " * 200)
+            mgr.add_to_kb("kb1", "src-2", "Other", "a neighbouring source. " * 50)
+        return collection
+
+    def test_new_text_replaces_old_and_leaves_other_sources_alone(self):
+        mgr = self._manager()
+        collection = self._seeded(mgr)
+        other = collection.text_of("src-2")
+
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            count = mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "new policy text. " * 300)
+
+        texts = collection.text_of("src-1")
+        assert count == len(texts) > 0
+        assert all("new policy" in t for t in texts)
+        assert collection.text_of("src-2") == other
+
+    def test_a_failed_embed_keeps_the_old_chunks_and_none_of_the_new(self):
+        mgr = self._manager()
+        collection = self._seeded(mgr)
+        before = sorted(collection.text_of("src-1"))
+        collection.fail_add_after = len(collection.rows) + 1  # one new chunk lands, then failure
+
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            with pytest.raises(RuntimeError):
+                mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "new policy text. " * 300)
+
+        assert sorted(collection.text_of("src-1")) == before
+
+    def test_a_failed_delete_of_the_old_chunks_raises_instead_of_reporting_success(self):
+        mgr = self._manager()
+        collection = self._seeded(mgr)
+        collection.fail_delete = True
+
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            with pytest.raises(RuntimeError):
+                mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "new policy text. " * 300)
+
+    def test_a_second_refresh_replaces_the_first(self):
+        mgr = self._manager()
+        collection = self._seeded(mgr)
+
+        with patch.object(DocumentManager, "get_kb_collection", return_value=collection):
+            mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "second version. " * 300)
+            mgr.replace_kb_source("kb1", "src-1", "APM 45.14", "third version. " * 300)
+
+        assert all("third version" in t for t in collection.text_of("src-1"))

@@ -1126,7 +1126,7 @@ export function ExtractionEditorPanel() {
                 onChange={e => setCombinedContext(e.target.checked)}
                 style={{ accentColor: 'var(--highlight-color, #eab308)' }}
               />
-              Combined
+              Combine input
             </label>
           )}
           <button

@@ -30,6 +30,12 @@ class KBTestQuery(Document):
     # re-importing a spreadsheet updates the matching row instead of
     # duplicating it, so a test set can track a KB across versions.
     external_id: Optional[str] = None
+    # The bulk import that last wrote this row (created or updated it). Lets
+    # an evaluator pick out "the set I just imported" from the combined list
+    # and validate it in isolation. None for manual and generated rows.
+    import_batch_id: Optional[str] = None
+    import_batch_label: Optional[str] = None
+    import_batch_at: Optional[datetime.datetime] = None
     source_chunk_ids: list[str] = Field(default_factory=list)
     last_judged_score: Optional[float] = None
     last_judged_at: Optional[datetime.datetime] = None

@@ -88,6 +88,7 @@ class KBSourceResponse(BaseModel):
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; UI prefers this over title/url
     source_reference: Optional[str] = None  # user-verifiable provenance, shown as "Source: …"
+    amends_source_uuids: list[str] = []  # sources in this KB that this one revises
     status: str
     error_message: Optional[str] = None
     chunk_count: int = 0
@@ -142,6 +143,9 @@ class UpdateSourceRequest(BaseModel):
     an empty string clears that field (reverts to the auto-derived value)."""
     custom_name: Optional[str] = None
     source_reference: Optional[str] = None
+    # Replaces the list; [] clears it. Every uuid must be another source in
+    # the same knowledge base.
+    amends_source_uuids: Optional[list[str]] = None
 
 
 class KBOptimizationStatusResponse(BaseModel):

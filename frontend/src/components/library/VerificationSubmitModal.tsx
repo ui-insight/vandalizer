@@ -195,8 +195,8 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                   >
                     <Users className="h-5 w-5 mt-0.5 text-gray-500 shrink-0" aria-hidden="true" />
                     <span>
-                      <span className="block text-sm font-semibold text-gray-900">Share with my team</span>
-                      <span className="block text-xs text-gray-600 mt-0.5">Just your team, right now. No examiner involved.</span>
+                      <span className="block text-sm font-semibold text-gray-900">Share with a team</span>
+                      <span className="block text-xs text-gray-600 mt-0.5">A team you belong to — you pick which. No examiner involved.</span>
                     </span>
                   </button>
                 )}

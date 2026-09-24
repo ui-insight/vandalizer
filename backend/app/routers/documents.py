@@ -1,5 +1,4 @@
 import re
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -179,63 +178,17 @@ async def retry_extraction(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Same lazy import as dispatch_upload_tasks below: the tasks module pulls
-    # in Celery and the sync DB, which the router must not do at import time.
-    from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
-    from app.tasks.upload_tasks import dispatch_upload_tasks
-
-    in_flight = doc.processing or doc.task_status in _IN_PROGRESS_TASK_STATUSES
-    if in_flight and not _extraction_is_stale(doc):
+    if document_service.extraction_in_flight(doc) and not _extraction_is_stale(doc):
         raise HTTPException(
             status_code=409,
             detail="Extraction is already in progress for this document",
         )
 
-    # Both reads must happen before the field resets below wipe the evidence
-    # they are based on.
-    previous_task_status = doc.task_status
-    low_quality = document_service.is_extraction_low_quality(doc)
-    # Two reasons to re-read with OCR, and they are not interchangeable. An
-    # errored document usually has no stored text — every in-task error write
-    # clears it — so if OCR is down the reader may still fall back to a local
-    # reading, which is strictly more than it has. A low-quality document's
-    # local reading is exactly what is being replaced, so it may not be
-    # re-stored: ocr_required makes the reader raise instead, and the
-    # extraction task retries it with backoff. Two errored documents fall on
-    # the second side: one moved to error by the cleanup task or the stuck-
-    # document reaper still holds its text and its ratio, and one whose layer
-    # was already refused carries text_layer_rejected — the ratio that proved
-    # it is cleared by this very dispatch, so the refusal is what survives to
-    # the next click.
-    #
-    # Both flags are PDF-only: the extraction task forwards them to the PDF
-    # reader and to nothing else, so setting them for a DOCX or a spreadsheet
-    # would only record a requirement in the audit log that was never applied.
-    is_pdf = (doc.extension or "").lower().lstrip(".") == "pdf"
-    force_ocr = is_pdf and (doc.task_status == "error" or low_quality)
-    ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
-    if ocr_required:
-        doc.text_layer_rejected = True
-
-    doc.task_status = "extracting"
-    doc.processing = True
-    doc.updated_at = datetime.now()
-    doc.error_message = None
-    doc.raw_text = ""
-    doc.token_count = 0
-    doc.text_markers = []
-    doc.extraction_nonletter_ratio = None
-    doc.ingestion_warnings = []
-    await doc.save()
-
-    task_id = dispatch_upload_tasks(
-        document_uuid=doc.uuid,
-        extension=doc.extension or "",
-        document_path=doc.path,
-        user_id=user.user_id,
-        force_ocr=force_ocr,
-        ocr_required=ocr_required,
-    )
+    restart = await document_service.restart_extraction(doc, user.user_id)
+    task_id = restart["task_id"]
+    force_ocr = restart["force_ocr"]
+    ocr_required = restart["ocr_required"]
+    previous_task_status = restart["previous_task_status"]
 
     await audit_service.log_event(
         action="document.retry_extraction",
