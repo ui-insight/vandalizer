@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Play, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import {
+  type KBValidationGrader,
   type KBValidationExportFormat,
   type KBValidationMode,
   type KBValidationResult,
@@ -22,9 +23,11 @@ interface Props {
   /** Downloads the displayed run's per-query results. Absent until the run's
    * persisted uuid is known (i.e. before any run has landed this session). */
   onExport?: (format: KBValidationExportFormat) => void | Promise<void>
+  /** The system-wide grader the next run will use; null until loaded. */
+  grader?: KBValidationGrader | null
 }
 
-export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun, onExport }: Props) {
+export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun, onExport, grader = null }: Props) {
   const [mode, setMode] = useState<KBValidationMode>('judge+baseline')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -77,6 +80,21 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
         <span style={{ fontSize: 11, color: '#666' }}>
           {numQueries} {numQueries === 1 ? 'query' : 'queries'} configured
         </span>
+        {grader?.model && (
+          <span
+            data-testid="validation-grader"
+            title={
+              'Every validation run is graded by one model, set by your administrator in System Config, '
+              + 'whoever starts the run. Scores graded by different models are not directly comparable.'
+            }
+            style={{ fontSize: 11, color: grader.fallback ? '#f59e0b' : '#888' }}
+          >
+            Graded by {grader.model}
+            {grader.fallback
+              ? ` — the chosen grader ${grader.fallback.configured} is no longer configured`
+              : grader.configured ? '' : ' (default model)'}
+          </span>
+        )}
       </div>
 
       {error && (
@@ -123,6 +141,20 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
               Smoke test over {latestRun.query_selection.selected} of {latestRun.query_selection.total} test
               queries. This score is for those questions only and does not change the KB's quality score.
               The History export for this run holds just these questions.
+            </div>
+          )}
+
+          {latestRun.judge_model_fallback && (
+            <div
+              role="note"
+              style={{
+                fontSize: 11, color: '#fbbf24', padding: '6px 10px', marginBottom: 10,
+                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 6,
+              }}
+            >
+              Graded by {latestRun.judge_model_fallback.used}, not the chosen grader{' '}
+              {latestRun.judge_model_fallback.configured} (no longer in System Config). Compare this
+              score only with runs graded by the same model.
             </div>
           )}
 

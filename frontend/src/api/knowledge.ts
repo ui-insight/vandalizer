@@ -138,6 +138,19 @@ export function refreshKBSource(uuid: string, sourceUuid: string) {
   )
 }
 
+/** The model that grades this KB's validation runs (one system-wide setting). */
+export type KBValidationGrader = {
+  model: string | null
+  /** False when it is the default model because no grader was chosen. */
+  configured: boolean
+  /** Set when the chosen grader is no longer configured and the default grades instead. */
+  fallback: { configured: string; used: string; reason?: string } | null
+}
+
+export function getKBValidationGrader(uuid: string) {
+  return apiFetch<KBValidationGrader>(`/api/knowledge/${uuid}/validation-grader`)
+}
+
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
 }
@@ -270,6 +283,8 @@ export type KBValidationResult = {
   /** Set when the KB's applied override named a model System Config no
    *  longer has, so the user's model answered instead of the tuned one. */
   answer_model_fallback?: { configured: string; used: string; reason?: string } | null
+  /** Set when the configured grader was unavailable and the default graded. */
+  judge_model_fallback?: { configured: string; used: string; reason?: string } | null
   source_health: {
     total: number
     healthy: number

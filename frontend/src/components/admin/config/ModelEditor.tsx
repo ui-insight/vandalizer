@@ -6,7 +6,7 @@ import {
 import { DiagnosticsPanel, type DiagnosticFact } from './DiagnosticsPanel'
 import { useConfirm } from '../../shared/useConfirm'
 import {
-  addModel, updateModel, deleteModel, setDefaultModel, setLongDocumentModel, testModel, probeModel,
+  addModel, updateModel, deleteModel, setDefaultModel, setLongDocumentModel, setValidationJudgeModel, testModel, probeModel,
 } from '../../../api/admin'
 import type { ModelTestResult, SystemConfigData } from '../../../api/admin'
 import { ModelCharacterBars } from '../../ModelEffortPicker'
@@ -202,8 +202,12 @@ export interface ModelEditorProps {
   /** Model to fall back to when a request won't fit the chosen one. Empty
    *  disables routing. */
   longDocumentModel?: string
+  /** Model that grades every validation run. Empty = the default model. */
+  validationJudgeModel?: string
   /** Merge a model-list / default-model change back into the parent's config. */
-  onConfigPatch: (patch: { available_models?: ModelList; default_model?: string; long_document_model?: string }) => void
+  onConfigPatch: (patch: {
+    available_models?: ModelList; default_model?: string; long_document_model?: string; validation_judge_model?: string
+  }) => void
   /** Re-grade the setup checklist after a change that can affect readiness. */
   onReadinessChange: () => void
   /** The tab-level error banner is shared with the parent; the wizard also
@@ -214,7 +218,7 @@ export interface ModelEditorProps {
 }
 
 export function ModelEditor({
-  models, defaultModel, longDocumentModel = '', onConfigPatch, onReadinessChange, error, onError, ref,
+  models, defaultModel, longDocumentModel = '', validationJudgeModel = '', onConfigPatch, onReadinessChange, error, onError, ref,
 }: ModelEditorProps) {
   const confirm = useConfirm()
 
@@ -670,6 +674,37 @@ export function ModelEditor({
             </select>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
               When a document is too large for the chosen model, answer with this one instead of trimming the middle out. Pick a model with a large context window. Routing never moves a request to a model with weaker privacy, and the answer says which model was used.
+            </div>
+          </div>
+        )}
+
+        {models.length > 0 && (
+          <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
+            <label htmlFor="admin-validation-judge-model" style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+              Validation grader
+            </label>
+            <select
+              id="admin-validation-judge-model"
+              value={validationJudgeModel}
+              onChange={async e => {
+                const name = e.target.value
+                try {
+                  const res = await setValidationJudgeModel(name)
+                  onConfigPatch({ validation_judge_model: res.validation_judge_model ?? name })
+                  onError(null)
+                } catch (err) {
+                  onError(err instanceof Error ? err.message : String(err))
+                }
+              }}
+              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, maxWidth: 320 }}
+            >
+              <option value="">Default model{defaultModel ? ` (${defaultModel})` : ''}</option>
+              {models.map(m => (
+                <option key={m.id} value={m.name}>{m.name}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+              The model that grades every knowledge-base validation run, whoever starts it. Scores are only comparable when the same model graded them, so change this rarely; History marks where the grader changed.
             </div>
           </div>
         )}

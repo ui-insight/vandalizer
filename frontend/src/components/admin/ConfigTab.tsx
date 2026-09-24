@@ -562,6 +562,7 @@ export function ConfigTab() {
         models={cfg.available_models}
         defaultModel={cfg.default_model}
         longDocumentModel={cfg.long_document_model ?? ''}
+        validationJudgeModel={cfg.validation_judge_model ?? ''}
         onConfigPatch={applyModelConfigPatch}
         onReadinessChange={refreshReadiness}
         error={error}

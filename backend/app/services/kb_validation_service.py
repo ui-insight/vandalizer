@@ -1752,6 +1752,7 @@ async def run_kb_validation(
     # LLM judge — gated by skip_judge AND presence of expected_answer on any query.
     judge_payload: dict | None = None
     judge_model_used: str | None = None
+    judge_model_fallback: dict | None = None
     judge_variance: float | None = None
     # The model that generated the graded answers — set only when the judge
     # actually ran; a retrieval-only run has no task model to attribute.
@@ -1760,19 +1761,26 @@ async def run_kb_validation(
     answer_model_fallback: dict | None = None
     if test_queries and not skip_judge and any(getattr(q, "expected_answer", None) for q in test_queries):
         try:
-            # Resolve the judge model. get_user_model_name validates the user's
-            # stored selection against available_models and falls back to the
-            # system default when stale — a stale pick has no resolvable
-            # endpoint and routes to an unreachable public default host.
-            from app.services.config_service import get_user_model_name
-            judge_model_used = await get_user_model_name(user_id)
-            if judge_model_used:
+            # The grader is one system-wide setting, never the runner's chat
+            # model: scores are compared run to run, and a grader that changed
+            # with whoever pressed Run made those comparisons silently unequal.
+            # The answering side is unchanged: an applied override's model,
+            # else the runner's model. get_user_model_name validates a stored
+            # selection and falls back to the system default when it is stale
+            # (a stale pick has no resolvable endpoint).
+            from app.services.config_service import (
+                get_user_model_name,
+                get_validation_judge_model,
+            )
+            judge_model_used, judge_model_fallback = await get_validation_judge_model()
+            answer_fallback_model = await get_user_model_name(user_id)
+            if judge_model_used and answer_fallback_model:
                 # Resolve the answer config once so the persisted run can
                 # state which model actually generated the graded answers.
                 answer_cfg = await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
                 if model:
                     answer_cfg = answer_cfg.with_overrides(model=model)
-                effective_answer_model = answer_cfg.model or judge_model_used
+                effective_answer_model = answer_cfg.model or answer_fallback_model
                 # The applied override may name a model that System Config no
                 # longer has; resolution drops it and the user's model answers
                 # instead. Say so on the run, so the score is not read as the
@@ -1794,8 +1802,8 @@ async def run_kb_validation(
                 # same answer model as the KB answer (an applied override's
                 # model, else the user's), so lift measures the KB, not a swap.
                 judge_payload = await judge_test_queries(
-                    kb_uuid, test_queries, judge_model_used, mode=mode,
-                    answer_config=answer_cfg,
+                    kb_uuid, test_queries, answer_fallback_model, mode=mode,
+                    answer_config=answer_cfg, judge_model=judge_model_used,
                 )
                 # First-run variance sample: only when no prior ValidationRun exists for this KB.
                 from app.models.validation_run import ValidationRun
@@ -1901,6 +1909,9 @@ async def run_kb_validation(
         "num_runs": 1,
         "mode": mode,
         "judge_model": judge_model_used,
+        # Set when the configured grader was no longer in System Config and
+        # the default graded instead: {"configured", "used", "reason"}.
+        "judge_model_fallback": judge_model_fallback if judge_payload else None,
         # Set on a run over hand-picked queries: {"selected": n, "total": N}.
         "query_selection": query_selection,
         # Which model generated the graded answers, and whether it is the one
@@ -1927,6 +1938,7 @@ async def run_kb_validation(
             {
                 "requested_model": model,
                 "judge_model": judge_model_used,
+                "judge_model_fallback": judge_model_fallback,
                 "answer_temperature": answer_cfg.answer_temperature if answer_cfg else None,
                 "answer_model_fallback": answer_model_fallback,
             }

@@ -1125,6 +1125,30 @@ async def validate_knowledge_base(
     return result
 
 
+@router.get("/{uuid}/validation-grader")
+async def get_validation_grader(uuid: str, user: User = Depends(get_current_user)):
+    """The model that will grade this KB's next validation run.
+
+    One system-wide setting (Admin → System Config), shown on the Run tab
+    before a run starts so nobody has to infer it from History afterwards.
+    ``configured`` is False when it is the system default by omission;
+    ``fallback`` is set when the configured grader is no longer available.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.system_config import SystemConfig
+    from app.services.config_service import get_validation_judge_model
+
+    model, fallback = await get_validation_judge_model()
+    cfg = await SystemConfig.get_config()
+    configured = bool((getattr(cfg, "validation_judge_model", "") or "").strip())
+    return {"model": model or None, "configured": configured, "fallback": fallback}
+
+
 @router.get("/{uuid}/source-health")
 async def get_source_health(uuid: str, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
