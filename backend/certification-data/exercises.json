@@ -230,23 +230,23 @@
     }
   },
   "governance": {
-    "overview": "Organize, verify, and share your workflows across spaces. This module uses workflows you've already built — no new documents needed.",
+    "overview": "Organize, share, and document your workflows across spaces. This module uses workflows you've already built — no new documents needed.",
     "documents": [],
     "instructions": [
       "This module uses workflows you've already built — no new documents needed.",
       "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
       "Build or duplicate a workflow in your second space.",
       "Ensure your workflow has a clear description explaining what it does.",
-      "**Submit the workflow for verification** — this completes the module. An examiner reviews it later; you don't wait on that to finish your certification.",
+      "**Share the workflow with everyone** (⋯ → Share with everyone) — this completes the module. An examiner looks it over later, and once they accept it the shared entry is Checked; you don't wait on that to finish your certification.",
       "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
       "You now have a submitted, portable, well-documented workflow."
     ],
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
-      "1": "Submit a workflow for verification",
-      "2": "Have 1+ workflow approved by an examiner",
-      "3": "Have 2+ workflows approved by an examiner"
+      "1": "Share a workflow with everyone",
+      "2": "Have 1+ shared workflow accepted by an examiner (Checked)",
+      "3": "Have 2+ shared workflows accepted by an examiner (Checked)"
     }
   }
 }
