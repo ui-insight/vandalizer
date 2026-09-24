@@ -77,6 +77,18 @@ class TestReader:
         assert pages == [1]
         assert "unread_pages" not in report
 
+    def test_an_undrawn_image_resource_does_not_make_a_blank_page_unread(self):
+        """get_images() lists shared resources a page never draws; ink decides."""
+        white = SimpleNamespace(samples=bytes([255]) * 64)
+        page = SimpleNamespace(
+            rect=__import__("pymupdf").Rect(0, 0, 612, 792),
+            number=1,
+            get_image_info=lambda: [],
+            get_images=lambda full=False: [(7, 0, 100, 100, 8, "DeviceRGB", "", "Im0", "")],
+            get_pixmap=lambda **kw: white,
+        )
+        assert dr._page_has_unread_content(page, "") is False
+
 
 class TestFastPath:
     """The classifier is a light pass; the full parse can still flag a page
