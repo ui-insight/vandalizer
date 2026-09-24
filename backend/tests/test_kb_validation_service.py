@@ -1461,6 +1461,8 @@ def _run_kb_validation_patches(fake_kb, judge_payload, persisted: dict):
         patch.object(kb_validation_service, "check_source_health",
                      AsyncMock(return_value={"ratio": 1.0, "total": 1, "details": []})),
         patch.object(kb_validation_service, "check_chunk_coverage", AsyncMock(return_value={"ratio": 1.0})),
+        patch("app.services.kb_source_snapshot.snapshot_kb_sources",
+              AsyncMock(return_value={"recorded": True, "sources": []})),
         patch.object(kb_validation_service, "check_retrieval_precision",
                      AsyncMock(return_value={"total_queries": 1, "avg_precision": 1.0, "details": [{"query": "Q?"}]})),
         patch("app.services.config_service.get_user_model_name", AsyncMock(return_value="qwen/qwen3.8-27b")),
