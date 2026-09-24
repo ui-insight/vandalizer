@@ -49,7 +49,12 @@ async def test_passes_on_submission_without_approval():
     out = await _run([SimpleNamespace(verified=False)], [_request("submitted")])
     assert out["passed"] is True
     assert out["stars"] == 1
-    assert "approval is not required" in out["checks"][0]["detail"]
+    detail = out["checks"][0]["detail"]
+    assert "not required to pass" in detail
+    # Module 10 says "share with everyone" and "Checked"; the progress check
+    # used to say "verification", which learners read as Module 8's validation.
+    assert detail.startswith("Shared 1 workflow(s) with everyone")
+    assert "verif" not in detail.lower()
 
 
 async def test_passes_while_in_review():
