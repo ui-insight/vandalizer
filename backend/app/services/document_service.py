@@ -11,6 +11,9 @@ from app.services import access_control
 INGESTION_WARNING_LABELS = {
     "partial_ocr": "only part of this document could be converted",
     "sparse_text": "far less text than its page count suggests",
+    # A page showing content — typically an image of a page with no text
+    # layer — that no reader got text from, so it is missing from the text.
+    "unread_pages": "some pages could not be read and are missing from its text",
     # Emitted by the extraction path from `is_extraction_low_quality`, which
     # reads the stored nonletter ratio rather than these codes. Without an
     # entry here `ingestion_warnings()` filtered it straight back out, so the
@@ -48,7 +51,19 @@ def warning_text_for_codes(codes: list[str]) -> str:
 
 def ingestion_warning_text(doc: SmartDocument) -> str:
     """The warnings as one readable clause, or "" when there are none."""
-    labels = [INGESTION_WARNING_LABELS[c] for c in ingestion_warnings(doc)]
+    labels = []
+    for code in ingestion_warnings(doc):
+        pages = getattr(doc, "unread_pages", None) or []
+        if code == "unread_pages" and pages:
+            # Name the pages: "which page?" is the user's next question, and
+            # the viewer shows them all.
+            listed = ", ".join(str(p) for p in pages[:10]) + (", …" if len(pages) > 10 else "")
+            if len(pages) == 1:
+                labels.append(f"page {listed} could not be read and is missing from its text")
+            else:
+                labels.append(f"pages {listed} could not be read and are missing from its text")
+        else:
+            labels.append(INGESTION_WARNING_LABELS[code])
     return "; ".join(labels)
 
 
@@ -57,7 +72,7 @@ def ingestion_warning_text(doc: SmartDocument) -> str:
 #: contain EXTRA unvetted content, the inverse risk — telling the user content
 #: may be missing (and to retry extraction for "the full text") would assert
 #: the opposite of what happened.
-COMPLETENESS_WARNING_CODES = frozenset({"partial_ocr", "sparse_text", "low_quality_text"})
+COMPLETENESS_WARNING_CODES = frozenset({"partial_ocr", "sparse_text", "low_quality_text", "unread_pages"})
 
 
 def is_partially_ingested(doc: SmartDocument) -> bool:
@@ -281,4 +296,84 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "extraction_low_quality": is_extraction_low_quality(doc),
         "ingestion_warnings": ingestion_warnings(doc),
         "ingestion_warning_text": ingestion_warning_text(doc),
+    }
+
+
+def extraction_in_flight(doc: SmartDocument) -> bool:
+    """An extraction holds the document (it may still be stale; callers that
+    can replace a dead one check ``extraction_is_stale`` as well)."""
+    # Lazy: the tasks module pulls in Celery and the sync DB.
+    from app.tasks.document_tasks import _IN_PROGRESS_TASK_STATUSES
+
+    return bool(doc.processing) or doc.task_status in _IN_PROGRESS_TASK_STATUSES
+
+
+async def restart_extraction(doc: SmartDocument, user_id: str) -> dict:
+    """Clear a document's extracted text and re-dispatch the upload chain.
+
+    Shared by the document's Retry extraction and a knowledge-base source's
+    Reprocess, so both re-read a page the same way. Callers check
+    ``extraction_in_flight`` and authorization first.
+
+    A retry re-reads the pages with OCR when the previous extraction failed or
+    produced unreadable text; a healthy document is re-read the ordinary way.
+    Returns the dispatched task id and the OCR decisions, for the audit log.
+    """
+    import datetime as _datetime
+
+    from app.tasks.upload_tasks import dispatch_upload_tasks
+
+    # Both reads must happen before the field resets below wipe the evidence
+    # they are based on.
+    previous_task_status = doc.task_status
+    low_quality = is_extraction_low_quality(doc)
+    # Two reasons to re-read with OCR, and they are not interchangeable. An
+    # errored document usually has no stored text — every in-task error write
+    # clears it — so if OCR is down the reader may still fall back to a local
+    # reading, which is strictly more than it has. A low-quality document's
+    # local reading is exactly what is being replaced, so it may not be
+    # re-stored: ocr_required makes the reader raise instead, and the
+    # extraction task retries it with backoff. Two errored documents fall on
+    # the second side: one moved to error by the cleanup task or the stuck-
+    # document reaper still holds its text and its ratio, and one whose layer
+    # was already refused carries text_layer_rejected — the ratio that proved
+    # it is cleared by this very dispatch, so the refusal is what survives to
+    # the next click.
+    #
+    # Both flags are PDF-only: the extraction task forwards them to the PDF
+    # reader and to nothing else, so setting them for a DOCX or a spreadsheet
+    # would only record a requirement in the audit log that was never applied.
+    is_pdf = (doc.extension or "").lower().lstrip(".") == "pdf"
+    # Pages no reader got text from are exactly what a retry is for: without
+    # OCR first it would take the same local reading and miss them again.
+    missed_pages = "unread_pages" in (doc.ingestion_warnings or [])
+    force_ocr = is_pdf and (doc.task_status == "error" or low_quality or missed_pages)
+    ocr_required = is_pdf and (low_quality or doc.text_layer_rejected)
+    if ocr_required:
+        doc.text_layer_rejected = True
+
+    doc.task_status = "extracting"
+    doc.processing = True
+    doc.updated_at = _datetime.datetime.now()
+    doc.error_message = None
+    doc.raw_text = ""
+    doc.token_count = 0
+    doc.text_markers = []
+    doc.extraction_nonletter_ratio = None
+    doc.ingestion_warnings = []
+    await doc.save()
+
+    task_id = dispatch_upload_tasks(
+        document_uuid=doc.uuid,
+        extension=doc.extension or "",
+        document_path=doc.path,
+        user_id=user_id,
+        force_ocr=force_ocr,
+        ocr_required=ocr_required,
+    )
+    return {
+        "task_id": task_id,
+        "force_ocr": force_ocr,
+        "ocr_required": ocr_required,
+        "previous_task_status": previous_task_status,
     }

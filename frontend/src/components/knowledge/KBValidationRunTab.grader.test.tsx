@@ -7,7 +7,7 @@ vi.mock('../../utils/truncationWarning', () => ({ useIsAdmin: () => false }))
 function renderTab(grader: Parameters<typeof KBValidationRunTab>[0]['grader']) {
   render(
     <KBValidationRunTab
-      kbReady canManage numQueries={120} latestRun={null}
+      kbReady canManage queries={[]} latestRun={null}
       running={false} error={null} onRun={vi.fn()} grader={grader}
     />,
   )

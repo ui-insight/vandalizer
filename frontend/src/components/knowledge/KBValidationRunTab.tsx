@@ -1,25 +1,37 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Play, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import {
   type KBValidationGrader,
+  type KBTestQuery,
   type KBValidationExportFormat,
   type KBValidationMode,
   type KBValidationResult,
   type KBValidationDetail,
 } from '../../api/knowledge'
 import { explainKBScore } from './kbScoreFormula'
+import {
+  categoryCounts,
+  importBatches,
+  resolveRunSelection,
+  scopeQueries,
+  type QuestionScope,
+} from './kbQuestionSet'
 import { useIsAdmin } from '../../utils/truncationWarning'
 
 interface Props {
   kbReady: boolean
   canManage: boolean
-  numQueries: number
+  queries: KBTestQuery[]
+  /** Questions ticked on the Test Queries tab and handed here by "Run
+   *  selected", so the run is reviewed (count, categories) before it starts. */
+  selectedUuids?: string[] | null
   latestRun: KBValidationResult | null
   // Run lifecycle is owned by the parent KBValidationPanel so an in-flight run
   // survives switching away from and back to this tab.
   running: boolean
   error: string | null
-  onRun: (mode: KBValidationMode) => void
+  /** ``queryUuids`` is set for a subset run and omitted for the full set. */
+  onRun: (mode: KBValidationMode, queryUuids?: string[]) => void
   /** Downloads the displayed run's per-query results. Absent until the run's
    * persisted uuid is known (i.e. before any run has landed this session). */
   onExport?: (format: KBValidationExportFormat) => void | Promise<void>
@@ -27,11 +39,43 @@ interface Props {
   grader?: KBValidationGrader | null
 }
 
-export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun, onExport, grader = null }: Props) {
-  const [mode, setMode] = useState<KBValidationMode>('judge+baseline')
+export function KBValidationRunTab({
+  kbReady, canManage, queries, selectedUuids = null, latestRun, running, error, onRun, onExport, grader = null,
+}: Props) {
+  const handed = !!selectedUuids?.length
+  // A handed-over selection keeps "Run selected"'s old cost profile (judge
+  // only); the full-set default stays the recommended baseline comparison.
+  const [mode, setMode] = useState<KBValidationMode>(handed ? 'judge' : 'judge+baseline')
+  const [scope, setScope] = useState<QuestionScope>(handed ? 'selected' : 'all')
+  const [excluded, setExcluded] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const handleRun = () => onRun(mode)
+  const batches = useMemo(() => importBatches(queries), [queries])
+  const userCount = useMemo(() => queries.filter(q => !q.auto_generated).length, [queries])
+  const scoped = useMemo(() => scopeQueries(queries, scope, selectedUuids), [queries, scope, selectedUuids])
+  // Chips list every category in the scope, excluded ones included, so an
+  // excluded category can be switched back on.
+  const scopeCategories = useMemo(() => categoryCounts(scoped), [scoped])
+  const selection = useMemo(
+    () => resolveRunSelection(queries, scope, selectedUuids, excluded),
+    [queries, scope, selectedUuids, excluded],
+  )
+  const isSubset = selection.queryUuids !== undefined
+
+  const changeScope = (next: QuestionScope) => {
+    setScope(next)
+    setExcluded(new Set())
+  }
+
+  const toggleCategory = (cat: string) => {
+    setExcluded(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+
+  const handleRun = () => onRun(mode, selection.queryUuids)
 
   const toggle = (key: string) => {
     setExpanded(prev => {
@@ -41,10 +85,93 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
     })
   }
 
-  const disabled = !kbReady || !canManage || running
+  const disabled = !kbReady || !canManage || running || !!selection.blockedReason
+  const n = selection.questions.length
 
   return (
     <div>
+      {/* Question set — which questions this run covers */}
+      {queries.length > 0 && (
+        <div style={{
+          padding: '8px 10px', marginBottom: 10,
+          backgroundColor: '#222', border: '1px solid #333', borderRadius: 6,
+          display: 'flex', flexDirection: 'column', gap: 8,
+        }}>
+          <label style={{ fontSize: 11, color: '#aaa', display: 'inline-flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            Questions:
+            <select
+              value={scope}
+              onChange={e => changeScope(e.target.value as QuestionScope)}
+              disabled={running}
+              style={selectStyle}
+            >
+              <option value="all">All test queries ({queries.length})</option>
+              {handed && (
+                <option value="selected">Selected on Test Queries ({scopeQueries(queries, 'selected', selectedUuids).length})</option>
+              )}
+              {batches.map(b => (
+                <option key={b.id} value={`batch:${b.id}`}>
+                  Imported: {b.label}{b.at ? ` · ${new Date(b.at).toLocaleString()}` : ''} ({b.count})
+                </option>
+              ))}
+              {/* Authorship slices only when the set actually mixes both */}
+              {userCount > 0 && userCount < queries.length && (<>
+                <option value="user">User-authored ({userCount})</option>
+                <option value="auto">Auto-generated ({queries.length - userCount})</option>
+              </>)}
+            </select>
+          </label>
+
+          {scopeCategories.length > 0 && (
+            <div role="group" aria-label="Categories to include" style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, color: '#888', marginRight: 2 }}>Categories:</span>
+              {scopeCategories.map(([cat, count]) => {
+                const on = !excluded.has(cat)
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggleCategory(cat)}
+                    disabled={running}
+                    title={on ? `Exclude ${cat} questions from this run` : `Include ${cat} questions in this run`}
+                    style={{
+                      fontFamily: 'inherit', fontSize: 10, fontWeight: 600,
+                      padding: '2px 8px', borderRadius: 8, cursor: 'pointer',
+                      color: on ? '#e5e5e5' : '#666',
+                      backgroundColor: on ? '#2b3140' : 'transparent',
+                      border: `1px solid ${on ? '#3b82f6' : '#333'}`,
+                      textDecoration: on ? 'none' : 'line-through',
+                    }}
+                  >
+                    {cat} {count}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+
+          {/* The final count and distribution, stated before anything runs */}
+          <div role="status" style={{ fontSize: 11, color: '#bbb', lineHeight: 1.5 }}>
+            {selection.blockedReason ? (
+              <span style={{ color: '#f59e0b' }}>{selection.blockedReason}</span>
+            ) : (
+              <>
+                <b style={{ color: '#e5e5e5' }}>{n} {n === 1 ? 'question' : 'questions'}</b> will run
+                {n > 0 && (
+                  <> — {categoryCounts(selection.questions).map(([c, k]) => `${c} ${k}`).join(' · ')}</>
+                )}
+                <div style={{ color: isSubset ? '#fbbf24' : '#888' }}>
+                  {isSubset
+                    ? `Subset run (${n} of ${queries.length}): recorded in History as a smoke test and does not change the KB's quality score.`
+                    : "Full run: updates the KB's quality score."}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Run controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <button
@@ -61,25 +188,19 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
           }}
         >
           {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
-          {running ? 'Running…' : 'Run Validation'}
+          {running ? 'Running…' : queries.length > 0 ? `Run ${n} ${n === 1 ? 'question' : 'questions'}` : 'Run Validation'}
         </button>
         <label style={{ fontSize: 11, color: '#aaa', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           Mode:
           <select
             value={mode}
             onChange={e => setMode(e.target.value as KBValidationMode)}
-            style={{
-              background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
-              borderRadius: 4, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
-            }}
+            style={selectStyle}
           >
             <option value="judge+baseline">Score vs. no-KB (recommended)</option>
             <option value="judge">Score only</option>
           </select>
         </label>
-        <span style={{ fontSize: 11, color: '#666' }}>
-          {numQueries} {numQueries === 1 ? 'query' : 'queries'} configured
-        </span>
         {grader?.model && (
           <span
             data-testid="validation-grader"
@@ -113,7 +234,7 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
         </div>
       ) : !latestRun ? (
         <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
-          No validation run yet. Click <b>Run Validation</b> to evaluate this KB.
+          No validation run yet. Choose the questions above and click <b>Run</b> to evaluate this KB.
         </div>
       ) : (
         <div>
@@ -155,6 +276,18 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
               Graded by {latestRun.judge_model_fallback.used}, not the chosen grader{' '}
               {latestRun.judge_model_fallback.configured} (no longer in System Config). Compare this
               score only with runs graded by the same model.
+            </div>
+          )}
+          {latestRun.question_set && (
+            <div
+              style={{ fontSize: 10, color: '#888', marginBottom: 10 }}
+              title="Fingerprint of the exact questions, expected answers, categories and source labels this run used. Runs with different fingerprints measured different question sets."
+            >
+              Question set <code style={{ color: '#a78bfa' }}>{latestRun.question_set.fingerprint}</code>
+              {' · '}{latestRun.question_set.count} {latestRun.question_set.count === 1 ? 'question' : 'questions'}
+              {Object.keys(latestRun.question_set.category_counts).length > 0 && (
+                <> · {Object.entries(latestRun.question_set.category_counts).map(([c, k]) => `${c} ${k}`).join(' · ')}</>
+              )}
             </div>
           )}
 
@@ -478,4 +611,10 @@ function discColor(d: string) {
   if (d === 'redundant') return '#888'
   if (d === 'failing') return '#ef4444'
   return '#666'
+}
+
+const selectStyle: React.CSSProperties = {
+  background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
+  borderRadius: 4, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
+  maxWidth: 360,
 }

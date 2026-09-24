@@ -291,6 +291,7 @@ def _source_response(
         url_title=s.url_title or "",
         custom_name=s.custom_name,
         source_reference=getattr(s, "source_reference", None),
+        amends_source_uuids=list(getattr(s, "amends_source_uuids", None) or []),
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
@@ -901,6 +902,37 @@ async def refresh_source(
     return {"ok": True, "status": "queued", "source_uuid": source.uuid}
 
 
+@router.post("/{uuid}/source/{source_uuid}/reprocess")
+@limiter.limit("10/minute")
+async def reprocess_source(
+    request: Request, uuid: str, source_uuid: str, user: User = Depends(get_current_user),
+):
+    """Run one source through extraction, chunking and embedding again, in place.
+
+    Web sources re-fetch (the same work as ``/refresh``). Document sources
+    re-index the document's text, re-reading the document first only when it
+    has no usable text. The response's ``mode`` says which: ``refetch``,
+    ``reindex``, ``reextract``, or ``waiting`` (an extraction already running
+    will index it). The source reports ``pending``/``processing`` until it
+    lands, then ``ready`` with its new chunk count and dates, or ``error``
+    with the reason. 409 while already in progress.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+    from app.services.kb_source_reprocess import ReprocessRefused, reprocess_source as _reprocess
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        return await _reprocess(kb, source, user)
+    except ReprocessRefused as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
 @router.post("/{uuid}/refresh-web-sources")
 @limiter.limit("5/minute")
 async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(get_current_user)):
@@ -1002,9 +1034,11 @@ async def update_source(
 ):
     """Update a single source within a KB.
 
-    Send ``custom_name`` to set a user-facing label, or ``source_reference`` to
-    set the verifiable provenance shown as "Source: …". Only fields explicitly
-    present in the request are applied; an empty string clears that field.
+    Send ``custom_name`` to set a user-facing label, ``source_reference`` to
+    set the verifiable provenance shown as "Source: …", or
+    ``amends_source_uuids`` to say which sources in this KB this one revises.
+    Only fields explicitly present in the request are applied; an empty string
+    (or list) clears that field.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
@@ -1017,6 +1051,11 @@ async def update_source(
         source = await svc.update_source_name(kb, source_uuid, req.custom_name)
     if "source_reference" in fields_set:
         source = await svc.set_source_reference(kb, source_uuid, req.source_reference)
+    if "amends_source_uuids" in fields_set:
+        try:
+            source = await svc.set_source_amends(kb, source_uuid, req.amends_source_uuids or [])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
     titles = await _resolve_document_titles([source])
@@ -1381,6 +1420,11 @@ def _serialize_test_query(q) -> dict:
         "category": q.category,
         "notes": getattr(q, "notes", None),
         "external_id": getattr(q, "external_id", None),
+        "import_batch_id": getattr(q, "import_batch_id", None),
+        "import_batch_label": getattr(q, "import_batch_label", None),
+        "import_batch_at": (
+            q.import_batch_at.isoformat() if getattr(q, "import_batch_at", None) else None
+        ),
         "auto_generated": q.auto_generated,
         "source_chunk_ids": q.source_chunk_ids,
         "last_judged_score": q.last_judged_score,
@@ -1453,6 +1497,7 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
     """
     import base64
     import datetime as _datetime
+    import uuid as _uuid
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
@@ -1506,6 +1551,14 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
 
     created = updated = skipped = 0
     now = _datetime.datetime.now(tz=_datetime.timezone.utc)
+    # Every row this file writes — new or updated — joins one batch, so the
+    # Run tab can validate exactly this file's questions on their own.
+    batch_id = _uuid.uuid4().hex
+    batch = {
+        "import_batch_id": batch_id,
+        "import_batch_label": filename[:200],
+        "import_batch_at": now,
+    }
     for row in rows:
         target = by_external_id.get(row["external_id"]) if row["external_id"] else None
         if target is not None:
@@ -1516,6 +1569,9 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
             target.category = row["category"]
             target.notes = row["notes"]
             target.updated_at = now
+            target.import_batch_id = batch["import_batch_id"]
+            target.import_batch_label = batch["import_batch_label"]
+            target.import_batch_at = batch["import_batch_at"]
             await target.save()
             seen_questions.add(row["query"].strip().lower())
             updated += 1
@@ -1533,6 +1589,7 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
             notes=row["notes"],
             external_id=row["external_id"],
             user_id=user.user_id,
+            **batch,
         )
         await tq.insert()
         seen_questions.add(row["query"].strip().lower())
@@ -1570,6 +1627,8 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
         "total_rows": len(rows) + len(row_errors),
         "errors": row_errors,
         "unmatched_source_labels": unmatched,
+        # None when the file wrote nothing, so there is no batch to select.
+        "import_batch_id": batch_id if (created or updated) else None,
     }
 
 

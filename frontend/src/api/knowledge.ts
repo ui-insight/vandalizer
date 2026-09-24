@@ -151,6 +151,19 @@ export function getKBValidationGrader(uuid: string) {
   return apiFetch<KBValidationGrader>(`/api/knowledge/${uuid}/validation-grader`)
 }
 
+/** What a Reprocess queued: a web page re-fetch, a re-index of a document's
+ *  text, a re-read of a document with no usable text, or a wait on an
+ *  extraction that is already running. */
+export type KBSourceReprocessMode = 'refetch' | 'reindex' | 'reextract' | 'waiting'
+
+/** Run one source through extraction, chunking and embedding again, in place (background). */
+export function reprocessKBSource(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; mode: KBSourceReprocessMode; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/reprocess`,
+    { method: 'POST' },
+  )
+}
+
 export function getKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
 }
@@ -164,6 +177,7 @@ export interface KBSourceResponse {
   url_title?: string | null
   custom_name?: string | null
   source_reference?: string | null
+  amends_source_uuids?: string[]
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number
@@ -186,6 +200,14 @@ export function setKBSourceReference(uuid: string, sourceUuid: string, sourceRef
   return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'PATCH',
     body: JSON.stringify({ source_reference: sourceReference }),
+  })
+}
+
+/** Replace the list of sources in this KB that a source amends. Pass `[]` to clear. */
+export function setKBSourceAmends(uuid: string, sourceUuid: string, amendsSourceUuids: string[]) {
+  return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ amends_source_uuids: amendsSourceUuids }),
   })
 }
 
@@ -285,6 +307,10 @@ export type KBValidationResult = {
   answer_model_fallback?: { configured: string; used: string; reason?: string } | null
   /** Set when the configured grader was unavailable and the default graded. */
   judge_model_fallback?: { configured: string; used: string; reason?: string } | null
+  /** The exact questions the run measured, frozen at run time. Two runs with
+   *  different fingerprints scored different questions or expectations.
+   *  Absent on runs from before it was recorded. */
+  question_set?: KBQuestionSet | null
   source_health: {
     total: number
     healthy: number
@@ -414,6 +440,11 @@ export type KBTestQuery = {
   category: string | null
   notes: string | null
   external_id: string | null
+  /** The bulk import that last wrote this row (null for manual and generated
+   *  rows). Lets the Run tab validate one imported file on its own. */
+  import_batch_id?: string | null
+  import_batch_label?: string | null
+  import_batch_at?: string | null
   auto_generated: boolean
   source_chunk_ids: string[]
   last_judged_score: number | null
@@ -477,6 +508,22 @@ export function bulkDeleteKBTestQueries(uuid: string, queryUuids: string[]) {
 }
 
 
+export type KBQuestionSet = {
+  fingerprint: string
+  count: number
+  category_counts: Record<string, number>
+  questions?: {
+    query_uuid: string
+    external_id: string | null
+    query: string
+    expected_answer: string | null
+    expected_answer_contains: string | null
+    category: string | null
+    expected_source_labels: string[]
+    import_batch_label: string | null
+  }[]
+}
+
 export type KBTestQueryImportResult = {
   created: number
   updated: number
@@ -489,6 +536,9 @@ export type KBTestQueryImportResult = {
    * retrieval precision on every question that carries it.
    */
   unmatched_source_labels?: { label: string; questions: number }[]
+  /** The batch every row this file wrote was tagged with; null when the file
+   *  wrote nothing. */
+  import_batch_id?: string | null
 }
 
 /**

@@ -1456,4 +1456,19 @@ def _run_to_dict(r: ValidationRun) -> dict:
             r.result_snapshot.get("query_selection")
             if isinstance(r.result_snapshot, dict) else None
         ),
+        # {"fingerprint", "count", "category_counts"} of the KB questions the
+        # run measured; the full list stays in result_snapshot. None on runs
+        # from before question sets were recorded.
+        "question_set": _question_set_summary(r.result_snapshot),
+    }
+
+
+def _question_set_summary(snapshot) -> Optional[dict]:
+    qs = snapshot.get("question_set") if isinstance(snapshot, dict) else None
+    if not isinstance(qs, dict) or not qs.get("fingerprint"):
+        return None
+    return {
+        "fingerprint": qs["fingerprint"],
+        "count": qs.get("count"),
+        "category_counts": qs.get("category_counts") or {},
     }
