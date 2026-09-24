@@ -104,6 +104,9 @@ export interface KnowledgeBaseSource {
   url_title?: string
   custom_name?: string | null
   source_reference?: string | null
+  // Sources in this KB that this one revises (a supplement or notice).
+  // Retrieval searches this source whenever one of those is retrieved.
+  amends_source_uuids?: string[]
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string
   chunk_count: number

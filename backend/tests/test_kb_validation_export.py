@@ -559,3 +559,28 @@ def test_a_run_with_no_source_record_exports_without_a_sources_sheet():
     from openpyxl import load_workbook
     wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows, payload["kb_sources"])))
     assert "Sources" not in wb.sheetnames
+
+
+def test_export_names_the_question_set_the_run_measured():
+    """Concatenated exports from runs over different question sets must be
+    tellable apart row by row; older runs without a snapshot export blank."""
+    kb, vr, queries = _make_kb(), _make_vr(), _make_queries()
+    vr.result_snapshot["question_set"] = {
+        "fingerprint": "abc123def456", "count": 2,
+        "category_counts": {"factual": 2}, "questions": [],
+    }
+
+    _payload, run_meta, rows = build_kb_validation_results_export(
+        kb=kb, vr=vr, test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+    assert run_meta["question_set_fingerprint"] == "abc123def456"
+    assert run_meta["question_set_categories"] == {"factual": 2}
+    parsed = list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))
+    assert dict(zip(parsed[0], parsed[1]))["question_set_fingerprint"] == "abc123def456"
+
+    _payload, older_meta, _rows = build_kb_validation_results_export(
+        kb=kb, vr=_make_vr(), test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+    assert older_meta["question_set_fingerprint"] is None

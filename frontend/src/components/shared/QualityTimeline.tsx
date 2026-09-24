@@ -42,6 +42,26 @@ export interface QualityHistoryItem {
    *  ``requested`` (newer runs) is what the caller asked for; the route now
    *  refuses a selection that doesn't fully match, so it equals ``selected``. */
   query_selection?: { selected: number; requested?: number; total: number } | null
+  /** KB runs: the question set measured. Absent on older runs and on other
+   *  item kinds, which then show no set marker. */
+  question_set?: { fingerprint: string; count?: number | null; category_counts?: Record<string, number> } | null
+}
+
+/** For each row, whether it measured a different question set than the
+ *  nearest older run of the same kind (full vs. subset) that recorded one.
+ *  Comparing a full run with a smoke test would flag every full run after a
+ *  spot-check, so the two tracks are compared separately. ``items`` is newest
+ *  first, as history returns it. */
+export function questionSetChanges(items: QualityHistoryItem[]): boolean[] {
+  return items.map((it, i) => {
+    const fp = it.question_set?.fingerprint
+    if (!fp) return false
+    const smoke = it.source === SMOKE_TEST_SOURCE
+    const prev = items.slice(i + 1).find(
+      o => o.question_set?.fingerprint && (o.source === SMOKE_TEST_SOURCE) === smoke,
+    )
+    return !!prev && prev.question_set!.fingerprint !== fp
+  })
 }
 
 /** Source tag for a "Run selected" smoke test — a run over hand-picked
@@ -171,6 +191,7 @@ export function QualityTimeline({
   }
 
   const ordered = [...items].reverse()
+  const setChanges = questionSetChanges(items)
   // Smoke tests don't set the axis: a 2-of-150 run at 100% must not stretch
   // the scale the full runs are read against. (They still draw, faded and
   // outlined, at their position on the full-run scale.)
@@ -302,15 +323,23 @@ export function QualityTimeline({
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.slice(0, 10).map((it, i) => (
-          <Row key={it.uuid || i} item={it} sampleNoun={sampleNoun} onExportRun={onExportRun} />
+          <Row
+            key={it.uuid || i}
+            item={it}
+            setChanged={setChanges[i]}
+            sampleNoun={sampleNoun}
+            onExportRun={onExportRun}
+          />
         ))}
       </div>
     </div>
   )
 }
 
-function Row({ item, sampleNoun, onExportRun }: {
+function Row({ item, setChanged = false, sampleNoun, onExportRun }: {
   item: QualityHistoryItem
+  /** This run measured a different question set than the one before it. */
+  setChanged?: boolean
   sampleNoun: string
   onExportRun?: (runUuid: string, format: QualityRunExportFormat) => void | Promise<void>
 }) {
@@ -350,6 +379,29 @@ function Row({ item, sampleNoun, onExportRun }: {
             style={{ marginLeft: 6, color: '#fbbf24' }}
           >
             · selected{item.query_selection ? ` ${item.query_selection.selected}/${item.query_selection.total}` : ''}
+          </span>
+        )}
+        {item.question_set && (
+          <span
+            title={
+              `Question set ${item.question_set.fingerprint}` +
+              (item.question_set.count != null ? ` · ${item.question_set.count} ${sampleNoun}` : '') +
+              (item.question_set.category_counts && Object.keys(item.question_set.category_counts).length
+                ? ` · ${Object.entries(item.question_set.category_counts).map(([c, k]) => `${c} ${k}`).join(', ')}`
+                : '') +
+              '. Runs with the same set scored the same questions, expected answers, categories and source labels.'
+            }
+            style={{ marginLeft: 6, color: '#666' }}
+          >
+            · set <code style={{ fontSize: 10 }}>{item.question_set.fingerprint.slice(0, 6)}</code>
+          </span>
+        )}
+        {setChanged && (
+          <span
+            title={`This run measured a different question set than the previous ${item.source === SMOKE_TEST_SOURCE ? 'subset' : 'full'} run — ${sampleNoun} were added, removed or edited, so the two scores are not directly comparable.`}
+            style={{ marginLeft: 6, color: '#f59e0b' }}
+          >
+            · different {sampleNoun}
           </span>
         )}
       </span>

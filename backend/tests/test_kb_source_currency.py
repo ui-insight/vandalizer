@@ -190,6 +190,7 @@ def _result(text: str) -> WebFetchResult:
 
 def _dm(chunks=7):
     dm = MagicMock()
+    dm.replace_kb_source.return_value = chunks
     dm.add_to_kb.return_value = chunks
     return dm
 
@@ -224,7 +225,7 @@ class TestRefreshCurrency:
             reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
         assert reason is None
-        dm.add_to_kb.assert_called_once()
+        dm.replace_kb_source.assert_called_once()
         assert src.last_refresh_outcome == cur.OUTCOME_REFRESHED
         assert src.last_refresh_error is None
         assert src.content_hash == cur.content_fingerprint(NEW_TEXT)
@@ -249,8 +250,7 @@ class TestRefreshCurrency:
             reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
         assert reason is None
-        dm.delete_kb_source.assert_not_called()
-        dm.add_to_kb.assert_not_called()
+        dm.replace_kb_source.assert_not_called()
         assert src.last_refresh_outcome == cur.OUTCOME_UNCHANGED
         assert src.last_refresh_error is None
         assert src.error_message is None
@@ -272,7 +272,7 @@ class TestRefreshCurrency:
             reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
         assert reason is None
-        dm.add_to_kb.assert_called_once()
+        dm.replace_kb_source.assert_called_once()
         assert src.last_refresh_outcome == cur.OUTCOME_REFRESHED
         assert src.status == "ready"
 
@@ -284,7 +284,7 @@ class TestRefreshCurrency:
              patch.object(knowledge_service, "_get_dm", return_value=dm):
             await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
-        dm.add_to_kb.assert_called_once()
+        dm.replace_kb_source.assert_called_once()
         assert src.content_hash == cur.content_fingerprint(OLD_TEXT)
         assert src.last_refresh_outcome == cur.OUTCOME_REFRESHED
 
@@ -292,13 +292,16 @@ class TestRefreshCurrency:
     async def test_reindex_failure_records_ingestion_failed(self):
         src = _source()
         dm = _dm()
-        dm.add_to_kb.side_effect = RuntimeError("chroma down")
+        dm.replace_kb_source.side_effect = RuntimeError("chroma down")
         with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(NEW_TEXT))), \
              patch.object(knowledge_service, "_get_dm", return_value=dm):
             reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
         assert "re-indexing" in reason
-        assert src.status == "error"
+        # The swap never removed the old chunks, so the source still answers
+        # from them and says so.
+        assert src.status == "ready"
+        assert src.error_message.startswith("Refresh failed while re-indexing — previous content kept")
         assert src.last_refresh_outcome == cur.OUTCOME_INGESTION_FAILED
         assert src.last_refresh_error == reason
         # Retrieval worked; what is retained is still the old text.
@@ -307,6 +310,18 @@ class TestRefreshCurrency:
         assert src.content_retrieved_at == T_OLD
         assert src.content_hash == cur.content_fingerprint(OLD_TEXT)
         assert cur.derive_source_currency(src)["status"] == cur.STATUS_INGESTION_FAILED
+
+    @pytest.mark.asyncio
+    async def test_reindex_failure_on_an_errored_source_stays_error(self):
+        src = _source(status="error", chunk_count=0)
+        dm = _dm()
+        dm.replace_kb_source.side_effect = RuntimeError("chroma down")
+        with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(NEW_TEXT))), \
+             patch.object(knowledge_service, "_get_dm", return_value=dm):
+            reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+        assert src.status == "error"
+        assert src.error_message == reason
 
 
 # ---------------------------------------------------------------------------

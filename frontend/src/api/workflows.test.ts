@@ -9,6 +9,8 @@ import {
   addTask,
   deleteTask,
   runWorkflow,
+  downloadResults,
+  downloadBatchResults,
 } from './workflows'
 
 const mockFetch = vi.fn()
@@ -107,5 +109,16 @@ describe('Workflow Execution', () => {
     expect(call[1].method).toBe('POST')
     const body = JSON.parse(call[1].body)
     expect(body.document_uuids).toEqual(['doc-1', 'doc-2'])
+  })
+})
+
+describe('Download URLs', () => {
+  // The server names the file for the run's date and time in this zone.
+  it('send the browser time zone so the file name shows the local run time', () => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const single = new URL(downloadResults('sess-1', 'pdf'), 'http://x')
+    const batch = new URL(downloadBatchResults('batch-1', 'pdf'), 'http://x')
+    expect(single.searchParams.get('tz')).toBe(tz)
+    expect(batch.searchParams.get('tz')).toBe(tz)
   })
 })

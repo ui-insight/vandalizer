@@ -20,19 +20,26 @@ from app.services import kb_validation_service
 SNAPSHOT = {"recorded": True, "fingerprint": "f00", "total_sources": 1, "total_chunks": 4, "sources": []}
 
 
-def _tq(uuid: str) -> MagicMock:
-    tq = MagicMock()
-    tq.uuid, tq.query, tq.expected_answer, tq.category = uuid, f"Q {uuid}?", "A", None
-    return tq
+def _tq(uuid: str, **overrides) -> SimpleNamespace:
+    fields = {
+        "uuid": uuid, "query": f"Q {uuid}?", "expected_answer": "A", "category": None,
+        "external_id": None, "expected_answer_contains": None,
+        "expected_source_labels": [], "notes": None, "import_batch_label": None,
+    }
+    fields.update(overrides)
+    return SimpleNamespace(**fields)
 
 
-async def _run(query_uuids, all_uuids=("q1", "q2", "q3")):
+async def _run(query_uuids, all_uuids=("q1", "q2", "q3"), queries=None):
     """run_kb_validation with everything it touches stubbed. Returns
     (result, persist kwargs, the queries the judge saw)."""
     fake_kb = MagicMock()
     fake_kb.uuid, fake_kb.title, fake_kb.rag_config_override = "kb-1", "KB", None
     find = MagicMock()
-    find.to_list = AsyncMock(return_value=[_tq(u) for u in all_uuids])
+    if queries is None:
+        queries = [_tq(u) for u in all_uuids]
+    all_uuids = [q.uuid for q in queries]
+    find.to_list = AsyncMock(return_value=queries)
     persisted: dict = {}
 
     async def fake_persist(**kw):
@@ -64,6 +71,9 @@ async def _run(query_uuids, all_uuids=("q1", "q2", "q3")):
         ))
         stack.enter_context(patch.object(
             kb_validation_service, "check_retrieval_precision", AsyncMock(side_effect=fake_precision),
+        ))
+        stack.enter_context(patch(
+            "app.services.config_service.get_validation_judge_model", AsyncMock(return_value=("m", None)),
         ))
         stack.enter_context(patch(
             "app.services.config_service.get_user_model_name", AsyncMock(return_value="m"),
@@ -209,3 +219,55 @@ def test_export_run_meta_carries_the_selection():
     assert run_meta["query_selection"] == {"selected": 2, "total": 150}
     assert [r["query_uuid"] for r in rows] == ["q1", "q3"]
     assert payload["validation_run"]["query_selection"]["selected"] == 2
+
+
+# ---------------------------------------------------------------------------
+# Every run keeps a snapshot of the exact questions it measured
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_snapshots_the_questions_it_measured():
+    queries = [
+        _tq("q1", category="factual", external_id="NEW-1",
+            expected_source_labels=["Doc A"], import_batch_label="set.csv"),
+        _tq("q2", category="summary"),
+        _tq("q3", category="factual"),
+    ]
+    result, persisted, _ = await _run(["q1", "q3"], queries=queries)
+
+    qs = result["question_set"]
+    assert qs["count"] == 2
+    assert qs["category_counts"] == {"factual": 2}
+    assert [q["query_uuid"] for q in qs["questions"]] == ["q1", "q3"]
+    first = qs["questions"][0]
+    assert first["external_id"] == "NEW-1"
+    assert first["expected_answer"] == "A"
+    assert first["expected_source_labels"] == ["Doc A"]
+    assert first["import_batch_label"] == "set.csv"
+    # Persisted with the run, so History and exports read it back.
+    assert persisted["result"]["question_set"] is qs
+
+
+def test_fingerprint_tracks_what_a_run_grades_and_nothing_else():
+    from app.services.kb_validation_service import question_set_snapshot
+
+    base = [_tq("q1", category="factual"), _tq("q2")]
+    fp = question_set_snapshot(base)["fingerprint"]
+
+    # Order and import provenance do not change the set.
+    assert question_set_snapshot(list(reversed(base)))["fingerprint"] == fp
+    relabelled = [_tq("q1", category="factual", import_batch_label="again.csv"), _tq("q2")]
+    assert question_set_snapshot(relabelled)["fingerprint"] == fp
+
+    # A new question, an edited expected answer, a changed source label or
+    # category each make it a different set.
+    for changed in (
+        [*base, _tq("q3")],
+        [_tq("q1", category="factual", expected_answer="B"), _tq("q2")],
+        [_tq("q1", category="factual", expected_source_labels=["Doc Z"]), _tq("q2")],
+        [_tq("q1", category="summary"), _tq("q2")],
+    ):
+        assert question_set_snapshot(changed)["fingerprint"] != fp
+
+    assert question_set_snapshot(base)["category_counts"] == {"factual": 1, "uncategorized": 1}

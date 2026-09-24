@@ -1466,6 +1466,67 @@ class TestModelsAddressedById:
         assert resp.json()["default_model"] == ""
 
 
+class TestValidationGraderSetting:
+    """PUT /api/admin/config/models/validation-judge, and the grader pointer
+    across a model rename or delete."""
+
+    async def _call(self, client, cfg, method, path, **kw):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin._audit", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            return await getattr(client, method)(path, cookies=cookies, headers=headers, **kw)
+
+    @staticmethod
+    def _cfg(grader=""):
+        return SimpleNamespace(
+            available_models=[_model("alpha", "id-alpha"), _model("bravo", "id-bravo")],
+            oauth_providers=[], default_model="alpha",
+            validation_judge_model=grader, save=AsyncMock(),
+        )
+
+    @pytest.mark.asyncio
+    async def test_set_and_clear(self, client):
+        cfg = self._cfg()
+        resp = await self._call(client, cfg, "put", "/api/admin/config/models/validation-judge", json={"name": "bravo"})
+        assert resp.status_code == 200
+        assert cfg.validation_judge_model == "bravo"
+
+        resp = await self._call(client, cfg, "put", "/api/admin/config/models/validation-judge", json={"name": ""})
+        assert resp.status_code == 200
+        assert cfg.validation_judge_model == ""
+
+    @pytest.mark.asyncio
+    async def test_unknown_model_is_404(self, client):
+        cfg = self._cfg()
+        resp = await self._call(client, cfg, "put", "/api/admin/config/models/validation-judge", json={"name": "nope"})
+        assert resp.status_code == 404
+        assert cfg.validation_judge_model == ""
+
+    @pytest.mark.asyncio
+    async def test_deleting_the_grader_hands_grading_to_the_default(self, client):
+        cfg = self._cfg("bravo")
+        resp = await self._call(client, cfg, "delete", "/api/admin/config/models/id-bravo")
+        assert resp.status_code == 200
+        assert cfg.validation_judge_model == ""
+
+    @pytest.mark.asyncio
+    async def test_renaming_the_grader_keeps_it_the_grader(self, client):
+        cfg = self._cfg("bravo")
+        resp = await self._call(
+            client, cfg, "put", "/api/admin/config/models/id-bravo",
+            json={"name": "bravo-2", "tag": "bravo", "api_key": "***"},
+        )
+        assert resp.status_code == 200
+        assert cfg.validation_judge_model == "bravo-2"
+
+
 class TestTestModelAddressedById:
     """POST /api/admin/config/test-model/{model_id} — stable-id addressing.
 
