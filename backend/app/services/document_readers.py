@@ -214,13 +214,21 @@ def _page_text_with_table_rows(page) -> str:
     band_of = {i: b for b, band in enumerate(bands) for i in band}
     out: list[str] = []
     emitted: set[int] = set()
+
+    def emit(b: int) -> None:
+        emitted.add(b)
+        out.append(header_prefix.get(b, "") + "\t".join(c["text"].strip() for c in cells(bands[b])))
+
     for idx, ln in enumerate(lines):
         b = band_of[idx]
         if not joined[b]:
             out.append(ln["text"])
         elif b not in emitted:
-            emitted.add(b)
-            out.append(header_prefix.get(b, "") + "\t".join(c["text"].strip() for c in cells(bands[b])))
+            # A content stream written column by column reaches the rows'
+            # label column before the header cells: the header goes first.
+            if b > 0 and joined[b - 1] and not is_row[b - 1] and (b - 1) not in emitted:
+                emit(b - 1)
+            emit(b)
     return "\n".join(out) + "\n"
 
 

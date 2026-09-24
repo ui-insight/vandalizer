@@ -103,3 +103,16 @@ def test_page_markers_still_point_at_each_page(tmp_path):
     second = next(m for m in markers if m["value"] == 2)
     # The offset lands on the "\n" that joins pages (unchanged by this fix).
     assert text[second["char_offset"]:].lstrip("\n").startswith("Second page narrative.")
+
+
+def test_header_precedes_rows_when_the_stream_is_written_column_by_column():
+    doc = pymupdf.open()
+    page = doc.new_page(width=792, height=612)
+    for c, x in enumerate(COLS):
+        if c:
+            page.insert_text((x, 80), HEADER[c - 1], fontsize=9)
+        for r, row in enumerate(ROWS):
+            page.insert_text((x, 100 + 16 * r), row[c], fontsize=9)
+    lines = _lines(_page_text_with_table_rows(page))
+    assert lines[0] == ["", *HEADER]
+    assert lines[2] == list(ROWS[1])
