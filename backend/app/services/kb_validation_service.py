@@ -3,6 +3,8 @@ and LLM-as-judge answer evaluation (with optional baseline ablation for lift mea
 """
 
 import asyncio
+import hashlib
+import json
 import logging
 from contextvars import ContextVar
 from typing import Callable, Optional
@@ -1508,6 +1510,56 @@ def _query_identity(tq) -> dict:
         "notes": getattr(tq, "notes", None) or "",
         "expected_answer": getattr(tq, "expected_answer", None) or "",
         "category": getattr(tq, "category", None),
+        "expected_sources": list(getattr(tq, "expected_source_labels", None) or []),
+    }
+
+
+# Category label for questions without one, in counts and the Run tab summary.
+UNCATEGORIZED = "uncategorized"
+
+
+def question_set_snapshot(test_queries: list) -> dict:
+    """Freeze the exact questions a run measured.
+
+    Test sets change between runs — an import adds rows, an edit rewrites an
+    expected answer — and two scores are only comparable when they measured
+    the same questions against the same expectations. The snapshot keeps each
+    question as it stood at run time, and ``fingerprint`` hashes that content
+    so History can flag a run whose set differs from the one before it
+    without diffing hundreds of rows.
+
+    The fingerprint covers identity and every field that changes what a run
+    grades (question, expected answer and substring, category, source
+    labels). Import-batch provenance and notes are recorded but not hashed:
+    re-importing an unchanged file must not read as a different set.
+    """
+    questions = []
+    categories: dict[str, int] = {}
+    for tq in sorted(test_queries, key=lambda q: getattr(q, "uuid", "") or ""):
+        category = getattr(tq, "category", None)
+        categories[category or UNCATEGORIZED] = categories.get(category or UNCATEGORIZED, 0) + 1
+        questions.append({
+            "query_uuid": getattr(tq, "uuid", "") or "",
+            "external_id": getattr(tq, "external_id", None),
+            "query": tq.query,
+            "expected_answer": getattr(tq, "expected_answer", None),
+            "expected_answer_contains": getattr(tq, "expected_answer_contains", None),
+            "category": category,
+            "expected_source_labels": list(getattr(tq, "expected_source_labels", None) or []),
+            "import_batch_label": getattr(tq, "import_batch_label", None),
+        })
+    hashed = [
+        {k: v for k, v in q.items() if k != "import_batch_label"}
+        for q in questions
+    ]
+    digest = hashlib.sha256(
+        json.dumps(hashed, sort_keys=True, ensure_ascii=False).encode("utf-8"),
+    ).hexdigest()
+    return {
+        "fingerprint": digest[:12],
+        "count": len(questions),
+        "category_counts": dict(sorted(categories.items())),
+        "questions": questions,
     }
 
 
@@ -1903,6 +1955,9 @@ async def run_kb_validation(
         "judge_model": judge_model_used,
         # Set on a run over hand-picked queries: {"selected": n, "total": N}.
         "query_selection": query_selection,
+        # The exact questions this run measured, frozen at run time, with a
+        # fingerprint so History can tell runs over different sets apart.
+        "question_set": question_set_snapshot(test_queries),
         # Which model generated the graded answers, and whether it is the one
         # the applied override asked for.
         "answer_model": effective_answer_model if judge_payload else None,

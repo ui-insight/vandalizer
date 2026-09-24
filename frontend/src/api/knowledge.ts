@@ -270,6 +270,10 @@ export type KBValidationResult = {
   /** Set when the KB's applied override named a model System Config no
    *  longer has, so the user's model answered instead of the tuned one. */
   answer_model_fallback?: { configured: string; used: string; reason?: string } | null
+  /** The exact questions the run measured, frozen at run time. Two runs with
+   *  different fingerprints scored different questions or expectations.
+   *  Absent on runs from before it was recorded. */
+  question_set?: KBQuestionSet | null
   source_health: {
     total: number
     healthy: number
@@ -399,6 +403,11 @@ export type KBTestQuery = {
   category: string | null
   notes: string | null
   external_id: string | null
+  /** The bulk import that last wrote this row (null for manual and generated
+   *  rows). Lets the Run tab validate one imported file on its own. */
+  import_batch_id?: string | null
+  import_batch_label?: string | null
+  import_batch_at?: string | null
   auto_generated: boolean
   source_chunk_ids: string[]
   last_judged_score: number | null
@@ -462,6 +471,22 @@ export function bulkDeleteKBTestQueries(uuid: string, queryUuids: string[]) {
 }
 
 
+export type KBQuestionSet = {
+  fingerprint: string
+  count: number
+  category_counts: Record<string, number>
+  questions?: {
+    query_uuid: string
+    external_id: string | null
+    query: string
+    expected_answer: string | null
+    expected_answer_contains: string | null
+    category: string | null
+    expected_source_labels: string[]
+    import_batch_label: string | null
+  }[]
+}
+
 export type KBTestQueryImportResult = {
   created: number
   updated: number
@@ -474,6 +499,9 @@ export type KBTestQueryImportResult = {
    * retrieval precision on every question that carries it.
    */
   unmatched_source_labels?: { label: string; questions: number }[]
+  /** The batch every row this file wrote was tagged with; null when the file
+   *  wrote nothing. */
+  import_batch_id?: string | null
 }
 
 /**

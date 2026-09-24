@@ -19,9 +19,9 @@ interface Props {
   canManage: boolean
   queries: KBTestQuery[]
   onChange: () => void
-  /** Run a validation over just the selected queries (a smoke test). The
-   *  panel owns the run, so its result shows on the Run tab and in History
-   *  with only those questions. Absent when running is not offered. */
+  /** Hand the selected queries to the Run tab, which shows their count and
+   *  category mix before the user starts the (smoke-test) run. Absent when
+   *  running is not offered. */
   onRunSelected?: (uuids: string[]) => void
   /** True while any validation run is in flight — disables Run selected. */
   running?: boolean
@@ -430,9 +430,9 @@ export function KBTestQueriesTab({
                   onClick={handleRunSelected}
                   disabled={!kbReady || running || bulkDeleting}
                   title={
-                    'Validate only the selected questions (judge mode). The run appears on the Run tab ' +
-                    'and in History, where its export holds just these questions. It is a smoke test and ' +
-                    "does not change the KB's quality score."
+                    'Open Run now with only the selected questions, to review the count and categories ' +
+                    'before starting. The run appears in History, where its export holds just these ' +
+                    "questions. It is a smoke test and does not change the KB's quality score."
                   }
                   style={btn(kbReady && !running && !bulkDeleting, '#2563eb')}
                 >
@@ -533,6 +533,11 @@ export function KBTestQueriesTab({
                     )}
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#666', marginTop: 4, flexWrap: 'wrap' }}>
                       {q.category && <span>· {q.category}</span>}
+                      {q.import_batch_label && (
+                        <span title={q.import_batch_at ? `Imported ${new Date(q.import_batch_at).toLocaleString()}` : undefined}>
+                          · imported from {q.import_batch_label}
+                        </span>
+                      )}
                       {q.expected_source_labels.length > 0 && (
                         <span>· sources: {q.expected_source_labels.join(', ')}</span>
                       )}
