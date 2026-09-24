@@ -1150,6 +1150,56 @@ class TestKnowledgeDocSources:
         # The refresh must not run inline — the service isn't touched here.
         mock_svc.refresh_url_source.assert_not_called()
 
+    async def _post_reprocess(self, client, src, reprocess):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource.find_one", AsyncMock(return_value=src)),
+            patch("app.services.kb_source_reprocess.reprocess_source", reprocess),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            return await client.post(
+                "/api/knowledge/kb-uuid-1/source/src-1/reprocess",
+                cookies=cookies,
+                headers=headers,
+            )
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_reports_what_it_queued(self, client):
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="error")
+        body = {"ok": True, "status": "queued", "mode": "reindex", "source_uuid": "src-1"}
+        reprocess = AsyncMock(return_value=body)
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 200
+        assert resp.json() == body
+        assert reprocess.await_args.args[1] is src
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_refusal_carries_its_status_and_reason(self, client):
+        from app.services.kb_source_reprocess import ReprocessRefused
+
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="processing")
+        reprocess = AsyncMock(side_effect=ReprocessRefused(409, "This source is already being processed"))
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "This source is already being processed"
+
+    @pytest.mark.asyncio
+    async def test_reprocess_unknown_source_is_404(self, client):
+        resp = await self._post_reprocess(client, None, AsyncMock())
+        assert resp.status_code == 404
+
     @pytest.mark.asyncio
     async def test_refresh_source_rejects_document_sources(self, client):
         user = _make_user()
@@ -2091,6 +2141,55 @@ class TestUpdateSourceFields:
         assert resp.json()["source_reference"] == "APM Ch.45"
 
 
+    async def _patch_amends(self, client, set_amends):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.routers.knowledge.svc.set_source_amends", set_amends),
+            patch("app.routers.knowledge.svc.update_source_name", new_callable=AsyncMock) as mock_rename,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock, return_value={}),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.patch(
+                "/api/knowledge/kb-1/source/s1",
+                json={"amends_source_uuids": ["s-base"]},
+                cookies=cookies,
+                headers=headers,
+            )
+        mock_rename.assert_not_awaited()
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_amends_routes_to_set_source_amends(self, client):
+        updated = _make_source()
+        updated.amends_source_uuids = ["s-base"]
+        set_amends = AsyncMock(return_value=updated)
+
+        resp = await self._patch_amends(client, set_amends)
+
+        assert resp.status_code == 200
+        assert set_amends.await_args.args[1:] == ("s1", ["s-base"])
+        assert resp.json()["amends_source_uuids"] == ["s-base"]
+
+    @pytest.mark.asyncio
+    async def test_amends_naming_a_foreign_source_is_a_400(self, client):
+        set_amends = AsyncMock(side_effect=ValueError("Not a source of this knowledge base: s-base"))
+
+        resp = await self._patch_amends(client, set_amends)
+
+        assert resp.status_code == 400
+        assert "Not a source of this knowledge base" in resp.json()["detail"]
+
+
 class TestAdminKBInventory:
     @pytest.mark.asyncio
     async def test_non_admin_forbidden(self, client):
@@ -2330,6 +2429,14 @@ class TestTestQueryImport:
         assert existing_by_id.category == "summary"
         assert existing_by_id.expected_source_labels == ["Doc B"]
         assert existing_by_id.updated_at is not None
+        # Both rows this file wrote join one batch, returned so the client
+        # can select exactly this import; the skipped row is left alone.
+        batch_id = body["import_batch_id"]
+        assert batch_id
+        assert created[0].import_batch_id == batch_id
+        assert existing_by_id.import_batch_id == batch_id
+        assert created[0].import_batch_label == existing_by_id.import_batch_label == "set.csv"
+        assert getattr(existing_dup, "import_batch_id", None) is None
 
     @pytest.mark.asyncio
     async def test_import_reports_row_errors_without_failing(self, client):

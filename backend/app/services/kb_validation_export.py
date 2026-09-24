@@ -64,6 +64,8 @@ RUN_META_CSV_COLUMNS = [
     "kb_title",
     "mode",
     "judge_model",
+    # Rows from concatenated exports group by the set they were scored on.
+    "question_set_fingerprint",
     "run_score",
     "score_formula",
     "avg_judge_score",
@@ -190,6 +192,11 @@ def build_kb_validation_results_export(
         # queries only ("Run selected" on the Test Queries tab). Such a run
         # is a smoke test, not the KB's quality score.
         "query_selection": snap.get("query_selection"),
+        # Identifies the exact question set the run measured: two runs with
+        # different fingerprints scored different questions or expectations
+        # and are not directly comparable. None on runs that predate it.
+        "question_set_fingerprint": (snap.get("question_set") or {}).get("fingerprint"),
+        "question_set_categories": (snap.get("question_set") or {}).get("category_counts"),
         # The model that generated the graded answers. Older runs recorded
         # neither; ``answer_model_fallback`` is set when the KB's applied
         # override named a model System Config no longer had, so the user's
