@@ -1275,6 +1275,105 @@ class TestGetAuthorizedWorkflow:
         assert result is None
         mock_review_access.assert_not_awaited()
 
+    async def test_examiner_can_validate_workflow_with_open_verification_request(self):
+        """Reviewing a submission means grading it: an examiner may author the
+        validation plan / test data and start validation runs on a workflow
+        while its verification request is open.
+
+        Regression test for "Workflow not found" on Generate Plan in the
+        Validate tab of a submission the examiner had just opened and run.
+        """
+        user = _make_user("examiner1", is_examiner=True)
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.id = "workflow-oid"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.access_control.has_open_verification_review_access",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as mock_review_access,
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), validate=True
+            )
+
+        assert result is wf
+        mock_review_access.assert_awaited_once_with("workflow", "workflow-oid", user)
+
+    async def test_validate_without_open_review_requires_manage(self):
+        """``validate`` is manage-level for everyone else: a plain team member
+        (view access only) cannot author validation artifacts."""
+        user = _make_user("member1")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.id = "workflow-oid"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ) as mock_lib,
+            patch(
+                "app.services.access_control.has_open_verification_review_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            member = _team_access(team_uuids={"team-abc"}, roles={"team-abc": "member"})
+            view = await get_authorized_workflow("wf-id", user, team_access=member)
+            validate = await get_authorized_workflow(
+                "wf-id", user, team_access=member, validate=True,
+            )
+
+        assert view is wf
+        assert validate is None
+        # The library-backed fallback was asked for manage-level access.
+        assert mock_lib.await_args.kwargs["manage"] is True
+
+    async def test_share_token_does_not_grant_validate(self):
+        """A share link lets you run a workflow, not write its validation plan."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.id = "workflow-oid"
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+            patch(
+                "app.services.access_control.has_open_verification_review_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(),
+                share_token="tok-abc", validate=True,
+            )
+
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # TestHasOpenVerificationReviewAccess

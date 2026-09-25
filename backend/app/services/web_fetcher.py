@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -74,13 +74,22 @@ class WebFetchResult:
     # www.uidaho.edu). Crawlers dedup on this too, so the same page can't be
     # fetched once per spelling.
     final_url: Optional[str] = None
-    # True when the returned ``text`` was cut off at web_fetcher_max_chars (a
-    # genuinely huge page). Ingestion surfaces this so a partial source shows a
-    # warning instead of a clean "ready" — a truncated page yields wrong answers
-    # for anything past the cut. (Note: raw HTML being trimmed at
+    # True when the returned ``text`` was cut off at the caller's ``max_chars``
+    # (a genuinely huge page). Ingestion surfaces this so a partial source shows
+    # a warning instead of a clean "ready" — a truncated page yields wrong
+    # answers for anything past the cut. (Note: raw HTML being trimmed at
     # web_fetcher_max_html_chars would also set this, but that limit is sized so
     # real documents never hit it.)
     truncated: bool = False
+    # Caveats about the text that are not failures: the fetch succeeded and
+    # the text is usable, but something the reader normally checks could not
+    # be checked. Currently ``"hidden_text_unchecked"`` — the PDF hidden-text
+    # scrub could not inspect the file, so the text may include content the
+    # page never displays. KB ingestion persists these on the source row.
+    advisories: list[str] = field(default_factory=list)
+
+
+ADVISORY_HIDDEN_TEXT_UNCHECKED = "hidden_text_unchecked"
 
 
 def _cap(text: str, limit: int) -> tuple[str, bool]:
@@ -133,23 +142,26 @@ def _looks_like_pdf(url: str, content_type: str) -> bool:
     return path.endswith(".pdf")
 
 
-def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str, list[str]]:
-    """Extract text, a title, and embedded hyperlinks from PDF bytes fetched over HTTP.
+def _extract_pdf_response(
+    content: bytes, url: str,
+) -> tuple[str, str, list[str], list[str]]:
+    """Extract text, a title, embedded hyperlinks, and advisories from PDF bytes fetched over HTTP.
 
     Uses PyMuPDF (no OCR) to stay fast and dependency-light in the fetch path;
     image-only PDFs will yield little text, which the caller treats as an empty
     result. Title prefers the PDF's metadata, falling back to the URL filename.
     Links come from the PDF's URI annotations so crawl-enabled KB sources can
     follow them the same way <a href> links are followed on an HTML page.
+    The last element carries ``WebFetchResult.advisories`` for the text.
     """
     if not content:
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, [], []
     if len(content) > _MAX_PDF_BYTES:
         logger.warning(
             "PDF at %s is %d bytes (> %d cap) — skipping extraction",
             url, len(content), _MAX_PDF_BYTES,
         )
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, [], []
 
     import os
     import tempfile
@@ -163,21 +175,23 @@ def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str, list[str]
             tmp.write(content)
             tmp_path = tmp.name
         scrub_report: dict = {}
+        advisories: list[str] = []
         text = extract_text_from_pdf(tmp_path, report=scrub_report)
         if scrub_report.get("hidden_text_unchecked"):
-            # This path feeds KB/RAG content directly; there is no per-source
-            # warning surface for it yet (tracked on the ingestion follow-ups
-            # issue), so at minimum say it loudly with the URL attached.
+            # This path feeds KB/RAG content directly. The advisory rides on
+            # the result so KB ingestion can record it on the source row
+            # instead of the caveat living only in this log line.
             logger.warning(
                 "Hidden-text safety check could not run on fetched PDF %s — "
                 "its text may include content the page never displays", url,
             )
+            advisories.append(ADVISORY_HIDDEN_TEXT_UNCHECKED)
         title = _pdf_title(tmp_path) or filename
         links = _pdf_uri_links(tmp_path)
-        return _normalize_whitespace(text or ""), title, links
+        return _normalize_whitespace(text or ""), title, links, advisories
     except Exception as e:
         logger.warning("Failed to extract PDF from %s: %s", url, e)
-        return "", filename, []
+        return "", filename, [], []
     finally:
         if tmp_path:
             try:
@@ -286,14 +300,25 @@ async def fetch_url(
     *,
     settings: Optional[Settings] = None,
     allow_browser: Optional[bool] = None,
+    max_chars: Optional[int] = None,
 ) -> WebFetchResult:
     """Fetch *url* and return cleaned main-content text + raw HTML.
 
     Raises ``ValueError`` if the URL fails SSRF validation.  HTTP and
     network errors propagate as ``httpx`` exceptions so callers can
     surface them to the user.
+
+    ``max_chars`` caps the extracted text, defaulting to
+    ``settings.web_fetcher_max_chars``. It is a per-caller limit because the
+    callers are not alike: chat's "attach link" and the workflow Fetch step
+    send this text straight into a model prompt and genuinely cannot take a
+    megabyte of it, while knowledge-base ingestion chunks and embeds it, where
+    the only cost of length is embedding time. Sharing one cap meant the
+    prompt-sized limit silently decided how much of a federal regulation got
+    indexed — see ``Settings.kb_url_max_chars``.
     """
     settings = settings or Settings()
+    max_chars = settings.web_fetcher_max_chars if max_chars is None else max_chars
     if allow_browser is None:
         allow_browser = settings.web_fetcher_browser_enabled
 
@@ -334,8 +359,10 @@ async def fetch_url(
         # when the body actually is a PDF, so challenge pages fall through to
         # HTML extraction where bot-challenge detection can name the failure.
         if blocked_error is None and _looks_like_pdf(url, resp.headers.get("content-type", "")) and b"%PDF" in resp.content[:1024]:
-            pdf_text, pdf_title, pdf_links = _extract_pdf_response(resp.content, url)
-            pdf_text, pdf_truncated = _cap(pdf_text, settings.web_fetcher_max_chars)
+            pdf_text, pdf_title, pdf_links, pdf_advisories = _extract_pdf_response(
+                resp.content, url,
+            )
+            pdf_text, pdf_truncated = _cap(pdf_text, max_chars)
             return WebFetchResult(
                 url=url,
                 title=pdf_title,
@@ -346,6 +373,7 @@ async def fetch_url(
                 pdf_links=pdf_links or None,
                 final_url=str(resp.url),
                 truncated=pdf_truncated,
+                advisories=pdf_advisories,
             )
 
         # Cap the *raw HTML* at the (much larger) HTML limit, not the text limit
@@ -394,11 +422,11 @@ async def fetch_url(
                 title = _extract_title(rendered, url)
                 used_browser = True
 
-    text, text_truncated = _cap(text, settings.web_fetcher_max_chars)
+    text, text_truncated = _cap(text, max_chars)
     if text_truncated:
         logger.warning(
             "Extracted text for %s exceeded %d chars and was truncated",
-            url, settings.web_fetcher_max_chars,
+            url, max_chars,
         )
     return WebFetchResult(
         url=url,
@@ -417,9 +445,12 @@ def fetch_url_sync(
     *,
     settings: Optional[Settings] = None,
     allow_browser: Optional[bool] = None,
+    max_chars: Optional[int] = None,
 ) -> WebFetchResult:
     """Sync wrapper around :func:`fetch_url` for the Celery / workflow paths.
 
     Safe to call from threads with no running event loop (Celery workers).
     """
-    return asyncio.run(fetch_url(url, settings=settings, allow_browser=allow_browser))
+    return asyncio.run(fetch_url(
+        url, settings=settings, allow_browser=allow_browser, max_chars=max_chars,
+    ))

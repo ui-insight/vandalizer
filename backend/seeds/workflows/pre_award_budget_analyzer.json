@@ -7,7 +7,7 @@
     "seed_id": "wf-pre-award-budget-analyzer",
     "display_name": "Budget Analyzer",
     "description": "Extracts budget line items from a proposal or award document, checks for arithmetic errors, and flags potentially disallowed costs.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "pre-award",
       "financial"

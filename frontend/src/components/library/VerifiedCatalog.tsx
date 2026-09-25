@@ -319,10 +319,10 @@ export function VerifiedCatalog() {
 
   const handleUnverify = async (item: VerifiedCatalogItem) => {
     const ok = await confirm({
-      title: 'Remove verified status?',
+      title: 'Stop sharing with everyone?',
       message: (
         <>
-          Remove verified status from <strong>{item.display_name || item.name}</strong>? It will no longer appear in the verified catalog.
+          Stop sharing <strong>{item.display_name || item.name}</strong> with everyone? It will no longer appear under Everyone.
         </>
       ),
       confirmLabel: 'Remove',
@@ -343,8 +343,8 @@ export function VerifiedCatalog() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search verified items..."
-            aria-label="Search verified items"
+            placeholder="Search shared items..."
+            aria-label="Search shared items"
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
@@ -415,7 +415,7 @@ export function VerifiedCatalog() {
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
       ) : items.length === 0 ? (
         <div role="status" aria-live="polite" className="text-sm text-gray-500 py-12 text-center">
-          No verified items found.
+          No shared items found.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

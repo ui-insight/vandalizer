@@ -14,6 +14,7 @@ from app.celery_app import celery_app
 from app.services.document_readers import DocumentReadError
 from app.services.ocr_client import OcrUnavailableError
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
+from app.utils import kb_source_currency as currency
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,28 @@ def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
         cursor = folder.get("parent_id")
 
     return db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
+
+
+class ProjectKbRefreshFailed(RuntimeError):
+    """A mirror that failed on the refresh branch rather than the insert one.
+
+    What it carries is which of three states the project KB was left in, since
+    the bell has to say a different thing for each: an insert failure means a
+    file the user just added never got in; this one means the previously
+    indexed chunks were deleted and their replacement did not land, so the
+    project can no longer answer from the document at all. Wraps the underlying
+    error and keeps its message, so the cause snippet in the body is unchanged.
+    """
+
+
+class ProjectKbDeleteFailed(ProjectKbRefreshFailed):
+    """The third state: the delete itself failed, so nothing was removed.
+
+    The opposite of its parent, and the reason the two cannot share wording —
+    the project still answers from the superseded extraction, and telling the
+    owner their document has gone from the project would send them looking for
+    the wrong problem.
+    """
 
 
 def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
@@ -69,26 +92,156 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> bool:
         )
         from app.services.failure_notifications import notify_project_kb_sync_failed
 
-        notify_project_kb_sync_failed(db, doc=doc, project=project, error=e)
+        if isinstance(e, ProjectKbDeleteFailed):
+            failed_at = "delete"
+        elif isinstance(e, ProjectKbRefreshFailed):
+            failed_at = "replace"
+        else:
+            failed_at = "insert"
+        notify_project_kb_sync_failed(
+            db, doc=doc, project=project, error=e, failed_at=failed_at,
+        )
         return False
+
+
+def _add_document_chunks_to_kb(dm, kb_uuid: str, doc: dict, text: str) -> int:
+    """The one place that calls ``dm.add_to_kb`` for a project-KB document.
+
+    Both the insert branch and the refresh branch of ``_mirror_into_project_kb``
+    need the identical five kwargs; factored out so they cannot drift apart.
+    """
+    return dm.add_to_kb(
+        kb_uuid=kb_uuid,
+        source_id=doc["uuid"],
+        source_name=doc.get("title", ""),
+        raw_text=text,
+        text_markers=doc.get("text_markers") or [],
+    )
 
 
 def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None:
     kb_uuid = project["kb_uuid"]
     doc_uuid = doc["uuid"]
-    # Dedupe — never add the same document to a project KB twice.
-    if db.knowledge_base_sources.find_one(
+    existing = db.knowledge_base_sources.find_one(
         {"knowledge_base_uuid": kb_uuid, "document_uuid": doc_uuid}
-    ):
+    )
+    if existing:
+        # A row proves membership, not currency. It used to answer both
+        # questions, so a successful re-extraction replaced the document's own
+        # chunks and left the project's alone — "chat with this project" went
+        # on quoting whatever the first extraction read (#887 review).
+        #
+        # The hash is what keeps the two move tasks cheap: sync_project_kb_on_move
+        # and sync_project_kb_on_folder_move come through here for every document
+        # they touch, and re-embedding a forty-file subtree nobody edited is a
+        # real bill for no change in what retrieval returns.
+        #
+        # ``status`` and ``chunk_count`` are part of the gate because a matching
+        # hash on a row that never finished indexing is not evidence the chunks
+        # are there. ``or 0`` because a row may carry an explicit None.
+        if (
+            existing.get("content_hash") == currency.content_fingerprint(text)
+            and existing.get("status") == "ready"
+            and (existing.get("chunk_count") or 0) > 0
+        ):
+            return
+
+        # Chunk ids are deterministic (``<document_uuid>_chunk_<i>``), so a
+        # shorter second extraction would leave the tail of the first one behind
+        # for retrieval to find. The delete is what makes the replacement total
+        # — and it is why the delete/add pair needs a guard: between them the
+        # row's "ready" and chunk_count describe chunks that are gone.
+        #
+        # delete_kb_source logs and swallows its own exceptions, so its return
+        # value is the only evidence the old chunks are gone. Re-adding over a
+        # delete that failed is the worst outcome available: add_to_kb writes
+        # the same deterministic ids with ``collection.add``, which skips ids
+        # that already exist, so the first extraction's text would survive
+        # under a row stamped ready with the new text's fingerprint — and the
+        # gate above would certify that row as current from then on.
+        from app.tasks.knowledge_base_tasks import _recalculate_kb
+
+        try:
+            if not dm.delete_kb_source(kb_uuid, doc_uuid):
+                raise ProjectKbDeleteFailed(
+                    f"could not remove the previous chunks for {doc_uuid} from {kb_uuid}"
+                )
+            chunk_count = _add_document_chunks_to_kb(dm, kb_uuid, doc, text)
+        except Exception as e:
+            db.knowledge_base_sources.update_one(
+                {"_id": existing["_id"]},
+                # chunk_count 0, not the old number: _recalculate_kb sums it
+                # over every row whatever the status, so leaving it would keep
+                # the KB advertising chunks that are gone. On the delete-failure
+                # path they may still be there, but the row is errored and the
+                # next pass replaces them — under-counting an errored row is the
+                # honest side to err on.
+                {"$set": {
+                    "status": "error",
+                    "error_message": str(e)[:2000],
+                    "chunk_count": 0,
+                }},
+            )
+            try:
+                _recalculate_kb(db, kb_uuid)
+            except Exception:
+                # The row is already written and the bell is what matters from
+                # here; a recount that fails too must not be the thing that
+                # decides which failure the owner is told about.
+                logger.exception(
+                    "Failed to recompute project KB %s after a failed refresh", kb_uuid,
+                )
+            # _ingest_into_project_kb is the one catch: it logs and bells the
+            # project owner. Same contract the insert branch has always had,
+            # with the one thing that branch cannot say — which of the two
+            # half-done states this document is in.
+            if isinstance(e, ProjectKbRefreshFailed):
+                raise
+            raise ProjectKbRefreshFailed(str(e)) from e
+
+        # From here the new chunks are in Chroma and current: the project can
+        # answer from the document whatever happens to the bookkeeping below.
+        # A failed stamp leaves the row carrying the previous fingerprint, so
+        # the next pass through the gate simply refreshes again; a failed
+        # recount leaves the KB's aggregate counters one pass stale. Neither is
+        # the "removed and could not be replaced" state the bell describes, so
+        # neither may convert a successful refresh into an errored row.
+        try:
+            db.knowledge_base_sources.update_one(
+                {"_id": existing["_id"]},
+                {
+                    "$set": {
+                        "chunk_count": chunk_count,
+                        "status": "ready",
+                        "error_message": None,
+                        # Kept so the row still has a name if the document is
+                        # later deleted from Files — the chunks outlive it.
+                        "document_title": doc.get("title") or None,
+                        # The document was just re-read, so the retrieval dates
+                        # move with the ingestion one.
+                        **currency.ingestion_stamp(text),
+                    }
+                },
+            )
+            # Recomputed from the rows, not incremented: this row was already
+            # counted toward total_sources when it was inserted, and its old
+            # chunk_count is the number the new one replaces. An $inc here
+            # would double-count the source on every retry.
+            _recalculate_kb(db, kb_uuid)
+        except Exception:
+            logger.exception(
+                "Refreshed document %s in project %s implicit KB but could not "
+                "record it; the next pass will refresh it again",
+                doc_uuid, project.get("uuid"),
+            )
+            return
+        logger.info(
+            "Refreshed document %s in project %s implicit KB (%d chunks)",
+            doc_uuid, project.get("uuid"), chunk_count,
+        )
         return
 
-    chunk_count = dm.add_to_kb(
-        kb_uuid=kb_uuid,
-        source_id=doc_uuid,
-        source_name=doc.get("title", ""),
-        raw_text=text,
-        text_markers=doc.get("text_markers") or [],
-    )
+    chunk_count = _add_document_chunks_to_kb(dm, kb_uuid, doc, text)
 
     now = datetime.datetime.now(tz=datetime.timezone.utc)
     db.knowledge_base_sources.insert_one({
@@ -109,6 +262,10 @@ def _mirror_into_project_kb(db, dm, doc: dict, project: dict, text: str) -> None
         "crawled_urls": None,
         "created_at": now,
         "processed_at": now,
+        # Stamped from the start so a later move of an unchanged document is
+        # a no-op instead of a one-time re-embed the first time the refresh
+        # gate above sees this row.
+        **currency.ingestion_stamp(text, now=now),
     })
     db.knowledge_bases.update_one(
         {"uuid": kb_uuid},
@@ -146,19 +303,14 @@ def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
     dm.delete_kb_source(kb_uuid, doc_uuid)
     db.knowledge_base_sources.delete_one({"_id": src["_id"]})
 
-    chunk_count = src.get("chunk_count") or 0
-    now = datetime.datetime.now(tz=datetime.timezone.utc)
-    db.knowledge_bases.update_one(
-        {"uuid": kb_uuid},
-        {
-            "$inc": {
-                "total_sources": -1,
-                "sources_ready": -1,
-                "total_chunks": -chunk_count,
-            },
-            "$set": {"updated_at": now},
-        },
-    )
+    # Recomputed from the rows, not decremented: since a failed refresh can
+    # leave a project-KB row at status "error", a blind ``sources_ready: -1``
+    # here would take an errored row out of the ready count and leave
+    # sources_failed counting a row that no longer exists — a drift nothing
+    # corrects until some other document on the KB happens to be refreshed.
+    from app.tasks.knowledge_base_tasks import _recalculate_kb
+
+    _recalculate_kb(db, kb_uuid)
     logger.info(
         "Removed document %s from project %s implicit KB",
         doc_uuid, project.get("uuid"),
@@ -199,12 +351,13 @@ def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | Non
                 "Failed to remove %s from old project KB on move", document_uuid
             )
 
-    # Add to the new project's KB. _ingest_into_project_kb dedupes, so a no-op
-    # move (same project) is harmless. Requires extracted text — a doc still being
-    # processed will be mirrored by perform_semantic_ingestion when it finishes.
+    # Add to the new project's KB. _ingest_into_project_kb no-ops when the text
+    # is unchanged and refreshes when it changed, so a same-project move is
+    # harmless either way. Requires extracted text — a doc still being processed
+    # will be mirrored by perform_semantic_ingestion when it finishes.
     if new_project:
         text = doc.get("raw_text", "") or ""
-        if text:
+        if text.strip():
             try:
                 _ingest_into_project_kb(db, dm, doc, text)
             except Exception:
@@ -260,7 +413,7 @@ def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | 
                 )
         if new_project:
             text = doc.get("raw_text", "") or ""
-            if text:
+            if text.strip():
                 try:
                     # Counted only on success: a Chroma outage mirroring zero
                     # of 40 documents must not log "re-synced 40".
@@ -293,6 +446,16 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     notify_document_failed(db, doc=doc, error=message)
 
 
+def _is_last_extraction_attempt(task) -> bool:
+    """True when an OCR outage raised now would not be retried. Never raises:
+    unsure means not final, which keeps today's retry-then-fail behavior."""
+    try:
+        max_retries = task.max_retries
+        return max_retries is not None and (task.request.retries or 0) >= max_retries
+    except Exception:  # noqa: BLE001 — deciding a fallback must never fail a read
+        return False
+
+
 # An OCR outage is measured in minutes — a GPU loading a model, a service
 # restarting during a deploy, a provider rate-limiting a burst. The previous
 # budget (backoff from 5s, 3 retries) was exhausted inside a minute and the
@@ -310,7 +473,10 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     max_retries=5,
     default_retry_delay=5,
 )
-def perform_extraction_and_update(self, document_uuid: str, extension: str) -> str:
+def perform_extraction_and_update(
+    self, document_uuid: str, extension: str,
+    force_ocr: bool = False, ocr_required: bool = False,
+) -> str:
     """Extract text from a document file (PDF, DOCX, XLSX, etc.).
 
     Updates SmartDocument.raw_text and processing flags.
@@ -337,7 +503,14 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
     try:
         db.smart_document.update_one(
             {"uuid": document_uuid},
-            {"$set": {"processing": True, "task_status": "extracting"}},
+            # updated_at is the retry route's staleness clock: a document
+            # whose worker died mid-extraction is told apart from one still
+            # being read by how long ago this write happened.
+            {"$set": {
+                "processing": True,
+                "task_status": "extracting",
+                "updated_at": datetime.datetime.now(),
+            }},
         )
 
         raw_text = ""
@@ -368,9 +541,34 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 extract_text_with_markers,
                 pdf_page_count,
             )
+            # A retry sets force_ocr so the pages are re-read rather than the
+            # same text layer re-decided (#858), and ocr_required when that
+            # re-read was forced because the stored text was refused — then
+            # no non-OCR reading of these pages is acceptable.
+            # The reader calls this when it hands the pages to OCR, which is
+            # where a slow ingestion actually spends its time: up to three
+            # attempts per task and five task retries with backoff, so roughly
+            # 25 minutes during an OCR outage. Without it the UI sat on
+            # "Extracting text from each page" for all of it, naming the one
+            # stage that had already finished.
+            # On the last attempt an OCR outage no longer has a retry to wait
+            # for: a PDF sent to OCR only for pages the local reading can't
+            # see is stored with those pages named, rather than failed (#955).
+            final_attempt = _is_last_extraction_attempt(self)
             raw_text, text_markers = extract_text_with_markers(
                 str(absolute_path), extension, report=ocr_report,
+                force_ocr=force_ocr, ocr_required=ocr_required,
+                local_on_ocr_outage=final_attempt,
+                on_stage=lambda stage: advance_task_status(db, document_uuid, stage),
             )
+            if ocr_report.get("ocr_unavailable_local_fallback"):
+                logger.warning(
+                    "OCR still unavailable for document %s on the final attempt "
+                    "(%d/%d) — stored the local reading with page(s) %s unread "
+                    "instead of failing",
+                    document_uuid, self.request.retries + 1, self.max_retries + 1,
+                    ocr_report.get("unread_pages"),
+                )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file
             # can't be opened, which is the same as the model default.
@@ -405,6 +603,11 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             ingestion_warnings.append("hidden_text_unchecked")
         if extension == "pdf" and raw_text and is_sparse_extraction(raw_text, num_pages):
             ingestion_warnings.append("sparse_text")
+        # Pages that show content no reader got text from. Used to vanish:
+        # the document was complete here while the viewer showed every page.
+        unread_pages = [int(p) for p in (ocr_report.get("unread_pages") or [])]
+        if unread_pages:
+            ingestion_warnings.append("unread_pages")
         if ingestion_warnings:
             logger.warning(
                 "Document %s ingested with warnings %s (pages=%s, chars=%d)",
@@ -420,30 +623,65 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 "Document %s produced empty extracted text (ext=%s) — marking as error",
                 document_uuid, extension,
             )
-            message = (
-                "We couldn't extract any text from this document. "
-                "It may be blank, image-only, or encrypted, or our "
-                "OCR service may be temporarily unavailable. Try "
-                "retrying — if it keeps failing, re-upload or "
-                "contact support."
-            )
+            layer_rejected = bool(ocr_report.get("text_layer_rejected"))
+            if layer_rejected:
+                # The reader refused this PDF's own text layer: naming the
+                # cause is the difference between "retry later" and "this
+                # copy of the file will never read". Which cause depends on
+                # which half of the reader's gate fired — only the classifier
+                # half diagnoses the fonts, and only it leaves "retry once OCR
+                # is available" as advice worth giving, since the other half
+                # is reached with OCR up and answering.
+                # The reader pops the partial-conversion signal before this
+                # branch sees it, so "nothing usable" may be one page of
+                # three: the advice has to leave a retry open rather than
+                # send the user straight to re-upload.
+                if ocr_report.get("text_layer_rejected_reason") == "ocr_required":
+                    message = (
+                        "OCR read this document's pages and found nothing "
+                        "usable, and its own text layer was already refused "
+                        "as unreadable. Retry extraction in case the OCR "
+                        "service was degraded, or re-upload a printed or "
+                        "scanned copy of the document."
+                    )
+                else:
+                    message = (
+                        "This PDF's text layer is unreadable (its fonts don't "
+                        "map to characters), and OCR could not read the pages. "
+                        "Retry extraction once OCR is available, or re-upload "
+                        "a printed or scanned copy."
+                    )
+            else:
+                message = (
+                    "We couldn't extract any text from this document. "
+                    "It may be blank, image-only, or encrypted, or our "
+                    "OCR service may be temporarily unavailable. Try "
+                    "retrying — if it keeps failing, re-upload or "
+                    "contact support."
+                )
+            error_fields: dict = {
+                "raw_text": "",
+                "processing": False,
+                "token_count": 0,
+                "text_markers": [],
+                "extraction_nonletter_ratio": None,
+                "ingestion_warnings": [],
+                # Don't leave a stale page count beside empty text when
+                # a previously-good document is reprocessed.
+                "num_pages": 0,
+                "task_status": "error",
+                "error_message": message,
+            }
+            if layer_rejected:
+                # The ratio cleared above is the other evidence that a
+                # non-OCR reading of this file is unacceptable, and the retry
+                # route clears it too. Recording the refusal here is what
+                # makes the next retry require OCR rather than fall back to
+                # the layer this run just refused.
+                error_fields["text_layer_rejected"] = True
             db.smart_document.update_one(
                 {"uuid": document_uuid},
-                {
-                    "$set": {
-                        "raw_text": "",
-                        "processing": False,
-                        "token_count": 0,
-                        "text_markers": [],
-                        "extraction_nonletter_ratio": None,
-                        "ingestion_warnings": [],
-                        # Don't leave a stale page count beside empty text when
-                        # a previously-good document is reprocessed.
-                        "num_pages": 0,
-                        "task_status": "error",
-                        "error_message": message,
-                    }
-                },
+                {"$set": error_fields},
             )
             # Every other terminal-error branch notifies; this one silently
             # relied on the user noticing the row state — which the file list
@@ -458,7 +696,15 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             "text_markers": text_markers,
             "extraction_nonletter_ratio": extraction_ratio,
             "ingestion_warnings": ingestion_warnings,
+            "unread_pages": unread_pages,
             "error_message": None,
+            # The refusal this run was retrying is resolved: the document has
+            # a stored reading again, and the next retry starts from its
+            # status and ratio like any other. Left set, a ratio false
+            # positive (a short page of checkbox glyphs) would make every
+            # later re-read OCR-only, and fail it outright whenever OCR is
+            # down — for a document whose local reading was fine.
+            "text_layer_rejected": False,
         }
         if num_pages is not None:
             update_fields["num_pages"] = num_pages
@@ -511,8 +757,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
             raise
         # Out of retries. Say *why* it failed — "we couldn't reach OCR" is a
         # different instruction to the user than "this file has no text in it".
+        # The reader already declined to store a local reading (see #955).
         logger.warning(
-            "OCR still unavailable for document %s after %d attempts",
+            "OCR still unavailable for document %s after %d attempts — no "
+            "usable local reading to store, failing",
             document_uuid, self.max_retries,
         )
         message = (
@@ -1082,6 +1330,14 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
     settings = Settings()
     try:
         dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+        # A retry must replace the chunks from the previous extraction, or
+        # retrieval keeps answering from the old text. Only when there is
+        # new text to replace them with: the extraction task returns "" on
+        # a failed read rather than raising, so the chain still reaches
+        # here, and wiping the old chunks then would turn a document that
+        # was searchable a minute ago into one that is not.
+        if text.strip():
+            dm.delete_document(user_id, document_uuid)
         chunk_count = dm.add_document(
             user_id=user_id,
             document_name=doc.get("title", ""),
@@ -1142,17 +1398,36 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
 _IN_PROGRESS_TASK_STATUSES = ["layout", "extracting", "ocr", "security", "readying"]
 
 
+# What the library shows for a document whose extraction worker died with the
+# lock held. Deliberately says "stopped", not "failed to read": the file is
+# probably fine, and the fix is the Retry button, which the same staleness
+# window has already unlocked.
+_EXTRACTION_ABANDONED_MESSAGE = (
+    "Text extraction stopped without finishing — the worker was likely "
+    "restarted or ran out of memory mid-read. Retry the extraction."
+)
+
+
 @celery_app.task(bind=True, name="tasks.document.reap_stuck")
 def reap_stuck_documents(self) -> None:
     """Self-heal documents whose task_status is stuck in an in-progress stage.
 
-    Failure mode this handles: extraction finished (processing=False, raw_text
-    populated) but task_status never advanced to "complete" because the caller
-    dispatched the extraction task without chaining update_document_fields.
-    The frontend then shows these docs as "Reading text…" indefinitely.
+    Two failure modes, two sweeps:
 
-    Acts as a backstop against pipeline-chaining bugs; the fix in the caller
-    is still preferred.
+    1. Extraction finished (processing=False, raw_text populated) but
+       task_status never advanced to "complete" because the caller dispatched
+       the extraction task without chaining update_document_fields. The
+       chain is re-joined by dispatching the update step.
+    2. Extraction never finished: the worker was SIGKILLed mid-read (OOM, a
+       deploy, the hard time limit), leaving processing=True,
+       task_status="extracting", raw_text="" — the exact shape the lock is
+       taken in, so no completion write ever follows. Sweep 1 cannot see
+       these (processing is True and raw_text is empty), and until #887
+       stamped ``updated_at`` on the lock there was nothing to age against.
+       The document is marked failed with a retry hint.
+
+    Either way the frontend showed "Reading text…" indefinitely. Both act as
+    backstops; the fix in the caller / a worker that stays alive is preferred.
     """
     db = get_sync_db()
 
@@ -1166,10 +1441,100 @@ def reap_stuck_documents(self) -> None:
         {"uuid": 1},
     ))
 
-    if not orphans:
-        return
-
     for doc in orphans:
         update_document_fields.delay(doc["uuid"])
 
-    logger.info("Reaped %d stuck document(s) — dispatched update step", len(orphans))
+    if orphans:
+        logger.info(
+            "Reaped %d stuck document(s) — dispatched update step", len(orphans),
+        )
+
+    _reap_abandoned_extractions(db)
+
+
+def _reap_abandoned_extractions(db) -> int:
+    """Sweep 2 of reap_stuck_documents: fail locks whose worker is dead.
+
+    Returns the number of documents flipped to error.
+    """
+    from app.services.extraction_staleness import EXTRACTION_STALE_AFTER
+
+    # Naive local time on purpose: it is what perform_extraction_and_update
+    # and the retry route stamp into updated_at, and what the model's
+    # default_factory writes into created_at, so the cutoff compares like
+    # with like. (The workflow-run reaper uses aware UTC because its writers
+    # do.)
+    cutoff = datetime.datetime.now() - EXTRACTION_STALE_AFTER
+
+    abandoned = list(db.smart_document.find(
+        {
+            "processing": True,
+            "task_status": {"$in": _IN_PROGRESS_TASK_STATUSES},
+            "soft_deleted": {"$ne": True},
+            "$or": [
+                {"updated_at": {"$lt": cutoff}},
+                # ``None`` matches a null or missing field: rows that predate
+                # the lock stamp fall into this gentler sweep, aged by their
+                # upload time instead, the way the workflow reaper treats a
+                # run with no heartbeat.
+                {"updated_at": None, "created_at": {"$lt": cutoff}},
+            ],
+        },
+        {"uuid": 1, "updated_at": 1},
+    ))
+
+    reaped = 0
+    for doc in abandoned:
+        document_uuid = doc["uuid"]
+        try:
+            # Flip to error; never fake completion. update_document_fields is
+            # deliberately NOT used here: it forces task_status="complete" and
+            # re-runs _check_folder_watch_automations, which has no dedup, so
+            # a reaped document would be presented as read (with no text) and
+            # would re-fire every folder-watch automation on its folder.
+            #
+            # The filter repeats processing=True and the updated_at we
+            # matched on so a worker that finished (or a retry that re-took
+            # the lock) between the find and this write is left alone —
+            # either changes at least one of the two.
+            result = db.smart_document.update_one(
+                {
+                    "uuid": document_uuid,
+                    "processing": True,
+                    "updated_at": doc.get("updated_at"),
+                },
+                {"$set": {
+                    "processing": False,
+                    "task_status": "error",
+                    "task_id": None,
+                    "error_message": _EXTRACTION_ABANDONED_MESSAGE,
+                }},
+            )
+            if not result.matched_count:
+                continue
+            reaped += 1
+            # Same bell as every other terminal extraction error; the sweep
+            # is the final attempt by definition, and the notifier never
+            # raises.
+            _notify_document_processing_failed(
+                db, document_uuid, _EXTRACTION_ABANDONED_MESSAGE,
+            )
+            # KB sources parked on this document (see
+            # knowledge_service._ingest_document_source) would otherwise wait
+            # forever for an extraction that is never going to finish. This
+            # is the error-path call update_document_fields makes, which
+            # reads the error_message written above.
+            _resume_pending_kb_sources(db, document_uuid, extraction_failed=True)
+        except Exception:
+            # One bad row must not stop the sweep for the rest.
+            logger.exception(
+                "Failed to reap abandoned extraction for document %s", document_uuid,
+            )
+
+    if reaped:
+        logger.info(
+            "Reaped %d document(s) whose extraction worker died mid-read "
+            "— marked failed with a retry hint",
+            reaped,
+        )
+    return reaped

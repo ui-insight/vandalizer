@@ -24,6 +24,7 @@ from app.services.name_conflicts import (
 )
 from app.services.version_service import get_update_status
 from app.utils.encryption import decrypt_value, encrypt_value
+from app.utils import url_validation
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.document import SmartDocument
@@ -285,6 +286,7 @@ class ConfigUpdateRequest(BaseModel):
     llm_endpoint: Optional[str] = None
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
+    outbound_url_allowed_hosts: Optional[list[str]] = None
 
 
 class AdminTeamItem(BaseModel):
@@ -364,6 +366,11 @@ class OAuthProviderRequest(BaseModel):
     client_secret: str = ""
     redirect_uri: Optional[str] = None
     enabled: bool = True
+    # When False, SSO logins for identities with no existing account are
+    # denied instead of auto-created (JIT provisioning off). Plain bool with
+    # a default on purpose: model_dump(exclude_none=True) then always stores
+    # it, so the full-replace update handler can't drop it.
+    jit_provisioning: bool = True
     tenant_id: Optional[str] = None
     metadata_url: Optional[str] = None
     entity_id: Optional[str] = None
@@ -1478,6 +1485,7 @@ async def get_config(
         "available_models": _sanitize_models(cfg.available_models),
         "default_model": cfg.default_model or "",
         "long_document_model": getattr(cfg, "long_document_model", "") or "",
+        "validation_judge_model": getattr(cfg, "validation_judge_model", "") or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
         "web_search_endpoint": cfg.web_search_endpoint,
@@ -1494,6 +1502,10 @@ async def get_config(
         "support_contacts": cfg.support_contacts,
         "compliance_config": cfg.get_compliance_config(),
         "retention_config": cfg.get_retention_config(),
+        "outbound_url_allowed_hosts": list(getattr(cfg, "outbound_url_allowed_hosts", None) or []),
+        # Read-only: what the operator allowed via env, shown beside the
+        # editable list so an admin can see the whole effective policy.
+        "outbound_url_env_allowed_hosts": sorted(url_validation.env_allowed_hosts()),
     }
 
 
@@ -1558,14 +1570,49 @@ async def update_config(
         cfg.default_team_id = body.default_team_id or None
     if body.support_contacts is not None:
         cfg.support_contacts = body.support_contacts
+    hosts_audit: dict | None = None
+    if body.outbound_url_allowed_hosts is not None:
+        # Each entry is one deliberate exemption from the SSRF block, so a
+        # malformed one is a 400 naming it, not a silent trim: an exemption
+        # that never matches would leave the admin as blocked as before,
+        # with no clue why.
+        try:
+            hosts = _normalize_allowed_hosts(body.outbound_url_allowed_hosts)
+        except url_validation.InvalidAllowedHost as e:
+            raise HTTPException(status_code=400, detail=f"Allowed private hosts: {e}")
+        if hosts != list(cfg.outbound_url_allowed_hosts or []):
+            hosts_audit = {"before": list(cfg.outbound_url_allowed_hosts or []), "after": hosts}
+        cfg.outbound_url_allowed_hosts = hosts
 
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "update_config", "Updated system configuration")
+    if hosts_audit is not None:
+        # Its own entry: this widens what the server will fetch on a
+        # workflow author's behalf, so it must be findable in the audit log
+        # by name rather than buried in a generic config update.
+        await _audit(
+            user, "update_outbound_allowed_hosts",
+            "Changed the private-address hosts outbound requests may reach: "
+            f"{', '.join(hosts_audit['after']) or '(none)'}",
+            hosts_audit,
+        )
 
     return {"status": "ok"}
+
+
+def _normalize_allowed_hosts(entries: list[str]) -> list[str]:
+    """Canonicalise and de-duplicate, preserving the admin's order."""
+    out: list[str] = []
+    for entry in entries:
+        if not (entry or "").strip():
+            continue  # a blank line in the textarea is not an error
+        host = url_validation.normalize_allowed_host(entry)
+        if host not in out:
+            out.append(host)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1738,6 +1785,39 @@ async def set_long_document_model(
     return {"status": "ok", "long_document_model": cfg.long_document_model or ""}
 
 
+@router.put("/config/models/validation-judge")
+async def set_validation_judge_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    """Choose the model that grades every validation run. Empty = the default.
+
+    One grader for everyone, so a score is comparable with the last one; it
+    used to follow the chat model of whoever pressed Run.
+    """
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.validation_judge_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    await _audit(user, "set_validation_judge_model",
+                 f"Validation grader: {name or '(system default)'}")
+
+    return {"status": "ok", "validation_judge_model": cfg.validation_judge_model or ""}
+
+
 @router.put("/config/models/default")
 async def set_default_model(
     body: DefaultModelRequest,
@@ -1838,6 +1918,9 @@ async def update_model(
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
         cfg.default_model = body.name
+    # Same for the grader: a rename must not silently change who grades.
+    if getattr(cfg, "validation_judge_model", "") == prev_name and prev_name and body.name != prev_name:
+        cfg.validation_judge_model = body.name
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
@@ -1868,6 +1951,9 @@ async def delete_model(
     # Clear default_model if we just deleted it.
     if cfg.default_model and cfg.default_model == removed.get("name", ""):
         cfg.default_model = ""
+    # A deleted grader hands grading back to the default model.
+    if getattr(cfg, "validation_judge_model", "") and cfg.validation_judge_model == removed.get("name", ""):
+        cfg.validation_judge_model = ""
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
@@ -1958,16 +2044,38 @@ async def parse_saml_metadata(
         raise HTTPException(status_code=400, detail=f"Could not read IdP metadata: {e}")
 
     idp = data.get("idp", {}) if isinstance(data, dict) else {}
+
+    # The parser flattens to "x509cert" only when one cert serves both
+    # signing and encryption. IdPs that publish distinct certs (standard for
+    # Shibboleth) come back as x509certMulti instead — take the signing certs
+    # from there. Multiple signing certs mean a key rollover is in progress;
+    # the first is used and the rest are surfaced so the admin can swap if
+    # logins fail against the newer key.
+    signing_certs = [c for c in [idp.get("x509cert", "")] if c]
+    if not signing_certs:
+        signing_certs = (idp.get("x509certMulti") or {}).get("signing") or []
+
     result = {
         "idp_entity_id": idp.get("entityId", ""),
         "idp_sso_url": (idp.get("singleSignOnService") or {}).get("url", ""),
-        "idp_x509_cert": idp.get("x509cert", ""),
+        "idp_x509_cert": signing_certs[0] if signing_certs else "",
     }
     if not all(result.values()):
+        missing = [
+            label
+            for key, label in [
+                ("idp_entity_id", "entityID"),
+                ("idp_sso_url", "HTTP-Redirect SSO URL"),
+                ("idp_x509_cert", "signing certificate"),
+            ]
+            if not result[key]
+        ]
         raise HTTPException(
             status_code=422,
-            detail="Metadata is missing an entityID, HTTP-Redirect SSO URL, or signing certificate.",
+            detail=f"Metadata is missing: {', '.join(missing)}.",
         )
+    if len(signing_certs) > 1:
+        result["idp_x509_cert_alternates"] = signing_certs[1:]
     return result
 
 
@@ -2867,76 +2975,38 @@ class TestOcrRequest(BaseModel):
 
 @router.post("/config/test-ocr")
 async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(get_current_user)):
-    """Test OCR endpoint connectivity by sending a small health-check request.
+    """Convert a generated one-page PDF through the OCR service and report it
+    step by step — the same structured diagnostic shape as the model Test button.
 
     Accepts the admin form's current values so unsaved edits can be tested;
     an ``"***"`` api key means "use the saved key", the same sentinel the
     config update path uses. Omitted fields fall back to the saved config.
 
-    The probe is provider-aware: docling-serve's convert path only answers
-    POSTs, so a GET against it reports 405 and tells an admin nothing. For that
-    provider we probe the service's ``/health`` endpoint instead, and report
-    the convert URL the extraction path will actually use — the field most
-    often misconfigured.
+    This used to GET the endpoint and call any response "ok". Both of UIdaho's
+    OCR services answer a GET with 405, so the panel read "OCR endpoint
+    responded with 405" — green — while one returned HTTP 500 to every real
+    conversion and the other returned an empty body. A month of scanned uploads
+    failed behind that badge. A test that cannot fail when the thing it tests is
+    broken is not a test, so this one does the actual conversion.
+
+    Returns HTTP 200 with ``ok`` true/false in-band (like the model diagnostic)
+    so the UI can render the breakdown rather than a bare error toast.
     """
     await _require_superadmin(user)
 
+    from app.services.system_diagnostics import diagnose_ocr
+
     cfg = await SystemConfig.get_config()
-    endpoint = body.ocr_endpoint if body and body.ocr_endpoint is not None else cfg.ocr_endpoint
-    if not endpoint:
-        raise HTTPException(status_code=400, detail="OCR endpoint not configured")
-
-    provider_raw = body.ocr_provider if body and body.ocr_provider is not None else cfg.ocr_provider
-    provider = ocr_client.normalize_provider(provider_raw)
-
-    import httpx
-
+    api_key: Optional[str] = None
     if body and body.ocr_api_key is not None and body.ocr_api_key != "***":
         api_key = body.ocr_api_key
-    else:
-        api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
 
-    headers: dict[str, str] = {}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-
-    probe_url = (
-        ocr_client.docling_health_url(endpoint) if provider == "docling" else endpoint
+    return await diagnose_ocr(
+        cfg,
+        endpoint=body.ocr_endpoint if body else None,
+        api_key=api_key,
+        provider=body.ocr_provider if body else None,
     )
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(probe_url, headers=headers)
-            if provider == "docling":
-                convert_url = ocr_client.normalize_endpoint(
-                    endpoint, provider, use_async=bool(cfg.ocr_async)
-                )
-                healthy = resp.status_code == 200
-                message = (
-                    f"Docling-Serve health check returned {resp.status_code}"
-                    f" — documents will be converted via POST {convert_url}"
-                )
-                if not healthy:
-                    message += (
-                        f" (probed {probe_url}; a non-200 here usually means the URL "
-                        "is not a docling-serve root)"
-                    )
-                return {
-                    "status": "ok" if healthy else "warning",
-                    "status_code": resp.status_code,
-                    "message": message,
-                }
-            return {
-                "status": "ok",
-                "status_code": resp.status_code,
-                "message": f"OCR endpoint responded with {resp.status_code}",
-            }
-    except httpx.ConnectError:
-        raise HTTPException(status_code=502, detail="Could not connect to OCR endpoint")
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="OCR endpoint timed out")
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"OCR test failed: {e}")
 
 
 @router.post("/config/test-web-search")
@@ -3008,6 +3078,36 @@ async def get_readiness(user: User = Depends(get_current_user)) -> dict:
 
     cfg = await SystemConfig.get_config()
     return build_readiness(cfg)
+
+
+@router.get("/readiness/ocr")
+async def get_readiness_ocr(user: User = Depends(get_current_user)) -> dict:
+    """Live-probe the saved OCR service and return the checklist's OCR item.
+
+    Split from ``/readiness`` rather than folded into it because a real
+    conversion takes seconds and the checklist must render on page load. The
+    admin UI fetches this after the checklist paints and upgrades the OCR row
+    in place, so a dead OCR service turns red on its own — which is what was
+    missing when both campus services broke and the only symptom anyone saw
+    was a support ticket about uploads six weeks later.
+
+    Admin, not superadmin: reading a health verdict is not editing config, and
+    the row is already on a page admins can open. So only the verdict row is
+    returned — the probe itself carries the endpoint URL (credentials can
+    live in it) and the service's raw reply, which are for the superadmin's
+    Test button.
+    """
+    await _require_admin(user)
+
+    from app.services.system_diagnostics import build_readiness, diagnose_ocr
+
+    cfg = await SystemConfig.get_config()
+    probe = await diagnose_ocr(cfg)
+    item = next(
+        (it for it in build_readiness(cfg, ocr_probe=probe)["items"] if it["key"] == "ocr"),
+        None,
+    )
+    return {"item": item}
 
 
 class TestPromptRequest(BaseModel):

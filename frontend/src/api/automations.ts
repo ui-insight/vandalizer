@@ -27,6 +27,14 @@ export function updateAutomation(id: string, data: {
   return apiFetch<Automation>(`/api/automations/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
+/** The next three run times for a schedule pick, before it is saved. */
+export function previewSchedule(triggerConfig: Record<string, unknown>) {
+  return apiFetch<{ cron_expression: string; timezone: string; next_runs: string[] }>(
+    '/api/automations/schedule/preview',
+    { method: 'POST', body: JSON.stringify({ trigger_config: triggerConfig }) },
+  )
+}
+
 export function deleteAutomation(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/automations/${id}`, { method: 'DELETE' })
 }

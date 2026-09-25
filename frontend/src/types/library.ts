@@ -175,6 +175,14 @@ export interface VerifiedCatalogItem {
   quality_grade: string | null
   last_validated_at: string | null
   validation_run_count: number
+  /** How many test cases the latest score was measured on. */
+  test_case_count?: number
+  /** Consistency across runs, 0-1 (extraction only); null when not measured. */
+  consistency?: number | null
+  /** Distinct people who added this item to a library or adopted this KB. */
+  adoption_count?: number
+  /** Bundled starter example from the seed files — nobody here shared it. */
+  starter?: boolean
   /** Monitoring found a regression here and nobody has reviewed it yet. */
   regression_pending_review?: boolean
   // KB-specific fields

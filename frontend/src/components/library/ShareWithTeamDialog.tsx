@@ -2,22 +2,39 @@ import { useEffect, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 
-interface Props {
-  itemName: string
-  teamName?: string
-  busy?: boolean
-  onCancel: () => void
-  onConfirm: (comment: string) => void | Promise<void>
+export interface ShareTeamOption {
+  id: string
+  name: string
 }
 
-export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConfirm }: Props) {
+interface Props {
+  itemName: string
+  /** The destination when the caller can't offer a choice (a KB shares with its own team). */
+  teamName?: string
+  /**
+   * Teams the item can be sent to. With more than one, the dialog shows a
+   * picker defaulting to ``defaultTeamId``; the chosen id goes to onConfirm.
+   */
+  teams?: ShareTeamOption[]
+  defaultTeamId?: string
+  busy?: boolean
+  onCancel: () => void
+  onConfirm: (comment: string, teamId?: string) => void | Promise<void>
+}
+
+export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, busy, onCancel, onConfirm }: Props) {
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [teamId, setTeamId] = useState<string | undefined>(
+    () => (teams?.some((t) => t.id === defaultTeamId) ? defaultTeamId : teams?.[0]?.id),
+  )
+  const destination = teams?.find((t) => t.id === teamId)?.name ?? teamName
+  const canPick = (teams?.length ?? 0) > 1
 
   const handleSubmit = async () => {
     setSubmitting(true)
     try {
-      await onConfirm(comment.trim())
+      await onConfirm(comment.trim(), teamId)
     } finally {
       setSubmitting(false)
     }
@@ -47,11 +64,38 @@ export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConf
           </button>
         </div>
 
-        <p className="text-sm text-gray-700 mb-4">
-          Sharing <span className="font-medium">{itemName}</span>
-          {teamName ? <> with <span className="font-medium">{teamName}</span></> : null}.
-          Teammates will get a bell notification and an email.
-        </p>
+        {canPick ? (
+          <>
+            <p className="text-sm text-gray-700 mb-3">
+              Sharing <span className="font-medium">{itemName}</span>. Teammates will get a
+              bell notification and an email.
+            </p>
+            <div className="mb-4">
+              <label htmlFor="share-team-select" className="block text-sm font-medium text-gray-700 mb-1">
+                Team
+              </label>
+              <select
+                id="share-team-select"
+                value={teamId}
+                onChange={(e) => setTeamId(e.target.value)}
+                disabled={isBusy}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-highlight"
+              >
+                {teams!.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}{t.id === defaultTeamId ? ' (current team)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-gray-700 mb-4">
+            Sharing <span className="font-medium">{itemName}</span>
+            {destination ? <> with <span className="font-medium">{destination}</span></> : null}.
+            Teammates will get a bell notification and an email.
+          </p>
+        )}
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -82,7 +126,7 @@ export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConf
             disabled={isBusy}
             className="px-4 py-2 text-sm font-bold text-highlight-text bg-highlight hover:brightness-90 rounded-lg disabled:opacity-50"
           >
-            {isBusy ? 'Sharing…' : 'Share'}
+            {isBusy ? 'Sharing…' : destination ? `Share with ${destination}` : 'Share'}
           </button>
         </div>
       </div>

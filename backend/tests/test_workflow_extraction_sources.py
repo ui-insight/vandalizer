@@ -167,7 +167,7 @@ class TestHydration:
         assert "FormFiller" in DOC_META_TASKS
 
     def test_build_steps_data_attaches_doc_metas_to_extraction(self):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db = MagicMock()
         db.workflow_step.find_one.return_value = {
@@ -181,7 +181,7 @@ class TestHydration:
             "text_markers": [{"page": 1, "char_offset": 0}],
         }
 
-        steps_data, _ = _build_steps_data(
+        steps_data, _ = build_steps_data(
             db, {"steps": ["s1"], "input_config": {}}, "wf1", {"doc_uuids": ["d1"]},
         )
 

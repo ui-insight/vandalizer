@@ -51,6 +51,7 @@ def _result(text: str, title: str = "APM 45.14 - Changes Requiring Prior Approva
 
 def _dm():
     dm = MagicMock()
+    dm.replace_kb_source.return_value = 7
     dm.add_to_kb.return_value = 7
     return dm
 
@@ -66,10 +67,11 @@ async def test_refresh_replaces_text_title_and_chunks_on_good_fetch():
         reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
     assert reason is None
-    # Old chunks are dropped before the new ones land, under the same source id.
-    dm.delete_kb_source.assert_called_once_with("kb-1", "src-1")
-    dm.add_to_kb.assert_called_once()
-    assert dm.add_to_kb.call_args.args[:3] == ("kb-1", "src-1", "APM 45.14 - Changes Requiring Prior Approval | UI")
+    # The chunks are swapped in one call under the same source id, so the
+    # old ones are only dropped once the new ones are in.
+    dm.delete_kb_source.assert_not_called()
+    dm.replace_kb_source.assert_called_once()
+    assert dm.replace_kb_source.call_args.args[:3] == ("kb-1", "src-1", "APM 45.14 - Changes Requiring Prior Approval | UI")
     assert src.content == new_text
     assert src.url_title == "APM 45.14 - Changes Requiring Prior Approval | UI"
     assert src.chunk_count == 7
@@ -86,7 +88,7 @@ async def test_refresh_keeps_custom_name_as_chunk_label():
     with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(fresh))), \
          patch.object(knowledge_service, "_get_dm", return_value=dm):
         await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
-    assert dm.add_to_kb.call_args.args[2] == "Prior approvals policy"
+    assert dm.replace_kb_source.call_args.args[2] == "Prior approvals policy"
 
 
 @pytest.mark.asyncio
@@ -101,8 +103,7 @@ async def test_refresh_keeps_previous_content_when_fetch_errors():
         reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
     assert reason
-    dm.delete_kb_source.assert_not_called()
-    dm.add_to_kb.assert_not_called()
+    dm.replace_kb_source.assert_not_called()
     assert src.content.startswith("Last updated: December 1, 2018")
     assert src.chunk_count == 3
     assert src.status == "ready"  # still serves the old text
@@ -121,7 +122,6 @@ async def test_refresh_keeps_previous_content_when_page_is_bot_challenge():
         reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
     assert "bot protection" in reason
-    dm.delete_kb_source.assert_not_called()
     assert src.status == "ready"
     assert src.content.startswith("Last updated: December 1, 2018")
 
@@ -225,8 +225,7 @@ async def test_refresh_refuses_a_page_that_is_a_fraction_of_the_indexed_text():
 
     assert reason and "looks like the site's shell" in reason
     # The index was never touched: the 208 chunks are still what chat searches.
-    dm.delete_kb_source.assert_not_called()
-    dm.add_to_kb.assert_not_called()
+    dm.replace_kb_source.assert_not_called()
     assert src.content == _SUBPART_E
     assert src.chunk_count == 208
     # And it does not wear a green check.
@@ -249,7 +248,7 @@ async def test_refresh_accepts_a_genuine_revision_that_shrinks_the_page():
         reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
     assert reason is None
-    dm.add_to_kb.assert_called_once()
+    dm.replace_kb_source.assert_called_once()
     assert src.content == revised
     assert src.last_refresh_outcome == "refreshed"
 
@@ -302,7 +301,7 @@ async def test_a_page_that_really_did_shrink_gets_in_on_the_second_refresh():
         first = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
         assert first is not None, "first attempt should still be refused"
         assert src.last_collapsed_hash, "the refused text must be remembered"
-        dm.add_to_kb.assert_not_called()
+        dm.replace_kb_source.assert_not_called()
 
         second = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
 
@@ -326,4 +325,120 @@ async def test_a_shell_that_differs_between_attempts_stays_refused():
         with patch("app.services.web_fetcher.fetch_url",
                    AsyncMock(return_value=_result("Error 502 (b)"))):
             assert await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1")) is not None
-    dm.add_to_kb.assert_not_called()
+    dm.replace_kb_source.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# #834: fetch-time advisories (a PDF the hidden-text scrub could not inspect)
+# are persisted on the source row, and a later clean fetch clears them.
+# ---------------------------------------------------------------------------
+
+def _pdf_result(text: str, advisories: list[str]) -> WebFetchResult:
+    r = _result(text)
+    r.advisories = list(advisories)
+    return r
+
+
+@pytest.mark.asyncio
+async def test_refresh_records_the_hidden_text_unchecked_advisory_on_the_source():
+    src = _source()
+    new_text = "Last Updated: July 13, 2026\nA. Purpose. new text"
+
+    with patch("app.services.web_fetcher.fetch_url",
+               AsyncMock(return_value=_pdf_result(new_text, ["hidden_text_unchecked"]))), \
+         patch.object(knowledge_service, "_get_dm", return_value=_dm()):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    assert src.status == "ready"
+    assert src.warnings == ["hidden_text_unchecked"]
+
+
+@pytest.mark.asyncio
+async def test_a_later_clean_refresh_clears_an_earlier_advisory():
+    src = _source(warnings=["hidden_text_unchecked"])
+    new_text = "Last Updated: July 13, 2026\nA. Purpose. new text"
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(new_text))), \
+         patch.object(knowledge_service, "_get_dm", return_value=_dm()):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    assert src.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_an_unchanged_refresh_also_rewrites_the_advisory():
+    """The fetch, not the re-embed, is what carries the caveat — a refresh
+    that finds the same text still ran a fresh scrub."""
+    from app.utils import kb_source_currency as currency
+
+    text = "Last updated: December 1, 2018\nA. Overview. old text"
+    src = _source(content=text, content_hash=currency.content_fingerprint(text),
+                  warnings=["hidden_text_unchecked"])
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(text))), \
+         patch.object(knowledge_service, "_get_dm", return_value=_dm()):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    assert src.last_refresh_outcome == currency.OUTCOME_UNCHANGED
+    assert src.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_first_ingest_records_the_advisory_on_the_source():
+    src = _source(status="pending", content=None, chunk_count=0)
+    text = "A. Purpose. " + "Award terms and conditions apply to every subaward. " * 20
+
+    with patch("app.services.web_fetcher.fetch_url",
+               AsyncMock(return_value=_pdf_result(text, ["hidden_text_unchecked"]))), \
+         patch.object(knowledge_service, "_get_dm", return_value=_dm()):
+        result = await knowledge_service._ingest_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert result is not None
+    assert src.status == "ready"
+    assert src.warnings == ["hidden_text_unchecked"]
+
+
+def _link_hub_result() -> WebFetchResult:
+    """A page that has become an index: enough text, but mostly links."""
+    links = "".join(f'<a href="/policies/apm/45/{i}">APM 45.{i}</a>' for i in range(30))
+    return WebFetchResult(
+        url="https://www.uidaho.edu/policies/apm/45/14", title="APM 45 | UI",
+        text="Chapter 45 policies. " * 72, raw_html=f"<html><body>{links}</body></html>",
+        used_browser=False, status_code=200,
+    )
+
+
+@pytest.mark.asyncio
+async def test_refresh_of_a_crawled_page_that_became_a_link_hub_keeps_the_content():
+    """The crawler never keeps a navigation page; a refresh of a page it found
+    must not embed one over the content it replaced (#726 follow-up)."""
+    src = _source(parent_source_uuid="parent-1", content="A. Purpose. real policy text. " * 50)
+    dm = _dm()
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_link_hub_result())), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason and reason.startswith("Link index page")
+    dm.replace_kb_source.assert_not_called()
+    assert src.content.startswith("A. Purpose.")
+    assert src.status == "ready"
+    assert src.last_refresh_outcome == "retrieval_failed"
+    assert src.error_message.startswith("Refresh failed — previous content kept: Link index page")
+
+
+@pytest.mark.asyncio
+async def test_refresh_of_a_hand_added_link_hub_is_still_accepted():
+    """First ingest never gated a URL someone added themselves, so neither does refresh."""
+    src = _source(content="A. Purpose. real policy text. " * 50)
+    dm = _dm()
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_link_hub_result())), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm):
+        reason = await knowledge_service.refresh_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert reason is None
+    dm.replace_kb_source.assert_called_once()

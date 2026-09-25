@@ -25,6 +25,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _allowed_hosts() -> frozenset[str]:
+    """Private-address hosts a credential's endpoints may point at: the
+    operator's env list plus the admin's System Config list."""
+    from app.utils.url_validation import load_allowed_hosts
+
+    return await load_allowed_hosts()
+
+
 def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
@@ -129,6 +137,7 @@ async def test_credential_draft(
     """
     result = await asyncio.to_thread(
         credentials_service.run_connection_test, body.type, body.payload, test_url=body.test_url,
+        allowed_hosts=await _allowed_hosts(),
     )
     return CredentialTestResponse(**result)
 
@@ -158,6 +167,7 @@ async def test_saved_credential(
     result = await asyncio.to_thread(
         credentials_service.run_connection_test, cred.type, payload,
         test_url=(body.test_url if body else None) or payload.get("test_url") or None,
+        allowed_hosts=await _allowed_hosts(),
     )
     return CredentialTestResponse(**result)
 
@@ -172,7 +182,7 @@ async def create_credential(
     user: User = Depends(get_current_user),
 ) -> CredentialResponse:
     try:
-        credentials_service.validate_payload(req.type, req.payload)
+        credentials_service.validate_payload(req.type, req.payload, allowed_hosts=await _allowed_hosts())
     except credentials_service.CredentialError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -252,7 +262,7 @@ async def update_credential(
                 detail="Changing the credential type requires the complete payload for the new type.",
             )
         try:
-            credentials_service.validate_payload(req.type, req.payload)
+            credentials_service.validate_payload(req.type, req.payload, allowed_hosts=await _allowed_hosts())
         except credentials_service.CredentialError as e:
             raise HTTPException(status_code=400, detail=str(e))
         cred.type = req.type
@@ -270,7 +280,7 @@ async def update_credential(
             cred.type, cred.payload, req.payload
         )
         try:
-            credentials_service.validate_payload(cred.type, merged)
+            credentials_service.validate_payload(cred.type, merged, allowed_hosts=await _allowed_hosts())
         except credentials_service.CredentialError as e:
             raise HTTPException(status_code=400, detail=str(e))
         cred.payload = credentials_service.encrypt_payload(cred.type, merged)

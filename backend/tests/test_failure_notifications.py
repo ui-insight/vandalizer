@@ -310,6 +310,63 @@ class TestNotifyProjectKbSyncFailed:
         assert "NSF Renewal" in kwargs["title"]
         assert "Budget.xlsx" in kwargs["body"]
         assert "will not" in kwargs["body"]
+        # The insert branch: nothing was indexed before, so the body is the one
+        # this notification has always sent, byte for byte.
+        assert kwargs["body"] == (
+            "“Budget.xlsx” was saved, but could not be added to the "
+            "project's knowledge base — chatting with this project will not "
+            "see it. chroma down"
+        )
+
+    def _refresh_body(self, failed_at):
+        from app.services.failure_notifications import notify_project_kb_sync_failed
+
+        db = MagicMock()
+        with patch(
+            "app.services.failure_notifications.create_notification_sync"
+        ) as create:
+            notify_project_kb_sync_failed(
+                db,
+                doc={"uuid": "d1", "title": "Budget.xlsx", "user_id": "u1"},
+                project={"uuid": "p1", "title": "NSF Renewal", "owner_user_id": "p-owner"},
+                error=RuntimeError("chroma down"),
+                failed_at=failed_at,
+            )
+        return create.call_args.kwargs["body"]
+
+    def test_a_replacement_that_failed_says_the_copy_is_gone(self):
+        """The delete ran and the re-add did not, so "saved, but could not be
+        added" describes the wrong event: this document was searchable in the
+        project until a moment ago, and the owner needs to know that and how to
+        get it back (#887 follow-up)."""
+        body = self._refresh_body("replace")
+
+        assert "Budget.xlsx" in body
+        assert (
+            "Its previously indexed copy was removed from the project and could "
+            "not be replaced; use Retry extraction on the document to index it "
+            "again." in body
+        )
+        assert "was saved, but could not be added" not in body
+        # The cause still rides along.
+        assert "chroma down" in body
+
+    def test_a_delete_that_failed_says_the_old_text_may_still_answer(self):
+        """The other half of a refresh failure, and the one it would be worst
+        to describe as the first: nothing was removed, so the project still
+        answers from the superseded extraction. Telling the owner their file is
+        gone from the project would send them looking for the wrong problem."""
+        body = self._refresh_body("delete")
+
+        assert "Budget.xlsx" in body
+        assert (
+            "Its previously indexed copy could not be removed, so the project "
+            "may still answer from the older text until this is fixed; use "
+            "Retry extraction on the document to index it again." in body
+        )
+        assert "was removed from the project" not in body
+        assert "was saved, but could not be added" not in body
+        assert "chroma down" in body
 
     def test_falls_back_to_the_project_owner(self):
         from app.services.failure_notifications import notify_project_kb_sync_failed

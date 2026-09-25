@@ -8,6 +8,13 @@ from beanie import Document
 from pydantic import Field
 
 
+# A KB validation over a user-selected subset of test queries. It is a
+# measurement — history lists it and it exports — but of a hand-picked few,
+# so it must not stand in for the full eval set anywhere a "latest run" is
+# read as the item's quality.
+SMOKE_TEST_SOURCE = "smoke_test"
+
+
 class ValidationRun(Document):
     """A single validation run result, linked to a search set or workflow."""
 
@@ -44,9 +51,12 @@ class ValidationRun(Document):
     user_id: str
     # Provenance tag — distinguishes a user-triggered validation run from an
     # auto-recorded apply event (Phase 4 of loop closure). Values:
-    # ``"validation"`` (default), ``"optimizer_apply"``. Optimizer-apply rows
-    # are rendered differently on the quality timeline so users can tell
-    # "we measured this" from "the optimizer believed this".
+    # ``"validation"`` (default), ``"optimizer_apply"``, ``"passive_monthly"``,
+    # and ``SMOKE_TEST_SOURCE`` for a run over a hand-picked subset of test
+    # queries. Optimizer-apply rows are rendered differently on the quality
+    # timeline so users can tell "we measured this" from "the optimizer
+    # believed this"; smoke-test rows stay in history (and export) but never
+    # become the item's quality score or a regression baseline.
     source: Optional[str] = None
     # When source="optimizer_apply", the originating optimization-run uuid.
     # Lets the timeline deep-link an apply row back to its winning trial.

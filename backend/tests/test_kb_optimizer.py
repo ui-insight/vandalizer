@@ -611,6 +611,11 @@ def _terminal_run_doc(status: str, **fields) -> MagicMock:
     rd.baseline_default_score = fields.get("baseline_default_score", 0.5)
     rd.optimized_score = fields.get("optimized_score", 0.85)
     rd.error_message = fields.get("error_message")
+    rd.options = fields.get("options", {})
+    rd.best_config = fields.get("best_config", {"k": 8})
+    rd.tied_with_baseline = fields.get("tied_with_baseline", False)
+    rd.applied_at = fields.get("applied_at")
+    rd.dismissed_at = None
     return rd
 
 
@@ -645,33 +650,21 @@ async def test_notify_terminal_emits_completion_notification_with_lift():
     assert captured["kind"] == "kb_optimization_completed"
     assert captured["user_id"] == "user1"
     assert "Grants KB" in captured["title"]
-    assert "85%" in captured["body"]
-    assert "+30pts" in captured["body"]  # 85 - 55
+    assert "55% → 85%" in captured["body"]
+    assert "+30 pts" in captured["body"]  # 85 - 55
     assert captured["item_kind"] == "knowledge_base"
     assert captured["item_id"] == "kb-1"
     assert captured["link"] == "/?mode=knowledge&kb=kb-1"
 
 
 @pytest.mark.asyncio
-async def test_notify_terminal_emits_cancelled_notification():
+async def test_notify_terminal_is_silent_on_cancel():
+    """The user cancelled it; a bell entry saying so tells them nothing."""
     rd = _terminal_run_doc("cancelled", trials=[{"t": 1}])
-    kb = _kb_stub("KB-Cancelled")
-
-    captured = {}
-
-    async def fake(**kw):
-        captured.update(kw)
-        return {}
-
-    with patch(
-        "app.services.notification_service.create_notification",
-        new=AsyncMock(side_effect=fake),
-    ):
-        await KBOptimizer()._notify_terminal(rd, kb)
-
-    assert captured["kind"] == "kb_optimization_cancelled"
-    assert "Cancelled" in captured["title"]
-    assert "1 trial" in captured["body"]
+    create = AsyncMock()
+    with patch("app.services.notification_service.create_notification", new=create):
+        await KBOptimizer()._notify_terminal(rd, _kb_stub("KB-Cancelled"))
+    create.assert_not_awaited()
 
 
 @pytest.mark.asyncio

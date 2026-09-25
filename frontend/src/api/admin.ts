@@ -364,6 +364,8 @@ export interface SystemConfigData {
   available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
   default_model: string
   long_document_model?: string
+  /** The model that grades every validation run; empty = the default model. */
+  validation_judge_model?: string
   ocr_endpoint: string
   ocr_api_key: string
   web_search_endpoint: string
@@ -379,13 +381,17 @@ export interface SystemConfigData {
   default_team_id: string
   compliance_config: CompliancePolicyConfig
   retention_config: Record<string, unknown>
+  /** Exact hostnames outbound steps may reach although they resolve to a private address. */
+  outbound_url_allowed_hosts: string[]
+  /** Read-only: the operator's OUTBOUND_URL_ALLOWED_HOSTS, merged with the list above. */
+  outbound_url_env_allowed_hosts?: string[]
 }
 
 export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; web_search_endpoint?: string; web_search_api_key?: string; web_search_provider?: string; ocr_provider?: OcrProvider; ocr_options?: Record<string, unknown>; ocr_async?: boolean; ocr_timeout_seconds?: number; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; web_search_endpoint?: string; web_search_api_key?: string; web_search_provider?: string; ocr_provider?: OcrProvider; ocr_options?: Record<string, unknown>; ocr_async?: boolean; ocr_timeout_seconds?: number; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[]; outbound_url_allowed_hosts?: string[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -523,6 +529,14 @@ export function setLongDocumentModel(name: string) {
   })
 }
 
+/** Choose the model that grades every validation run ('' = the default model). */
+export function setValidationJudgeModel(name: string) {
+  return apiFetch<{ status: string; validation_judge_model: string }>('/api/admin/config/models/validation-judge', {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
+}
+
 export function setDefaultModel(name: string) {
   return apiFetch<{ status: string; default_model: string }>('/api/admin/config/models/default', {
     method: 'PUT',
@@ -532,8 +546,26 @@ export function setDefaultModel(name: string) {
 
 // Test connectivity
 
+// The result of converting a generated one-page PDF through the OCR service.
+// Not a reachability ping: the probe this replaced reported any HTTP response
+// as success, which is how two dead OCR services sat behind a green badge for
+// a month while every scanned upload failed.
+export type OcrTestResult = {
+  ok: boolean
+  summary: string
+  endpoint: string
+  provider: string
+  convert_url: string
+  checks: ModelCheck[]
+  latency_ms?: number
+  status_code?: number | null
+  chars?: number
+  sample?: string
+  error?: ModelDiagnosticError | null
+}
+
 export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string; ocr_provider?: OcrProvider }) {
-  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', {
+  return apiFetch<OcrTestResult>('/api/admin/config/test-ocr', {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -574,7 +606,7 @@ export function testModel(modelId: string) {
 // System readiness — the admin setup checklist
 
 export type ReadinessSeverity = 'blocker' | 'recommended' | 'optional'
-export type ReadinessStatus = 'missing' | 'incomplete' | 'configured'
+export type ReadinessStatus = 'missing' | 'incomplete' | 'configured' | 'broken'
 
 export type ReadinessItem = {
   key: string
@@ -597,6 +629,14 @@ export function getReadiness() {
   return apiFetch<ReadinessReport>('/api/admin/readiness')
 }
 
+// Live-probes the OCR service and returns the checklist's OCR row as it stands
+// once the verdict is in. Split from getReadiness because a real conversion
+// takes seconds and the checklist has to render on page load; the UI fetches
+// this afterwards and upgrades the row in place.
+export function probeOcrReadiness() {
+  return apiFetch<{ item: ReadinessItem | null; probe: OcrTestResult }>('/api/admin/readiness/ocr')
+}
+
 export type TestPromptResult = {
   ok: boolean
   request: { model: string; system_prompt: string; user_prompt: string }
@@ -615,11 +655,11 @@ export function testPrompt(data: { model_name: string; system_prompt: string; us
 
 // Auth
 
-export function addOAuthProvider(data: Record<string, string>) {
+export function addOAuthProvider(data: Record<string, unknown>) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/providers', { method: 'POST', body: JSON.stringify(data) })
 }
 
-export function updateOAuthProvider(providerId: string, data: Record<string, string>) {
+export function updateOAuthProvider(providerId: string, data: Record<string, unknown>) {
   return apiFetch<{ status: string }>(`/api/admin/config/auth/providers/${encodeURIComponent(providerId)}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 

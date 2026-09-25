@@ -16,7 +16,7 @@ import type { KnowledgeBase, KBScope } from '../../types/knowledge'
 const SCOPES: { value: KBScope; label: string }[] = [
   { value: 'mine', label: 'Mine' },
   { value: 'team', label: 'Team' },
-  { value: 'verified', label: 'Verified' },
+  { value: 'verified', label: 'Everyone' },
 ]
 
 interface Props {

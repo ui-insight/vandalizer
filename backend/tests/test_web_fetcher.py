@@ -591,3 +591,132 @@ async def test_blocked_fetch_raises_immediately_when_browser_disabled():
             await fetch_url("https://example.com/blocked", settings=settings)
 
     assert mock_render.called is False
+
+
+# ---------------------------------------------------------------------------
+# #834: a fetched PDF whose hidden-text scrub could not run says so on the
+# result, so KB ingestion can record it on the source instead of the caveat
+# living only in a log line.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_pdf_whose_hidden_text_scrub_fails_carries_an_advisory():
+    from app.services import pdf_hidden_text
+
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("Award terms and conditions, section 4")
+
+    def unscrubbed(pdf_path, text, markers=None, report=None):
+        if report is not None:
+            report["hidden_text_unchecked"] = True
+        return text, markers or []
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"), \
+         patch.object(pdf_hidden_text, "scrub_pdf", side_effect=unscrubbed):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    assert "Award terms" in result.text
+    assert result.advisories == ["hidden_text_unchecked"]
+
+
+@pytest.mark.asyncio
+async def test_pdf_whose_hidden_text_scrub_ran_carries_no_advisory():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("Award terms and conditions, section 4")
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    assert result.advisories == []
+
+
+# ---------------------------------------------------------------------------
+# Per-caller text cap
+# ---------------------------------------------------------------------------
+#
+# The two kinds of caller are not alike. Chat's "attach link" and the workflow
+# Fetch step put this text into a model prompt and genuinely cannot take a
+# megabyte of it; knowledge-base ingestion chunks and embeds it, where length
+# costs embedding time and nothing else. Sharing one cap meant the
+# prompt-sized limit silently decided how much of a federal regulation was
+# indexed — the Federal Register's 2 CFR 200 rewrite lost 54% of its text,
+# four whole subparts, behind a warning the user could do nothing about.
+
+
+def _long_page(paragraph_chars: int, paragraphs: int) -> str:
+    body = "".join(
+        f"<p>{'Long federal regulation body text. ' * (paragraph_chars // 35)}</p>\n"
+        for _ in range(paragraphs)
+    )
+    return f"<!DOCTYPE html><html><head><title>Long Reg</title></head><body><main><article><h1>Long Reg</h1>{body}</article></main></body></html>"
+
+
+@pytest.mark.asyncio
+async def test_default_cap_is_the_prompt_sized_setting():
+    settings = Settings(web_fetcher_browser_enabled=False, web_fetcher_max_chars=5_000)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(_long_page(2_000, 20))), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/reg"):
+        result = await fetch_url("https://example.com/reg", settings=settings)
+
+    assert len(result.text) == 5_000
+    assert result.truncated is True
+
+
+@pytest.mark.asyncio
+async def test_max_chars_lets_a_caller_take_the_whole_page():
+    settings = Settings(web_fetcher_browser_enabled=False, web_fetcher_max_chars=5_000)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(_long_page(2_000, 20))), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/reg"):
+        result = await fetch_url(
+            "https://example.com/reg", settings=settings, max_chars=5_000_000,
+        )
+
+    # Well past the prompt-sized cap, and not flagged as a partial page.
+    assert len(result.text) > 5_000
+    assert result.truncated is False
+
+
+@pytest.mark.asyncio
+async def test_a_page_past_even_the_raised_cap_still_reports_truncation():
+    """The warning survives as the genuine extreme case it was written for."""
+    settings = Settings(web_fetcher_browser_enabled=False, web_fetcher_max_chars=5_000)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(_long_page(2_000, 20))), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com/reg"):
+        result = await fetch_url(
+            "https://example.com/reg", settings=settings, max_chars=1_000,
+        )
+
+    assert len(result.text) == 1_000
+    assert result.truncated is True
+
+
+def test_sync_wrapper_forwards_max_chars():
+    """The Celery and workflow paths go through the sync wrapper."""
+    captured = {}
+
+    async def fake_fetch(url, **kwargs):
+        captured.update(kwargs)
+        return WebFetchResult(
+            url=url, title="t", text="x", raw_html=None,
+            used_browser=False, status_code=200,
+        )
+
+    with patch("app.services.web_fetcher.fetch_url", side_effect=fake_fetch):
+        fetch_url_sync("https://example.com/reg", max_chars=5_000_000)
+
+    assert captured["max_chars"] == 5_000_000

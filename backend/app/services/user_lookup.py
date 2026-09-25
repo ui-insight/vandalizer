@@ -6,7 +6,7 @@ from app.models.user import User
 from app.schemas.user import AuthorRef
 
 
-SYSTEM_AUTHOR_NAME = "Verified Catalog"
+SYSTEM_AUTHOR_NAME = "Vandalizer"
 
 
 async def resolve_authors(user_ids: Iterable[str]) -> dict[str, AuthorRef]:

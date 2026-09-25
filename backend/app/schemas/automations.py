@@ -4,6 +4,7 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, model_validator
 
+from app.services.automation_schedule import normalize_schedule_config
 from app.utils.naming import EntityName, OptionalEntityName
 
 TRIGGER_TYPES = ("folder_watch", "m365_intake", "api", "schedule")
@@ -26,9 +27,7 @@ class CreateAutomationRequest(BaseModel):
     @model_validator(mode="after")
     def validate_trigger_config(self) -> "CreateAutomationRequest":
         if self.trigger_type == "schedule":
-            cfg = self.trigger_config or {}
-            if not cfg.get("cron_expression"):
-                raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
+            self.trigger_config = normalize_schedule_config(self.trigger_config)
         if self.trigger_type == "folder_watch":
             cfg = self.trigger_config or {}
             if not cfg.get("folder_id"):
@@ -54,8 +53,8 @@ class UpdateAutomationRequest(BaseModel):
         # two-step UI flow: pick the new type, then fill in its required fields.
         if not self.trigger_config:
             return self
-        if self.trigger_type == "schedule" and not self.trigger_config.get("cron_expression"):
-            raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
+        if self.trigger_type == "schedule":
+            self.trigger_config = normalize_schedule_config(self.trigger_config)
         if self.trigger_type == "folder_watch" and not self.trigger_config.get("folder_id"):
             raise ValueError("Folder watch trigger requires 'folder_id' in trigger_config")
         return self
@@ -78,6 +77,21 @@ class AutomationResponse(BaseModel):
     created_at: str
     updated_at: str
     can_manage: bool = True
+    # Schedule triggers only: the next time it will fire (ISO, UTC), and the
+    # last time it did. ``next_run_at`` is set whether or not it is enabled;
+    # the UI says "paused" beside it when it is not.
+    next_run_at: Optional[str] = None
+    last_run_at: Optional[str] = None
+
+
+class SchedulePreviewRequest(BaseModel):
+    trigger_config: dict
+
+
+class SchedulePreviewResponse(BaseModel):
+    cron_expression: str
+    timezone: str
+    next_runs: list[str]
 
 
 class TriggerEventStatusResponse(BaseModel):

@@ -176,7 +176,10 @@ class TestConnectionTestRoutes:
         assert resp.status_code == 200, resp.text
         assert resp.json() == report
         assert mock_test.call_args.args == ("static_header", {"header_name": "X", "header_value": "k"})
-        assert mock_test.call_args.kwargs == {"test_url": "https://api.example.com/"}
+        # allowed_hosts rides along so a token endpoint on an admin-allowed
+        # private host can be tested; its value is whatever the deployment allows.
+        assert mock_test.call_args.kwargs["test_url"] == "https://api.example.com/"
+        assert isinstance(mock_test.call_args.kwargs["allowed_hosts"], frozenset)
 
     @pytest.mark.asyncio
     async def test_saved_test_merges_form_edits_over_stored_secrets(self, client):
@@ -208,7 +211,8 @@ class TestConnectionTestRoutes:
         # Blank secret in the form keeps the stored one (merge handles it); the
         # stored test_url is used when the request gives none.
         assert mock_merge.call_args.args[2] == {"header_name": "X-New", "header_value": ""}
-        assert mock_test.call_args.kwargs == {"test_url": "https://stored.example/"}
+        assert mock_test.call_args.kwargs["test_url"] == "https://stored.example/"
+        assert isinstance(mock_test.call_args.kwargs["allowed_hosts"], frozenset)
 
     @pytest.mark.asyncio
     async def test_saved_test_is_404_for_a_credential_the_user_cannot_see(self, client):

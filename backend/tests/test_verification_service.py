@@ -681,14 +681,14 @@ async def test_check_auto_approve_no_score(mock_vr, mock_sc):
 async def test_get_item_metadata_found(mock_vim):
     from app.services.verification_service import get_item_metadata
 
-    meta = _make_meta(display_name="Nice Name", quality_score=92.5, quality_tier="gold")
+    meta = _make_meta(display_name="Nice Name", quality_score=92.5, quality_tier="excellent")
     mock_vim.find_one = AsyncMock(return_value=meta)
 
     result = await get_item_metadata("workflow", "obj-id-123")
     assert result is not None
     assert result["display_name"] == "Nice Name"
     assert result["quality_score"] == 92.5
-    assert result["quality_tier"] == "gold"
+    assert result["quality_tier"] == "excellent"
     assert result["id"] == "meta-oid"
 
 
@@ -1119,7 +1119,7 @@ async def test_submit_for_verification_gate_min_score_fails(mock_wf_cls, mock_sc
     }
 
     with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
-         patch("app.services.quality_service.compute_quality_tier", return_value="bronze"):
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"):
         with pytest.raises(ValueError, match="Quality score is 70"):
             await submit_for_verification(
                 item_kind="workflow",
@@ -1391,3 +1391,170 @@ class TestVerificationSubmittedDeepLink:
         assert 'href="https://vandalizer.example.edu/verification"' in html
         assert "request=" not in html
         assert "Open Queue" in html
+
+
+# ---------------------------------------------------------------------------
+# sort=quality — one tier vocabulary, measured before asserted
+# ---------------------------------------------------------------------------
+
+
+def test_quality_sort_measured_excellent_outranks_asserted_excellent():
+    """A catalog author typing "excellent" must never rank above a run that
+    earned it. Regression for #908, where validating an item sank it below
+    every hand-tiered seed."""
+    from app.services.verification_service import _quality_sort_key
+
+    asserted = {"quality_tier": "excellent", "quality_score": None}
+    measured = {"quality_tier": "excellent", "quality_score": 94.0}
+    good = {"quality_tier": "good", "quality_score": 99.0}
+    unrated = {"quality_tier": None, "quality_score": None}
+    legacy = {"quality_tier": "gold", "quality_score": None}
+
+    ordered = sorted([legacy, unrated, good, asserted, measured], key=_quality_sort_key)
+    # sorted() is stable, so the two 99-keyed tail entries keep input order.
+    assert ordered == [measured, asserted, good, legacy, unrated]
+    # Anything outside the measured vocabulary sorts with the unrated tail.
+    assert _quality_sort_key(legacy)[0] == _quality_sort_key(unrated)[0] == 99
+
+
+def test_quality_sort_higher_score_first_within_tier():
+    from app.services.verification_service import _quality_sort_key
+
+    lo = {"quality_tier": "good", "quality_score": 71.0}
+    hi = {"quality_tier": "good", "quality_score": 88.0}
+    assert sorted([lo, hi], key=_quality_sort_key) == [hi, lo]
+
+
+@pytest.mark.asyncio
+@patch(f"{MODULE}.VerificationRequest")
+@patch(f"{MODULE}.SystemConfig")
+@patch(f"{MODULE}.Workflow")
+async def test_submit_gate_min_workflow_grade_enforces_only_with_require_validation(mock_wf_cls, mock_sc, mock_vr_cls):
+    """min_workflow_grade sits under the admin UI's "Require validation" toggle
+    and was read by nothing (#911). With the toggle on it refuses; off, the
+    same submission goes through."""
+    from app.services.verification_service import submit_for_verification
+
+    wf = _make_obj()
+    mock_wf_cls.get = AsyncMock(return_value=wf)
+    mock_vr_cls.find_one = AsyncMock(return_value=None)
+    latest = {"result_snapshot": {"test_cases": [1, 2, 3], "num_runs": 3}, "score": 62, "grade": "D"}
+
+    mock_sc.get_config = AsyncMock(return_value=_make_sys_config(
+        {"verification_gates": {"require_validation": True, "min_workflow_grade": "C"}}
+    ))
+    with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"):
+        with pytest.raises(ValueError, match="Workflow grade is D, minimum is C"):
+            await submit_for_verification(item_kind="workflow", item_id="507f1f77bcf86cd799439011", user_id="alice")
+
+    mock_sc.get_config = AsyncMock(return_value=_make_sys_config(
+        {"verification_gates": {"require_validation": False, "min_workflow_grade": "C"}}
+    ))
+    created = _make_verification_request()
+    mock_vr_cls.return_value = created
+    with patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=latest), \
+         patch("app.services.quality_service.compute_quality_tier", return_value="fair"), \
+         patch(f"{MODULE}._notify_examiners", new_callable=AsyncMock):
+        result = await submit_for_verification(item_kind="workflow", item_id="507f1f77bcf86cd799439011", user_id="alice")
+    # submit_for_verification returns the serialised request; the insert is the tell.
+    assert isinstance(result, dict)
+    created.insert.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# adoption_counts — "N people use it" (#913)
+# ---------------------------------------------------------------------------
+
+
+def _lib_row(item_id, user, kind=None, verified=False):
+    from app.models.library import LibraryItemKind
+    r = MagicMock()
+    r.item_id = item_id
+    r.added_by_user_id = user
+    r.kind = kind or LibraryItemKind.WORKFLOW
+    r.verified = verified
+    return r
+
+
+def _kb_ref(source_kb_uuid, user):
+    r = MagicMock()
+    r.source_kb_uuid = source_kb_uuid
+    r.user_id = user
+    return r
+
+
+def test_adoption_counts_distinct_people_per_item_and_skips_the_catalog_row():
+    from app.services.verification_service import adoption_counts
+
+    rows = [
+        _lib_row("wf-1", "alice"),
+        _lib_row("wf-1", "alice"),            # re-added: still one person
+        _lib_row("wf-1", "bob"),
+        _lib_row("wf-1", "catalog", verified=True),  # the catalog's own row
+        _lib_row("wf-2", "carol"),
+    ]
+    refs = [_kb_ref("kb-uuid-1", "alice"), _kb_ref("kb-uuid-1", "dave"), _kb_ref("kb-uuid-9", "eve")]
+    counts = adoption_counts(rows, refs, {"kb-uuid-1": "kb-1"})
+    assert counts[("workflow", "wf-1")] == 2
+    assert counts[("workflow", "wf-2")] == 1
+    assert counts[("knowledge_base", "kb-1")] == 2
+    assert ("knowledge_base", "kb-9") not in counts  # unknown uuid is dropped, not miscounted
+
+
+def test_quality_sort_adoption_orders_most_used_first():
+    from app.services.verification_service import list_verified_items  # noqa: F401  (module import guard)
+    entries = [{"adoption_count": 1}, {"adoption_count": 7}, {}]
+    entries.sort(key=lambda e: -(e.get("adoption_count") or 0))
+    assert [e.get("adoption_count") for e in entries] == [7, 1, None]
+
+
+def test_adoption_counts_leave_out_the_author_and_the_system_user():
+    """Creating an item bookmarks it for its author; that is not an adoption."""
+    from app.services.verification_service import adoption_counts
+
+    rows = [_lib_row("wf-1", "author"), _lib_row("wf-1", "bob"), _lib_row("wf-2", "system")]
+    refs = [_kb_ref("kb-uuid-1", "kb-owner")]
+    counts = adoption_counts(
+        rows, refs, {"kb-uuid-1": "kb-1"},
+        {("workflow", "wf-1"): "author", ("knowledge_base", "kb-1"): "kb-owner"},
+    )
+    assert counts[("workflow", "wf-1")] == 1
+    assert counts[("workflow", "wf-2")] == 0
+    assert counts[("knowledge_base", "kb-1")] == 0
+
+
+def _meta_row(validated_at=None, **quality):
+    import datetime as _dt
+    from types import SimpleNamespace
+    fields = dict(quality_score=None, quality_tier=None, quality_grade=None, validation_run_count=0,
+                  test_case_count=None, consistency=None)
+    fields.update(quality)
+    return SimpleNamespace(
+        item_kind="search_set", item_id="x", display_name="Grant fields", organization_ids=["org-1"],
+        last_validated_at=_dt.datetime(2026, 9, validated_at, tzinfo=_dt.timezone.utc) if validated_at else None,
+        **fields,
+    )
+
+
+def test_catalog_row_carries_the_uuid_keyed_validation_result():
+    """Extraction/KB runs record under the uuid; the catalog row is keyed by
+    ObjectId. The newer measurement must reach the catalog entry."""
+    from app.services.verification_service import with_measured_quality
+
+    catalog = _meta_row(quality_tier="excellent")  # asserted, never validated
+    measured = _meta_row(20, quality_score=0.71, quality_tier="good", test_case_count=12, consistency=0.91)
+    merged = with_measured_quality(catalog, measured)
+    assert (merged.quality_score, merged.quality_tier, merged.test_case_count, merged.consistency) == (0.71, "good", 12, 0.91)
+    assert merged.display_name == "Grant fields" and merged.organization_ids == ["org-1"]
+    assert catalog.quality_score is None  # the stored row is not mutated
+
+
+def test_catalog_row_keeps_its_own_newer_result():
+    from app.services.verification_service import with_measured_quality
+
+    catalog = _meta_row(22, quality_score=0.8, quality_tier="excellent")
+    older = _meta_row(20, quality_score=0.5, quality_tier="fair")
+    assert with_measured_quality(catalog, older) is catalog
+    assert with_measured_quality(catalog, None) is catalog
+    assert with_measured_quality(None, older) is older

@@ -7,7 +7,7 @@
     "seed_id": "wf-compliance-irb-protocol",
     "display_name": "IRB Protocol Pre-Review",
     "description": "Pre-screens a human subjects research protocol for completeness and appropriate review level before IRB submission.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance"
     ]

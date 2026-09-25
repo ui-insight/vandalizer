@@ -35,6 +35,7 @@ from app.services.extraction_tuning_service import (
     _build_candidate_configs,
     _run_single_config,
 )
+from app.services.optimizer_notifications import notify_run_terminal
 from app.services.optimization_common import (
     DEFAULT_JUDGE_NOISE_FLOOR,
     build_apply_preview,
@@ -733,12 +734,13 @@ async def run_optimization(
                 "Not applying winner for run %s: no baseline to measure "
                 "significance against", run_doc.uuid,
             )
-        if (
+        applied = bool(
             apply_on_finish
             and run_doc.best_config
             and run_doc.baseline_default_score is not None
             and not run_doc.tied_with_baseline
-        ):
+        )
+        if applied:
             await _apply_best(ss, run_doc)
             # Close the loop: re-validate the full test set with the applied
             # config so the completed-state UI can show "optimizer score → real
@@ -792,6 +794,7 @@ async def run_optimization(
         run_doc.progress_message = "Optimization complete"
         run_doc.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await run_doc.save()
+        await notify_run_terminal("extraction", run_doc, applied=applied)
 
         return run_doc
 
@@ -803,6 +806,7 @@ async def run_optimization(
         run_doc.error_message = str(e)
         run_doc.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await run_doc.save()
+        await notify_run_terminal("extraction", run_doc)
         return run_doc
 
 
@@ -968,6 +972,7 @@ async def reap_one(run_doc: ExtractionOptimizationRun | None) -> ExtractionOptim
         )
         run_doc.completed_at = now
         await run_doc.save()
+        await notify_run_terminal("extraction", run_doc)
 
     return run_doc
 

@@ -6,7 +6,7 @@
     "seed_id": "kb-nsf-pappg",
     "display_name": "NSF PAPPG Reference",
     "description": "NSF Proposal & Award Policies & Procedures Guide (PAPPG) - the primary reference for NSF proposal preparation and award management requirements.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": ["federal-agency", "reference-knowledge", "pre-award"]
   },
   "items": [{

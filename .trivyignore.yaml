@@ -1,0 +1,22 @@
+# Findings the release gate (`make security-gate`) is told to skip. Every entry
+# needs an expiry, so an ignore cannot quietly outlive its reason.
+#
+# The gate scans the *upstream* tags in RUNTIME_IMAGES, not an image we build,
+# so a Debian security update that lands before Docker rebuilds the tag turns
+# a CVE from "unfixed" (ignored by --ignore-unfixed) into "fixed" (gate fails)
+# with no action a developer can take against the upstream tag. The fix a
+# developer *can* take is the `apt-get upgrade` in backend/Dockerfile, which
+# puts the patched package in the image we ship; the entries here bridge the
+# gap until python:3.12-slim is rebuilt on the patched base. When it is, the
+# entries stop matching anything and can be deleted; if they expire first, the
+# gate fails again and someone has to look, which is the point.
+vulnerabilities:
+  - id: CVE-2026-13221
+    expired_at: 2026-10-17
+    statement: perl-base 5.40.1-6 in python:3.12-slim (built 2026-09-02); Debian fixed in 5.40.1-6+deb13u1, applied by apt-get upgrade in backend/Dockerfile.
+  - id: CVE-2026-42496
+    expired_at: 2026-10-17
+    statement: perl-base 5.40.1-6 in python:3.12-slim (built 2026-09-02); Debian fixed in 5.40.1-6+deb13u1, applied by apt-get upgrade in backend/Dockerfile.
+  - id: CVE-2026-8376
+    expired_at: 2026-10-17
+    statement: perl-base 5.40.1-6 in python:3.12-slim (built 2026-09-02); Debian fixed in 5.40.1-6+deb13u1, applied by apt-get upgrade in backend/Dockerfile.

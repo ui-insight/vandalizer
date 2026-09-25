@@ -11,6 +11,13 @@ const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
 // has decided is broken, which is the one thing a quality badge must not do.
 const regressionColor = { bg: '#fef2f2', text: '#b91c1c', border: '#fecaca' }
 
+// A hand-typed catalog tier with no measured score behind it is a claim. It
+// renders in the neutral style whatever the tier word says, so a seeded
+// "excellent" cannot pass for one a validation run earned.
+const ASSERTED_TITLE =
+  'The rating came with the starter example from its author. Nobody here has run a ' +
+  'validation on it yet — validate it to get a measured score.'
+
 const REGRESSION_TITLE =
   'Automatic revalidation scored this materially lower than before. ' +
   'The previous rating no longer applies until someone reviews it.'
@@ -20,26 +27,36 @@ export function QualityBadge({
   score,
   title,
   regressionPending = false,
+  asserted = false,
+  variant = 'quality',
 }: {
   tier: string | null
   score: number | null
   title?: string
   regressionPending?: boolean
+  /** The tier is a catalog assertion with no measured score — see ASSERTED_TITLE. */
+  asserted?: boolean
+  /** 'catalog': the badge on a shared entry, where a score means an examiner
+   *  checked it — leads with "Checked" instead of "Quality:". */
+  variant?: 'quality' | 'catalog'
 }) {
   const colors = regressionPending
     ? regressionColor
-    : tier
+    : tier && !asserted
       ? tierColors[tier] || defaultColor
       : defaultColor
   const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
+  const catalog = variant === 'catalog'
   const baseLabel = tierLabel
-    ? `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
-    : 'Unvalidated'
+    ? asserted
+      ? `Rated ${tierLabel} by its author · not yet checked here`
+      : `${catalog ? 'Checked' : 'Quality:'} ${catalog ? '· ' : ''}${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}`
+    : catalog ? 'Not yet checked here' : 'Unvalidated'
   const label = regressionPending ? 'Regression pending review' : baseLabel
 
   return (
     <span
-      title={regressionPending ? REGRESSION_TITLE : title}
+      title={regressionPending ? REGRESSION_TITLE : asserted && tier ? ASSERTED_TITLE : title}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

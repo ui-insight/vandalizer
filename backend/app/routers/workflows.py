@@ -3,12 +3,14 @@
 import asyncio
 import base64
 import csv
+import datetime
 import io
 import json
 import logging
 import re
 import tempfile
 import zipfile
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -202,16 +204,23 @@ async def list_workflows(
     )
     # One team-access lookup powers can_manage for every workflow in the page.
     team_access = await access_control.get_team_access_context(user)
-    return WorkflowPageResponse(
-        items=[
+    # The listing never reaches a submission's verification request, so the
+    # examiner carve-out is not visible here; the detail endpoint computes
+    # can_validate exactly, and that is the one the editor reads.
+    items = []
+    for wf in workflows:
+        can_manage = access_control.can_manage_workflow(wf, user, team_access)
+        items.append(
             WorkflowResponse(
                 id=str(wf.id), name=wf.name, description=wf.description,
                 user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
-                can_manage=access_control.can_manage_workflow(wf, user, team_access),
+                can_manage=can_manage,
+                can_validate=can_manage,
                 created_by=author_map.get(wf.created_by_user_id or wf.user_id),
             )
-            for wf in workflows
-        ],
+        )
+    return WorkflowPageResponse(
+        items=items,
         total=total,
         skip=skip,
         limit=limit,
@@ -377,21 +386,63 @@ MAX_BATCH_DOWNLOAD_RUNS = 250
 _ZIP_SPOOL_BYTES = 32 * 1024 * 1024
 
 
-def _session_base_filename(status: dict, session_id: str) -> str:
-    """Build a filesystem-safe base name (no extension) unique per session.
+def _download_zone(tz: str | None) -> ZoneInfo | None:
+    """The viewer's IANA time zone for naming a download, or None to use UTC.
 
-    Browsers cap auto-suffixing of duplicate downloads at ~5; past that, the same
-    Content-Disposition name causes older files to be overwritten. Embedding the
-    session id guarantees uniqueness across manual runs.
+    The server has no idea what time it is for the person clicking, and a
+    file named for a UTC hour would read as the wrong time of day. The
+    frontend sends the browser's zone; an unknown or missing one falls back.
+    """
+    if not tz:
+        return None
+    try:
+        return ZoneInfo(tz)
+    except (ZoneInfoNotFoundError, ValueError, OSError):
+        # OSError: a tzdata directory ("America") or an over-long key is
+        # opened as a file and fails there, not as "not found".
+        return None
+
+
+def _run_stamp(start_time, zone: ZoneInfo | None) -> str | None:
+    """``2026-09-02 02-30 PM`` in ``zone``, or ``… UTC`` without one.
+
+    Colons are not allowed in Windows file names, hence the dash in the time.
+    """
+    if isinstance(start_time, str):
+        try:
+            start_time = datetime.datetime.fromisoformat(start_time)
+        except ValueError:
+            return None
+    if not isinstance(start_time, datetime.datetime):
+        return None
+    if start_time.tzinfo is None:
+        # Mongo hands datetimes back naive; they were stored as UTC.
+        start_time = start_time.replace(tzinfo=datetime.timezone.utc)
+    if zone is None:
+        return start_time.astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %I-%M %p UTC")
+    return start_time.astimezone(zone).strftime("%Y-%m-%d %I-%M %p")
+
+
+def _session_base_filename(status: dict, session_id: str, zone: ZoneInfo | None = None) -> str:
+    """Build a filesystem-safe base name (no extension) that says which run it is.
+
+    ``<workflow>[ - <document>] <run date and time>``, e.g. ``Budget Prediction
+    Flow 2026-09-02 02-30 PM``. The run id used to stand in for the time, which
+    kept names unique but meant nothing to the person holding several
+    downloads of the same workflow (support ticket). The time is to the minute
+    because the same workflow is often run several times a day. Two runs of one
+    workflow on one document in the same minute do share a name, and the
+    browser numbers the second. A run with no recorded start falls back to the
+    run id.
     """
     workflow_name = status.get("workflow_name")
     document_title = status.get("document_title")
-    name_parts: list[str] = [workflow_name or "results"]
+    raw_base = workflow_name or "results"
     if document_title:
         doc_stem = document_title.rsplit(".", 1)[0] if "." in document_title else document_title
-        name_parts.append(doc_stem)
-    name_parts.append(session_id[:8])
-    raw_base = "-".join(name_parts)
+        raw_base = f"{raw_base} - {doc_stem}"
+    stamp = _run_stamp(status.get("start_time"), zone)
+    raw_base = f"{raw_base} {stamp}" if stamp else f"{raw_base}-{session_id[:8]}"
     return "".join(c if c.isalnum() or c in " _-." else "_" for c in raw_base).strip() or f"results-{session_id[:8]}"
 
 
@@ -523,6 +574,7 @@ async def download_results(
     session_id: str,
     format: str = "json",
     parse_structured: bool = False,
+    tz: str | None = Query(default=None, description="IANA time zone for the run time in the file name"),
     user: User = Depends(get_current_user),
 ):
     """Download workflow results in specified format.
@@ -538,7 +590,7 @@ async def download_results(
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
-    base_filename = _session_base_filename(status, session_id)
+    base_filename = _session_base_filename(status, session_id, _download_zone(tz))
     content, media_type, ext, explicit_name = _render_workflow_output(status, format, parse_structured)
     filename = explicit_name or f"{base_filename}.{ext}"
     return StreamingResponse(
@@ -554,6 +606,7 @@ async def download_batch_results(
     format: str = "json",
     parse_structured: bool = False,
     share_token: str | None = Query(default=None),
+    tz: str | None = Query(default=None, description="IANA time zone for run times in member names"),
     user: User = Depends(get_current_user),
 ):
     """Bundle every completed run in a batch into a single ZIP.
@@ -584,6 +637,8 @@ async def download_batch_results(
             ),
         )
 
+    zone = _download_zone(tz)
+
     def _build_zip():
         """Render and compress every run.
 
@@ -600,7 +655,7 @@ async def download_batch_results(
                 content, _media_type, ext, explicit_name = _render_workflow_output(
                     status, format, parse_structured,
                 )
-                base = _session_base_filename(status, sid)
+                base = _session_base_filename(status, sid, zone)
                 if explicit_name:
                     # A step-supplied filename is static config, identical for
                     # every run in the batch, so on its own it says nothing about
@@ -1383,6 +1438,8 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
     try:
         checks = await svc.generate_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(checks=checks)
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -1767,7 +1824,7 @@ async def start_workflow_optimization(
       - apply_on_finish: bool (default false)
       - include_judge: bool (default true — workflow scoring is judge-based)
     """
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -1776,6 +1833,19 @@ async def start_workflow_optimization(
         body = await request.json()
     except Exception:
         body = {}
+
+    # Starting a run only needs validate rights (an examiner grading a
+    # submission), but applying the winner rewrites the workflow's config —
+    # that stays with whoever may edit the workflow.
+    apply_on_finish = bool(body.get("apply_on_finish", False))
+    if apply_on_finish and not await get_authorized_workflow(workflow_id, user, manage=True):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Only the workflow owner or a team admin can apply optimized "
+                "settings. Start the run without apply_on_finish to score it."
+            ),
+        )
 
     try:
         token_budget = int(body.get("token_budget", 0))
@@ -1789,7 +1859,6 @@ async def start_workflow_optimization(
     if max_candidates < 1 or max_candidates > 50:
         raise HTTPException(status_code=400, detail="max_candidates must be in [1, 50]")
 
-    apply_on_finish = bool(body.get("apply_on_finish", False))
     include_judge = bool(body.get("include_judge", True))
 
     # Fail fast on missing preconditions so the user gets an immediate,
@@ -1874,10 +1943,17 @@ async def get_active_workflow_optimization(
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    from app.services import workflow_optimizer as _workflow_optimizer
     run = await WorkflowOptimizationRun.find_one(
         WorkflowOptimizationRun.workflow_id == workflow_id,
         {"status": {"$in": ["queued", "running"]}},
     )
+    # Self-heal an orphaned run on read; if reaped it's no longer active, so
+    # the spinner stops on the next poll instead of at the next start attempt
+    # or janitor pass (#835).
+    run = await _workflow_optimizer.reap_one(run)
+    if run is not None and run.status not in ("queued", "running"):
+        run = None
     return {"run": _serialize_workflow_optimization_run(run) if run else None}
 
 
@@ -1923,6 +1999,9 @@ async def get_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
+    # Self-heal a forever-"Running…" run the next time it's polled.
+    from app.services import workflow_optimizer as _workflow_optimizer
+    run = await _workflow_optimizer.reap_one(run)
     return _serialize_workflow_optimization_run(run)
 
 
@@ -1931,7 +2010,7 @@ async def cancel_workflow_optimization(
     workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
 ):
     """Request cancellation. The worker checks this flag between trials."""
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
@@ -1941,6 +2020,9 @@ async def cancel_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
+    # A reviewer with validate access may stop their own run, not the owner's.
+    if run.user_id != user.user_id and not await get_authorized_workflow(workflow_id, user, manage=True):
+        raise HTTPException(status_code=403, detail="You can only cancel optimization runs you started")
     if run.status not in ("queued", "running"):
         return {"ok": True, "status": run.status, "note": "not running"}
     run.cancel_requested = True

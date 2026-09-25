@@ -7,7 +7,7 @@
     "seed_id": "wf-pre-award-proposal-review",
     "display_name": "Proposal Readiness Review",
     "description": "Scans a proposal draft and produces a readiness checklist identifying missing sections, incomplete information, and formatting issues before submission.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "pre-award"
     ]

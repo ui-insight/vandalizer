@@ -7,7 +7,7 @@
     "seed_id": "wf-financial-cost-allocation",
     "display_name": "Cost Allocation Analyzer",
     "description": "Reviews cost allocations for compliance with 2 CFR 200 Uniform Guidance, checking allowability, allocability, and reasonableness.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "financial"
     ]

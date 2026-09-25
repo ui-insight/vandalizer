@@ -8,7 +8,7 @@ It is intentionally narrower than [DEPLOY.md](DEPLOY.md): use this document for 
 
 These instructions assume:
 
-- the stack is running with `docker compose` from the repo root
+- the stack is running with `docker compose` from the repo root (on a podman host, `podman-compose` takes the same subcommands — see [DEPLOY.md](DEPLOY.md#container-engine-docker-or-podman))
 - persistent data lives in the default named volumes from [compose.yaml](compose.yaml)
 - secrets are stored in `backend/.env`
 

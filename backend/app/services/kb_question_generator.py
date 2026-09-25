@@ -10,6 +10,7 @@ remains meaningful.
 from __future__ import annotations
 
 import asyncio
+import datetime
 import logging
 import random
 import re
@@ -23,6 +24,13 @@ from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.services.document_manager import DocumentManager
 from app.services.llm_service import get_agent_model
 from app.services.config_service import get_user_model_name
+from app.services.kb_test_query_ids import (
+    AutoQueryIdAllocator,
+    auto_query_notes,
+    backfill_auto_query_ids,
+    kb_id_prefix,
+    reserve_and_write,
+)
 from app.services.workflow_validator import _extract_json
 
 logger = logging.getLogger(__name__)
@@ -208,24 +216,72 @@ class KBQuestionGenerator:
             kb_uuid, questions, model_name, model,
         )
 
+        # Every generated question carries the same columns an imported row
+        # does — ID, category, source, notes — so a mixed set reviews and
+        # filters as one. IDs continue from whatever the KB already holds,
+        # so a second generation never reuses one (imported IDs are never
+        # touched — see kb_test_query_ids).
+        #
+        # Legacy auto-generated rows with no ID are numbered first, so this
+        # batch continues after them and the KB's oldest questions keep the
+        # lowest numbers. This is the write path (inline or in the Celery
+        # task, both land here); a preview must not touch the KB, and the
+        # generation must still go through if the backfill cannot.
+        if persist:
+            try:
+                await backfill_auto_query_ids(kb)
+            except Exception:
+                logger.exception("Could not backfill auto-query IDs for KB %s", kb_uuid)
+        allocator = AutoQueryIdAllocator(
+            kb_id_prefix(getattr(kb, "title", None), kb_uuid),
+            await self._existing_external_ids(kb_uuid),
+        )
+        chunk_sources = {c["chunk_id"]: c["source_name"] for c in sampled}
+        generated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+
         created: list[KBTestQuery] = []
         for q in questions:
+            chunk_ids = q.get("source_chunk_ids", [])
+            # The Source column: the generator's own labels when they name a
+            # real source, else the source(s) of the chunks it cited — those
+            # are real names by construction, so the column is never blank
+            # for a question grounded in a chunk.
+            cited_sources = [chunk_sources[cid] for cid in chunk_ids if chunk_sources.get(cid)]
+            labels = q.get("expected_source_labels") or list(dict.fromkeys(cited_sources))
             tq = KBTestQuery(
                 knowledge_base_uuid=kb_uuid,
                 query=q["query"],
                 expected_answer=q.get("expected_answer"),
-                expected_source_labels=q.get("expected_source_labels", []),
+                expected_source_labels=labels,
                 category=q.get("category"),
-                source_chunk_ids=q.get("source_chunk_ids", []),
+                notes=auto_query_notes(
+                    source_names=cited_sources or labels,
+                    coverage=coverage,
+                    model_name=model_name,
+                    generated_at=generated_at,
+                ),
+                # A preview never touches the KB. A persisted row gets its ID
+                # below: re-checked against the KB, then written, with the
+                # unique index's DuplicateKeyError taken as "next number".
+                external_id=None if persist else allocator.allocate(),
+                source_chunk_ids=chunk_ids,
                 auto_generated=True,
                 user_id=user_id,
             )
             if persist:
-                await tq.insert()
+                await reserve_and_write(allocator, tq, kb_uuid, write=tq.insert)
             created.append(tq)
         return created
 
     # ----- internals -----
+
+    @staticmethod
+    async def _existing_external_ids(kb_uuid: str) -> list[str]:
+        """IDs already on the KB's test queries, imported and generated alike."""
+        existing = await KBTestQuery.find(
+            KBTestQuery.knowledge_base_uuid == kb_uuid,
+        ).to_list()
+        return [q.external_id for q in existing if getattr(q, "external_id", None)]
 
     async def _filter_contradicted_absence_questions(
         self,

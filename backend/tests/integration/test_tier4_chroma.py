@@ -204,3 +204,83 @@ class TestKBCollectionRoundTrip:
             "kb-floor", "what is the indirect cost rate", k=4, min_similarity=0.05,
         )
         assert len(in_scope) >= 1
+
+
+# ---------------------------------------------------------------------------
+# Amending sources — the PAPPG supplement ticket, against the real embedder
+# ---------------------------------------------------------------------------
+
+# Chapter IV passages approximate PAPPG 24-1 §IV.D wording; the supplement's
+# Section 9 line is quoted from the support ticket's screenshot. The other
+# supplement sections are filler standing in for its unrelated revisions.
+_CHAPTER_IV = [
+    "D. Declines. 1. Reasons for declines. NSF will notify the proposer when a proposal is declined and "
+    "will provide copies of the reviews and the panel summary. The PI may contact the cognizant program "
+    "officer to discuss the reasons for the declination.",
+    "2. Reconsideration. a. A proposer whose proposal was declined may request reconsideration by the "
+    "Assistant Director or Office Head within 30 days of the declination. The request must explain why "
+    "the proposer believes the declination was unwarranted.",
+    "b. Reconsideration is not available for: (1) a decision to discourage a preliminary proposal; "
+    "(2) proposals for fellowships, travel, planning, RAPID, EAGER, RAISE, conferences and equipment; "
+    "(3) Phase I SBIR and STTR proposals; (4) proposals returned without review because they did not "
+    "allow sufficient lead time, missed an announced deadline, or did not meet preparation requirements.",
+    "c. If the declination is upheld, the proposer may request further reconsideration from the Deputy "
+    "Director within 60 days. A reconsideration request does not stop the proposer from submitting a "
+    "revised proposal to a later deadline.",
+    "E. Returns without review. Proposals may be returned without review if they are inappropriate for "
+    "funding by NSF, duplicate another proposal, or fail to comply with proposal preparation requirements.",
+]
+_SUPPLEMENT_PAGES = [
+    "Section 7. Chapter II.D.2.h is revised to update the biographical sketch format and the SciENcv "
+    "requirement. Section 8. Chapter III.A is revised to clarify merit review language for broader impacts. "
+    "Section 9. Chapter IV.D.2.b.(7) is revised to remove reconsideration for all SBIR/STTR proposals. "
+    "The added item states: (7) proposals submitted under the Small Business Innovation Research (SBIR)/"
+    "Small Business Technology Transfer (STTR) programs; and",
+    "Section 10. Chapter VII.B.2 is revised to update no-cost extension notification timing. Section 11. "
+    "Chapter X.A.2 is revised to align indirect cost rate references with 2 CFR 200.414. Section 12. "
+    "Chapter XI.A.1 is revised to reference the current civil rights certification.",
+]
+_PLAIN_QUESTION = "Which proposal types are excluded from reconsideration under the current policy?"
+
+
+class TestAmendingSourceRetrieval:
+    def _seed(self, dm):
+        dm.add_to_kb("kb-pappg", "src-ch4", "NSF_PAPPG_24-1_Chapter_IV_snapshot.pdf", "\n\n".join(_CHAPTER_IV))
+        # Enough unrelated policy text that a top-8 is a real competition.
+        for i in range(12):
+            dm.add_to_kb(
+                "kb-pappg", f"src-other-{i}", f"Chapter {i} guidance.pdf",
+                f"Chapter {i} guidance on proposal preparation, budgets, and award administration, part {i}. "
+                "Proposers should consult the program solicitation for deadlines and eligibility.",
+            )
+        dm.add_to_kb("kb-pappg", "src-supp", "NSF_PAPPG_24-1_Supplement_1.pdf", "\n\n".join(_SUPPLEMENT_PAGES))
+
+    def test_plain_question_misses_the_supplement_then_the_amends_search_finds_it(self, doc_manager):
+        import asyncio
+        from unittest.mock import patch
+
+        from app.services import kb_validation_service
+        from app.services.kb_validation_service import AmendmentLinks
+
+        self._seed(doc_manager)
+        top8 = doc_manager.query_kb("kb-pappg", _PLAIN_QUESTION, k=8)
+        sources = [r["metadata"]["source_id"] for r in top8]
+        assert "src-ch4" in sources
+        # The ticket: the plain question never reaches the supplement.
+        assert "src-supp" not in sources
+
+        links = AmendmentLinks(
+            amenders_of={"src-ch4": ["src-supp"]},
+            search_ids={"src-supp": ["src-supp"]},
+            amends_names={"src-supp": ["Chapter IV"]},
+            amender_name={"src-supp": "Supplement 1"},
+        )
+        with patch.object(kb_validation_service, "_get_dm", return_value=doc_manager):
+            hits = asyncio.run(kb_validation_service.retrieve_amendment_chunks(
+                "kb-pappg", top8, _PLAIN_QUESTION, links,
+            ))
+
+        assert hits, "the amends search returned nothing"
+        # The best supplement passage for this question is the Section 9 line,
+        # not the page of unrelated revisions.
+        assert "remove reconsideration for all SBIR/STTR proposals" in hits[0]["content"]

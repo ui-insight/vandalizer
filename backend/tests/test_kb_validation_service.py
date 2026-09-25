@@ -11,6 +11,8 @@ Also covers the KBTestQuery field additions for the LLM-as-judge feature.
 import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from types import SimpleNamespace
+
 import pytest
 
 from app.models.kb_test_query import KBTestQuery
@@ -345,9 +347,11 @@ async def test_generate_baseline_answer_uses_baseline_prompt_no_kb():
 
 
 @pytest.mark.asyncio
-async def test_generate_kb_answer_swallows_agent_errors():
-    """Per-query LLM failures must not crash the run — judge_test_queries
-    relies on this for resilience."""
+async def test_generate_kb_answer_propagates_agent_errors():
+    """A failed generation must not become an empty answer. The judge graded
+    "" as a FAIL on every query of a KB whose answer model was gone, and the
+    export showed blank answers with no error. The per-query handler in
+    judge_test_queries turns the raised error into a SKIPPED row instead."""
     fake_dm = MagicMock()
     fake_dm.query_kb = MagicMock(return_value=[
         {"content": "ctx", "metadata": {"source_name": "S"}},
@@ -356,14 +360,9 @@ async def test_generate_kb_answer_swallows_agent_errors():
     fake_agent.run = AsyncMock(side_effect=RuntimeError("LLM down"))
 
     with patch.object(kb_validation_service, "_get_dm", return_value=fake_dm), \
-         patch.object(kb_validation_service, "_get_or_build_agent", return_value=fake_agent):
-        answer, retrieved, tokens = await kb_validation_service._generate_kb_answer(
-            "kb-1", "Q?", "test-model"
-        )
-
-    assert answer == ""
-    assert len(retrieved) == 1
-    assert tokens == 0  # exception swallowed before usage() ran
+         patch.object(kb_validation_service, "_get_or_build_agent", return_value=fake_agent), \
+         pytest.raises(RuntimeError, match="LLM down"):
+        await kb_validation_service._generate_kb_answer("kb-1", "Q?", "test-model")
 
 
 @pytest.mark.asyncio
@@ -621,6 +620,9 @@ async def test_judge_test_queries_per_query_failure_does_not_crash():
     assert out["details"][0]["judge"]["verdict"] == "SKIPPED"
     assert out["details"][0]["judge"]["score"] is None
     assert "retrieval failed" in out["details"][0]["judge"]["reasoning"]
+    # The export's ``error`` column reads the row, not the judge dict.
+    assert "retrieval failed" in out["details"][0]["error"]
+    assert out["details"][0]["actual_answer"] == ""
     # And it must not drag the aggregate the KB is scored on.
     assert out["avg_judge_score"] is None
 
@@ -1370,3 +1372,263 @@ def test_judge_measured_rejects_every_non_measurement():
     assert measured({"score": None}) is False
     assert measured(None) is False
     assert measured({}) is False
+
+
+# ---------------------------------------------------------------------------
+# Stale override model — the 2 CFR 200 "blank actual_answer" ticket
+# ---------------------------------------------------------------------------
+
+_MODELS_DOC = {
+    "available_models": [
+        {"name": "openai/gpt-oss-120b", "tag": "Fast"},
+        {"name": "qwen/qwen3.8-27b", "tag": "Strong"},
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_resolve_rag_config_drops_override_model_missing_from_system_config():
+    """The override pinned the answer model by name; the admin renamed the
+    model. The name must not be honoured — it builds an agent with no key
+    and the wrong endpoint, and every answer fails."""
+    fake_kb = MagicMock()
+    fake_kb.rag_config_override = {"k": 8, "model": "qwen/qwen3.6-27b", "query_rewriting": True}
+    token = kb_validation_service._active_system_config_doc.set(_MODELS_DOC)
+    try:
+        with patch.object(kb_validation_service, "KnowledgeBase") as KB:
+            KB.find_one = AsyncMock(return_value=fake_kb)
+            cfg = await kb_validation_service._resolve_rag_config("kb-1", None, k=5)
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+
+    assert cfg.model is None          # caller's model answers
+    assert cfg.k == 8                 # the tuned retrieval knobs survive
+    assert cfg.query_rewriting is True
+
+
+@pytest.mark.asyncio
+async def test_resolve_rag_config_keeps_override_model_that_exists_and_resolves_a_tag():
+    fake_kb = MagicMock()
+    token = kb_validation_service._active_system_config_doc.set(_MODELS_DOC)
+    try:
+        with patch.object(kb_validation_service, "KnowledgeBase") as KB:
+            fake_kb.rag_config_override = {"model": "qwen/qwen3.8-27b"}
+            KB.find_one = AsyncMock(return_value=fake_kb)
+            kept = await kb_validation_service._resolve_rag_config("kb-1", None, k=5)
+
+            fake_kb.rag_config_override = {"model": "Strong"}
+            by_tag = await kb_validation_service._resolve_rag_config("kb-1", None, k=5)
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+
+    assert kept.model == "qwen/qwen3.8-27b"
+    assert by_tag.model == "qwen/qwen3.8-27b"
+
+
+@pytest.mark.asyncio
+async def test_resolve_rag_config_keeps_override_model_when_system_config_unavailable():
+    """A config outage must not read as "the model is gone"."""
+    fake_kb = MagicMock()
+    fake_kb.rag_config_override = {"model": "qwen/qwen3.6-27b"}
+    token = kb_validation_service._active_system_config_doc.set(None)
+    try:
+        with patch.object(kb_validation_service, "KnowledgeBase") as KB, \
+             patch.object(kb_validation_service, "_ensure_system_config_loaded", AsyncMock()):
+            KB.find_one = AsyncMock(return_value=fake_kb)
+            cfg = await kb_validation_service._resolve_rag_config("kb-1", None, k=5)
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+    assert cfg.model == "qwen/qwen3.6-27b"
+
+
+def _run_kb_validation_patches(fake_kb, judge_payload, persisted: dict):
+    """Everything run_kb_validation touches, stubbed. Returns a list of
+    context managers plus the mocks the test asserts on."""
+    # Explicit fields: the run snapshots its questions, and a bare
+    # MagicMock's auto-attrs cannot be serialized into that record.
+    tq = SimpleNamespace(
+        uuid="q1", query="Q?", expected_answer="A", category=None, external_id=None,
+        expected_answer_contains=None, expected_source_labels=[], notes=None,
+        import_batch_label=None,
+    )
+    find = MagicMock()
+    find.to_list = AsyncMock(return_value=[tq])
+
+    async def fake_persist(**kw):
+        persisted.update(kw)
+        vr = MagicMock()
+        vr.score, vr.score_breakdown = 50.0, {}
+        return vr
+
+    KB = patch.object(kb_validation_service, "KnowledgeBase")
+    TQ = patch.object(kb_validation_service, "KBTestQuery")
+    judge = AsyncMock(return_value=judge_payload)
+    return [
+        KB, TQ,
+        patch.object(kb_validation_service, "check_source_health",
+                     AsyncMock(return_value={"ratio": 1.0, "total": 1, "details": []})),
+        patch.object(kb_validation_service, "check_chunk_coverage", AsyncMock(return_value={"ratio": 1.0})),
+        patch("app.services.kb_source_snapshot.snapshot_kb_sources",
+              AsyncMock(return_value={"recorded": True, "sources": []})),
+        patch.object(kb_validation_service, "check_retrieval_precision",
+                     AsyncMock(return_value={"total_queries": 1, "avg_precision": 1.0, "details": [{"query": "Q?"}]})),
+        # The runner's model answers; the system grader judges. Distinct on
+        # purpose, so a test can tell which one reached which role.
+        patch("app.services.config_service.get_user_model_name", AsyncMock(return_value="qwen/qwen3.8-27b")),
+        patch("app.services.config_service.get_validation_judge_model",
+              AsyncMock(return_value=("openai/gpt-oss-120b", None))),
+        patch.object(kb_validation_service, "judge_test_queries", judge),
+        patch("app.models.validation_run.ValidationRun"),
+        patch("app.services.quality_service.persist_validation_run", AsyncMock(side_effect=fake_persist)),
+        patch("app.services.quality_service.compute_quality_tier", return_value="A"),
+        patch("app.models.system_config.SystemConfig"),
+    ], find, judge
+
+
+async def _run_with(fake_kb, judge_payload):
+    persisted: dict = {}
+    cms, find, judge = _run_kb_validation_patches(fake_kb, judge_payload, persisted)
+    token = kb_validation_service._active_system_config_doc.set(_MODELS_DOC)
+    try:
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            mocks = [stack.enter_context(cm) for cm in cms]
+            KB, TQ, *_rest = mocks
+            VR, _persist, _tier, SC = mocks[-4], mocks[-3], mocks[-2], mocks[-1]
+            KB.find_one = AsyncMock(return_value=fake_kb)
+            TQ.find = MagicMock(return_value=find)
+            VR.find_one = AsyncMock(return_value=MagicMock())  # prior run: no variance sample
+            SC.get_config = AsyncMock(return_value=MagicMock())
+            result = await kb_validation_service.run_kb_validation("kb-1", "u1", mode="judge")
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+    return result, persisted, judge
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_records_stale_override_model_fallback():
+    """The run must say which model answered and that it was not the tuned
+    one — the score is otherwise read as the applied configuration's."""
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "2 CFR 200"
+    fake_kb.rag_config_override = {"k": 8, "model": "qwen/qwen3.6-27b"}
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": None, "verdict": "SKIPPED"},
+                     "error": "answer generation failed: 401"}],
+        "avg_judge_score": None, "num_queries_judged": 0,
+    }
+
+    result, persisted, judge = await _run_with(fake_kb, judge_payload)
+
+    assert result["answer_model"] == "qwen/qwen3.8-27b"
+    assert result["answer_model_fallback"] == {
+        "configured": "qwen/qwen3.6-27b", "used": "qwen/qwen3.8-27b", "reason": "not in System Config",
+    }
+    assert persisted["model"] == "qwen/qwen3.8-27b"
+    assert persisted["model_settings"]["answer_model_fallback"]["configured"] == "qwen/qwen3.6-27b"
+    # The resolved config is pinned for the whole run — the baseline then
+    # uses the same answer model as the KB answer — with the dead model gone
+    # and the tuned k kept.
+    cfg = judge.call_args.kwargs["answer_config"]
+    assert cfg.model is None and cfg.k == 8
+    # The per-query error reaches the merged detail row the export reads.
+    assert result["retrieval_precision"]["details"][0]["error"] == "answer generation failed: 401"
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_no_fallback_note_when_override_model_exists():
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "2 CFR 200"
+    fake_kb.rag_config_override = {"k": 8, "model": "openai/gpt-oss-120b"}
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+
+    result, persisted, judge = await _run_with(fake_kb, judge_payload)
+
+    assert result["answer_model"] == "openai/gpt-oss-120b"
+    assert result["answer_model_fallback"] is None
+    assert persisted["model"] == "openai/gpt-oss-120b"
+    assert judge.call_args.kwargs["answer_config"].model == "openai/gpt-oss-120b"
+    assert "error" not in result["retrieval_precision"]["details"][0]
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_no_fallback_note_when_override_is_a_tag_that_resolves():
+    """An override pinned by tag resolves to a different *name*; that is not
+    a fallback, and the run must not say the tuned model was unavailable."""
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "2 CFR 200"
+    fake_kb.rag_config_override = {"k": 8, "model": "Strong"}
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+
+    result, persisted, judge = await _run_with(fake_kb, judge_payload)
+
+    assert result["answer_model"] == "qwen/qwen3.8-27b"
+    assert result["answer_model_fallback"] is None
+    assert judge.call_args.kwargs["answer_config"].model == "qwen/qwen3.8-27b"
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_grades_with_the_system_grader_not_the_runner_model():
+    """Support ticket: one KB, one question set, graded by gpt-oss-120b one
+    day and qwen3.8-27b the next, because the grader was whichever chat model
+    the person pressing Run had picked. The grader is now system-wide; the
+    runner's model still answers."""
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "NSF PAPPG"
+    fake_kb.rag_config_override = None
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+
+    result, persisted, judge = await _run_with(fake_kb, judge_payload)
+
+    assert judge.call_args.kwargs["judge_model"] == "openai/gpt-oss-120b"
+    # Answers come from the runner's model, as before.
+    assert judge.call_args.args[2] == "qwen/qwen3.8-27b"
+    assert result["judge_model"] == "openai/gpt-oss-120b"
+    assert result["answer_model"] == "qwen/qwen3.8-27b"
+    assert result["judge_model_fallback"] is None
+    assert persisted["model_settings"]["judge_model"] == "openai/gpt-oss-120b"
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_records_a_grader_fallback():
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "NSF PAPPG"
+    fake_kb.rag_config_override = None
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+    note = {"configured": "qwen/qwen3.6-27b", "used": "openai/gpt-oss-120b", "reason": "not in System Config"}
+    # Swap the helper's grader patch for one that reports a fallback.
+    persisted: dict = {}
+    cms, find, judge = _run_kb_validation_patches(fake_kb, judge_payload, persisted)
+    cms = [c for c in cms if getattr(c, "attribute", None) != "get_validation_judge_model"]
+    cms.append(patch(
+        "app.services.config_service.get_validation_judge_model",
+        AsyncMock(return_value=("openai/gpt-oss-120b", note)),
+    ))
+    token = kb_validation_service._active_system_config_doc.set(_MODELS_DOC)
+    try:
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            mocks = {getattr(c, "attribute", None): stack.enter_context(c) for c in cms}
+            mocks["KnowledgeBase"].find_one = AsyncMock(return_value=fake_kb)
+            mocks["KBTestQuery"].find = MagicMock(return_value=find)
+            mocks["ValidationRun"].find_one = AsyncMock(return_value=MagicMock())
+            mocks["SystemConfig"].get_config = AsyncMock(return_value=MagicMock())
+            result = await kb_validation_service.run_kb_validation("kb-1", "u1", mode="judge")
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+
+    assert result["judge_model"] == "openai/gpt-oss-120b"
+    assert result["judge_model_fallback"] == note
+    assert persisted["model_settings"]["judge_model_fallback"] == note

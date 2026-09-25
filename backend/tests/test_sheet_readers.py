@@ -112,3 +112,32 @@ class TestXls:
     def test_a_hidden_sheet_is_marked_hidden(self, workbook):
         assert workbook["sheets"][0]["hidden"] is False
         assert workbook["sheets"][1]["hidden"] is True
+
+
+class TestCsvBinaryGate:
+    """#834: the CSV decode ladder ended in errors="replace", which cannot
+    fail, so a binary named .csv rendered as a mojibake grid in the viewer.
+    It now goes through the same gated reader as every other text path."""
+
+    def _csv_bytes(self, payload: bytes) -> dict:
+        f = tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="wb")
+        try:
+            f.write(payload)
+            f.close()
+            return extract_sheet_json_from_csv(f.name)
+        finally:
+            os.unlink(f.name)
+
+    def test_a_binary_named_csv_is_refused_with_a_csv_specific_message(self):
+        from app.services.document_readers import DocumentReadError
+
+        with pytest.raises(DocumentReadError) as exc:
+            self._csv_bytes(b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 64)
+        assert "not a text CSV" in str(exc.value)
+
+    def test_a_cp1252_csv_with_curly_quotes_still_renders(self):
+        """The legitimate customer of the old ladder: legacy Excel exports."""
+        out = self._csv_bytes(
+            "Item,Note\nBudget,“final” — €5000\n".encode("cp1252")
+        )
+        assert out["sheets"][0]["rows"] == [["Budget", "“final” — €5000"]]

@@ -403,6 +403,60 @@ class TestUpdateQualityMetadata:
             assert meta.quality_score == 88.0
 
     @pytest.mark.asyncio
+    async def test_carries_case_count_and_consistency_to_the_catalog_entry(self):
+        """Both were measured on every run and dropped before the catalog (#913)."""
+        vr = _make_validation_run(score=88.0, grade="B")
+        vr.num_test_cases = 12
+        vr.consistency = 0.91
+        meta = _make_verified_metadata(quality_score=70.0)
+        sys_cfg = _make_sys_config()
+
+        with (
+            patch("app.services.quality_service._get_latest_run", new_callable=AsyncMock, return_value=vr),
+            patch("app.services.quality_service.SystemConfig") as MockSysCfg,
+            patch("app.services.quality_service.ValidationRun") as MockVR,
+            patch("app.services.quality_service.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockSysCfg.get_config = AsyncMock(return_value=sys_cfg)
+            mock_count_chain = MagicMock()
+            mock_count_chain.count = AsyncMock(return_value=5)
+            MockVR.find = MagicMock(return_value=mock_count_chain)
+            MockMeta.find_one = AsyncMock(return_value=meta)
+
+            from app.services.quality_service import update_quality_metadata
+
+            await update_quality_metadata("search_set", "item-1")
+            assert meta.test_case_count == 12
+            assert meta.consistency == 0.91
+
+    @pytest.mark.asyncio
+    async def test_case_count_falls_back_to_the_snapshot_for_older_runs(self):
+        vr = _make_validation_run(score=88.0)
+        vr.num_test_cases = 0
+        vr.consistency = None
+        vr.result_snapshot = {"test_cases": [{"label": "a"}, {"label": "b"}, {"label": "c"}]}
+        meta = _make_verified_metadata(quality_score=70.0)
+        sys_cfg = _make_sys_config()
+
+        with (
+            patch("app.services.quality_service._get_latest_run", new_callable=AsyncMock, return_value=vr),
+            patch("app.services.quality_service.SystemConfig") as MockSysCfg,
+            patch("app.services.quality_service.ValidationRun") as MockVR,
+            patch("app.services.quality_service.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockSysCfg.get_config = AsyncMock(return_value=sys_cfg)
+            mock_count_chain = MagicMock()
+            mock_count_chain.count = AsyncMock(return_value=5)
+            MockVR.find = MagicMock(return_value=mock_count_chain)
+            MockMeta.find_one = AsyncMock(return_value=meta)
+
+            from app.services.quality_service import update_quality_metadata
+
+            await update_quality_metadata("search_set", "item-1")
+            assert meta.test_case_count == 3
+            assert meta.consistency is None
+
+    @pytest.mark.asyncio
     async def test_creates_metadata_when_not_exists(self):
         vr = _make_validation_run(score=88.0)
         sys_cfg = _make_sys_config()
@@ -501,8 +555,27 @@ class TestFmtPct:
 
 class TestCheckVerificationReadiness:
     @pytest.mark.asyncio
-    async def test_not_ready_when_no_runs(self):
-        sys_cfg = _make_sys_config()
+    async def test_no_runs_is_ready_with_an_observation_unless_validation_is_required(self):
+        """The advisory must not refuse what submission accepts (#911): with
+        require_validation off, no run is an observation, not an issue."""
+        sys_cfg = _make_sys_config(verification_gates={"require_validation": False})
+        with (
+            patch("app.services.quality_service.SystemConfig") as MockSysCfg,
+            patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=None),
+        ):
+            MockSysCfg.get_config = AsyncMock(return_value=sys_cfg)
+            from app.services.quality_service import check_verification_readiness
+
+            result = await check_verification_readiness("search_set", "item-1")
+            assert result["ready"] is True
+            assert result["enforced"] is False
+            assert result["issues"] == []
+            assert any("No validation run yet" in o for o in result["observations"])
+            assert result["recommendations"] == result["observations"]
+
+    @pytest.mark.asyncio
+    async def test_not_ready_when_no_runs_and_validation_required(self):
+        sys_cfg = _make_sys_config(verification_gates={"require_validation": True})
         with (
             patch("app.services.quality_service.SystemConfig") as MockSysCfg,
             patch("app.services.quality_service.get_latest_validation", new_callable=AsyncMock, return_value=None),
@@ -512,7 +585,8 @@ class TestCheckVerificationReadiness:
 
             result = await check_verification_readiness("search_set", "item-1")
             assert result["ready"] is False
-            assert len(result["issues"]) > 0
+            assert result["enforced"] is True
+            assert "must be validated" in result["issues"][0]
 
     @pytest.mark.asyncio
     async def test_ready_when_meets_thresholds(self):
@@ -534,6 +608,67 @@ class TestCheckVerificationReadiness:
             result = await check_verification_readiness("workflow", "wf-1")
             assert result["ready"] is True
             assert len(result["issues"]) == 0
+
+
+class TestEvaluateSubmissionGates:
+    """One reading of verification_gates for advisory and enforcement (#911)."""
+
+    def _eval(self, item_kind, latest, gates):
+        from app.services.quality_service import evaluate_submission_gates
+        return evaluate_submission_gates(item_kind, latest, {"verification_gates": gates})
+
+    def test_defaults_block_nothing_and_advise_on_sample_size(self):
+        latest = {"score": 64.0, "result_snapshot": {"test_cases": [{"label": "a"}], "num_runs": 1}}
+        v = self._eval("search_set", latest, {})
+        assert v["issues"] == []
+        assert v["enforced"] is False
+        assert any("1 test case " in o for o in v["observations"])
+        assert any("1 run per test case" in o for o in v["observations"])
+
+    def test_ui_thresholds_are_ignored_while_require_validation_is_off(self):
+        # These three sit under the "Require validation" checkbox in the admin
+        # UI and were read by nothing before; they enforce only with the toggle.
+        gates = {"require_validation": False, "min_extraction_accuracy": 0.9,
+                 "min_extraction_consistency": 0.9, "min_workflow_grade": "A"}
+        ss = {"score": 70.0, "accuracy": 0.5, "consistency": 0.5, "result_snapshot": {}}
+        assert self._eval("search_set", ss, gates)["issues"] == []
+        wf = {"score": 70.0, "grade": "D", "result_snapshot": {}}
+        assert self._eval("workflow", wf, gates)["issues"] == []
+
+    def test_ui_thresholds_enforce_with_require_validation_on(self):
+        gates = {"require_validation": True, "min_extraction_accuracy": 0.7,
+                 "min_extraction_consistency": 0.8, "min_workflow_grade": "C"}
+        ss = {"score": 70.0, "accuracy": 0.5, "consistency": 0.95, "result_snapshot": {}}
+        issues = self._eval("search_set", ss, gates)["issues"]
+        assert issues == ["Extraction accuracy is 50%, minimum is 70%"]
+        wf = {"score": 70.0, "grade": "D", "result_snapshot": {}}
+        assert self._eval("workflow", wf, gates)["issues"] == ["Workflow grade is D, minimum is C"]
+        ok = {"score": 70.0, "grade": "B", "result_snapshot": {}}
+        assert self._eval("workflow", ok, gates)["issues"] == []
+
+    def test_accuracy_falls_back_to_the_snapshot_aggregate(self):
+        gates = {"require_validation": True, "min_extraction_accuracy": 0.7}
+        ss = {"score": 70.0, "result_snapshot": {"aggregate_accuracy": 0.6}}
+        assert self._eval("search_set", ss, gates)["issues"] == ["Extraction accuracy is 60%, minimum is 70%"]
+
+    def test_hand_set_sample_gates_enforce_regardless_of_toggle(self):
+        # min_test_cases / min_runs / min_score are not in the admin UI; an
+        # operator who set them meant it. Existing behaviour, kept.
+        gates = {"min_test_cases": 3, "min_runs": 3, "min_score": 70}
+        latest = {"score": 64.0, "result_snapshot": {"test_cases": [{"label": "a"}], "num_runs": 1}}
+        v = self._eval("workflow", latest, gates)
+        assert v["issues"] == [
+            "Validation used 1 test case(s), minimum is 3",
+            "Validation used 1 run(s), minimum is 3",
+            "Quality score is 64, minimum is 70",
+        ]
+        # A threshold already raised as an issue is not repeated as advice.
+        assert v["observations"] == []
+
+    def test_no_run_is_an_issue_only_when_required(self):
+        assert self._eval("workflow", None, {"require_validation": True})["issues"]
+        v = self._eval("workflow", None, {})
+        assert v["issues"] == [] and len(v["observations"]) == 1
 
 
 class TestQualityByModel:

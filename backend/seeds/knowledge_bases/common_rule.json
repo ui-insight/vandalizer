@@ -6,7 +6,7 @@
     "seed_id": "kb-common-rule",
     "display_name": "Human Subjects Protection (Common Rule)",
     "description": "The Common Rule (45 CFR 46) governing protection of human research subjects: IRB review, informed consent, and vulnerable populations.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "compliance",
       "reference-knowledge"

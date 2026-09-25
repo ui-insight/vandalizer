@@ -3,10 +3,12 @@ import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucid
 import {
   listKBTestQueries,
   getKBQuality,
+  getKBValidationGrader,
   runKBValidationAsync,
   downloadKBValidationRunExport,
   type KBTestQuery,
   type KBValidationExportFormat,
+  type KBValidationGrader,
   type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
@@ -55,8 +57,13 @@ type KBHistoryItem = {
   num_test_queries?: number | null
   mode?: string | null
   created_at?: string | null
+  source?: string | null
   result_snapshot?: KBValidationResult | null
 }
+
+/** A run over hand-picked queries ("Run selected") is a smoke test — it
+ * must never stand in for the KB's quality score in the header. */
+const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
 
 const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
   { id: 'autovalidate', label: 'Validate', icon: Sparkles },
@@ -76,6 +83,9 @@ type LatestQualitySummary = {
   breakdown: string | null
   answerAccuracy: number | null
   judgeModel: string | null
+  // The tuned answer model could not be used (removed from System Config);
+  // the score came from ``used`` and must not be read as the tuned config's.
+  answerModelFallback: { configured: string; used: string } | null
   numQueries: number | null
   mode: string | null
   createdAt: string | null
@@ -96,6 +106,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // showing the idle "Run Validation" button as if nothing were happening.
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  // Questions ticked on Test Queries and handed to Run now by "Run selected",
+  // where the count and category mix are shown before the run starts.
+  const [handedSelection, setHandedSelection] = useState<string[] | null>(null)
+  // A "Run selected" hand-off applies to the visit it opened; choosing a tab
+  // from the strip starts clean, so a later Run visit opens on the full set.
+  const selectTab = (id: Tab) => {
+    setHandedSelection(null)
+    setTab(id)
+  }
+  // The system-wide grader, named on the Run tab before a run starts.
+  const [grader, setGrader] = useState<KBValidationGrader | null>(null)
   // Bumped whenever a run finishes so the History tab refetches even if it's
   // already mounted (it otherwise only loads on mount, so a freshly persisted
   // run wouldn't appear until a full page reload).
@@ -117,7 +138,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
       : e.key === 'Home' ? 0
       : n - 1
-    setTab(TAB_LABELS[next].id)
+    selectTab(TAB_LABELS[next].id)
     tabRefs.current[next]?.focus()
   }
 
@@ -136,13 +157,14 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   }, [kbUuid])
 
   const applyLatestQuality = useCallback((history: KBHistoryItem[]) => {
-    const last = history[0]
+    const last = history.find(h => !isSmokeTest(h))
     const snap = last?.result_snapshot ?? null
     setLatestQuality(last?.score != null ? {
       score: Number(last.score),
       breakdown: snap ? describeKBScoreWithValues(explainKBScore(snap).components) : null,
       answerAccuracy: snap?.retrieval_precision?.avg_judge_score ?? null,
       judgeModel: last.judge_model ?? null,
+      answerModelFallback: snap?.answer_model_fallback ?? null,
       numQueries: last.num_queries_judged ?? last.num_test_queries ?? null,
       mode: last.mode ?? null,
       createdAt: last.created_at ?? null,
@@ -163,7 +185,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // even though the server finished and persisted the run (it only surfaced
   // later in History). Instead we enqueue the Celery task and poll the quality
   // history until the new ValidationRun lands, then render its full snapshot.
-  const runValidation = useCallback(async (mode: KBValidationMode) => {
+  const runValidation = useCallback(async (mode: KBValidationMode, queryUuids?: string[]) => {
     setRunning(true)
     setRunError(null)
     try {
@@ -177,7 +199,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
         // Non-fatal — worst case we match the first completed run we see.
       }
 
-      await runKBValidationAsync(kbUuid, { mode })
+      await runKBValidationAsync(
+        kbUuid,
+        queryUuids ? { mode, query_uuids: queryUuids } : { mode },
+      )
 
       const deadline = Date.now() + MAX_POLL_MS
       let result: KBValidationResult | null = null
@@ -238,6 +263,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     Promise.all([refreshQueries(), refreshHistory()]).finally(() => setLoading(false))
   }, [refreshQueries, refreshHistory])
 
+  // Re-read on entry to the Run tab: an admin can change the grader at any time.
+  useEffect(() => {
+    if (tab !== 'run') return
+    let cancelled = false
+    getKBValidationGrader(kbUuid)
+      .then(g => { if (!cancelled) setGrader(g) })
+      .catch(() => { /* optional context; the run works without it */ })
+    return () => { cancelled = true }
+  }, [tab, kbUuid])
+
   // Re-pull the test-query list on every entry to the Test Queries tab. The
   // Validate-tab wizard generates and persists queries server-side, so the
   // snapshot held here goes stale; refetching on entry keeps the tab honest
@@ -267,6 +302,12 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       parts.push(`answer accuracy ${(latestQuality.answerAccuracy * 100).toFixed(0)}%`)
     }
     if (latestQuality.judgeModel) parts.push(`judged by ${latestQuality.judgeModel}`)
+    if (latestQuality.answerModelFallback) {
+      parts.push(
+        `answered by ${latestQuality.answerModelFallback.used}, not the tuned `
+        + `${latestQuality.answerModelFallback.configured} (no longer in System Config)`,
+      )
+    }
     if (latestQuality.numQueries != null) parts.push(`on ${latestQuality.numQueries} queries`)
     if (latestQuality.mode) parts.push(`(${latestQuality.mode})`)
     if (latestQuality.createdAt) {
@@ -345,6 +386,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             {provenance}
           </span>
         )}
+        {latestQuality?.answerModelFallback && (
+          <span
+            title={`The applied optimization pins ${latestQuality.answerModelFallback.configured}, which is no longer in System Config. This score was answered by ${latestQuality.answerModelFallback.used}. Re-run Autovalidate or revert the optimization to clear this.`}
+            style={{
+              fontSize: 10, color: '#f59e0b',
+              maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}
+          >
+            tuned model unavailable · answered by {shortenModel(latestQuality.answerModelFallback.used)}
+          </span>
+        )}
         {collapsed && running && (
           <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
         )}
@@ -382,7 +434,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
               tabIndex={active ? 0 : -1}
               ref={el => { tabRefs.current[idx] = el }}
               onKeyDown={e => onTabKeyDown(e, idx)}
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
               style={{
                 fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -429,17 +481,27 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           canManage={canManage}
           queries={queries}
           onChange={refreshQueries}
+          running={running}
+          onRunSelected={uuids => {
+            // Review before running: Run now opens on this selection (judge
+            // only, so it costs what the handful of questions costs) and
+            // states the count and categories; the user starts it there.
+            setHandedSelection(uuids)
+            setTab('run')
+          }}
         />
       ) : tab === 'run' ? (
         <KBValidationRunTab
           kbReady={kbReady}
           canManage={canManage}
-          numQueries={queries.length}
+          queries={queries}
+          selectedUuids={handedSelection}
           latestRun={latestRun}
           running={running}
           error={runError}
           onRun={runValidation}
           onExport={latestRunUuid ? exportLatestRun : undefined}
+          grader={grader}
         />
       ) : (
         <KBQualityHistoryTab

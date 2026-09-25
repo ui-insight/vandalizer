@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 import {
   Search, ShieldCheck, BookOpen, FolderOpen, Star, X,
   ArrowUpDown, ArrowLeft, Loader2, Tag, Sparkles, User as UserIcon, Mail,
@@ -6,9 +6,8 @@ import {
 import { QualityBadge } from '../library/QualityBadge'
 import { KB_QUALITY_SCORE_HOVER } from './kbScoreFormula'
 import { ItemDetailModal } from '../library/ExploreTab'
-import {
-  listVerifiedItems, browseCollections, listFeaturedCollections,
-} from '../../api/library'
+import { CatalogSignals } from '../library/CatalogSignals'
+import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type QualityFilter, type SortOption } from '../library/useCatalogBrowser'
 import { adoptKnowledgeBase } from '../../api/knowledge'
 import { ApiError } from '../../api/client'
 import type {
@@ -17,10 +16,7 @@ import type {
 import { useToast } from '../../contexts/ToastContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
-type SortOption = '' | 'quality' | 'name' | 'validations'
-type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
 
-const PAGE_SIZE = 30
 
 // Dark palette (matches KnowledgePanel)
 const C = {
@@ -75,11 +71,20 @@ function DarkAuthorChip({ author, size = 'sm' }: { author: AuthorRef | null | un
 // Tier styling
 // ---------------------------------------------------------------------------
 
+// Keyed on the tiers compute_quality_tier emits — the only vocabulary a
+// measured item can carry. Colours track QualityBadge's for the same tiers.
 const TIER_RING = {
-  gold: '1px solid rgba(251, 191, 36, 0.45)',
-  silver: '1px solid rgba(156, 163, 175, 0.45)',
-  bronze: '1px solid rgba(251, 146, 60, 0.4)',
+  excellent: '1px solid rgba(74, 222, 128, 0.45)',
+  good: '1px solid rgba(96, 165, 250, 0.45)',
+  fair: '1px solid rgba(250, 204, 21, 0.4)',
 } as const
+
+const TIER_ICON = {
+  excellent: '#4ade80',
+  good: '#60a5fa',
+  fair: '#facc15',
+} as const
+
 
 // ---------------------------------------------------------------------------
 // Featured collection card (dark)
@@ -140,14 +145,13 @@ function KBCatalogCard({
   onTagClick: (tag: string) => void
   onClick: () => void
 }) {
-  const tierBorder = item.quality_tier
-    ? TIER_RING[item.quality_tier as keyof typeof TIER_RING]
-    : `1px solid ${C.border}`
-
-  const tierIconColor =
-    item.quality_tier === 'gold' ? '#fbbf24'
-    : item.quality_tier === 'silver' ? '#9ca3af'
-    : '#34d399'
+  // An asserted tier gets neither ring nor colour: the badge renders
+  // assertions in neutral and the card must not out-claim it.
+  const measuredTier = item.quality_tier && !item.quality_asserted
+    ? (item.quality_tier as keyof typeof TIER_RING)
+    : null
+  const tierBorder = (measuredTier && TIER_RING[measuredTier]) || `1px solid ${C.border}`
+  const tierIconColor = (measuredTier && TIER_ICON[measuredTier]) || C.textFaint
 
   return (
     <button
@@ -186,13 +190,11 @@ function KBCatalogCard({
           tier={item.quality_tier}
           score={item.quality_score}
           title={KB_QUALITY_SCORE_HOVER}
+          asserted={item.quality_asserted}
           regressionPending={item.regression_pending_review}
+          variant="catalog"
         />
-        {item.validation_run_count > 0 && (
-          <span style={{ fontSize: 10, color: C.textFaint }}>
-            {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}
-          </span>
-        )}
+        <CatalogSignals item={item} style={{ fontSize: 10, color: C.textFaint }} />
       </div>
 
       {item.description && (
@@ -293,117 +295,20 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
   const { toast } = useToast()
   const { activateKB } = useWorkspace()
 
-  // Data
-  const [items, setItems] = useState<VerifiedCatalogItem[]>([])
-  const [total, setTotal] = useState(0)
-  // Unfiltered KB count for the "All Knowledge Bases" badge — `total` tracks
-  // the active query, so it shrinks whenever a collection/search filter is on.
-  const [allTotal, setAllTotal] = useState<number | null>(null)
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filters (kind locked to knowledge_base)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
-  const [tagFilter, setTagFilter] = useState('')
-  const [sortOption, setSortOption] = useState<SortOption>('')
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
+  const {
+    items, total, allTotal, featuredCollections, regularCollections,
+    loading, loadingMore, error,
+    searchQuery, setSearchQuery, qualityFilter, setQualityFilter,
+    tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
+    refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
+    topItems, otherItems,
+  } = useCatalogBrowser({
+    lockedKind: 'knowledge_base',
+    loadErrorMessage: 'Failed to load knowledge bases. Please try again.',
+    onLoadMoreError: (m) => toast(m, 'error'),
+  })
 
   const [detailItem, setDetailItem] = useState<VerifiedCatalogItem | null>(null)
-
-  // Debounced search
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
-
-  // Load collections once (counts scoped to knowledge bases only)
-  useEffect(() => {
-    browseCollections('knowledge_base')
-      .then(d => setCollections(d.collections))
-      .catch(() => {})
-    listFeaturedCollections('knowledge_base')
-      .then(d => setFeaturedCollections(d.collections))
-      .catch(() => {})
-  }, [])
-
-  // Fetch items when filters change (kind always knowledge_base)
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listVerifiedItems({
-        kind: 'knowledge_base',
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: 0,
-        limit: PAGE_SIZE,
-      })
-      setItems(data.items)
-      setTotal(data.total)
-      // Sort doesn't change the result count, so any fetch without narrowing
-      // filters carries the true "all KBs" total.
-      if (!debouncedSearch && !qualityFilter && !tagFilter && !selectedCollectionId) {
-        setAllTotal(data.total)
-      }
-    } catch {
-      setError('Failed to load knowledge bases. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }, [debouncedSearch, qualityFilter, tagFilter, sortOption, selectedCollectionId])
-
-  useEffect(() => { refresh() }, [refresh])
-
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const data = await listVerifiedItems({
-        kind: 'knowledge_base',
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: items.length,
-        limit: PAGE_SIZE,
-      })
-      setItems(prev => [...prev, ...data.items])
-    } catch {
-      toast('Failed to load more items', 'error')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const hasMore = items.length < total
-
-  const activeCollection = selectedCollectionId
-    ? collections.find(c => c.id === selectedCollectionId) ?? null
-    : null
-
-  const clearFilters = () => {
-    setSearchQuery('')
-    setQualityFilter('')
-    setTagFilter('')
-    setSortOption('')
-    setSelectedCollectionId(null)
-  }
-
-  const hasActiveFilters = !!(qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
-
-  // Show the hero landing when no filters are active
-  const showHero = !hasActiveFilters && !loading
 
   const handleAdoptKB = async (kbUuid: string) => {
     try {
@@ -426,20 +331,6 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
     activateKB(item.source_uuid, item.display_name || item.name)
   }
 
-  const sortOptions: [SortOption, string][] = [
-    ['', 'Newest'],
-    ['quality', 'Highest Quality'],
-    ['name', 'Name A-Z'],
-    ['validations', 'Most Validated'],
-  ]
-
-  const goldItems = useMemo(() => items.filter(i => i.quality_tier === 'gold'), [items])
-  const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'gold') : items,
-    [items, showHero],
-  )
-
-  const regularCollections = collections.filter(c => !featuredCollections.some(f => f.id === c.id))
 
   return (
     <>
@@ -529,10 +420,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   </div>
                   <div>
                     <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
-                      Explore Knowledge Bases
+                      Shared with everyone here
                     </h2>
                     <p style={{ fontSize: 13, color: C.textDim, margin: '2px 0 0' }}>
-                      Verified knowledge bases ready to chat with
+                      Knowledge bases ready to chat with — checked, scored, and free to copy
+                    </p>
+                    <p style={{ fontSize: 12, color: C.textFaint, margin: '4px 0 0' }}>
+                      Built one that works for you? Share it from My KBs — it doesn't need to be finished.
                     </p>
                   </div>
                 </div>
@@ -602,10 +496,9 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                 }}
               >
-                <option value="">Any quality</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="bronze">Bronze</option>
+                {QUALITY_FILTER_OPTIONS.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -620,7 +513,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                   }}
                 >
-                  {sortOptions.map(([val, label]) => (
+                  {SORT_OPTIONS.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>
@@ -714,7 +607,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
               <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '80px 16px' }}>
                 <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} aria-hidden="true" />
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-                  {hasActiveFilters ? 'No matching knowledge bases' : 'No verified knowledge bases yet'}
+                  {hasActiveFilters ? 'No matching knowledge bases' : 'No knowledge bases shared yet'}
                 </h3>
                 <p style={{ fontSize: 13, color: C.textDim, maxWidth: 340, margin: '0 auto' }}>
                   {hasActiveFilters
@@ -755,23 +648,23 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   </div>
                 )}
 
-                {/* Gold tier spotlight */}
-                {showHero && !activeCollection && goldItems.length > 0 && (
+                {/* Top-tier spotlight */}
+                {showHero && !activeCollection && topItems.length > 0 && (
                   <div style={{ marginBottom: 28 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                       <div style={{
                         height: 14, width: 14, borderRadius: 999,
-                        background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)',
+                        background: 'linear-gradient(135deg, #4ade80 0%, #16a34a 100%)',
                       }} />
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>
                         Top Rated
                       </h3>
                       <span style={{ fontSize: 11, color: C.textFaint }}>
-                        {goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}
+                        {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
                       </span>
                     </div>
                     <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
-                      {goldItems.slice(0, 6).map(item => (
+                      {topItems.slice(0, 6).map(item => (
                         <KBCatalogCard
                           key={item.id}
                           item={item}
@@ -785,7 +678,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
                 {/* Main grid */}
                 <div style={{ marginBottom: 6 }}>
-                  {showHero && !activeCollection && goldItems.length > 0 && (
+                  {showHero && !activeCollection && topItems.length > 0 && (
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
                   )}
                   {!showHero && !loading && (

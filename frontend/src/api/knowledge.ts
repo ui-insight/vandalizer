@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope, URLRefreshInterval } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -44,7 +44,13 @@ export function getKnowledgeBase(uuid: string) {
   return apiFetch<KnowledgeBaseDetail>(`/api/knowledge/${uuid}`)
 }
 
-export function updateKnowledgeBase(uuid: string, data: { title?: string; description?: string; tags?: string[] }) {
+export function updateKnowledgeBase(uuid: string, data: {
+  title?: string
+  description?: string
+  tags?: string[]
+  /** 'off' clears it. */
+  url_refresh_interval?: 'off' | URLRefreshInterval
+}) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/update`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -116,10 +122,44 @@ export function removeKBSource(uuid: string, sourceUuid: string) {
   })
 }
 
+/** Re-fetch every web source in the KB, each as its own Refresh would (background). */
+export function refreshKBWebSources(uuid: string) {
+  return apiFetch<{ ok: boolean; queued: number; in_progress: number }>(
+    `/api/knowledge/${uuid}/refresh-web-sources`,
+    { method: 'POST' },
+  )
+}
+
 /** Re-fetch a URL source from its page and rebuild its chunks in place (background). */
 export function refreshKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean; status: string; source_uuid: string }>(
     `/api/knowledge/${uuid}/source/${sourceUuid}/refresh`,
+    { method: 'POST' },
+  )
+}
+
+/** The model that grades this KB's validation runs (one system-wide setting). */
+export type KBValidationGrader = {
+  model: string | null
+  /** False when it is the default model because no grader was chosen. */
+  configured: boolean
+  /** Set when the chosen grader is no longer configured and the default grades instead. */
+  fallback: { configured: string; used: string; reason?: string } | null
+}
+
+export function getKBValidationGrader(uuid: string) {
+  return apiFetch<KBValidationGrader>(`/api/knowledge/${uuid}/validation-grader`)
+}
+
+/** What a Reprocess queued: a web page re-fetch, a re-index of a document's
+ *  text, a re-read of a document with no usable text, or a wait on an
+ *  extraction that is already running. */
+export type KBSourceReprocessMode = 'refetch' | 'reindex' | 'reextract' | 'waiting'
+
+/** Run one source through extraction, chunking and embedding again, in place (background). */
+export function reprocessKBSource(uuid: string, sourceUuid: string) {
+  return apiFetch<{ ok: boolean; status: string; mode: KBSourceReprocessMode; source_uuid: string }>(
+    `/api/knowledge/${uuid}/source/${sourceUuid}/reprocess`,
     { method: 'POST' },
   )
 }
@@ -138,6 +178,7 @@ export interface KBSourceResponse {
   custom_name?: string | null
   // User-verifiable provenance (origin URL / citation); shown as "Source: …".
   source_reference?: string | null
+  amends_source_uuids?: string[]
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number
@@ -160,6 +201,14 @@ export function setKBSourceReference(uuid: string, sourceUuid: string, sourceRef
   return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'PATCH',
     body: JSON.stringify({ source_reference: sourceReference }),
+  })
+}
+
+/** Replace the list of sources in this KB that a source amends. Pass `[]` to clear. */
+export function setKBSourceAmends(uuid: string, sourceUuid: string, amendsSourceUuids: string[]) {
+  return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ amends_source_uuids: amendsSourceUuids }),
   })
 }
 
@@ -248,6 +297,21 @@ export type KBValidationResult = {
   num_sources: number
   mode?: KBValidationMode
   judge_model?: string | null
+  /** Set when the run covered hand-picked queries only ("Run selected").
+   *  ``selected`` is what ran; ``requested`` (newer runs) is what was asked
+   *  for — the route now refuses a mismatch, so they agree on new rows. */
+  query_selection?: { selected: number; requested?: number; total: number } | null
+  /** The model that generated the graded answers (absent on older runs). */
+  answer_model?: string | null
+  /** Set when the KB's applied override named a model System Config no
+   *  longer has, so the user's model answered instead of the tuned one. */
+  answer_model_fallback?: { configured: string; used: string; reason?: string } | null
+  /** Set when the configured grader was unavailable and the default graded. */
+  judge_model_fallback?: { configured: string; used: string; reason?: string } | null
+  /** The exact questions the run measured, frozen at run time. Two runs with
+   *  different fingerprints scored different questions or expectations.
+   *  Absent on runs from before it was recorded. */
+  question_set?: KBQuestionSet | null
   source_health: {
     total: number
     healthy: number
@@ -302,9 +366,17 @@ export type KBValidationResult = {
   } | null
 }
 
+export type KBValidationRunOptions = {
+  mode?: KBValidationMode
+  skip_judge?: boolean
+  /** Run only these test queries — a smoke test. The run lands in history
+   *  and exports like any other but never becomes the KB's quality score. */
+  query_uuids?: string[]
+}
+
 export function runKBValidation(
   uuid: string,
-  options?: { mode?: KBValidationMode; skip_judge?: boolean },
+  options?: KBValidationRunOptions,
 ) {
   return apiFetch<KBValidationResult>(`/api/knowledge/${uuid}/validate`, {
     method: 'POST',
@@ -314,7 +386,7 @@ export function runKBValidation(
 
 export function runKBValidationAsync(
   uuid: string,
-  options?: { mode?: KBValidationMode; skip_judge?: boolean },
+  options?: KBValidationRunOptions,
 ) {
   return apiFetch<{ task_id: string; status: 'queued' }>(`/api/knowledge/${uuid}/validate`, {
     method: 'POST',
@@ -369,6 +441,11 @@ export type KBTestQuery = {
   category: string | null
   notes: string | null
   external_id: string | null
+  /** The bulk import that last wrote this row (null for manual and generated
+   *  rows). Lets the Run tab validate one imported file on its own. */
+  import_batch_id?: string | null
+  import_batch_label?: string | null
+  import_batch_at?: string | null
   auto_generated: boolean
   source_chunk_ids: string[]
   last_judged_score: number | null
@@ -432,6 +509,22 @@ export function bulkDeleteKBTestQueries(uuid: string, queryUuids: string[]) {
 }
 
 
+export type KBQuestionSet = {
+  fingerprint: string
+  count: number
+  category_counts: Record<string, number>
+  questions?: {
+    query_uuid: string
+    external_id: string | null
+    query: string
+    expected_answer: string | null
+    expected_answer_contains: string | null
+    category: string | null
+    expected_source_labels: string[]
+    import_batch_label: string | null
+  }[]
+}
+
 export type KBTestQueryImportResult = {
   created: number
   updated: number
@@ -444,6 +537,9 @@ export type KBTestQueryImportResult = {
    * retrieval precision on every question that carries it.
    */
   unmatched_source_labels?: { label: string; questions: number }[]
+  /** The batch every row this file wrote was tagged with; null when the file
+   *  wrote nothing. */
+  import_batch_id?: string | null
 }
 
 /**

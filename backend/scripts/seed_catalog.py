@@ -53,6 +53,8 @@ from app.models.library import Library, LibraryItem, LibraryItemKind, LibrarySco
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.verification import VerifiedCollection, VerifiedItemMetadata
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
+from app.services.verification_service import LEGACY_TIERS as _LEGACY_TIERS
+from app.services.verification_service import normalize_tier  # noqa: F401 — re-exported for callers
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +195,11 @@ async def add_to_collection(collection: VerifiedCollection, item_id: str):
         await collection.save()
 
 
+# Catalog releases before 1.1 hand-typed gold/silver/bronze, a vocabulary the
+# measurement pipeline never emits (compute_quality_tier -> excellent/good/fair).
+# Map on the way in so old seed files and old rows land on the one vocabulary.
+
+
 async def upsert_verified_metadata(
     item_kind: str, item_id: str, display_name: str, description: str,
     quality_tier: str | None = None, quality_score: float | None = None,
@@ -214,6 +221,7 @@ async def upsert_verified_metadata(
     hand-asserted tier. It never overwrites a baseline an examiner pinned
     locally — local pins carry a user id, seed pins carry "catalog-seed".
     """
+    quality_tier = normalize_tier(quality_tier)
     existing = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == item_kind,
         VerifiedItemMetadata.item_id == item_id,
@@ -222,11 +230,18 @@ async def upsert_verified_metadata(
     if existing:
         existing.display_name = display_name
         existing.description = description
-        if quality_tier is not None:
+        # A seed that only asserts a tier (no score) never overrides one this
+        # install measured: the row would keep the measured score under the
+        # asserted tier and display as a measured "Excellent (62%)".
+        seed_asserts_only = quality_score is None
+        measured_here = existing.quality_score is not None
+        if quality_tier is not None and not (seed_asserts_only and measured_here):
             existing.quality_tier = quality_tier
+        elif existing.quality_tier in _LEGACY_TIERS:
+            existing.quality_tier = _LEGACY_TIERS[existing.quality_tier]
         if quality_score is not None:
             existing.quality_score = quality_score
-        if quality_grade is not None:
+        if quality_grade is not None and not (seed_asserts_only and measured_here):
             existing.quality_grade = quality_grade
         if credit and credit.get("name"):
             existing.credit_name = credit["name"]

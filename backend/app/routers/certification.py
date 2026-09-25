@@ -1,12 +1,14 @@
 """Vandal Workflow Architect certification endpoints."""
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.services import certification_service as svc
+from app.services.certificate_pdf import render_certificate_pdf
 
 
 class AssessmentPayload(BaseModel):
@@ -18,6 +20,25 @@ router = APIRouter()
 @router.get("/progress")
 async def get_progress(user: User = Depends(get_current_user)):
     return await svc.get_progress_dict(user.user_id)
+
+
+@router.get("/certificate")
+async def download_certificate(user: User = Depends(get_current_user)):
+    """Return the caller's certificate as a printable PDF, once certified."""
+    prog = await svc.get_progress(user.user_id)
+    if not prog.certified or not prog.certified_at:
+        raise HTTPException(status_code=404, detail="Complete all 11 modules to earn a certificate")
+    pdf = render_certificate_pdf(
+        name=user.name or user.email or user.user_id,
+        level=prog.level,
+        certified_at=prog.certified_at,
+        credential_id=str(prog.id)[-8:].upper(),
+    )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="vandal-workflow-architect-certificate.pdf"'},
+    )
 
 
 @router.post("/modules/{module_id}/validate")

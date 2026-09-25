@@ -8,7 +8,9 @@ from app.dependencies import get_current_user
 from app.models.document import SmartDocument
 from app.models.team import Team, TeamMembership
 from app.models.user import User
+from app.rate_limit import limiter
 from app.services import access_control, audit_service, document_service
+from app.services.extraction_staleness import EXTRACTION_STALE_AFTER, extraction_is_stale
 
 router = APIRouter()
 
@@ -134,8 +136,70 @@ async def poll_status(
     return result
 
 
+class TitlesRequest(BaseModel):
+    document_uuids: list[str] = []
+    folder_uuids: list[str] = []
+
+
+# A chat setup link attaches at most 3 knowledge bases, but its documents and
+# folders are whatever the sender had selected; this bounds the lookup.
+_MAX_TITLE_LOOKUPS = 100
+
+
+@router.post("/titles")
+async def resolve_titles(
+    body: TitlesRequest,
+    user: User = Depends(get_current_user),
+):
+    """Titles for the documents and folders the caller can view.
+
+    Opening a chat setup link re-attaches the sender's documents and folders
+    as chips, which need titles. ``poll_status`` would ship each document's
+    full text to get one. Anything the caller cannot view is left out, not
+    reported, so the response says nothing about what exists; the caller
+    counts what came back to tell the user some of the link was not shared
+    with them. Authorization matches the chat route's, so what resolves here
+    is what the chat will accept.
+    """
+    if len(body.document_uuids) + len(body.folder_uuids) > _MAX_TITLE_LOOKUPS:
+        raise HTTPException(status_code=400, detail=f"At most {_MAX_TITLE_LOOKUPS} items per request")
+    team_access = await access_control.get_team_access_context(user)
+    documents = []
+    for uuid in dict.fromkeys(body.document_uuids):
+        doc = await access_control.get_authorized_document(
+            uuid, user, team_access=team_access, allow_admin=True,
+        )
+        if doc:
+            documents.append({"uuid": doc.uuid, "title": doc.title or doc.uuid})
+    folders = []
+    for uuid in dict.fromkeys(body.folder_uuids):
+        folder = await access_control.get_authorized_folder(
+            uuid, user, team_access=team_access, allow_admin=True,
+        )
+        if folder:
+            folders.append({"uuid": folder.uuid, "title": folder.title})
+    return {"documents": documents, "folders": folders}
+
+
+# How long an in-progress extraction may go without a status write before a
+# retry is allowed to replace it. The in-flight guard below is the only thing
+# standing between a document and a second dispatch, and the shape this route
+# itself writes — processing=True, task_status="extracting", raw_text="" — is
+# what a worker that dies after that write leaves behind. The window is the
+# same one the reap_stuck sweep uses to mark such a document failed, imported
+# from a single definition so the route can never allow a retry while the
+# sweep still considers the lock live (or vice versa).
+_EXTRACTION_STALE_AFTER = EXTRACTION_STALE_AFTER
+
+
+def _extraction_is_stale(doc: SmartDocument) -> bool:
+    return extraction_is_stale(doc.updated_at, doc.created_at)
+
+
 @router.post("/{doc_uuid}/retry-extraction")
+@limiter.limit("30/minute")
 async def retry_extraction(
+    request: Request,
     doc_uuid: str,
     user: User = Depends(get_current_user),
 ):
@@ -144,6 +208,14 @@ async def retry_extraction(
     Useful when the original extraction silently produced no text — for example
     because the OCR endpoint was temporarily down. Clears any prior error state
     and re-dispatches the same Celery chain that ran at upload time.
+
+    A retry re-reads the pages with OCR when the previous extraction failed or
+    produced unreadable text; a healthy document is re-read the ordinary way,
+    so a retry on a working document does not spend an OCR round-trip to get
+    back what it already had. When the reason is unreadable text, or the
+    document's text layer was refused before, the re-read also *requires*
+    OCR: rather than fall back to the local reading it is replacing, it fails
+    and is retried once OCR is back.
     """
     doc = await access_control.get_authorized_document(
         doc_uuid, user, manage=True, allow_admin=True
@@ -151,24 +223,17 @@ async def retry_extraction(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    from app.tasks.upload_tasks import dispatch_upload_tasks
+    if document_service.extraction_in_flight(doc) and not _extraction_is_stale(doc):
+        raise HTTPException(
+            status_code=409,
+            detail="Extraction is already in progress for this document",
+        )
 
-    doc.task_status = "extracting"
-    doc.processing = True
-    doc.error_message = None
-    doc.raw_text = ""
-    doc.token_count = 0
-    doc.text_markers = []
-    doc.extraction_nonletter_ratio = None
-    doc.ingestion_warnings = []
-    await doc.save()
-
-    task_id = dispatch_upload_tasks(
-        document_uuid=doc.uuid,
-        extension=doc.extension or "",
-        document_path=doc.path,
-        user_id=user.user_id,
-    )
+    restart = await document_service.restart_extraction(doc, user.user_id)
+    task_id = restart["task_id"]
+    force_ocr = restart["force_ocr"]
+    ocr_required = restart["ocr_required"]
+    previous_task_status = restart["previous_task_status"]
 
     await audit_service.log_event(
         action="document.retry_extraction",
@@ -176,6 +241,11 @@ async def retry_extraction(
         resource_type="document",
         resource_id=doc_uuid,
         resource_name=doc.title,
+        detail={
+            "force_ocr": force_ocr,
+            "ocr_required": ocr_required,
+            "previous_task_status": previous_task_status,
+        },
     )
 
     return {"uuid": doc_uuid, "task_id": task_id, "status": "extracting"}

@@ -182,6 +182,12 @@ class SystemConfig(Document):
     # product picks a model for the user, and an unattended pick could send a
     # confidential document to an external provider. See services/model_routing.
     long_document_model: str = ""
+    # The model that grades validation runs (the LLM judge), for everyone. A
+    # score is only comparable with another scored by the same grader, and the
+    # grader used to be whichever chat model the person pressing Run had picked
+    # (support ticket: one KB, one question set, a different grader a day
+    # apart). Empty = the system default model.
+    validation_judge_model: str = ""
 
     # Legacy fields kept for backwards compatibility
     extraction_model: str = ""
@@ -248,6 +254,12 @@ class SystemConfig(Document):
 
     # Support contacts — list of {"user_id": ..., "email": ..., "name": ...}
     support_contacts: list[dict] = []
+
+    # Exact hostnames that server-side HTTP (workflow API Call / Fetch steps,
+    # automation callbacks, credential token endpoints) may reach even though
+    # they resolve to a private address. Merged with the operator's
+    # OUTBOUND_URL_ALLOWED_HOSTS env list; see app.utils.url_validation.
+    outbound_url_allowed_hosts: list[str] = []
 
     # Default team for new user auto-assignment
     default_team_id: Optional[str] = None

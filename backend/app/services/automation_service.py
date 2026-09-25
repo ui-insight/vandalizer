@@ -75,6 +75,7 @@ async def apply_automation_update(
     output_config: dict | None = None,
     clear_action_id: bool = False,
 ) -> Automation:
+    was_enabled = auto.enabled
     if name is not None:
         auto.name = name
     if description is not None:
@@ -85,6 +86,12 @@ async def apply_automation_update(
         auto.trigger_type = trigger_type
     if trigger_config is not None:
         auto.trigger_config = trigger_config
+    # A schedule switched on, switched to, or changed counts from now: a slot
+    # missed while paused, or one computed from the old time, never fires.
+    if auto.trigger_type == "schedule" and (
+        (auto.enabled and not was_enabled) or trigger_type is not None or trigger_config is not None
+    ):
+        auto.schedule_armed_at = datetime.datetime.now(tz=datetime.timezone.utc)
     if action_type is not None:
         auto.action_type = action_type
     # None means "not supplied" for every other field here, so clearing the

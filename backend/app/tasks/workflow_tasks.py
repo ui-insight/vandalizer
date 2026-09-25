@@ -189,17 +189,47 @@ def _default_model_from_config(sys_config: dict) -> str:
     return ""
 
 
-def _build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
+def default_model_for_owner(db, sys_config: dict, user_id: str | None) -> str:
+    """Resolve the model a run should use when the workflow names none.
+
+    The sync mirror of :func:`app.services.config_service.get_user_model_name`:
+    the owner's chosen model (stored as a name or a tag) when it still matches
+    a configured model, else the system default. The interactive run resolves
+    explicit > workflow default > owner default before it enqueues; the
+    scheduled run has no request to carry an explicit model, so it starts at
+    the workflow default and falls through the same ladder from there.
+    """
+    models = [m for m in (sys_config.get("available_models") or []) if isinstance(m, dict)]
+    if user_id:
+        user_cfg = db.user_model_config.find_one({"user_id": user_id}) or {}
+        chosen = (user_cfg.get("name") or "").strip()
+        if chosen:
+            for m in models:
+                if chosen in (m.get("name"), m.get("tag")) and m.get("name"):
+                    return m["name"]
+    return _default_model_from_config(sys_config)
+
+
+def build_steps_data(db, workflow_doc, workflow_id, trigger_step_data):
     """Materialize a workflow's steps into engine-ready ``steps_data``.
 
     Returns ``(steps_data, output_step_names)``.
 
-    Shared by the initial run and every resume pass. These used to be two
-    hand-maintained copies and had already drifted apart: the resume copy
-    dropped extraction ``field_metadata`` (so enum/optional constraints were
-    silently lost after an approval) and the ``input_config`` fixed-documents
-    merge (so fixed inputs vanished on resume). A resumed run must execute the
-    same configuration the first pass did, so there is one builder.
+    The one builder for every path that runs a workflow: the interactive run,
+    every resume pass, the scheduled / folder-watch run in ``passive_tasks``,
+    and the optimizer's in-process trials. Each of those used to keep its own
+    copy of this loop, and every copy drifted: the resume copy dropped
+    extraction ``field_metadata`` and the fixed-documents merge; the passive
+    copy missed the workflow default model (#842), step-level input (#796),
+    the selected-document preload, ``field_metadata``, and saved
+    Prompt/Formatter resolution; the optimizer copy had none of those. A
+    scheduled run that resolves the wrong model or preloads the wrong document
+    does not crash -- it produces a confident answer on schedule -- so the
+    only fix that holds is for there to be nothing to keep in step (#862).
+
+    ``workflow_id`` is the string form of the workflow's ObjectId; documents
+    whose ``origin_workflow_id`` matches are skipped so a workflow that writes
+    into its own input folder cannot feed itself.
     """
     from app.services.workflow_engine import apply_step_input_config, sanitize_step_name
 
@@ -1037,7 +1067,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             return
 
     # Build steps data from workflow steps
-    steps_data, output_step_names = _build_steps_data(
+    steps_data, output_step_names = build_steps_data(
         db, workflow_doc, workflow_id, trigger_step_data,
     )
 
@@ -1666,7 +1696,7 @@ def resume_workflow_after_approval(self, approval_uuid):
     # Rebuild steps_data through the same builder the initial run uses, so the
     # resumed pass executes the identical configuration.
     trigger_data = result_doc.get("input_context", {}) or {}
-    steps_data, _ = _build_steps_data(db, workflow_doc, workflow_id, trigger_data)
+    steps_data, _ = build_steps_data(db, workflow_doc, workflow_id, trigger_data)
 
     user_id = workflow_doc.get("user_id")
 

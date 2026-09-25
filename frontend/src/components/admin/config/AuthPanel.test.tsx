@@ -152,6 +152,47 @@ describe('AuthPanel — client secret sentinel (plans 003 / 011)', () => {
   })
 })
 
+describe('AuthPanel — JIT provisioning toggle', () => {
+  it('unchecking in the add form sends jit_provisioning: false', async () => {
+    renderPanel()
+
+    fireEvent.click(screen.getByRole('button', { name: /Add Provider/ }))
+    const form = screen.getByText('New Provider').parentElement!
+    fireEvent.change(formField(form, 'Display Name'), { target: { value: 'New IdP' } })
+    fireEvent.change(formField(form, 'Client ID'), { target: { value: 'cid-9' } })
+    const jit = screen.getByLabelText('Create accounts on first sign-in (JIT provisioning)')
+    expect(jit).toBeChecked()
+    fireEvent.click(jit)
+    fireEvent.click(screen.getAllByRole('button', { name: 'Add Provider' }).slice(-1)[0])
+
+    await waitFor(() => expect(mockAddOAuthProvider).toHaveBeenCalledWith(expect.objectContaining({
+      display_name: 'New IdP',
+      jit_provisioning: false,
+    })))
+  })
+
+  it('prefills unchecked from a stored false and preserves it through update', async () => {
+    renderPanel(['password', 'oauth'], [
+      { ...PROVIDERS[0], jit_provisioning: false } as SystemConfigData['oauth_providers'][number],
+    ])
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit provider' }))
+    const jit = await screen.findByLabelText('Create accounts on first sign-in (JIT provisioning)')
+    expect(jit).not.toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() => expect(mockUpdateOAuthProvider).toHaveBeenCalledTimes(1))
+    expect((mockUpdateOAuthProvider.mock.calls[0][1] as Record<string, unknown>).jit_provisioning).toBe(false)
+  })
+
+  it('prefills checked when the stored provider predates the field', async () => {
+    renderPanel()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit provider' }))
+    expect(await screen.findByLabelText('Create accounts on first sign-in (JIT provisioning)')).toBeChecked()
+  })
+})
+
 describe('AuthPanel — add and delete', () => {
   it('rejects a provider with no display name before calling the API', async () => {
     renderPanel()

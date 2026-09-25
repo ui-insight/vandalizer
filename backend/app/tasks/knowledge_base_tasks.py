@@ -83,8 +83,13 @@ def _source_label(source: dict, doc: dict | None = None) -> str:
     max_retries=3,
     default_retry_delay=10,
 )
-def kb_ingest_document(self, source_uuid: str) -> None:
-    """Fetch a SmartDocument's raw_text, chunk and embed into the KB collection."""
+def kb_ingest_document(self, source_uuid: str, retrieved: bool = True) -> None:
+    """Fetch a SmartDocument's raw_text, chunk and embed into the KB collection.
+
+    ``retrieved=False`` is a Reprocess that re-indexes the document's stored
+    text without re-reading the file: the chunks are new, the text is not, so
+    the source's retrieval dates stay where they were.
+    """
     from app.services.document_manager import get_document_manager
 
     db = _get_db()
@@ -159,16 +164,38 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             return
 
         dm = get_document_manager()
-        # Idempotent: clear any chunks from a prior (partial) run so a Celery
-        # autoretry can't double-add or collide on chunk ids.
-        dm.delete_kb_source(kb_uuid, source_uuid)
-        chunk_count = dm.add_to_kb(
-            kb_uuid=kb_uuid,
-            source_id=source_uuid,
-            source_name=doc.get("title", ""),
-            raw_text=raw_text,
-            text_markers=doc.get("text_markers") or [],
+        # Project (implicit) KBs key chunks by document_uuid, as kb_reingest
+        # does; a Reprocess of a project source must replace those chunks,
+        # not add a second copy beside them under the source's uuid.
+        kb_doc = db.knowledge_bases.find_one({"uuid": kb_uuid}, {"implicit": 1}) or {}
+        document_uuid = source.get("document_uuid")
+        source_id = (
+            document_uuid if kb_doc.get("implicit") is True and document_uuid else source_uuid
         )
+        if retrieved:
+            # Idempotent: clear any chunks from a prior (partial) run so a Celery
+            # autoretry can't double-add or collide on chunk ids.
+            dm.delete_kb_source(kb_uuid, source_uuid)
+            if source_id != source_uuid:
+                dm.delete_kb_source(kb_uuid, source_id)
+            chunk_count = dm.add_to_kb(
+                kb_uuid=kb_uuid,
+                source_id=source_id,
+                source_name=doc.get("title", ""),
+                raw_text=raw_text,
+                text_markers=doc.get("text_markers") or [],
+            )
+        else:
+            # A Reprocess of a working source: swap the chunks in, so a failed
+            # embed leaves it answering from the ones it had instead of none.
+            # replace_kb_source cleans up its own partial writes, so an
+            # autoretry is still idempotent.
+            chunk_count = dm.replace_kb_source(
+                kb_uuid, source_id, doc.get("title", ""), raw_text,
+                text_markers=doc.get("text_markers") or [],
+            )
+            if source_id != source_uuid:
+                dm.delete_kb_source(kb_uuid, source_uuid)
 
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
@@ -176,19 +203,36 @@ def kb_ingest_document(self, source_uuid: str) -> None:
                 "$set": {
                     "chunk_count": chunk_count,
                     "status": "ready",
+                    # A Reprocess of a failed source succeeds here; the old
+                    # failure must not linger under a ready row.
+                    "error_message": None,
                     # Kept so the source still has a name if the document is
                     # later deleted from Files — the chunks outlive it.
                     "document_title": doc.get("title") or None,
-                    **currency.ingestion_stamp(raw_text),
+                    **currency.ingestion_stamp(
+                        raw_text, retrieved=retrieved,
+                        retrieved_at=None if retrieved else (
+                            source.get("content_retrieved_at") or source.get("processed_at")
+                        ),
+                    ),
                 }
             },
         )
 
     except Exception as e:
         logger.error("Error ingesting document source %s: %s", source_uuid, e)
+        if not retrieved and source.get("chunk_count"):
+            # The swap failed before the old chunks were dropped: the source
+            # still answers from them, so it is not an errored source.
+            failure = {
+                "status": "ready",
+                "error_message": f"Reprocess failed — previous content kept: {e}"[:2000],
+            }
+        else:
+            failure = {"status": "error", "error_message": str(e)[:2000]}
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},
-            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            {"$set": failure},
         )
         # Bell the KB owner — but only once Celery is done retrying, so a
         # transient blip that succeeds on retry rings nothing.
@@ -383,7 +427,13 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         # fallback for JS-rendered pages).
         from app.services.web_fetcher import fetch_url_sync
 
-        result = fetch_url_sync(url)  # raises ValueError for blocked URLs
+        from app.services.knowledge_service import _kb_snapshot, _kb_text_cap
+
+        # The KB limit, not the prompt-sized default: this text is chunked and
+        # embedded, never sent to a model, so length costs embedding time and
+        # nothing else. The default cut a 1.1 M-character federal regulation in
+        # half behind a warning the user could do nothing about.
+        result = fetch_url_sync(url, max_chars=_kb_text_cap())  # raises ValueError for blocked URLs
         raw_text = result.text
         url_title = result.title
 
@@ -417,7 +467,7 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             {"uuid": source_uuid},
             {
                 "$set": {
-                    "content": raw_text[:500000],
+                    "content": _kb_snapshot(raw_text),
                     "url_title": (url_title or "")[:500],
                     "truncated": bool(getattr(result, "truncated", False)),
                 }

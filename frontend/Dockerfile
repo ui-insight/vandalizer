@@ -42,7 +42,34 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Stage 2: Serve with nginx
+# Stage 2a: unprivileged variant (published as vandalizer-frontend-unprivileged;
+# the Helm chart defaults to it). Runs as the image's non-root `nginx` user
+# (uid 101) and listens on 8080, which satisfies Kubernetes restricted Pod
+# Security and OpenShift SCCs without workarounds. Built only when explicitly
+# targeted (`--target runtime-unprivileged`); this stage sits BEFORE the
+# default `runtime` stage so a plain `docker build` still produces the
+# root-nginx port-80 image that compose users expect.
+FROM docker.io/nginxinc/nginx-unprivileged:alpine AS runtime-unprivileged
+
+USER root
+RUN apk add --no-cache curl
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The shared nginx.conf listens on 80 for the default image; non-root nginx
+# cannot bind it, so rewrite to this base image's conventional 8080.
+RUN sed -i 's/listen 80;/listen 8080;/' /etc/nginx/conf.d/default.conf
+# Numeric (the base image's nginx user) so Kubernetes' runAsNonRoot check can
+# verify it without a runAsUser override.
+USER 101:101
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -sf http://localhost:8080/health || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
+
+# Stage 2b: Serve with nginx (default image: root nginx on port 80)
 FROM docker.io/library/nginx:alpine AS runtime
 
 RUN apk add --no-cache curl

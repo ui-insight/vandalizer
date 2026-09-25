@@ -1515,9 +1515,9 @@ async def chat_stream(
                 f"Text extracted poorly from {len(low_quality_docs)} selected "
                 f"document(s): {joined}. Most of the stored text is unreadable, "
                 "so answers about these documents are likely to be unreliable "
-                "or wrong. Try \"Retry extraction\" on the document, or "
-                "re-upload it (e.g. as a scanned/printed copy) so OCR can "
-                "produce clean text."
+                "or wrong. Use \"Retry extraction\" on the document to read "
+                "its pages again with OCR, or re-upload it as a scanned or "
+                "printed copy so OCR can produce clean text."
             ),
             "action": "documents_low_quality",
             "tokens_dropped": 0,
@@ -1840,7 +1840,11 @@ async def chat_stream(
         model_name=model_name,
         model_config=model_config,
         sys_config_doc=sys_config_doc,
-        system_prompt=system_prompt or "",
+        # The same instructions + reminder bundle the estimate below sizes
+        # (this branch has no single `system_prompt`).
+        system_prompt=(
+            instructions_text + ("\n\n" + reminder_bundle if reminder_bundle else "")
+        ),
         prompt=_build_chat_prompt(
             message,
             doc_segments,
@@ -3184,7 +3188,10 @@ async def _retrieve_kb_results(
     fan out over it and merge the pools before any prompt text is built."""
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
+        annotate_amendments,
         condense_retrieval_query,
+        load_amendment_links,
+        retrieve_amendment_chunks,
         retrieve_kb_chunks,
     )
 
@@ -3261,9 +3268,26 @@ async def _retrieve_kb_results(
             retrieval_query=retrieval_query,
         )
 
+    general_results = kb_results
     kb_results = _compose_kb_results(
-        kb_results, named_results, rag_cfg.k, pinned=pinned_results,
+        general_results, named_results, rag_cfg.k, pinned=pinned_results,
     )
+
+    # Amending sources: when a source the KB owner marked as amended made the
+    # cut, search its amenders directly and give their best passages the
+    # named-document share. The user should not have to know the supplement's
+    # file name to get the current rule (support ticket).
+    links = await load_amendment_links(kb_uuid)
+    amendment_results = await retrieve_amendment_chunks(
+        kb_uuid, kb_results, retrieval_query or message, links,
+        min_similarity=rag_cfg.min_similarity,
+    )
+    if amendment_results:
+        kb_results = _compose_kb_results(
+            general_results, named_results + amendment_results, rag_cfg.k,
+            pinned=pinned_results,
+        )
+    kb_results = annotate_amendments(kb_results, links)
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
     return kb_results
@@ -3283,10 +3307,13 @@ async def _render_kb_segment(
     if not kb_results:
         return None, []
 
+    from app.services.kb_validation_service import AMENDMENT_INSTRUCTION, amendment_label
+
     kb_sources: list[dict] = []
     snippet_blocks: list[str] = []
     any_approximate = False
     any_spanning = False
+    any_amendment = False
     for r in kb_results:
         meta = r.get("metadata") or {}
         content = r.get("content") or ""
@@ -3299,6 +3326,8 @@ async def _render_kb_segment(
         page, page_end, approximate = cited["page"], cited["page_end"], cited["page_approximate"]
         locator = format_page_range(page, page_end, approximate) if page is not None else locator_for_meta(meta)
         label = f"{src} ({locator})" if locator else src
+        label = f"{label}{amendment_label(r)}"
+        any_amendment = any_amendment or bool(r.get("amends") or r.get("amended_by"))
         kb_title = r.get("kb_title")
         if kb_title:
             label = f"{label} — {kb_title}"
@@ -3343,6 +3372,8 @@ async def _render_kb_segment(
             "one as exact and never say a passage is \"explicitly\" or "
             "\"clearly\" on it._\n"
         )
+    if any_amendment:
+        kb_text += f"_{AMENDMENT_INSTRUCTION}_\n"
     if any_spanning:
         kb_text += (
             "_A snippet that runs across pages carries `[p. N]` where the next "

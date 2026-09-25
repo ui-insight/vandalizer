@@ -77,7 +77,7 @@ const ROUTE_TITLES: Array<[string, string]> = [
   ['/account', 'Account'],
   ['/teams', 'Teams'],
   ['/organizations', 'Organizations'],
-  ['/verification', 'Verification'],
+  ['/verification', 'Shared items'],
   ['/reviews', 'Reviews'],
   ['/tuning', 'Tuning suggestions'],
   ['/support', 'Support'],
@@ -196,7 +196,12 @@ const indexRoute = createRoute({
     workflow: ((search.workflow as string) || (search.openWorkflow as string) || undefined),
     extraction: ((search.extraction as string) || (search.openExtraction as string) || undefined),
     automation: (search.automation as string) || undefined,
+    // One knowledge base, or a comma-separated list from a chat setup link,
+    // which may also carry `docs` and `folders` (see buildChatSetupUrl).
     kb: (search.kb as string) || undefined,
+    // Optional, so the many links that spell out the full search needn't name them.
+    ...(search.docs ? { docs: search.docs as string } : {}),
+    ...(search.folders ? { folders: search.folders as string } : {}),
     // Project scope — present when arriving from "Chat with this project".
     project: (search.project as string) || undefined,
     // Share-link tokens — present when arriving from a "Copy share link" URL

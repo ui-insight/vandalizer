@@ -798,16 +798,25 @@ def record_truncation(model_name: Optional[str], max_tokens: Optional[int]) -> N
         sink.append({"model": model_name, "max_tokens": max_tokens})
 
 
+# The warning is persisted on the run result and read back by whoever opens
+# it, so it names only remedies every user can act on. The admin-only remedy
+# (raising the model's response reserve under System Config) is appended by
+# the UI for admin viewers — see frontend/src/utils/truncationWarning.ts,
+# which keys on TRUNCATION_WARNING_PREFIX.
+TRUNCATION_WARNING_PREFIX = "Output was cut off"
+
+
 def describe_truncation(events: list[dict]) -> str:
     """Render truncation events as a user-facing warning string."""
     cap = next((e.get("max_tokens") for e in events if e.get("max_tokens")), None)
     limit = f"{cap:,}-token output limit" if cap else "output limit"
     plural = "responses were" if len(events) > 1 else "response was"
     return (
-        f"Output was cut off: the model {plural} stopped at its {limit} before "
-        "finishing. The result below is incomplete. Raise “Response reserve "
-        "(output tokens)” for this model under Admin → System Config → "
-        "Models, or split this step into smaller steps."
+        f"{TRUNCATION_WARNING_PREFIX}: the model {plural} stopped at its {limit} "
+        "before finishing. The result below is incomplete. To fit within the "
+        "limit, ask for a tighter output format (shorter answers, fewer fields, "
+        "no restated input), split this step into smaller steps, or run it per "
+        "document instead of across the whole set."
     )
 
 

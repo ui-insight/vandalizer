@@ -350,7 +350,308 @@ async def _probe_structured_output(
         return error
 
 
-def build_readiness(cfg: SystemConfig) -> dict[str, Any]:
+# ---------------------------------------------------------------------------
+# OCR
+# ---------------------------------------------------------------------------
+
+# A one-page probe that takes longer than this is not healthy, whatever the
+# configured per-document timeout says. Capping it keeps an admin's "Test" click
+# — and the readiness probe behind it — from holding a request open for the full
+# document timeout against a service that is hanging rather than answering.
+_OCR_PROBE_MAX_TIMEOUT = 60.0
+# The whole probe, end to end — httpx's timeout bounds each phase only.
+_OCR_PROBE_TOTAL_TIMEOUT = _OCR_PROBE_MAX_TIMEOUT + 5
+
+
+def _classify_ocr_error(exc: Exception) -> dict[str, str]:
+    """Map an OCR attempt's failure to a category + human why/fix.
+
+    Separate from :func:`_classify_error` on purpose: OCR endpoints fail in
+    different ways than model providers, and the remedy is a different screen.
+    """
+    from app.services import ocr_client
+
+    raw = str(exc)
+    name = type(exc).__name__.lower()
+    msg = raw.lower()
+    status = getattr(exc, "status_code", None)
+    body = (getattr(exc, "body", "") or "")[:300]
+
+    def has(*needles: str) -> bool:
+        return any(n in msg or n in name for n in needles)
+
+    if status in (401, 403):
+        return {
+            "category": "auth",
+            "title": "OCR service rejected the credentials",
+            "why": "The endpoint answered, but refused the API key — it is missing, wrong, or expired.",
+            "fix": "Re-enter the OCR API key above and save. If the service needs no key, clear the field.",
+            "raw": f"HTTP {status}: {body}" if body else raw,
+        }
+    if status == 404:
+        return {
+            "category": "config",
+            "title": "No OCR service at that URL",
+            "why": "The host answered but has nothing at this path. The endpoint URL names the wrong path.",
+            "fix": "Check the Endpoint URL against the service's own docs — the conversion path is usually part of it.",
+            "raw": f"HTTP {status}: {body}" if body else raw,
+        }
+    if status == 422:
+        return {
+            "category": "config",
+            "title": "OCR service rejected the request shape",
+            "why": "The endpoint answered but refused the upload — usually the wrong provider is selected, so the file field and options are named for a different service.",
+            "fix": "Check the Provider selector matches the service actually running, then re-test.",
+            "raw": f"HTTP {status}: {body}" if body else raw,
+        }
+    if status is not None and status >= 500:
+        return {
+            "category": "service",
+            "title": f"OCR service returned HTTP {status}",
+            "why": "The endpoint is reachable and the request was accepted, but the service failed to convert the page. This is a fault inside the OCR service, not in this configuration.",
+            "fix": "Report the error to whoever operates the OCR service. Until it is fixed, scanned and image-only PDFs will fail to ingest; text-based PDFs are unaffected.",
+            "raw": f"HTTP {status}: {body}" if body else raw,
+        }
+    if has("timeout", "timed out", "deadline"):
+        return {
+            "category": "timeout",
+            "title": "OCR service did not answer in time",
+            "why": f"The endpoint accepted the upload but sent no reply within {int(_OCR_PROBE_MAX_TIMEOUT)}s. A one-page probe should return in seconds, so the service is hanging or badly overloaded.",
+            "fix": "Check the service's own health and load. A document-sized conversion will not succeed while a single page cannot.",
+            "raw": raw,
+        }
+    if has("connect", "connection", "getaddrinfo", "refused", "name or service", "ssl", "certificate", "could not resolve"):
+        return {
+            "category": "connection",
+            "title": "Could not reach the OCR service",
+            "why": "The request never reached a service — the hostname does not resolve, the host is down, or it is not reachable from this server (a private address behind a firewall is the common case).",
+            "fix": "Verify the Endpoint URL, and confirm the host is reachable from the machine running Vandalizer — not just from your laptop.",
+            "raw": raw,
+        }
+    if isinstance(exc, ocr_client.OcrRequestError) and status is not None:
+        return {
+            "category": "service",
+            "title": f"OCR service returned HTTP {status}",
+            "why": "The endpoint answered with an error status rather than converted text.",
+            "fix": "Read the raw response below — it usually names what the service objected to.",
+            "raw": f"HTTP {status}: {body}" if body else raw,
+        }
+    return {
+        "category": "unknown",
+        "title": "OCR probe failed",
+        "why": "The conversion failed before any text came back. See the raw error below for the service's exact words.",
+        "fix": "Re-check the Endpoint URL, Provider, and API key. The raw error usually names the field at fault.",
+        "raw": raw,
+    }
+
+
+async def diagnose_ocr(
+    cfg: SystemConfig,
+    *,
+    endpoint: Optional[str] = None,
+    api_key: Optional[str] = None,
+    provider: Optional[str] = None,
+) -> dict[str, Any]:
+    """Convert a generated one-page PDF through the configured OCR service and
+    explain, step by step, what happened.
+
+    A real conversion, using the same ``ocr_client.convert`` the ingestion path
+    uses — not a reachability ping. The ping this replaces reported *any* HTTP
+    response as success, so both of UIdaho's OCR services sat behind a green
+    "responded with 405" badge for a month: one was answering conversions with
+    HTTP 500, the other with an empty body, and every scanned PDF uploaded in
+    that window failed. "Responds" is not the same claim as "converts", and
+    reporting the first as the second is how an outage stays invisible.
+
+    Each argument overrides the saved config when given, so the admin form can
+    test unsaved edits. Never raises for service-side failures: the verdict is
+    in ``ok``.
+    """
+    import asyncio
+    import os
+    import tempfile
+
+    from app.services import ocr_client
+
+    endpoint = (cfg.ocr_endpoint if endpoint is None else endpoint or "").strip()
+    provider = ocr_client.normalize_provider(
+        cfg.ocr_provider if provider is None else provider
+    )
+    if api_key is None:
+        api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
+    options = getattr(cfg, "ocr_options", None) or {}
+    use_async = bool(getattr(cfg, "ocr_async", False))
+    timeout = min(
+        float(getattr(cfg, "ocr_timeout_seconds", None) or ocr_client.DEFAULT_OCR_TIMEOUT),
+        _OCR_PROBE_MAX_TIMEOUT,
+    )
+
+    checks: list[dict[str, Any]] = []
+
+    # Step 1 — an endpoint to test at all
+    if not endpoint:
+        return {
+            "ok": False,
+            "summary": "No OCR endpoint is configured.",
+            "endpoint": "",
+            "provider": provider,
+            "convert_url": "",
+            "checks": [{
+                "label": "OCR endpoint",
+                "ok": False,
+                "detail": "No endpoint set — scanned and image-only PDFs fall back to basic text extraction.",
+            }],
+            "error": {
+                "category": "config",
+                "title": "OCR endpoint not configured",
+                "why": "Without an OCR service, a PDF with no usable text layer (a scan, a photo, a print-to-PDF with mangled fonts) cannot be read.",
+                "fix": "Enter the conversion URL of your OCR service above and save.",
+                "raw": "",
+            },
+        }
+    checks.append({"label": "OCR endpoint", "ok": True, "detail": endpoint})
+
+    # Step 2 — the URL uploads will actually be POSTed to. The most commonly
+    # misconfigured field for docling, whose stored root is rewritten.
+    convert_url = ocr_client.normalize_endpoint(endpoint, provider, use_async=use_async)
+    checks.append({
+        "label": "Provider",
+        "ok": True,
+        "detail": f"'{provider}' — documents will be converted via POST {convert_url}"
+                  + (" (async)" if use_async and provider == "docling" else ""),
+    })
+
+    # Step 3 — reported, never failed: plenty of on-campus OCR services take no
+    # key at all, so "no key" is only a finding once the service refuses.
+    checks.append({
+        "label": "Credentials",
+        "ok": True,
+        "detail": f"Sending a bearer token ({len(api_key)} chars)." if api_key
+                  else "No API key set — the service will be called unauthenticated.",
+    })
+
+    headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+    pdf_bytes = ocr_client.build_probe_pdf()
+    tmp = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    try:
+        tmp.write(pdf_bytes)
+        tmp.close()
+
+        def _convert() -> str:
+            import httpx
+
+            with httpx.Client(timeout=timeout) as client:
+                return ocr_client.convert(
+                    client,
+                    pdf_path=tmp.name,
+                    endpoint=endpoint,
+                    headers=headers,
+                    provider=provider,
+                    options=options,
+                    use_async=use_async,
+                    # The async (docling) path polls for up to 15 minutes by
+                    # default; a probe must not hold a worker that long.
+                    max_poll_seconds=_OCR_PROBE_MAX_TIMEOUT,
+                    poll_interval=1.0,
+                )
+
+        async def _convert_bounded() -> str:
+            # httpx's timeout bounds each phase, not the whole request, so a
+            # service trickling bytes could outlast it. Bound the total.
+            try:
+                return await asyncio.wait_for(asyncio.to_thread(_convert), _OCR_PROBE_TOTAL_TIMEOUT)
+            except asyncio.TimeoutError:
+                raise TimeoutError(f"OCR probe timed out after {int(_OCR_PROBE_TOTAL_TIMEOUT)}s") from None
+
+        started = time.perf_counter()
+        try:
+            text = await _convert_bounded()
+        except Exception as exc:  # noqa: BLE001 — classified and reported, not raised
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            error = _classify_ocr_error(exc)
+            checks.append({
+                "label": "Live conversion",
+                "ok": False,
+                "detail": f"{error['title']} (after {latency_ms} ms).",
+            })
+            return {
+                "ok": False,
+                "summary": error["title"],
+                "endpoint": endpoint,
+                "provider": provider,
+                "convert_url": convert_url,
+                "latency_ms": latency_ms,
+                "status_code": getattr(exc, "status_code", None),
+                "checks": checks,
+                "error": error,
+            }
+        latency_ms = int((time.perf_counter() - started) * 1000)
+    finally:
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+
+    checks.append({
+        "label": "Live conversion",
+        "ok": True,
+        "detail": f"Converted a one-page PDF in {latency_ms} ms.",
+    })
+
+    # Step 5 — the check the old ping could not make. An HTTP 200 carrying a
+    # bare newline is what dotsocr returned for every document it was handed;
+    # ingestion treats that as "too little text" and silently falls back to
+    # PyMuPDF, so a scanned page becomes an empty document with a green badge.
+    stripped = (text or "").strip()
+    if len(stripped) < ocr_client.PROBE_MIN_TEXT_CHARS:
+        checks.append({
+            "label": "Text returned",
+            "ok": False,
+            "detail": f"Responded successfully but returned {len(stripped)} characters "
+                      f"of text — the probe page carries {len(ocr_client.PROBE_PAGE_TEXT)}.",
+        })
+        return {
+            "ok": False,
+            "summary": "OCR service returned no text",
+            "endpoint": endpoint,
+            "provider": provider,
+            "convert_url": convert_url,
+            "latency_ms": latency_ms,
+            "chars": len(stripped),
+            "sample": stripped[:200],
+            "checks": checks,
+            "error": {
+                "category": "empty",
+                "title": "OCR service returned no text",
+                "why": "The service accepted the page and answered successfully, but sent back "
+                       "effectively nothing. Uploads will not error — they quietly fall back to "
+                       "basic text extraction, which yields little or nothing for a scanned page.",
+                "fix": "Report this to whoever operates the OCR service: it is answering requests "
+                       "without doing the conversion. Check the Provider selector too — the wrong "
+                       "one can read a valid response as empty.",
+                "raw": repr(stripped[:200]),
+            },
+        }
+
+    checks.append({
+        "label": "Text returned",
+        "ok": True,
+        "detail": f"{len(stripped)} characters: \"{stripped[:60]}\"",
+    })
+    return {
+        "ok": True,
+        "summary": f"OCR is working — converted a test page in {latency_ms} ms.",
+        "endpoint": endpoint,
+        "provider": provider,
+        "convert_url": convert_url,
+        "latency_ms": latency_ms,
+        "chars": len(stripped),
+        "sample": stripped[:200],
+        "checks": checks,
+    }
+
+
+def build_readiness(cfg: SystemConfig, ocr_probe: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     """Aggregate the settings a fresh install needs into a graded checklist.
 
     Severity tiers, because the settings are not equal:
@@ -361,6 +662,14 @@ def build_readiness(cfg: SystemConfig) -> dict[str, Any]:
     Status is presence-based (no live calls — the per-model "Test" button does
     the expensive round-trip). ``action_target`` is a stable key the frontend
     maps to the right config section.
+
+    The one exception is ``ocr_probe``: a :func:`diagnose_ocr` result, which the
+    caller fetches separately and passes back in. Presence alone was a
+    misleading claim for OCR — an endpoint string sat there reading "configured"
+    for a month while the service behind it answered every conversion with an
+    HTTP 500 — so when a probe is supplied its verdict, not the string, decides
+    the status. It stays optional and out of band so the checklist still renders
+    instantly on page load.
     """
     models = cfg.available_models or []
     default_model = (cfg.default_model or "").strip()
@@ -388,17 +697,34 @@ def build_readiness(cfg: SystemConfig) -> dict[str, Any]:
     })
 
     # --- OCR (recommended) ----------------------------------------------
-    ocr_status = "configured" if (cfg.ocr_endpoint or "").strip() else "missing"
+    if not (cfg.ocr_endpoint or "").strip():
+        ocr_status = "missing"
+        ocr_summary = "No OCR endpoint — scanned/image PDFs fall back to basic text extraction."
+        ocr_action = "Configure OCR"
+    elif ocr_probe is None:
+        ocr_status = "configured"
+        ocr_summary = f"OCR endpoint configured ({(cfg.ocr_provider or 'raw')} provider)."
+        ocr_action = "Configure OCR"
+    elif ocr_probe.get("ok"):
+        ocr_status = "configured"
+        ocr_summary = ocr_probe.get("summary") or "OCR is working."
+        ocr_action = "Configure OCR"
+    else:
+        # Configured but not working. A distinct status, not "missing": the
+        # remedy is to fix or replace a service that exists, and telling an
+        # admin their endpoint is absent when it is merely broken sends them
+        # to re-type a URL that was never wrong.
+        ocr_status = "broken"
+        ocr_summary = (ocr_probe.get("error") or {}).get("title") or "OCR service is not working."
+        ocr_action = "Diagnose OCR"
     items.append({
         "key": "ocr",
         "title": "Enable OCR for scanned PDFs",
         "severity": "recommended",
         "status": ocr_status,
-        "summary": f"OCR endpoint configured ({(cfg.ocr_provider or 'raw')} provider)."
-                   if ocr_status == "configured"
-                   else "No OCR endpoint — scanned/image PDFs fall back to basic text extraction.",
+        "summary": ocr_summary,
         "unlocks": "High-quality text from scanned and image-only PDFs. Without it those documents extract poorly but still upload.",
-        "action_label": "Configure OCR",
+        "action_label": ocr_action,
         "action_target": "ocr",
     })
 

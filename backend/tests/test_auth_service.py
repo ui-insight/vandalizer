@@ -551,6 +551,27 @@ class TestResolveOAuthUser:
         mock_log.assert_not_awaited()
 
 
+    @pytest.mark.asyncio
+    async def test_jit_disabled_denies_unknown_user(self):
+        with patch("app.services.auth_service.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=None)
+            new_user = _make_user(user_id="stranger@corp.com", password_hash=None)
+            MockUser.return_value = new_user
+
+            from app.services.auth_service import (
+                JitProvisioningDisabled,
+                resolve_oauth_user,
+            )
+
+            with pytest.raises(JitProvisioningDisabled):
+                await resolve_oauth_user(
+                    "stranger@corp.com", "stranger@corp.com", "Stranger",
+                    jit_provisioning=False,
+                )
+
+        new_user.insert.assert_not_awaited()
+
+
 # ---------------------------------------------------------------------------
 # resolve_saml_user
 # ---------------------------------------------------------------------------
@@ -579,6 +600,45 @@ class TestResolveSAMLUser:
         kwargs = mock_log.await_args.kwargs
         assert kwargs["action"] == "user.email_synced_from_provider"
         assert kwargs["detail"]["provider"] == "saml"
+
+    @pytest.mark.asyncio
+    async def test_jit_disabled_denies_unknown_user(self):
+        with patch("app.services.auth_service.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=None)
+            new_user = _make_user(user_id="stranger", password_hash=None)
+            MockUser.return_value = new_user
+
+            from app.services.auth_service import (
+                JitProvisioningDisabled,
+                resolve_saml_user,
+            )
+
+            with pytest.raises(JitProvisioningDisabled):
+                await resolve_saml_user(
+                    "stranger", "stranger@corp.com", "Stranger",
+                    jit_provisioning=False,
+                )
+
+        new_user.insert.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_jit_disabled_still_allows_existing_user(self):
+        user = _make_user(user_id="alice", email="alice@corp.com")
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service._auto_join_default_team", new_callable=AsyncMock),
+            patch("app.services.team_service.ensure_current_team", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            from app.services.auth_service import resolve_saml_user
+
+            result = await resolve_saml_user(
+                "alice", "alice@corp.com", "Alice", jit_provisioning=False
+            )
+
+        assert result is user
 
 
 # ---------------------------------------------------------------------------

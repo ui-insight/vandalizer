@@ -528,15 +528,6 @@ class TestProcessOutputs:
 
 class TestProcessScheduledAutomations:
     @patch("app.tasks.passive_tasks.get_sync_db")
-    def test_skips_when_croniter_not_installed(self, mock_get_db):
-        from app.tasks.passive_tasks import process_scheduled_automations
-
-        with patch.dict("sys.modules", {"croniter": None}):
-            # The actual import check is inside the function body
-            # This verifies the function handles missing croniter gracefully
-            pass
-
-    @patch("app.tasks.passive_tasks.get_sync_db")
     def test_processes_empty_automation_list(self, mock_get_db):
         from app.tasks.passive_tasks import process_scheduled_automations
 
@@ -613,3 +604,67 @@ class TestExecuteWorkflowPassiveMissingFixedDocument:
         event_set = db.workflow_trigger_event.update_one.call_args[0][1]["$set"]
         assert event_set["status"] == "failed"
         assert "deleted from Files" in event_set["error"]
+
+
+class TestExecuteWorkflowPassiveRecordsItsAutomation:
+    """The run records the automation and trigger event that produced it, so
+    the stale-run reaper (tasks.activity.reap_stale_workflow_runs) can bell
+    the person who set the schedule rather than whoever owns the workflow
+    (#835). Exercised through the fixed-document-missing path, which fails
+    after the WorkflowResult is inserted and before any step is built."""
+
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_result_doc_carries_automation_and_trigger_event_ids(self, mock_get_db, _build):
+        from app.tasks.passive_tasks import execute_workflow_passive
+
+        event_id, wf_id, auto_id = ObjectId(), ObjectId(), ObjectId()
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.workflow_trigger_event.find_one.return_value = {
+            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "schedule",
+            "trigger_context": {"automation_id": str(auto_id), "automation_name": "Nightly"},
+        }
+        db.workflow.find_one.return_value = {
+            "_id": wf_id, "user_id": "u1", "steps": [],
+            "input_config": {"fixed_documents": [{"uuid": "gone", "title": "Gone.pdf"}]},
+        }
+        db.system_config.find_one.return_value = {}
+        db.smart_document.find.return_value = []
+        db.smart_document.find_one.return_value = None
+        db.workflow_result.insert_one.return_value.inserted_id = ObjectId()
+
+        execute_workflow_passive(str(event_id))
+
+        inserted = db.workflow_result.insert_one.call_args[0][0]
+        assert inserted["automation_id"] == str(auto_id)
+        assert inserted["trigger_event_id"] == str(event_id)
+        assert inserted["is_passive"] is True
+        # The trigger context is still copied whole (older code read it there).
+        assert inserted["input_context"]["automation_id"] == str(auto_id)
+
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_a_folder_watch_run_without_an_automation_records_none(self, mock_get_db, _build):
+        from app.tasks.passive_tasks import execute_workflow_passive
+
+        event_id, wf_id = ObjectId(), ObjectId()
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.workflow_trigger_event.find_one.return_value = {
+            "_id": event_id, "workflow": wf_id, "documents": [], "trigger_type": "folder_watch",
+        }
+        db.workflow.find_one.return_value = {
+            "_id": wf_id, "user_id": "u1", "steps": [],
+            "input_config": {"fixed_documents": [{"uuid": "gone", "title": "Gone.pdf"}]},
+        }
+        db.system_config.find_one.return_value = {}
+        db.smart_document.find.return_value = []
+        db.smart_document.find_one.return_value = None
+        db.workflow_result.insert_one.return_value.inserted_id = ObjectId()
+
+        execute_workflow_passive(str(event_id))
+
+        inserted = db.workflow_result.insert_one.call_args[0][0]
+        assert inserted["automation_id"] is None
+        assert inserted["trigger_event_id"] == str(event_id)

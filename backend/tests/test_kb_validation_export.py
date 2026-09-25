@@ -43,6 +43,7 @@ def _make_queries():
             expected_answer="30 days after award",
             expected_source_labels=["PAPPG Ch. 2"],
             external_id="ext-1",
+            notes="From the FY26 spreadsheet",
         ),
         SimpleNamespace(
             uuid="q-2",
@@ -163,6 +164,7 @@ def test_rows_map_judge_and_retrieval_fields():
     assert r["discrimination"] == "useful"
     assert r["retrieved_sources"] == ["PAPPG Ch. 2", "PAPPG Ch. 7"]
     assert r["external_id"] == "ext-1"
+    assert r["notes"] == "From the FY26 spreadsheet"
     assert r["answer_match"] is True
 
 
@@ -332,6 +334,47 @@ def test_an_older_run_still_falls_back_to_the_live_test_set():
     assert rows[0]["external_id"] == "OLD-1"
 
 
+def test_a_recorded_note_wins_over_a_later_edit_to_the_live_query():
+    """``notes`` follows the same rule as external_id: what the run recorded
+    is what the export shows, so editing the note afterwards does not rewrite
+    history in the export of an older run (#886)."""
+    from app.services.kb_validation_export import build_kb_validation_results_export
+
+    vr = SimpleNamespace(
+        uuid="run-3",
+        created_at=None,
+        score=70.0,
+        model="judge-model",
+        run_type="full",
+        result_snapshot={
+            "retrieval_precision": {
+                "details": [{
+                    "query_uuid": "q-1",
+                    "query": "Old question?",
+                    "notes": "Auto-generated 2026-09-09 from Doc A (quick coverage).",
+                    "precision": 0.5,
+                }],
+            },
+        },
+    )
+    live = [SimpleNamespace(
+        uuid="q-1", query="Old question?", expected_answer="A", external_id="OLD-1",
+        category="factual", expected_source_labels=[],
+        notes="Reviewer rewrote this note after the run",
+    )]
+
+    _payload, _meta, rows = build_kb_validation_results_export(
+        kb=SimpleNamespace(uuid="kb-1", title="KB", tags=[], total_sources=1, total_chunks=2),
+        vr=vr,
+        test_queries=live,
+        catalog_version=None,
+        exported_by_user_id="u1",
+        exported_at="2026-08-20T00:00:00Z",
+    )
+
+    assert rows[0]["notes"] == "Auto-generated 2026-09-09 from Doc A (quick coverage)."
+
+
 # ---------------------------------------------------------------------------
 # The overall score is a composite; the export must say what it is made of so
 # nobody reads it as the judge's answer accuracy.
@@ -409,3 +452,135 @@ def test_rows_carry_truncation_flags_and_default_false_for_older_runs():
                 "baseline_answer_truncated", "baseline_generation_truncated"):
         assert key in RESULT_COLUMNS
         assert older[key] is False
+
+
+def test_run_meta_names_the_answer_model_and_any_fallback():
+    """An export has to say which model generated the graded answers — the
+    2 CFR 200 ticket's exports could not, and the blank answers had no cause."""
+    kb, vr, queries = _make_kb(), _make_vr(), _make_queries()
+    vr.result_snapshot["answer_model"] = "qwen/qwen3.8-27b"
+    vr.result_snapshot["answer_model_fallback"] = {
+        "configured": "qwen/qwen3.6-27b", "used": "qwen/qwen3.8-27b", "reason": "not in System Config",
+    }
+    vr.result_snapshot["retrieval_precision"]["details"][0]["error"] = "answer generation failed: 401"
+
+    _payload, run_meta, rows = build_kb_validation_results_export(
+        kb=kb, vr=vr, test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-09T00:00:00+00:00",
+    )
+
+    assert run_meta["answer_model"] == "qwen/qwen3.8-27b"
+    assert run_meta["answer_model_fallback"]["configured"] == "qwen/qwen3.6-27b"
+    assert rows[0]["error"] == "answer generation failed: 401"
+
+
+def test_run_meta_answer_model_falls_back_to_the_run_label_for_older_runs():
+    kb, vr, queries = _make_kb(), _make_vr(), _make_queries()
+    vr.model = "claude-y"
+
+    _payload, run_meta, _rows = build_kb_validation_results_export(
+        kb=kb, vr=vr, test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-09T00:00:00+00:00",
+    )
+
+    assert run_meta["answer_model"] == "claude-y"
+    assert run_meta["answer_model_fallback"] is None
+
+
+KB_SOURCES = {
+    "recorded": True, "fingerprint": "abc123def456", "total_sources": 2, "total_chunks": 50,
+    "sources": [
+        {"source_uuid": "s-1", "name": "PAPPG Ch. 2", "source_type": "url", "url": "https://nsf.gov/p",
+         "status": "ready", "chunk_count": 40, "content_hash": "sha-1", "content_hash_recorded": True,
+         "last_ingested_at": "2026-08-01T00:00:00+00:00"},
+        {"source_uuid": "s-2", "name": "Budget.pdf", "source_type": "document", "document_uuid": "d-2",
+         "status": "ready", "chunk_count": 10, "content_hash": "sha-2", "content_hash_recorded": True},
+    ],
+}
+
+
+def _build_with(vr):
+    return build_kb_validation_results_export(
+        kb=_make_kb(), vr=vr, test_queries=_make_queries(), catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+
+
+def test_export_carries_the_kb_sources_the_run_measured():
+    """Support ticket: exports had no source list, versions or chunk counts,
+    so an older run could not be reproduced once the KB changed."""
+    vr = _make_vr()
+    vr.result_snapshot["kb_sources"] = KB_SOURCES
+    vr.result_snapshot["rag_config_override"] = {"k": 8}
+
+    payload, run_meta, rows = _build_with(vr)
+
+    assert payload["kb_sources"] is KB_SOURCES
+    assert run_meta["kb_source_fingerprint"] == "abc123def456"
+    assert run_meta["kb_source_count"] == 2
+    assert run_meta["kb_chunk_count"] == 50
+    assert run_meta["kb_sources_recorded"] is True
+    assert run_meta["rag_config_override_at_run"] == {"k": 8}
+
+    parsed = list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))
+    first = dict(zip(parsed[0], parsed[1]))
+    assert first["kb_source_fingerprint"] == "abc123def456"
+    assert first["kb_chunk_count"] == "50"
+
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows, payload["kb_sources"])))
+    sheet = wb["Sources"]
+    header = [c.value for c in sheet[1]]
+    by_uuid = {r[0]: dict(zip(header, r)) for r in sheet.iter_rows(min_row=2, values_only=True)}
+    assert by_uuid["s-1"]["content_hash"] == "sha-1"
+    assert by_uuid["s-1"]["chunk_count"] == 40
+    assert by_uuid["s-2"]["document_uuid"] == "d-2"
+
+
+def test_an_older_run_exports_its_thinner_source_record_labelled_as_such():
+    vr = _make_vr()
+    vr.result_snapshot["source_health"] = {"ratio": 1.0, "total": 1, "details": [
+        {"uuid": "s-1", "source_type": "url", "name": "PAPPG Ch. 2", "status": "healthy"},
+    ]}
+    vr.result_snapshot["chunk_coverage"] = {"ratio": 0.9, "total_chunks": 120}
+
+    payload, run_meta, rows = _build_with(vr)
+
+    assert run_meta["kb_sources_recorded"] is False
+    assert run_meta["kb_source_fingerprint"] is None
+    assert run_meta["kb_chunk_count"] == 120
+    assert payload["kb_sources"]["sources"][0]["health"] == "healthy"
+    assert run_meta["rag_config_override_at_run"] is None
+
+
+def test_a_run_with_no_source_record_exports_without_a_sources_sheet():
+    payload, run_meta, rows = _build_with(_make_vr())
+    assert payload["kb_sources"] is None
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows, payload["kb_sources"])))
+    assert "Sources" not in wb.sheetnames
+
+
+def test_export_names_the_question_set_the_run_measured():
+    """Concatenated exports from runs over different question sets must be
+    tellable apart row by row; older runs without a snapshot export blank."""
+    kb, vr, queries = _make_kb(), _make_vr(), _make_queries()
+    vr.result_snapshot["question_set"] = {
+        "fingerprint": "abc123def456", "count": 2,
+        "category_counts": {"factual": 2}, "questions": [],
+    }
+
+    _payload, run_meta, rows = build_kb_validation_results_export(
+        kb=kb, vr=vr, test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+    assert run_meta["question_set_fingerprint"] == "abc123def456"
+    assert run_meta["question_set_categories"] == {"factual": 2}
+    parsed = list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))
+    assert dict(zip(parsed[0], parsed[1]))["question_set_fingerprint"] == "abc123def456"
+
+    _payload, older_meta, _rows = build_kb_validation_results_export(
+        kb=kb, vr=_make_vr(), test_queries=queries, catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+    assert older_meta["question_set_fingerprint"] is None

@@ -71,6 +71,11 @@ async def _audit_email_sync(user: User, new_email: str, *, provider: str) -> Non
     )
 
 
+class JitProvisioningDisabled(Exception):
+    """SSO asserted an identity with no existing account while the provider
+    has just-in-time provisioning turned off."""
+
+
 # Reason codes returned by authenticate_with_reason on failure. These are
 # consumed by the login route to produce a helpful error message.
 AUTH_REASON_UNKNOWN_USER = "unknown_user"
@@ -124,11 +129,16 @@ async def resolve_oauth_user(
     user_principal_name: str,
     email: str | None,
     display_name: str | None,
+    *,
+    jit_provisioning: bool = True,
 ) -> User:
     """Find or create a user from OAuth claims.
 
     Lookup priority: user_id == upn, then email == mail, then user_id == mail.
-    If not found, creates an OAuth-only user (password_hash=None) with a personal team.
+    If not found, creates an OAuth-only user (password_hash=None) with a
+    personal team — unless the provider has jit_provisioning turned off, in
+    which case JitProvisioningDisabled is raised. Existing users are always
+    allowed; the flag gates account creation only.
     """
     user = await User.find_one(User.user_id == user_principal_name)
     if not user and email:
@@ -162,6 +172,9 @@ async def resolve_oauth_user(
         await ensure_current_team(user)
         await _stamp_login(user)
         return user
+
+    if not jit_provisioning:
+        raise JitProvisioningDisabled(user_principal_name)
 
     # Create new OAuth-only user
     uid = user_principal_name
@@ -208,10 +221,14 @@ async def resolve_saml_user(
     email: str | None,
     display_name: str | None,
     department: str | None = None,
+    *,
+    jit_provisioning: bool = True,
 ) -> User:
     """Find or create a user from SAML assertion attributes.
 
     Similar to resolve_oauth_user but also maps department to organization.
+    Raises JitProvisioningDisabled instead of creating when the provider has
+    just-in-time provisioning turned off; existing users are always allowed.
     """
     user = await User.find_one(User.user_id == uid)
     if not user and email:
@@ -249,6 +266,9 @@ async def resolve_saml_user(
         await ensure_current_team(user)
         await _stamp_login(user)
         return user
+
+    if not jit_provisioning:
+        raise JitProvisioningDisabled(uid)
 
     # Create new SAML user
     user = User(

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { DocumentUsageDialog, summarizeUsage, describeWorkflowUse, mergeUsage } from './DocumentUsageDialog'
+import { DocumentUsageDialog, summarizeUsage, describeWorkflowUse, mergeUsage, describeDeleteEffects, UsageSummaryList, RemoveFromKnowledgeBasesOption } from './DocumentUsageDialog'
 import { fetchDocumentUsage, type DocumentUsage } from '../../api/files'
 
 vi.mock('../../api/files', () => ({
@@ -112,5 +112,52 @@ describe('DocumentUsageDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
     fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(2)
+  })
+})
+
+// Support ticket: the delete dialog promised the file would be removed from
+// its knowledge bases, but a KB answers from its own copy and kept answering.
+describe('describeDeleteEffects', () => {
+  it('says knowledge bases keep their copy — never that deleting removes it', () => {
+    const text = describeDeleteEffects(USAGE)
+    expect(text).toMatch(/Knowledge bases keep their own copy of it and keep answering from it\./)
+    expect(text).toMatch(/Extraction test cases keep a saved snapshot\./)
+    expect(text).toMatch(/A workflow that pins it will fail/)
+    expect(text).not.toMatch(/removes? it from each/)
+  })
+
+  it('points at the removal option when the dialog offers it', () => {
+    expect(describeDeleteEffects(USAGE, { removeOffered: true })).toMatch(/unless you remove it below/)
+    expect(describeDeleteEffects(USAGE, { many: true })).toMatch(/copy of them.*pins one/)
+  })
+
+  it('omits sections with no references', () => {
+    expect(describeDeleteEffects({ ...USAGE, extractions: [], workflows: [] }))
+      .toBe('Knowledge bases keep their own copy of it and keep answering from it.')
+  })
+})
+
+describe('UsageSummaryList', () => {
+  it('leads with the kind and quotes the name, so a KB named like a file list reads as one KB', () => {
+    render(<UsageSummaryList usage={{ ...USAGE, knowledge_bases: [{ uuid: 'kb1', title: 'NSF_PAPPG.pdf (and 1 more)', exists: true }] }} />)
+    const kbRow = screen.getByText('“NSF_PAPPG.pdf (and 1 more)”').closest('li')!
+    expect(kbRow.textContent).toBe('Knowledge base “NSF_PAPPG.pdf (and 1 more)”')
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+  })
+})
+
+describe('RemoveFromKnowledgeBasesOption', () => {
+  it('is checked by default and reports changes', () => {
+    const onChange = vi.fn()
+    render(<RemoveFromKnowledgeBasesOption count={1} onChange={onChange} />)
+    const box = screen.getByRole('checkbox', { name: 'Also remove from this knowledge base' })
+    expect(box).toBeChecked()
+    fireEvent.click(box)
+    expect(onChange).toHaveBeenCalledWith(false)
+  })
+
+  it('names the count when there are several', () => {
+    render(<RemoveFromKnowledgeBasesOption count={2} onChange={() => {}} />)
+    expect(screen.getByRole('checkbox', { name: 'Also remove from these 2 knowledge bases' })).toBeInTheDocument()
   })
 })

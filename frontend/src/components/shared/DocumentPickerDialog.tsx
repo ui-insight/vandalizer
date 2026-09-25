@@ -8,12 +8,15 @@ export function DocumentPickerDialog({
   onClose,
   excludeUuids,
   title = 'Add Documents',
+  zIndex = 1000,
 }: {
   onSelect: (docs: { uuid: string; title: string }[]) => void
   onClose: () => void
   excludeUuids: string[]
   /** Dialog heading — say where the documents come from when it isn't obvious. */
   title?: string
+  /** Stacking order — raise it when opening from inside another modal. */
+  zIndex?: number
 }) {
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<{ uuid: string; title: string }[]>([])
@@ -63,7 +66,7 @@ export function DocumentPickerDialog({
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
       backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 1000,
+      justifyContent: 'center', zIndex,
     }}>
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div role="dialog" aria-modal="true" aria-label={title} style={{

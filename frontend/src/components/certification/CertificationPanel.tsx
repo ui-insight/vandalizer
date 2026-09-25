@@ -215,10 +215,26 @@ export function CertificationPanel() {
     // A bare try/finally re-throws on failure (e.g. a 5xx while the backend is
     // restarting), escaping as a global "Request failed" unhandled rejection.
     // Catch, notify, and keep the panel usable.
+    let result: ValidationResult
     try {
-      setValidationResult(await validate(moduleId))
+      result = await validate(moduleId)
+      setValidationResult(result)
     } catch {
       toast('Could not validate the module right now. Please try again.', 'error')
+      setValidating(false)
+      return
+    }
+    // Complete Module is hidden once a module is completed, and validate is
+    // read-only, so a better result on a completed module was shown here but
+    // never saved. Save the upgrade quietly — no celebration or module jump.
+    const saved = progress?.modules[moduleId]
+    try {
+      if (result.passed && saved?.completed && result.stars > (saved.stars ?? 0)) {
+        const upgrade = await complete(moduleId)
+        toast(`Saved: ${upgrade.stars} stars${upgrade.xp_earned ? ` (+${upgrade.xp_earned} XP)` : ''}`, 'success')
+      }
+    } catch {
+      toast('Could not save your new stars right now. Please check progress again.', 'error')
     } finally { setValidating(false) }
   }
 

@@ -354,3 +354,44 @@ class TestDocumentUsageRoute:
             mock_svc.document_usage = AsyncMock(return_value=None)
             resp = await client.get("/api/files/doc-1/usage", cookies=cookies, headers=headers)
         assert resp.status_code == 404
+
+
+class TestSheetJsonBinaryCsv:
+    """#834: a binary named .csv used to render as a mojibake grid; now the
+    reader refuses it, the service lets that refusal through, and the route
+    answers with the message instead of a bare 404 (or a 500)."""
+
+    @pytest.mark.asyncio
+    async def test_service_lets_the_readers_refusal_through(self):
+        from app.services import file_service
+        from app.services.document_readers import DocumentReadError
+
+        doc = MagicMock(extension="csv", downloadpath="u/blob.csv", path="u/blob.csv")
+        storage = MagicMock()
+        storage.read = AsyncMock(return_value=b"\x89PNG\r\n\x1a\n" + bytes(range(256)) * 64)
+
+        with patch("app.services.access_control.get_authorized_document",
+                   AsyncMock(return_value=doc)), \
+             patch("app.services.storage.get_storage", return_value=storage), \
+             pytest.raises(DocumentReadError) as exc:
+            await file_service.render_xlsx_sheets("doc-1", _TEST_SETTINGS, user=_make_user())
+        assert "not a text CSV" in str(exc.value)
+
+    @pytest.mark.asyncio
+    async def test_route_answers_422_with_the_readers_message(self, client):
+        from app.services.document_readers import DocumentReadError
+
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.render_xlsx_sheets = AsyncMock(
+                side_effect=DocumentReadError("This file is not a text CSV — its contents look binary."),
+            )
+            resp = await client.get("/api/files/doc-1/sheet-json", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 422
+        assert "not a text CSV" in resp.json()["detail"]

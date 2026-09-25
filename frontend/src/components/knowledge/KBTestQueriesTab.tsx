@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil, Upload } from 'lucide-react'
+import { Plus, Sparkles, Trash2, Bot, User, Loader2, Pencil, Upload, Play, Search } from 'lucide-react'
 import {
   createKBTestQuery,
   updateKBTestQuery,
@@ -19,6 +19,12 @@ interface Props {
   canManage: boolean
   queries: KBTestQuery[]
   onChange: () => void
+  /** Hand the selected queries to the Run tab, which shows their count and
+   *  category mix before the user starts the (smoke-test) run. Absent when
+   *  running is not offered. */
+  onRunSelected?: (uuids: string[]) => void
+  /** True while any validation run is in flight — disables Run selected. */
+  running?: boolean
 }
 
 export type DraftShape = {
@@ -67,6 +73,19 @@ function matchesFilter(q: KBTestQuery, filter: SourceFilter): boolean {
   return true
 }
 
+/** Free-text narrowing over the columns a reviewer tracks a question by:
+ * ID (imported, or the generated `PREFIX-AUTO-Q001`), question, expected
+ * answer, category, source labels and notes. Case-insensitive substring. */
+export function matchesSearch(q: KBTestQuery, term: string): boolean {
+  const needle = term.trim().toLowerCase()
+  if (!needle) return true
+  const haystack = [
+    q.external_id, q.query, q.expected_answer, q.category, q.notes,
+    ...q.expected_source_labels,
+  ]
+  return haystack.some(v => typeof v === 'string' && v.toLowerCase().includes(needle))
+}
+
 /** Convert a saved query into the editable draft shape (comma-joined labels,
  * nulls coerced to empty strings). Single-sourced so the Test Queries tab and
  * the Autovalidate wizard preview edit queries identically. */
@@ -92,7 +111,9 @@ export function draftToUpdatePayload(draft: DraftShape) {
   }
 }
 
-export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange }: Props) {
+export function KBTestQueriesTab({
+  kbUuid, kbReady, canManage, queries, onChange, onRunSelected, running = false,
+}: Props) {
   const confirm = useConfirm()
   const { toast } = useToast()
   const [showGen, setShowGen] = useState(false)
@@ -107,6 +128,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
   const [editDraft, setEditDraft] = useState<DraftShape>(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
   const [filter, setFilter] = useState<SourceFilter>('all')
+  const [search, setSearch] = useState('')
   // Selection is keyed by uuid and kept across filter changes, so an
   // evaluator can gather a batch from more than one slice before deleting.
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -115,8 +137,8 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
   const autoCount = useMemo(() => queries.filter(q => q.auto_generated).length, [queries])
   const userCount = queries.length - autoCount
   const visible = useMemo(
-    () => queries.filter(q => matchesFilter(q, filter)),
-    [queries, filter],
+    () => queries.filter(q => matchesFilter(q, filter) && matchesSearch(q, search)),
+    [queries, filter, search],
   )
   // Only queries still on screen count toward the selection UI — a stale id
   // (deleted elsewhere, or filtered out) must not make the header claim a
@@ -209,6 +231,12 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       return next
     })
     await onChange()
+  }
+
+  const handleRunSelected = () => {
+    const uuids = queries.filter(q => selected.has(q.uuid)).map(q => q.uuid)
+    if (uuids.length === 0 || !onRunSelected) return
+    onRunSelected(uuids)
   }
 
   const handleDeleteSelected = async () => {
@@ -364,6 +392,22 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
             })}
           </div>
 
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+            <Search size={12} style={{ color: '#666', flexShrink: 0 }} aria-hidden="true" />
+            <input
+              type="search"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search ID, question, source…"
+              aria-label="Search test queries by ID, question, category, source or notes"
+              style={{
+                width: 190, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
+                color: '#e5e5e5', backgroundColor: '#1a1a1a',
+                border: '1px solid #333', borderRadius: 5,
+              }}
+            />
+          </label>
+
           {canManage && selectedCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
               <span style={{ fontSize: 11, color: '#888' }} role="status">
@@ -380,6 +424,24 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
               >
                 Clear
               </button>
+              {onRunSelected && (
+                <button
+                  type="button"
+                  onClick={handleRunSelected}
+                  disabled={!kbReady || running || bulkDeleting}
+                  title={
+                    'Open Run now with only the selected questions, to review the count and categories ' +
+                    'before starting. The run appears in History, where its export holds just these ' +
+                    "questions. It is a smoke test and does not change the KB's quality score."
+                  }
+                  style={btn(kbReady && !running && !bulkDeleting, '#2563eb')}
+                >
+                  {running
+                    ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+                    : <Play size={12} aria-hidden="true" />}
+                  {running ? 'Running…' : `Run selected (${selectedCount})`}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleDeleteSelected}
@@ -403,7 +465,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         </div>
       ) : visible.length === 0 ? (
         <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
-          No {FILTER_LABELS[filter].toLowerCase()} test queries.
+          No {FILTER_LABELS[filter].toLowerCase()} test queries{search.trim() ? ` match “${search.trim()}”` : ''}.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -444,7 +506,21 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                     <User size={13} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: '#e5e5e5', marginBottom: 4 }}>{q.query}</div>
+                    <div style={{ fontSize: 12, color: '#e5e5e5', marginBottom: 4 }}>
+                      {q.external_id && (
+                        <code
+                          title="Question ID — assigned once and kept across validation runs and exports; regenerating creates new IDs"
+                          style={{
+                            fontSize: 10, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+                            padding: '1px 5px', borderRadius: 4, marginRight: 8, whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {q.external_id}
+                        </code>
+                      )}
+                      {q.query}
+                    </div>
                     {q.expected_answer && (
                       <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>
                         <span style={{ color: '#666' }}>Expected: </span>{q.expected_answer}
@@ -456,8 +532,12 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                       </div>
                     )}
                     <div style={{ display: 'flex', gap: 8, fontSize: 10, color: '#666', marginTop: 4, flexWrap: 'wrap' }}>
-                      {q.external_id && <span>· ID: {q.external_id}</span>}
                       {q.category && <span>· {q.category}</span>}
+                      {q.import_batch_label && (
+                        <span title={q.import_batch_at ? `Imported ${new Date(q.import_batch_at).toLocaleString()}` : undefined}>
+                          · imported from {q.import_batch_label}
+                        </span>
+                      )}
                       {q.expected_source_labels.length > 0 && (
                         <span>· sources: {q.expected_source_labels.join(', ')}</span>
                       )}

@@ -19,6 +19,7 @@ from app.schemas.documents import (
 )
 from app.services import document_usage as document_usage_service
 from app.services import file_service
+from app.services import knowledge_service
 
 router = APIRouter()
 
@@ -210,7 +211,14 @@ async def sheet_json(
     """Return evaluated rows for an .xlsx file so the viewer can render
     formula results instead of blank cells when Excel didn't cache them.
     """
-    result = await file_service.render_xlsx_sheets(doc_uuid, settings, user=user)
+    from app.services.document_readers import DocumentReadError
+
+    try:
+        result = await file_service.render_xlsx_sheets(doc_uuid, settings, user=user)
+    except DocumentReadError as e:
+        # The file is readable but is not a spreadsheet's text (a binary
+        # named .csv). The message is user-facing; the viewer shows it.
+        raise HTTPException(status_code=422, detail=str(e)) from e
     if result is None:
         raise HTTPException(status_code=404, detail="Sheet rendering not available")
     return result
@@ -232,13 +240,21 @@ async def usage(
 @router.delete("/{doc_uuid}")
 async def delete(
     doc_uuid: str,
+    remove_from_knowledge_bases: bool = Query(False),
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
+    """Delete a document. Knowledge-base sources built from it keep their
+    ingested copy — and keep answering — unless ``remove_from_knowledge_bases``
+    is set, in which case they are removed from every KB the caller manages;
+    the KBs that still hold a copy come back as ``knowledge_bases_kept``."""
     ok = await file_service.delete_document(doc_uuid, settings, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
-    return {"ok": True}
+    if not remove_from_knowledge_bases:
+        return {"ok": True}
+    removed, kept = await knowledge_service.remove_document_from_knowledge_bases(doc_uuid, user)
+    return {"ok": True, "knowledge_bases_removed": removed, "knowledge_bases_kept": kept}
 
 
 @router.patch("/rename")

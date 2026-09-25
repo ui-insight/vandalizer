@@ -150,6 +150,14 @@ class WorkflowResult(Document):
     current_step_preview: Optional[str] = None
     trigger_type: Optional[str] = None
     is_passive: bool = False
+    # The automation (stringified ObjectId) and trigger event that produced a
+    # passive run, recorded at insert so the stale-run reaper can bell the
+    # person who set the schedule rather than whoever owns the workflow
+    # (#835). None on manual runs and on passive runs written before these
+    # fields existed — the reaper then falls back to input_context, where
+    # the trigger context (and its automation_id) has always been copied.
+    automation_id: Optional[str] = None
+    trigger_event_id: Optional[str] = None
     input_context: Optional[dict] = None
     # Approval workflow fields
     paused_at_step_index: Optional[int] = None

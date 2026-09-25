@@ -39,13 +39,13 @@ export function AuthPanel({
 
   // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
-  const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
+  const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '', jit_provisioning: true })
   // Holds the id of the provider being edited (never a list index/position)
   // — delete and edit are both reachable at once, so a position could drift
   // out from under an open form the moment another delete reshuffles the
   // list. See handleUpdateProvider.
   const [editingProviderId, setEditingProviderId] = useState<string | null>(null)
-  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
+  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '', jit_provisioning: true })
   const [samlMeta, setSamlMeta] = useState('')
   const [samlMetaBusy, setSamlMetaBusy] = useState(false)
   const [samlMetaError, setSamlMetaError] = useState('')
@@ -98,11 +98,11 @@ export function AuthPanel({
     if (validationError) { setProviderError(validationError); return }
     setProviderError('')
     try {
-      await addOAuthProvider(newProvider as unknown as Record<string, string>)
+      await addOAuthProvider(newProvider as unknown as Record<string, unknown>)
       // Refresh config
       const c = await getSystemConfig()
       onConfigReplace(c)
-      setNewProvider({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
+      setNewProvider({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '', jit_provisioning: true })
       setSamlMeta('')
       setShowAddProvider(false)
     } catch (e) {
@@ -158,6 +158,8 @@ export function AuthPanel({
       idp_entity_id: (p.idp_entity_id as string) || '',
       idp_sso_url: (p.idp_sso_url as string) || '',
       idp_x509_cert: (p.idp_x509_cert as string) || '',
+      // Absent on providers saved before the field existed = enabled.
+      jit_provisioning: p.jit_provisioning !== false,
     })
     setShowAddProvider(false)
   }
@@ -176,7 +178,7 @@ export function AuthPanel({
     }
     setProviderError('')
     try {
-      await updateOAuthProvider(editingProviderId, editingProvider as unknown as Record<string, string>)
+      await updateOAuthProvider(editingProviderId, editingProvider as unknown as Record<string, unknown>)
       const c = await getSystemConfig()
       onConfigReplace(c)
       setEditingProviderId(null)
@@ -348,6 +350,21 @@ export function AuthPanel({
                             </div>
                           </>
                         )}
+                        <div style={{ gridColumn: '1 / -1' }}>
+                          <label htmlFor={`admin-oauth-edit-${i}-jit`} style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                            <input
+                              id={`admin-oauth-edit-${i}-jit`}
+                              type="checkbox"
+                              checked={editingProvider.jit_provisioning}
+                              onChange={e => setEditingProvider({ ...editingProvider, jit_provisioning: e.target.checked })}
+                              style={checkStyle}
+                            />
+                            Create accounts on first sign-in (JIT provisioning)
+                          </label>
+                          <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, marginLeft: 24 }}>
+                            When off, sign-in is denied for users that don't already exist.
+                          </div>
+                        </div>
                       </div>
                       {providerError && (
                         <div role="alert" style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#b91c1c', fontSize: 13 }}>
@@ -467,6 +484,21 @@ export function AuthPanel({
                     </div>
                   </>
                 )}
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label htmlFor="admin-oauth-new-jit" style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                    <input
+                      id="admin-oauth-new-jit"
+                      type="checkbox"
+                      checked={newProvider.jit_provisioning}
+                      onChange={e => setNewProvider({ ...newProvider, jit_provisioning: e.target.checked })}
+                      style={checkStyle}
+                    />
+                    Create accounts on first sign-in (JIT provisioning)
+                  </label>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2, marginLeft: 24 }}>
+                    When off, sign-in is denied for users that don't already exist.
+                  </div>
+                </div>
               </div>
               {providerError && (
                 <div role="alert" style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#b91c1c', fontSize: 13 }}>

@@ -1,11 +1,12 @@
 import { useImperativeHandle, useState, type Ref } from 'react'
 import {
   Cpu, Plus, Trash2, Pencil, RefreshCw,
-  CheckCircle2, XCircle, ChevronDown, ChevronUp, Play, AlertCircle, Star,
+  CheckCircle2, XCircle, ChevronDown, ChevronUp, Play, Star,
 } from 'lucide-react'
+import { DiagnosticsPanel, type DiagnosticFact } from './DiagnosticsPanel'
 import { useConfirm } from '../../shared/useConfirm'
 import {
-  addModel, updateModel, deleteModel, setDefaultModel, setLongDocumentModel, testModel, probeModel,
+  addModel, updateModel, deleteModel, setDefaultModel, setLongDocumentModel, setValidationJudgeModel, testModel, probeModel,
 } from '../../../api/admin'
 import type { ModelTestResult, SystemConfigData } from '../../../api/admin'
 import { ModelCharacterBars } from '../../ModelEffortPicker'
@@ -17,93 +18,25 @@ import { sectionStyle, sectionHeaderStyle, sectionBodyStyle, labelStyle, inputSt
 // Model connectivity diagnostics
 // ──────────────────────────────────────────
 
-// Renders the step-by-step result of a model "Test" — on success, why the
-// hook-up is healthy (protocol, endpoint, latency, tokens, the actual reply);
-// on failure, a classified error with a plain-English cause and suggested fix.
+// Maps a model test result onto the shared diagnostics layout, which the OCR
+// test renders through as well — same question, same shape of answer.
 function ModelTestDiagnostics({ result }: { result: ModelTestResult }) {
-  const [showRaw, setShowRaw] = useState(false)
-  const accent = result.ok ? '#16a34a' : '#dc2626'
+  const facts: DiagnosticFact[] = []
+  if (result.protocol) facts.push({ label: 'Protocol', value: result.protocol })
+  if (result.endpoint) facts.push({ label: 'Endpoint', value: result.endpoint, mono: true })
+  if (typeof result.latency_ms === 'number') facts.push({ label: 'Latency', value: `${result.latency_ms} ms` })
+  if (result.tokens?.total != null) facts.push({ label: 'Tokens', value: String(result.tokens.total) })
   return (
-    <div style={{
-      padding: '12px 16px', fontSize: 13,
-      background: result.ok ? '#f0fdf4' : '#fef2f2',
-      border: '1px solid', borderTop: 'none',
-      borderColor: result.ok ? '#bbf7d0' : '#fecaca',
-      borderRadius: '0 0 var(--ui-radius, 12px) var(--ui-radius, 12px)',
-    }}>
-      <div style={{ fontWeight: 600, color: result.ok ? '#166534' : '#991b1b', marginBottom: 10 }}>
-        {result.summary}
-      </div>
-
-      {/* Step-by-step checks */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        {result.checks.map((c, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-            {c.ok
-              ? <CheckCircle2 size={15} style={{ color: '#16a34a', flexShrink: 0, marginTop: 1 }} />
-              : <XCircle size={15} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />}
-            <span style={{ color: '#374151' }}>
-              <span style={{ fontWeight: 600 }}>{c.label}:</span> {c.detail}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* Success facts */}
-      {result.ok && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-          {result.protocol && <DiagFact label="Protocol" value={result.protocol} />}
-          {result.endpoint && <DiagFact label="Endpoint" value={result.endpoint} mono />}
-          {typeof result.latency_ms === 'number' && <DiagFact label="Latency" value={`${result.latency_ms} ms`} />}
-          {result.tokens?.total != null && <DiagFact label="Tokens" value={String(result.tokens.total)} />}
-        </div>
-      )}
-      {result.ok && result.response_preview && (
-        <div style={{ marginTop: 10, padding: '8px 10px', background: '#fff', border: '1px solid #d1fae5', borderRadius: 8, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#374151' }}>
-          <span style={{ color: '#9ca3af' }}>reply:</span> {result.response_preview}
-        </div>
-      )}
-
-      {/* Failure guidance */}
-      {!result.ok && result.error && (
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <AlertCircle size={15} style={{ color: accent, flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <div style={{ fontWeight: 600, color: '#991b1b' }}>{result.error.title}</div>
-              <div style={{ color: '#374151', marginTop: 2 }}>{result.error.why}</div>
-            </div>
-          </div>
-          <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, color: '#374151' }}>
-            <span style={{ fontWeight: 600, color: '#b91c1c' }}>Try this: </span>{result.error.fix}
-          </div>
-          {result.error.raw && (
-            <div>
-              <button
-                onClick={() => setShowRaw(v => !v)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              >
-                {showRaw ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {showRaw ? 'Hide' : 'Show'} raw provider error
-              </button>
-              {showRaw && (
-                <pre style={{ marginTop: 6, padding: '8px 10px', background: '#1f2937', color: '#f9fafb', borderRadius: 8, fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {result.error.raw}
-                </pre>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DiagFact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 9999, fontSize: 12 }}>
-      <span style={{ color: '#9ca3af', fontWeight: 600 }}>{label}</span>
-      <span style={{ color: '#374151', fontFamily: mono ? 'ui-monospace, monospace' : undefined }}>{value}</span>
-    </span>
+    <DiagnosticsPanel
+      ok={result.ok}
+      summary={result.summary}
+      checks={result.checks}
+      facts={facts}
+      preview={result.response_preview}
+      previewLabel="reply"
+      error={result.error}
+      rawLabel="raw provider error"
+    />
   )
 }
 
@@ -269,8 +202,12 @@ export interface ModelEditorProps {
   /** Model to fall back to when a request won't fit the chosen one. Empty
    *  disables routing. */
   longDocumentModel?: string
+  /** Model that grades every validation run. Empty = the default model. */
+  validationJudgeModel?: string
   /** Merge a model-list / default-model change back into the parent's config. */
-  onConfigPatch: (patch: { available_models?: ModelList; default_model?: string; long_document_model?: string }) => void
+  onConfigPatch: (patch: {
+    available_models?: ModelList; default_model?: string; long_document_model?: string; validation_judge_model?: string
+  }) => void
   /** Re-grade the setup checklist after a change that can affect readiness. */
   onReadinessChange: () => void
   /** The tab-level error banner is shared with the parent; the wizard also
@@ -281,7 +218,7 @@ export interface ModelEditorProps {
 }
 
 export function ModelEditor({
-  models, defaultModel, longDocumentModel = '', onConfigPatch, onReadinessChange, error, onError, ref,
+  models, defaultModel, longDocumentModel = '', validationJudgeModel = '', onConfigPatch, onReadinessChange, error, onError, ref,
 }: ModelEditorProps) {
   const confirm = useConfirm()
 
@@ -737,6 +674,37 @@ export function ModelEditor({
             </select>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
               When a document is too large for the chosen model, answer with this one instead of trimming the middle out. Pick a model with a large context window. Routing never moves a request to a model with weaker privacy, and the answer says which model was used.
+            </div>
+          </div>
+        )}
+
+        {models.length > 0 && (
+          <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
+            <label htmlFor="admin-validation-judge-model" style={{ fontSize: 13, fontWeight: 600, display: 'block', marginBottom: 6 }}>
+              Validation grader
+            </label>
+            <select
+              id="admin-validation-judge-model"
+              value={validationJudgeModel}
+              onChange={async e => {
+                const name = e.target.value
+                try {
+                  const res = await setValidationJudgeModel(name)
+                  onConfigPatch({ validation_judge_model: res.validation_judge_model ?? name })
+                  onError(null)
+                } catch (err) {
+                  onError(err instanceof Error ? err.message : String(err))
+                }
+              }}
+              style={{ padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, maxWidth: 320 }}
+            >
+              <option value="">Default model{defaultModel ? ` (${defaultModel})` : ''}</option>
+              {models.map(m => (
+                <option key={m.id} value={m.name}>{m.name}</option>
+              ))}
+            </select>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+              The model that grades every knowledge-base validation run, whoever starts it. Scores are only comparable when the same model graded them, so change this rarely; History marks where the grader changed.
             </div>
           </div>
         )}

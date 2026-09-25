@@ -62,24 +62,46 @@ class TestReapStaleRunning:
     mark every review left overnight as a timeout and fail the run's activity.
     """
 
-    def _reap(self, pending_uuids=(), bell_rows=(), claim_modified=1):
-        """Run the task and return (elapsed_time_query, decided_review_query)."""
+    # A stale extraction row is the default candidate so the elapsed-time
+    # flip has something to write and both sweeps issue an update_many, as
+    # they always did.
+    _DEFAULT_CANDIDATES = ({"_id": "ss-row", "type": "search_set_run"},)
+
+    def _reap(self, pending_uuids=(), bell_rows=(), claim_modified=1,
+              candidates=_DEFAULT_CANDIDATES, runs=()):
+        """Run the task and return (elapsed_time_query, decided_review_query).
+
+        The elapsed-time sweep is now a find (candidates) followed by a
+        guarded update_many on the rows that survive the heartbeat check;
+        the query returned is the find's, which carries the predicates.
+        """
         import app.tasks.activity_tasks as at
 
         db = MagicMock()
-        db.activity_event.find.return_value = list(bell_rows)
+        # First find: stale candidates. Second: the bell sweep.
+        db.activity_event.find.side_effect = [list(candidates), list(bell_rows)]
         db.activity_event.update_many.return_value = MagicMock(modified_count=0)
         db.activity_event.update_one.return_value = MagicMock(modified_count=claim_modified)
         db.approval_request.find.return_value = [{"uuid": u} for u in pending_uuids]
+        db.workflow_result.find.return_value = list(runs)
         with patch.object(at, "_get_db", return_value=db), \
              patch.object(at, "_resolve_stale_threshold_minutes", return_value=30), \
              patch("app.services.failure_notifications.notify_extraction_failed") as notify:
             at.reap_stale_running_task()
         self.last_db = db
         self.last_notify = notify
+        elapsed = db.activity_event.find.call_args_list[0][0][0]
         calls = db.activity_event.update_many.call_args_list
         assert len(calls) == 2, f"expected two sweeps, got {len(calls)}"
-        return calls[0][0][0], calls[1][0][0]
+        return elapsed, calls[1][0][0]
+
+    def _flipped_ids(self):
+        """Ids the elapsed-time sweep flipped (first update_many), or []."""
+        calls = self.last_db.activity_event.update_many.call_args_list
+        first = calls[0][0][0]
+        if "_id" not in first:
+            return []
+        return first["_id"]["$in"]
 
     def test_skips_runs_awaiting_approval(self):
         elapsed, _ = self._reap()
@@ -118,14 +140,14 @@ class TestReapStaleRunning:
         import app.tasks.activity_tasks as at
 
         db = MagicMock()
-        db.activity_event.find.return_value = []
+        db.activity_event.find.side_effect = [[], []]
         db.activity_event.update_many.return_value = MagicMock(modified_count=0)
         db.approval_request.find.return_value = []
         with patch.object(at, "_get_db", return_value=db), \
              patch.object(at, "_resolve_stale_threshold_minutes", return_value=30):
             at.reap_stale_running_task()
 
-        update = db.activity_event.update_many.call_args_list[1][0][1]
+        update = db.activity_event.update_many.call_args_list[-1][0][1]
         assert update["$unset"] == {"meta_summary.pending_review_uuid": ""}
         assert update["$set"]["status"] == "failed"
 
@@ -142,7 +164,7 @@ class TestReapStaleRunning:
         no mid-run progress, so a fresh flip may just be a slow run — and an
         atomic claim keeps overlapping ticks from double-ringing."""
         self._reap(bell_rows=[{
-            "_id": "a1", "user_id": "u1",
+            "_id": "a1", "type": "search_set_run", "user_id": "u1",
             "search_set_uuid": "ss-1", "title": "Award terms",
         }])
         self.last_notify.assert_called_once()
@@ -157,7 +179,7 @@ class TestReapStaleRunning:
 
     def test_a_lost_claim_race_means_no_bell(self):
         self._reap(
-            bell_rows=[{"_id": "a1", "user_id": "u1",
+            bell_rows=[{"_id": "a1", "type": "search_set_run", "user_id": "u1",
                         "search_set_uuid": "ss-1", "title": "T"}],
             claim_modified=0,
         )
@@ -173,13 +195,163 @@ class TestReapStaleRunning:
         self._reap()
         self.last_notify.assert_not_called()
         find_filter = self.last_db.activity_event.find.call_args[0][0]
-        assert find_filter["type"] == "search_set_run"
+        assert find_filter["type"] == {"$in": ["search_set_run"]}
         assert find_filter["status"] == "failed"
         assert find_filter["meta_summary.reap_notified"] == {"$ne": True}
         cutoff = find_filter["meta_summary.reaper_flipped_at"]["$lte"]
         import datetime as dt
         age = dt.datetime.now(dt.timezone.utc) - cutoff
         assert abs(age.total_seconds() - at._EXTRACTION_BELL_DELAY_SECONDS) < 5
+
+    # --- one clock for workflow runs (#835 item 3) -------------------------
+
+    def _stale_workflow_row(self, **over):
+        row = {
+            "_id": "rail-1", "type": "workflow_run",
+            "workflow_result": ObjectId(), "workflow_session_id": "sess-1",
+        }
+        row.update(over)
+        return row
+
+    def test_a_workflow_rail_row_whose_run_heartbeated_recently_is_left_running(self):
+        """The rail row's clock said stale; the run's said alive one minute
+        ago. The run's last_progress_at is the authoritative clock and the
+        rail follows it — otherwise the rail read "failed" while the run
+        (and the SSE poller) carried on, for up to the run reaper's 2h."""
+        import datetime as dt
+
+        row = self._stale_workflow_row()
+        run = {
+            "_id": row["workflow_result"], "session_id": "sess-1",
+            "status": "running",
+            "last_progress_at": dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1),
+        }
+        self._reap(candidates=[row, *self._DEFAULT_CANDIDATES], runs=[run])
+        assert "rail-1" not in self._flipped_ids()
+        # The run lookup was one batched query over the rail rows' links.
+        link = self.last_db.workflow_result.find.call_args[0][0]["$or"]
+        assert {"_id": {"$in": [row["workflow_result"]]}} in link
+        assert {"session_id": {"$in": ["sess-1"]}} in link
+
+    def test_a_workflow_rail_row_whose_run_is_also_silent_is_flipped(self):
+        import datetime as dt
+
+        row = self._stale_workflow_row()
+        run = {
+            "_id": row["workflow_result"], "session_id": "sess-1",
+            "status": "running",
+            # pymongo hands back naive datetimes; the comparison must cope.
+            "last_progress_at": (
+                dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=3)
+            ).replace(tzinfo=None),
+        }
+        self._reap(candidates=[row], runs=[run])
+        assert self._flipped_ids() == ["rail-1"]
+        # ...but never belled from here: the run reaper owns that bell.
+        self.last_notify.assert_not_called()
+
+    def test_a_workflow_rail_row_with_no_linked_run_is_flipped_as_before(self):
+        self._reap(candidates=[self._stale_workflow_row()], runs=[])
+        assert self._flipped_ids() == ["rail-1"]
+
+    def test_a_workflow_rail_row_whose_run_is_parked_on_approval_is_left_alone(self):
+        """pending_approval is the run reaper's to decide (approved but never
+        resumed); the rail must not pre-empt it."""
+        row = self._stale_workflow_row()
+        run = {"_id": row["workflow_result"], "session_id": "sess-1",
+               "status": "pending_approval", "last_progress_at": None}
+        self._reap(candidates=[row, *self._DEFAULT_CANDIDATES], runs=[run])
+        assert "rail-1" not in self._flipped_ids()
+
+    def test_a_stale_extraction_row_is_still_flipped(self):
+        """Non-workflow rows have one clock and keep today's behaviour."""
+        self._reap(candidates=[{"_id": "ss-row", "type": "search_set_run"}])
+        assert self._flipped_ids() == ["ss-row"]
+        flip = self.last_db.activity_event.update_many.call_args_list[0][0]
+        # The write keeps the status guard: a row that completed between the
+        # find and the flip is left alone.
+        assert flip[0]["status"] == {"$in": ["running", "queued"]}
+        assert flip[1]["$set"]["status"] == "failed"
+
+    def test_nothing_stale_means_no_flip_write(self):
+        import app.tasks.activity_tasks as at
+
+        db = MagicMock()
+        db.activity_event.find.side_effect = [[], []]
+        db.activity_event.update_many.return_value = MagicMock(modified_count=0)
+        db.approval_request.find.return_value = []
+        with patch.object(at, "_get_db", return_value=db), \
+             patch.object(at, "_resolve_stale_threshold_minutes", return_value=30):
+            at.reap_stale_running_task()
+        # Only the decided-review sweep wrote; the elapsed sweep had no rows.
+        assert db.activity_event.update_many.call_count == 1
+        db.workflow_result.find.assert_not_called()
+
+
+class TestReapBellContract:
+    """Which activity types ring a bell when a reaper fails them used to live
+    in comments. It is a decision about disclosure, so it is now a map every
+    enum member must appear in — a new type fails here until someone decides.
+    """
+
+    def test_every_activity_type_has_a_bell_owner_entry(self):
+        import app.tasks.activity_tasks as at
+        from app.models.activity import ActivityType
+
+        missing = [t.value for t in ActivityType if t.value not in at.REAP_BELL_OWNERS]
+        assert not missing, (
+            f"ActivityType member(s) {missing} have no REAP_BELL_OWNERS entry. "
+            "Decide: a callable (this reaper bells it), OWNED_ELSEWHERE, or None."
+        )
+        # And nothing in the map that is not an activity type (a typo would
+        # silently bell nothing).
+        known = {t.value for t in ActivityType}
+        assert set(at.REAP_BELL_OWNERS) <= known
+
+    def test_the_contract_matches_the_two_reapers(self):
+        import app.tasks.activity_tasks as at
+
+        assert at.REAP_BELL_OWNERS["search_set_run"] is at._bell_reaped_extraction
+        assert at.REAP_BELL_OWNERS["workflow_run"] is at.OWNED_ELSEWHERE
+        assert at.REAP_BELL_OWNERS["conversation"] is None
+
+    def test_the_extraction_bell_still_fires_exactly_once_through_the_map(self):
+        import app.tasks.activity_tasks as at
+
+        db = MagicMock()
+        db.activity_event.find.side_effect = [[], [{
+            "_id": "a1", "type": "search_set_run", "user_id": "u1",
+            "search_set_uuid": "ss-1", "title": "Award terms",
+        }]]
+        db.activity_event.update_many.return_value = MagicMock(modified_count=0)
+        db.activity_event.update_one.return_value = MagicMock(modified_count=1)
+        db.approval_request.find.return_value = []
+        with patch.object(at, "_get_db", return_value=db), \
+             patch.object(at, "_resolve_stale_threshold_minutes", return_value=30), \
+             patch("app.services.failure_notifications.notify_extraction_failed") as notify:
+            at.reap_stale_running_task()
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["user_id"] == "u1"
+        assert notify.call_args.kwargs["search_set_uuid"] == "ss-1"
+
+    def test_a_row_of_a_silent_type_in_the_bell_sweep_is_not_belled(self):
+        """Defensive: even if a silent-type row reached the loop, the map is
+        consulted per row, not just in the query."""
+        import app.tasks.activity_tasks as at
+
+        db = MagicMock()
+        db.activity_event.find.side_effect = [[], [{
+            "_id": "c1", "type": "conversation", "user_id": "u1",
+        }]]
+        db.activity_event.update_many.return_value = MagicMock(modified_count=0)
+        db.activity_event.update_one.return_value = MagicMock(modified_count=1)
+        db.approval_request.find.return_value = []
+        with patch.object(at, "_get_db", return_value=db), \
+             patch.object(at, "_resolve_stale_threshold_minutes", return_value=30), \
+             patch("app.services.failure_notifications.notify_extraction_failed") as notify:
+            at.reap_stale_running_task()
+        notify.assert_not_called()
+        db.activity_event.update_one.assert_not_called()
 
 
 class TestReapStaleWorkflowRuns:
@@ -189,7 +361,8 @@ class TestReapStaleWorkflowRuns:
     History spun indefinitely. This reaper is the backstop.
     """
 
-    def _reap(self, stuck=(), parked=(), approved_old=(), flip_modified=1):
+    def _reap(self, stuck=(), parked=(), approved_old=(), flip_modified=1,
+              automation=None):
         import app.tasks.activity_tasks as at
 
         db = MagicMock()
@@ -204,6 +377,7 @@ class TestReapStaleWorkflowRuns:
         # to the server).
         db.approval_request.find.return_value = [{"uuid": u} for u in approved_old]
         db.workflow.find_one.return_value = {"name": "WF", "user_id": "owner"}
+        db.automation.find_one.return_value = automation
         with patch.object(at, "_get_db", return_value=db), \
              patch("app.services.failure_notifications.notify_workflow_failed") as notify:
             at.reap_stale_workflow_runs_task()
@@ -328,6 +502,97 @@ class TestReapStaleWorkflowRuns:
         assert looked_up == wf_id
         notify.assert_called_once()
 
+    # --- passive runs bell the automation owner (#835 item 5) --------------
+
+    def test_a_reaped_passive_run_bells_the_automation_owner(self):
+        """A scheduled automation has no one watching it, and the person who
+        set the schedule need not own the workflow. Before, the reaper told
+        the workflow owner "Workflow failed" and the scheduler heard nothing."""
+        auto_id = ObjectId()
+        run = self._run(is_passive=True, trigger_type="schedule",
+                        automation_id=str(auto_id))
+        # Passive runs have no rail row.
+        db, notify = self._reap(
+            stuck=[run],
+            automation={"_id": auto_id, "user_id": "scheduler", "name": "Nightly awards"},
+        )
+        db.activity_event.find_one_and_update.return_value = None
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        assert kwargs["user_id"] == "scheduler"
+        assert kwargs["automation_name"] == "Nightly awards"
+        assert db.automation.find_one.call_args[0][0] == {"_id": auto_id}
+
+    def test_the_automation_title_reaches_the_notification(self):
+        """End to end through the real notifier: the bell reads
+        "Automation failed: <name>", not "Workflow failed"."""
+        import app.tasks.activity_tasks as at
+
+        auto_id = ObjectId()
+        run = self._run(is_passive=True, automation_id=str(auto_id))
+        db = MagicMock()
+        db.workflow_result.find.side_effect = [[run], []]
+        db.workflow_result.update_one.return_value = MagicMock(modified_count=1)
+        db.activity_event.find_one_and_update.return_value = None
+        db.activity_event.find_one.return_value = None
+        db.approval_request.find.return_value = []
+        db.workflow.find_one.return_value = {"_id": run["workflow"], "name": "WF", "user_id": "owner"}
+        db.automation.find_one.return_value = {
+            "_id": auto_id, "user_id": "scheduler", "name": "Nightly awards",
+        }
+        with patch.object(at, "_get_db", return_value=db), \
+             patch("app.services.failure_notifications.create_notification_sync") as create:
+            at.reap_stale_workflow_runs_task()
+        create.assert_called_once()
+        assert create.call_args.kwargs["user_id"] == "scheduler"
+        assert create.call_args.kwargs["title"] == "Automation failed: Nightly awards"
+
+    def test_a_legacy_passive_run_resolves_its_automation_from_input_context(self):
+        """Runs written before WorkflowResult.automation_id existed carry the
+        trigger context (and its automation_id) in input_context."""
+        auto_id = ObjectId()
+        run = self._run(is_passive=True, input_context={"automation_id": str(auto_id)})
+        db, notify = self._reap(
+            stuck=[run],
+            automation={"_id": auto_id, "user_id": "scheduler", "name": "Nightly"},
+        )
+        assert notify.call_args.kwargs["user_id"] == "scheduler"
+        assert notify.call_args.kwargs["automation_name"] == "Nightly"
+
+    def test_a_passive_run_without_an_automation_still_bells_the_workflow_owner(self):
+        run = self._run(is_passive=True, trigger_type="folder_watch")
+        db, notify = self._reap(stuck=[run])
+        db.automation.find_one.assert_not_called()
+        notify.assert_called_once()
+        kwargs = notify.call_args.kwargs
+        assert "automation_name" not in kwargs
+        # Today's behaviour: rail user (or, inside the notifier, the workflow
+        # owner) — never a made-up recipient.
+        assert kwargs["user_id"] == "runner"
+
+    def test_a_passive_run_whose_automation_was_deleted_falls_back(self):
+        run = self._run(is_passive=True, automation_id=str(ObjectId()))
+        db, notify = self._reap(stuck=[run], automation=None)
+        db.automation.find_one.assert_called_once()
+        assert "automation_name" not in notify.call_args.kwargs
+
+    def test_a_manual_run_never_looks_up_an_automation(self):
+        db, notify = self._reap(stuck=[self._run()])
+        db.automation.find_one.assert_not_called()
+        assert "automation_name" not in notify.call_args.kwargs
+
+    def test_automation_lookups_are_cached_per_sweep(self):
+        auto_id = ObjectId()
+        runs = [
+            self._run(is_passive=True, automation_id=str(auto_id)),
+            self._run(is_passive=True, automation_id=str(auto_id)),
+        ]
+        db, notify = self._reap(
+            stuck=runs, automation={"_id": auto_id, "user_id": "s", "name": "N"},
+        )
+        assert notify.call_count == 2
+        db.automation.find_one.assert_called_once()
+
 
 class TestWorkflowTasksAckLate:
     """Workers ack on delivery by default, so a worker death loses the message
@@ -412,7 +677,7 @@ class TestWorkflowTasksAckLate:
         db.user.find_one.return_value = None
         db.workflow_result.update_one.return_value = MagicMock(matched_count=0)
         with patch.object(wt, "_get_db", return_value=db), \
-             patch.object(wt, "_build_steps_data", return_value=([], [])):
+             patch.object(wt, "build_steps_data", return_value=([], [])):
             out = wt.resume_workflow_after_approval("ap-1")
         assert out["status"] == "canceled"
         resumed_filter = db.workflow_result.update_one.call_args[0][0]

@@ -305,12 +305,34 @@ def notify_kb_source_failed(db, *, kb_uuid: str, source_name: str | None, error:
         logger.exception("Failed to emit KB source failure notification")
 
 
-def notify_project_kb_sync_failed(db, *, doc: dict | None, project: dict | None, error: Any) -> None:
-    """Notify the owner that a document never reached its project's KB.
+def notify_project_kb_sync_failed(
+    db,
+    *,
+    doc: dict | None,
+    project: dict | None,
+    error: Any,
+    failed_at: str = "insert",
+) -> None:
+    """Notify the owner that a document is not indexed as its project's KB says.
 
     The mirror into a project's implicit knowledge base is best-effort by
-    design, but its failure means "chat with this project" silently cannot
-    see a file the user just watched land in the project — worth a bell.
+    design, but its failure means "chat with this project" silently answers
+    from something other than the document the user is looking at — worth a
+    bell.
+
+    ``failed_at`` names which of the mirror's three failures happened, because
+    each leaves a different state and only one of them is the one this
+    notification used to describe:
+
+    - ``"insert"`` — a document that had never been indexed did not get in.
+      Nothing was there before and nothing is there now.
+    - ``"replace"`` — a refresh deleted the previously indexed chunks and the
+      new ones did not land, so the project can no longer answer from this
+      document at all.
+    - ``"delete"`` — a refresh could not delete the previously indexed chunks,
+      so nothing changed and the project still answers from the superseded
+      extraction. The opposite of ``"replace"``, and the case it would be worst
+      to describe as either of the other two.
     """
     try:
         doc = doc or {}
@@ -322,16 +344,33 @@ def notify_project_kb_sync_failed(db, *, doc: dict | None, project: dict | None,
         project_title = project.get("title") or "your project"
         project_uuid = project.get("uuid") or ""
 
+        if failed_at == "delete":
+            body = (
+                f"\u201c{doc_title}\u201d could not be re-indexed after it changed. "
+                "Its previously indexed copy could not be removed, so the project "
+                "may still answer from the older text until this is fixed; use "
+                f"Retry extraction on the document to index it again. {_snippet(error)}"
+            )
+        elif failed_at == "replace":
+            body = (
+                f"\u201c{doc_title}\u201d could not be re-indexed after it changed. "
+                "Its previously indexed copy was removed from the project and "
+                "could not be replaced; use Retry extraction on the document to "
+                f"index it again. {_snippet(error)}"
+            )
+        else:
+            body = (
+                f"\u201c{doc_title}\u201d was saved, but could not be added to the "
+                "project's knowledge base \u2014 chatting with this project will not "
+                f"see it. {_snippet(error)}"
+            )
+
         create_notification_sync(
             db,
             user_id=recipient,
             kind="project_kb_sync_failed",
             title=f"Document not searchable in project: {project_title}",
-            body=(
-                f"\u201c{doc_title}\u201d was saved, but could not be added to the "
-                "project's knowledge base \u2014 chatting with this project will not "
-                f"see it. {_snippet(error)}"
-            ),
+            body=body,
             link=f"/?project={project_uuid}" if project_uuid else "/",
             item_kind="project",
             item_id=project_uuid or None,

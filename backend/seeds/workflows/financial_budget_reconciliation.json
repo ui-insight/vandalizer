@@ -7,7 +7,7 @@
     "seed_id": "wf-financial-budget-reconciliation",
     "display_name": "Budget Reconciliation",
     "description": "Compares a financial report against the original budget, identifying variances and flagging categories that need sponsor approval for rebudgeting.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "financial"
     ]

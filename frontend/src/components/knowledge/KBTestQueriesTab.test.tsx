@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import { KBTestQueriesTab, chunkForBulkDelete, BULK_DELETE_BATCH } from './KBTestQueriesTab'
+import { KBTestQueriesTab, chunkForBulkDelete, BULK_DELETE_BATCH, matchesSearch } from './KBTestQueriesTab'
 import type { KBTestQuery } from '../../api/knowledge'
 
 const bulkDeleteKBTestQueries = vi.fn().mockResolvedValue({ deleted: 2 })
@@ -64,6 +64,36 @@ function renderTab(props: Partial<Parameters<typeof KBTestQueriesTab>[0]> = {}) 
   )
   return { onChange }
 }
+
+// Support ticket: selecting questions only offered deletion; evaluators want
+// to smoke-test a few and export just those from History.
+describe('KBTestQueriesTab run selected', () => {
+  it('runs exactly the selected queries', () => {
+    const onRunSelected = vi.fn()
+    renderTab({ onRunSelected })
+    fireEvent.click(screen.getByLabelText('Select test query: Generated question A?'))
+    fireEvent.click(screen.getByLabelText('Select test query: Generated question B?'))
+    fireEvent.click(screen.getByRole('button', { name: /Run selected \(2\)/ }))
+    expect(onRunSelected).toHaveBeenCalledWith(['q-2', 'q-3'])
+  })
+
+  it('is absent when the panel does not offer it', () => {
+    renderTab()
+    fireEvent.click(screen.getByLabelText('Select test query: Generated question A?'))
+    expect(screen.queryByRole('button', { name: /Run selected/ })).toBeNull()
+    expect(screen.getByRole('button', { name: /Delete selected \(1\)/ })).toBeInTheDocument()
+  })
+
+  it('disables the button while a run is in flight', () => {
+    const onRunSelected = vi.fn()
+    renderTab({ onRunSelected, running: true })
+    fireEvent.click(screen.getByLabelText('Select test query: Generated question A?'))
+    const button = screen.getByRole('button', { name: /Running…/ })
+    expect(button).toBeDisabled()
+    fireEvent.click(button)
+    expect(onRunSelected).not.toHaveBeenCalled()
+  })
+})
 
 // Support ticket: KBs accumulate hundreds of imported/auto-generated test
 // queries and the tab only offered row-by-row deletion.
@@ -188,5 +218,39 @@ describe('KBTestQueriesTab delete confirmation', () => {
     const { message } = confirmFn.mock.calls[0][0]
     expect(message).not.toMatch(/keep their own copy/i)
     expect(message).toMatch(/blank expected answer/i)
+  })
+})
+
+// Support ticket: auto-generated questions now carry the same columns as an
+// imported set (ID, category, source, notes) so a mixed set can be filtered
+// and tracked as one.
+describe('KBTestQueriesTab search', () => {
+  const WITH_IDS: KBTestQuery[] = [
+    { ...q('q-1', 'What is the deadline?', false), external_id: 'SUB-002', expected_source_labels: ['PAPPG Ch. 2'] },
+    { ...q('q-2', 'Who signs the budget?', true), external_id: 'FCOI-AUTO-Q001', category: 'factual',
+      notes: 'Auto-generated 2026-09-09 from Award Letter (quick coverage).' },
+    { ...q('q-3', 'List the reporting dates.', true), external_id: 'FCOI-AUTO-Q002', category: 'enumeration' },
+  ]
+
+  it('narrows the list by ID, source, category and notes', () => {
+    expect(WITH_IDS.filter(x => matchesSearch(x, 'auto-q00')).map(x => x.uuid)).toEqual(['q-2', 'q-3'])
+    expect(WITH_IDS.filter(x => matchesSearch(x, 'pappg')).map(x => x.uuid)).toEqual(['q-1'])
+    expect(WITH_IDS.filter(x => matchesSearch(x, 'enumeration')).map(x => x.uuid)).toEqual(['q-3'])
+    expect(WITH_IDS.filter(x => matchesSearch(x, 'award letter')).map(x => x.uuid)).toEqual(['q-2'])
+    expect(WITH_IDS.filter(x => matchesSearch(x, '   ')).length).toBe(3)
+  })
+
+  it('shows the ID on the card and filters the visible rows as the user types', () => {
+    renderTab({ queries: WITH_IDS })
+    expect(screen.getByText('FCOI-AUTO-Q001')).toBeInTheDocument()
+    expect(screen.getByText('SUB-002')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/Search test queries/), { target: { value: 'FCOI-AUTO-Q002' } })
+    expect(screen.getByText('List the reporting dates.')).toBeInTheDocument()
+    expect(screen.queryByText('What is the deadline?')).not.toBeInTheDocument()
+    expect(screen.queryByText('Who signs the budget?')).not.toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText(/Search test queries/), { target: { value: 'nothing-like-this' } })
+    expect(screen.getByText(/No all test queries match/)).toBeInTheDocument()
   })
 })

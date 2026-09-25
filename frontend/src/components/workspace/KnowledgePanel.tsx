@@ -1,21 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, Copy } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { describeSourceCurrency, formatCurrencyDateTime, shortHash } from '../knowledge/sourceCurrency'
+import { WebSourceRefreshBar } from '../knowledge/WebSourceRefreshBar'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useTeams } from '../../hooks/useTeams'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
+import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } from '../knowledge/kbSourceReprocess'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBGridView } from '../knowledge/KBGridView'
 import { KBValidationPanel } from '../knowledge/KBValidationPanel'
 import { KBSourceInspectorModal } from '../knowledge/KBSourceInspectorModal'
+import { sourceDisplayName } from '../knowledge/sourceName'
 import { KBExploreTab } from '../knowledge/KBExploreTab'
 import { CreateKBModal } from '../knowledge/CreateKBModal'
 import { KBTrustBanner } from '../knowledge/KBTrustBanner'
@@ -23,6 +27,7 @@ import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { ExplainerPill } from './AutomationsPanel'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
+import { ShareLabel } from '../../lib/catalogLabels'
 import { useConfirm } from '../shared/useConfirm'
 import { SharedKBDeleteDialog, type SharedKBDeleteChoice } from '../shared/SharedKBDeleteDialog'
 import { OptimizedBadge, VerifiedBadge } from '../knowledge/KBTrustBadges'
@@ -31,7 +36,7 @@ type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'mine', label: 'My KBs' },
   { key: 'team', label: 'Team' },
-  { key: 'explore', label: 'Explore' },
+  { key: 'explore', label: 'Everyone' },
 ]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
@@ -51,6 +56,7 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
 export function KnowledgePanel() {
   const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
+  const { teams, currentTeam } = useTeams()
   const { toast } = useToast()
   const { knowledgeBases, create, remove, transferToTeam, refresh } = useKnowledgeBases()
   const projectPins = useProjectPins(activeProjectUuid)
@@ -205,6 +211,29 @@ export function KnowledgePanel() {
     s => s.status === 'pending' || s.status === 'processing'
   )
   const inFlightCount = inFlightSources.length
+
+  // Sources the user reprocessed (or refreshed) here, followed until they
+  // settle so the outcome is announced — the row alone changes quietly.
+  const [reprocessing, setReprocessing] = useState<Record<string, TrackedReprocess>>({})
+  useEffect(() => { setReprocessing({}) }, [selectedKB?.uuid])
+  useEffect(() => {
+    if (!selectedKB || Object.keys(reprocessing).length === 0) return
+    const { remaining, settled } = settleReprocesses(reprocessing, selectedKB.sources ?? [])
+    if (settled.length === 0) return
+    setReprocessing(remaining)
+    for (const r of settled) {
+      const chunks = `${r.chunkCount} ${r.chunkCount === 1 ? 'chunk' : 'chunks'}`
+      if (r.unchanged) {
+        toast(`“${r.name}” re-fetched — the page is unchanged, so its ${chunks} were kept.`, 'success')
+      } else if (r.ok) {
+        toast(`“${r.name}” reprocessed — ${chunks}, indexed just now.`, 'success')
+      } else if (r.keptPrevious) {
+        toast(`Re-fetching “${r.name}” failed: ${r.error}. It still answers from its previous text; use Refresh to try again.`, 'error')
+      } else {
+        toast(`Reprocessing “${r.name}” failed: ${r.error}. Use Try again on the source to retry.`, 'error')
+      }
+    }
+  }, [selectedKB, reprocessing, toast])
 
   // Poll while the KB is building or any source is still indexing
   useEffect(() => {
@@ -374,6 +403,32 @@ export function KnowledgePanel() {
       .finally(() => setAddingUrls(false))
   }
 
+  const sourceName = (source: KnowledgeBaseSource) =>
+    source.custom_name || source.document_title || source.url_title || source.url || 'Source'
+
+  /** Run one source through the pipeline again — re-fetch a page, re-index a
+   * document's text, or re-read a document that has none. Also the row's
+   * "Try again" after a failure. */
+  const handleReprocessSource = async (source: KnowledgeBaseSource) => {
+    if (!selectedKB) return
+    try {
+      const { mode } = await api.reprocessKBSource(selectedKB.uuid, source.uuid)
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        status: 'building',
+        sources: prev.sources.map(s => s.uuid === source.uuid
+          ? { ...s, status: 'pending' as const, error_message: undefined } : s),
+      } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode, name: sourceName(source) } }))
+      toast(startMessage(mode, sourceName(source)), 'info')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to reprocess source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to reprocess source', 'error')
+    }
+  }
+
   const handleRefreshSource = async (source: KnowledgeBaseSource) => {
     if (!selectedKB) return
     try {
@@ -384,6 +439,7 @@ export function KnowledgePanel() {
         status: 'building',
         sources: prev.sources.map(s => s.uuid === source.uuid ? { ...s, status: 'pending' as const } : s),
       } : prev)
+      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode: 'refetch', name: sourceName(source) } }))
       toast('Re-fetching page in background — previous text is kept if the fetch fails', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
@@ -469,6 +525,13 @@ export function KnowledgePanel() {
   }
 
   const [shareDialogKB, setShareDialogKB] = useState<KnowledgeBase | null>(null)
+  // Sharing a KB flips its flag within the team that owns it — there is no
+  // destination to choose, but the dialog should still say which team. Same
+  // resolution as the backend's notification: the KB's team, else current.
+  const shareTeamName = (kb: KnowledgeBase) =>
+    kb.team_id
+      ? teams.find((t) => t.id === kb.team_id || t.uuid === kb.team_id)?.name
+      : currentTeam?.name
 
   const handleToggleShare = async (kb: KnowledgeBase) => {
     // Sharing for the first time → prompt for a note.
@@ -492,7 +555,8 @@ export function KnowledgePanel() {
     const kbUuid = shareDialogKB.uuid
     try {
       await api.shareKnowledgeBase(kbUuid, comment || undefined)
-      toast('Shared with team', 'success')
+      const teamName = shareTeamName(shareDialogKB)
+      toast(teamName ? `Shared with ${teamName}` : 'Shared with team', 'success')
       if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
       refresh()
     } catch (err) {
@@ -601,12 +665,12 @@ export function KnowledgePanel() {
       setVerifyDescription('')
       setVerifyCategory('')
       setVerificationSubmitted(true)
-      toast('Submitted for verification', 'success')
+      toast('Sent — an examiner will look it over', 'success')
       if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
       refresh()
     } catch (err) {
-      console.error('Failed to submit for verification:', err)
-      toast(err instanceof Error ? err.message : 'Failed to submit for verification', 'error')
+      console.error('Failed to share with everyone:', err)
+      toast(err instanceof Error ? err.message : 'Failed to share with everyone', 'error')
     } finally {
       setSubmittingVerify(false)
     }
@@ -615,6 +679,7 @@ export function KnowledgePanel() {
   const shareDialogJSX = shareDialogKB ? (
     <ShareWithTeamDialog
       itemName={shareDialogKB.title}
+      teamName={shareTeamName(shareDialogKB)}
       onCancel={() => setShareDialogKB(null)}
       onConfirm={confirmShareKB}
     />
@@ -630,7 +695,7 @@ export function KnowledgePanel() {
         border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
       }}>
         <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
-          Submit for Verification
+          <ShareLabel />
         </div>
         <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
           {verifyKB.title}
@@ -1162,7 +1227,7 @@ export function KnowledgePanel() {
                     }}
                   >
                     <Send size={13} />
-                    Submit for Verification
+                    <ShareLabel />
                   </button>
                 )
               )}
@@ -1249,6 +1314,20 @@ export function KnowledgePanel() {
                 {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
               </span>
             </button>
+            {!sourcesCollapsed && (
+              <WebSourceRefreshBar
+                kbUuid={selectedKB.uuid}
+                sources={selectedKB.sources}
+                interval={selectedKB.url_refresh_interval}
+                canManage={canManageKB}
+                onChanged={message => {
+                  if (message) toast(message, 'success')
+                  loadDetail(selectedKB.uuid)
+                  refresh()
+                }}
+                onError={message => toast(message, 'error')}
+              />
+            )}
             {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
               <div style={{ fontSize: 12, color: '#888', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.
@@ -1400,8 +1479,38 @@ export function KnowledgePanel() {
                             )}
                           </div>
                         )}
+                        {!isRenaming && (source.amends_source_uuids?.length ?? 0) > 0 && (() => {
+                          const names = source.amends_source_uuids!
+                            .map(u => selectedKB.sources.find(o => o.uuid === u))
+                            .filter((o): o is KnowledgeBaseSource => !!o)
+                            .map(sourceDisplayName)
+                          return names.length > 0 ? (
+                            <div
+                              style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              title={`Amends: ${names.join('; ')}`}
+                            >
+                              Amends: <span style={{ color: '#bcbcbc' }}>{names.join('; ')}</span>
+                            </div>
+                          ) : null
+                        })()}
                         {!isRenaming && source.error_message && (
-                          <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
+                          <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>
+                            {source.error_message}
+                            {canManageKB && source.status === 'error' && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
+                                title="Run this source through extraction, chunking and embedding again"
+                                style={{
+                                  marginLeft: 8, padding: 0, background: 'transparent', border: 'none',
+                                  fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                                  color: '#7aa2f7', textDecoration: 'underline', cursor: 'pointer',
+                                }}
+                              >
+                                Try again
+                              </button>
+                            )}
+                          </div>
                         )}
                         {!isRenaming && isPartial && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
@@ -1451,9 +1560,7 @@ export function KnowledgePanel() {
                         })()}
                         {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
                           <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
-                            {source.status === 'processing'
-                              ? 'Indexing… large documents can take a few minutes'
-                              : 'Waiting for document text to finish extracting…'}
+                            {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
@@ -1524,6 +1631,21 @@ export function KnowledgePanel() {
                                   <RefreshCw size={12} style={{ color: '#888' }} />
                                 </button>
                               )}
+                              {source.source_type === 'document' && (
+                                <button
+                                  type="button"
+                                  aria-label="Reprocess source"
+                                  onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
+                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  title={
+                                    'Reprocess: re-chunk and re-embed this document (it is read again first if it has no readable text)'
+                                    + (source.processed_at ? `. Last indexed ${new Date(source.processed_at).toLocaleString()}` : '')
+                                  }
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                                >
+                                  <RotateCcw size={12} style={{ color: '#888' }} />
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 aria-label="Remove source"
@@ -1591,6 +1713,7 @@ export function KnowledgePanel() {
           <KBSourceInspectorModal
             kbUuid={selectedKB.uuid}
             source={inspectingSource}
+            otherSources={selectedKB.sources}
             onClose={() => setInspectingSource(null)}
             onUpdated={() => { if (selectedKB) loadDetail(selectedKB.uuid) }}
           />
@@ -1926,7 +2049,7 @@ export function KnowledgePanel() {
                     title: 'Remove from My KBs?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from Explore.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from the Everyone tab.
                       </>
                     ),
                     confirmLabel: 'Remove',
@@ -1948,7 +2071,7 @@ export function KnowledgePanel() {
             emptyComponent={!isProjectScoped && activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
             emptyMessage={
               isProjectScoped
-                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or in Explore, or switch to "Show all".`
+                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or from the Everyone tab, or switch to "Show all".`
                 : activeTab === 'team'
                   ? 'No knowledge bases shared with your team yet.'
                   : 'No knowledge bases found.'

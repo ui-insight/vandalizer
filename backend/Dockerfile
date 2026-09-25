@@ -27,6 +27,16 @@ ENV VIRTUAL_ENV=/app/.venv \
 
 RUN echo "${VERSION}" > /app/VERSION
 
+# Pull Debian's security updates into the image we ship. The upstream
+# python:3.12-slim tag is rebuilt on its own schedule, so between a Debian
+# point release and that rebuild the base carries packages with a published
+# fix (2026-09: three CRITICAL perl-base CVEs). `make security-gate` scans the
+# upstream tag and cannot see this step; .trivyignore.yaml is where the
+# resulting gap is recorded, with an expiry.
+RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/.venv /app/.venv
 
 # Install headless Chromium for the web_fetcher's JS-rendering fallback.
@@ -88,7 +98,9 @@ COPY setup_default_team.py ./
 RUN mkdir -p /app/static/uploads /app/static/db && \
     chown -R appuser:appuser /app
 
-USER appuser
+# Numeric so Kubernetes' runAsNonRoot check can verify it without a
+# runAsUser override (a named USER cannot be verified by the kubelet).
+USER 1000:1000
 
 EXPOSE 8001
 

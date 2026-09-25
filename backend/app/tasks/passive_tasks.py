@@ -14,7 +14,6 @@ from bson import ObjectId
 
 from app.exceptions import TrialSpendBlockedError
 from app.celery_app import celery_app
-from app.services.form_fill import DOC_META_TASKS, document_meta
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
@@ -235,13 +234,12 @@ def process_pending_triggers(self) -> dict:
 def process_scheduled_automations(self) -> dict:
     """Evaluate schedule-based automations and create trigger events when due.
 
-    Runs every minute via Celery Beat.
+    Runs every minute via Celery Beat. A schedule is due when the first slot
+    after its last run (see ``automation_schedule.last_run_base``), evaluated
+    in its own time zone, has passed. Each firing is recorded on the
+    automation, whatever the action type, so a schedule fires once per slot.
     """
-    try:
-        from croniter import croniter
-    except ImportError:
-        logger.warning("croniter not installed — schedule triggers disabled")
-        return {"processed": 0, "error": "croniter not installed"}
+    from app.services import automation_schedule
 
     db = get_sync_db()
     now = datetime.now(timezone.utc)
@@ -263,50 +261,82 @@ def process_scheduled_automations(self) -> dict:
             if not cron_expr:
                 continue
 
-            # Determine last run time for this automation
-            last_event = db.workflow_trigger_event.find_one(
-                {
-                    "trigger_context.automation_id": str(auto["_id"]),
-                    "trigger_type": "schedule",
-                },
-                sort=[("created_at", -1)],
-            )
-
-            if last_event:
-                base_time = last_event["created_at"]
-                if base_time.tzinfo is None:
-                    base_time = base_time.replace(tzinfo=timezone.utc)
-            else:
-                # First run — use automation creation time as base
-                base_time = auto.get("created_at", now - timedelta(minutes=2))
-                if base_time.tzinfo is None:
-                    base_time = base_time.replace(tzinfo=timezone.utc)
-
-            cron = croniter(cron_expr, base_time)
-            next_run = cron.get_next(datetime)
-            if next_run.tzinfo is None:
-                next_run = next_run.replace(tzinfo=timezone.utc)
-
+            timing = auto
+            if not auto.get("last_scheduled_run_at") and not auto.get("schedule_armed_at"):
+                # A schedule from before either stamp existed: count from its
+                # last run the way the old scheduler did (its latest trigger
+                # event), or every legacy schedule fires off-slot on upgrade.
+                last_event = db.workflow_trigger_event.find_one(
+                    {"trigger_context.automation_id": str(auto["_id"]), "trigger_type": "schedule"},
+                    sort=[("created_at", -1)],
+                )
+                if last_event and last_event.get("created_at"):
+                    timing = {**auto, "last_scheduled_run_at": last_event["created_at"]}
+            base_time = automation_schedule.last_run_base(timing, now - timedelta(minutes=2))
+            next_run = automation_schedule.next_runs(trigger_config, base_time)[0]
             if next_run > now:
                 continue  # Not due yet
+
+            # Claim the slot before dispatching: a crash mid-dispatch skips
+            # one run rather than repeating it every minute. Conditional on
+            # the stamp this pass read, so two overlapping passes can't both
+            # dispatch the same slot.
+            claim = db.automation.update_one(
+                {"_id": auto["_id"], "last_scheduled_run_at": auto.get("last_scheduled_run_at")},
+                {"$set": {"last_scheduled_run_at": now}},
+            )
+            if getattr(claim, "modified_count", 1) == 0:
+                continue
 
             # Gather documents from trigger_config
             doc_uuids = trigger_config.get("document_uuids", [])
             folder_id = trigger_config.get("folder_id")
+            source_configured = bool(doc_uuids or folder_id)
+
+            scope: dict = {"soft_deleted": {"$ne": True}}
+            if doc_uuids:
+                scope["uuid"] = {"$in": doc_uuids}
+            elif folder_id:
+                scope["folder"] = folder_id
+            doc_query: dict = {**scope, "processing": False}
+            only_new = bool(trigger_config.get("only_new"))
+            if only_new:
+                # "Only new documents": after the first run, each run takes
+                # what arrived since the previous one (by ObjectId — always
+                # UTC, unlike SmartDocument.created_at) plus anything that was
+                # still processing then and so could not run yet.
+                watermark = auto.get("schedule_docs_watermark")
+                if watermark is not None:
+                    new_since = {"$or": [
+                        {"_id": {"$gte": ObjectId.from_datetime(watermark)}},
+                        {"uuid": {"$in": auto.get("schedule_carryover_uuids") or []}},
+                    ]}
+                    doc_query.update(new_since)
+                    scope = {**scope, **new_since}
+                carryover = [
+                    d["uuid"] for d in db.smart_document.find({**scope, "processing": True}, {"uuid": 1})
+                ]
+                db.automation.update_one(
+                    {"_id": auto["_id"]},
+                    {"$set": {"schedule_docs_watermark": now, "schedule_carryover_uuids": carryover}},
+                )
+
+            # A picker-made schedule (it has a frequency) with no folder or
+            # documents chosen yet has nothing to run on. A bare cron schedule
+            # from before the picker keeps running without documents, as it did.
+            if not source_configured and trigger_config.get("frequency"):
+                logger.info("Schedule '%s' has no folder or documents; skipped", auto.get("name"))
+                continue
 
             doc_oids = []
-            if doc_uuids:
-                docs = list(db.smart_document.find(
-                    {"uuid": {"$in": doc_uuids}},
-                    {"_id": 1},
-                ))
-                doc_oids = [d["_id"] for d in docs]
-            elif folder_id:
-                docs = list(db.smart_document.find(
-                    {"folder": folder_id, "processing": False},
-                    {"_id": 1},
-                ))
-                doc_oids = [d["_id"] for d in docs]
+            if source_configured:
+                doc_oids = [d["_id"] for d in db.smart_document.find(doc_query, {"_id": 1})]
+                if not doc_oids:
+                    logger.info(
+                        "Schedule '%s' fired with no documents to run on; skipped",
+                        auto.get("name"),
+                    )
+                    continue
 
             if auto.get("action_type") in ("workflow", "task"):
                 event = {
@@ -418,37 +448,37 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         )
 
         # Create WorkflowResult
+        # The run records which automation and trigger event produced it, so
+        # a reaper that finds it dead later can tell the person who set the
+        # schedule (reap_stale_workflow_runs_task) — the workflow's owner may
+        # be someone else entirely.
+        trigger_ctx = event.get("trigger_context") or {}
         result_doc = {
             "workflow": workflow["_id"],
             "session_id": uuid4().hex,
             "status": "running",
             "trigger_type": event.get("trigger_type"),
             "is_passive": True,
-            "input_context": event.get("trigger_context") or {},
+            "automation_id": trigger_ctx.get("automation_id") or None,
+            "trigger_event_id": str(event["_id"]),
+            "input_context": trigger_ctx,
             "created_at": now,
         }
         result_id = db.workflow_result.insert_one(result_doc).inserted_id
 
-        # Gather documents
+        # Gather the trigger's documents. Fixed documents from input_config are
+        # merged by build_steps_data, the same way as for an interactive run.
         doc_ids = event.get("documents", [])
         docs = list(db.smart_document.find({"_id": {"$in": doc_ids}}))
         doc_uuids = [d.get("uuid", "") for d in docs]
-
-        # Merge fixed documents from input_config — except in "no input" mode,
-        # where the workflow runs with no documents at all.
-        input_cfg = workflow.get("input_config") or {}
-        if input_cfg.get("trigger_type") != "no_input":
-            fixed_doc_config = input_cfg.get("fixed_documents", [])
-            for fd in fixed_doc_config:
-                fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
-                if fd_uuid and fd_uuid not in doc_uuids:
-                    doc_uuids.append(fd_uuid)
 
         # A fixed document deleted from Files is a configuration error: fail
         # this run with the reason rather than covering fewer documents than
         # the workflow was set up with (same check as manual runs).
         from app.tasks.workflow_tasks import (
             _missing_fixed_documents,
+            build_steps_data,
+            default_model_for_owner,
             fixed_documents_missing_message,
         )
 
@@ -466,99 +496,26 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             )
             return {"error": msg, "result_id": str(result_id)}
 
-        # Build trigger step data
+        # Build steps data through the same builder the interactive run and
+        # every resume pass use. This path kept its own copy of that loop and
+        # silently missed three fixes in a row (#862): the failure is never a
+        # crash, it is a scheduled run answering on the wrong model or over
+        # the wrong document and reporting success. The builder merges the
+        # fixed documents itself, so only the trigger's documents go in.
         trigger_step_data = {"doc_uuids": doc_uuids, "user_id": workflow.get("user_id")}
-
-        # Build steps data
-        steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
-
-        for step_id in workflow.get("steps", []):
-            step_doc = db.workflow_step.find_one({"_id": step_id})
-            if not step_doc:
-                continue
-
-            tasks = []
-            step_data = step_doc.get("data", {}) or {}
-            for task_id in step_doc.get("tasks", []):
-                task_doc = db.workflow_step_task.find_one({"_id": task_id})
-                if task_doc:
-                    task_data = dict(task_doc.get("data", {}))
-
-                    # Input is configured on the step and shared by every task
-                    # in it. This has to happen BEFORE the preloads below, for
-                    # the same reason workflow_tasks._build_steps_data does it
-                    # here: the engine resolves the step's choice, so a preload
-                    # reading the task's own keys would fetch a different
-                    # document than the one that runs -- or none at all, and
-                    # the step answers over empty text without erroring. This
-                    # path is the scheduled and folder-watch one, so the
-                    # mismatch would only ever show up in automation.
-                    from app.services.workflow_engine import apply_step_input_config
-                    apply_step_input_config(step_data, task_data)
-
-                    # Resolve extraction keys from search set
-                    if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
-                        ss_items = list(db.search_set_item.find({
-                            "searchset": task_data["search_set_uuid"],
-                            "searchtype": "extraction",
-                        }))
-                        task_data["keys"] = [item["searchphrase"] for item in ss_items]
-
-                    # Pre-load doc texts
-                    if doc_uuids:
-                        doc_texts = []
-                        doc_metas = []
-                        for uuid_val in doc_uuids:
-                            doc = db.smart_document.find_one({"uuid": uuid_val})
-                            if doc and doc.get("raw_text"):
-                                doc_texts.append(doc["raw_text"])
-                                doc_metas.append(document_meta(doc))
-                        task_data["doc_texts"] = doc_texts
-                        if task_doc.get("name") in DOC_META_TASKS:
-                            task_data["doc_metas"] = doc_metas
-
-                    # The other two hydration sites load this; the automation
-                    # path never did, so a step configured with "Selected
-                    # Document" as its input ran with no text at all under
-                    # folder-watch — an empty answer produced on schedule, with
-                    # nothing saying the input was missing.
-                    from app.tasks.workflow_tasks import _wants_selected_document
-
-                    if (
-                        _wants_selected_document(task_data)
-                        and task_data.get("selected_document_uuid")
-                    ):
-                        sel_doc = db.smart_document.find_one(
-                            {"uuid": task_data["selected_document_uuid"]},
-                        )
-                        if sel_doc and sel_doc.get("raw_text"):
-                            task_data["selected_doc_text"] = sel_doc["raw_text"]
-                            if task_doc.get("name") in DOC_META_TASKS:
-                                task_data["selected_doc_meta"] = document_meta(sel_doc)
-
-                    if task_doc.get("name") == "FormFiller":
-                        from app.tasks.workflow_tasks import _preload_form_filler_template
-
-                        _preload_form_filler_template(db, task_data)
-
-                    tasks.append({"name": task_doc.get("name", ""), "data": task_data})
-
-            steps_data.append({
-                "name": step_doc.get("name", ""),
-                "data": step_data,
-                "tasks": tasks,
-            })
+        steps_data, _ = build_steps_data(
+            db, workflow, str(workflow["_id"]), trigger_step_data,
+        )
 
         # Resolve model. The canvas says a workflow's default model "runs every
         # step on this model" without qualifying it to interactive runs, so an
         # automated run has to honour it too -- otherwise the same workflow uses
         # one model when a person clicks Run and another when the schedule
-        # fires, with nothing in the UI saying so. Falling back to the first
-        # configured model stays the last resort.
-        models = sys_config.get("available_models", [])
+        # fires, with nothing in the UI saying so. Below that, the same ladder
+        # the interactive run climbs: the owner's model, then the system default.
         model = (
             (workflow.get("input_config") or {}).get("default_model")
-            or (models[0]["name"] if models else "gpt-4o-mini")
+            or default_model_for_owner(db, sys_config, workflow.get("user_id"))
         )
 
         # Check if the workflow owner is an admin (gates code execution)
@@ -1317,10 +1274,14 @@ def deliver_callback(
     import httpx
 
     from app.services.output_handlers import compute_webhook_signature
-    from app.utils.url_validation import validate_outbound_url
+    from app.utils.url_validation import allowed_private_hosts, validate_outbound_url
 
+    db = get_sync_db()
     try:
-        validate_outbound_url(callback_url)
+        validate_outbound_url(
+            callback_url,
+            allowed_hosts=allowed_private_hosts(db.system_config.find_one() or {}),
+        )
     except ValueError as e:
         logger.error("Invalid callback_url for event %s: %s", trigger_event_id, e)
         return {"status": "rejected", "error": str(e)}
@@ -1328,7 +1289,6 @@ def deliver_callback(
     # Sign with the stored API-token hash. Receivers derive the signing
     # secret from their plaintext token via sha256(token) — the server never
     # stores plaintext, so the hash is the only shared value available.
-    db = get_sync_db()
     user = db.user.find_one({"user_id": user_id})
     signing_secret = (user.get("api_token_hash") or "") if user else ""
 

@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "vandalizer chart values",
+  "type": "object",
+  "properties": {
+    "hostname": {
+      "type": "string",
+      "description": "Public hostname, stated once; derives config.frontendUrl, httpRoute.hostnames, and ingress.host unless those are set explicitly."
+    },
+    "config": {
+      "type": "object",
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production"]
+        },
+        "frontendUrl": { "type": "string" },
+        "uploadDir": { "type": "string", "minLength": 1 },
+        "webWorkers": { "type": "integer", "minimum": 1 },
+        "extraEnv": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "jwtSecretKey": { "type": "string" },
+        "configEncryptionKey": { "type": "string" }
+      }
+    },
+    "uploads": {
+      "type": "object",
+      "properties": {
+        "existingClaim": { "type": "string" },
+        "storageClass": { "type": "string" },
+        "accessModes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["ReadWriteMany", "ReadWriteOnce", "ReadOnlyMany", "ReadWriteOncePod"]
+          }
+        },
+        "size": { "type": "string", "pattern": "^[0-9]+(\\.[0-9]+)?(Ei|Pi|Ti|Gi|Mi|Ki|E|P|T|G|M|k)?$" }
+      }
+    },
+    "api": {
+      "type": "object",
+      "properties": {
+        "replicaCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "celery": {
+      "type": "object",
+      "properties": {
+        "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
+        "queues": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "object",
+            "required": ["concurrency"],
+            "properties": {
+              "concurrency": { "type": "integer", "minimum": 1 },
+              "replicas": { "type": "integer", "minimum": 0 },
+              "resources": { "type": "object" },
+              "nodeSelector": { "type": "object" },
+              "tolerations": { "type": "array" },
+              "affinity": { "type": "object" },
+              "extraEnv": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "beat": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "frontend": {
+      "type": "object",
+      "properties": {
+        "containerPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+      }
+    },
+    "mongodb": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "external": {
+          "type": "object",
+          "properties": {
+            "uri": { "type": "string", "pattern": "^$|^mongodb(\\+srv)?://" }
+          }
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "pattern": "^$|^[^:/]+$",
+              "description": "Hostname only — no scheme, no port (the app hardcodes 6379)."
+            }
+          }
+        }
+      }
+    },
+    "chromadb": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "pattern": "^$|^[^:/]+$",
+              "description": "Hostname only — the port is a separate key; CHROMADB_HOST is not a URL."
+            },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "host": { "type": "string" }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "parentRefs": { "type": "array" },
+        "hostnames": { "type": "array", "items": { "type": "string" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "enabled": { "const": true } } },
+          "then": {
+            "properties": { "parentRefs": { "type": "array", "minItems": 1 } },
+            "required": ["parentRefs"]
+          }
+        }
+      ]
+    },
+    "bootstrap": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "existingSecret": { "type": "string" }
+      }
+    }
+  }
+}

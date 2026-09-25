@@ -146,14 +146,16 @@
       "In chat, describe the process you want: *\"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, period, PI, deliverables, and compliance terms. Step 2 analyzes the extracted data to identify key obligations and deadlines. Step 3 formats the analysis into a compliance summary report.\"*",
       "Work with the agent to refine the workflow in the editor — add the Extraction task (Step 1), the Prompt task (Step 2), and the Formatter task (Step 3).",
       "Back in chat, ask the agent to run the new workflow on **subaward-agreement.pdf**.",
-      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report."
+      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report.",
+      "Why Extraction first here: the terms you want are fixed fields the lab checks one by one, and the point of this lab is to chain three steps. Extraction is optional and task-dependent — a short or context-heavy document can go straight to a Prompt that reads the whole file (the first step receives the document automatically). See Module 3’s lesson on the extract-reason-deliver pattern."
     ],
     "chat_instructions": [
       "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample subaward agreement to your workspace.",
       "Describe the process you want: \"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, period, PI, deliverables, and compliance terms. Step 2 analyzes the extracted data to identify key obligations and deadlines. Step 3 formats the analysis into a compliance summary report.\"",
       "Work with the assistant to refine the workflow — the Extraction task (Step 1), the Prompt task (Step 2), and the Formatter task (Step 3). You can fine-tune it in the workflow editor at any point.",
       "Ask the assistant to run the new workflow on subaward-agreement.pdf.",
-      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report."
+      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report.",
+      "Why Extraction first here: the terms you want are fixed fields the lab checks one by one, and the point of this lab is to chain three steps. Extraction is optional and task-dependent — a short or context-heavy document can go straight to a Prompt that reads the whole file (the first step receives the document automatically). See Module 3’s lesson on the extract-reason-deliver pattern."
     ],
     "expected_fields": [
       "Prime Recipient", "Subrecipient", "Subaward Amount", "Performance Period",
@@ -214,16 +216,18 @@
     "instructions": [
       "Click **Set Up Lab** to add the sample progress report to your workspace.",
       "Describe the pipeline in chat: *\"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"*",
-      "Open the workflow in the editor and add a **Document Renderer**, **Data Export**, or **Package Builder** to Step 3 (the agent can suggest which fits your use case).",
+      "Open the workflow in the editor and add a **Document Renderer** or **Data Export** to Step 3 (the agent can suggest which fits your use case).",
       "From chat, ask the agent to run the workflow on **progress-report-year2.pdf**.",
-      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data."
+      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data.",
+      "Extraction is optional: for a short or context-heavy document, a Prompt reading the whole file can replace Steps 1 and 2, and the Step 3 output node builds the deliverable the same way."
     ],
     "chat_instructions": [
       "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample progress report to your workspace.",
       "Describe the pipeline: \"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"",
-      "Open the workflow in the editor (you can keep chat beside it) and add a Document Renderer, Data Export, or Package Builder to Step 3 — the assistant can suggest which fits your use case.",
+      "Open the workflow in the editor (you can keep chat beside it) and add a Document Renderer or Data Export to Step 3 — the assistant can suggest which fits your use case.",
       "Ask the assistant to run the workflow on progress-report-year2.pdf.",
-      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data."
+      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data.",
+      "Extraction is optional: for a short or context-heavy document, a Prompt reading the whole file can replace Steps 1 and 2, and the Step 3 output node builds the deliverable the same way."
     ],
     "expected_fields": [
       "Project Title", "PI Name", "Reporting Period", "Accomplishments",
@@ -235,9 +239,9 @@
       "Budget Spent": ["$287,500", "287500", "287,500"]
     },
     "star_criteria": {
-      "1": "Use a Document Renderer, Data Export, Package Builder, or Form Filler and run the workflow",
+      "1": "Use a Document Renderer, Data Export, or Form Filler and run the workflow",
       "2": "Use 2+ different output node types",
-      "3": "Use a Package Builder to create a ZIP archive with multiple output files"
+      "3": "Turn on Include in deliverables for 2+ steps and run the workflow, so the download is a ZIP with multiple output files"
     }
   },
   "validation_qa": {
@@ -297,14 +301,14 @@
     }
   },
   "governance": {
-    "overview": "Make your team's work discoverable: get workflows verified, published to the team library, and citable from every chat. This module uses workflows you've already built — no new documents needed.",
+    "overview": "Make your team's work discoverable: share workflows with everyone, have an examiner check them, and cite them from every chat. This module uses workflows you've already built — no new documents needed.",
     "documents": [],
     "instructions": [
       "This module uses workflows you've already built — no new documents needed.",
       "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
       "Build or duplicate a workflow in your second space.",
       "Ensure your workflow has a clear description explaining what it does.",
-      "**Submit the workflow for verification** — this completes the module. An examiner reviews it later; you don't wait on that to finish your certification.",
+      "**Share the workflow with everyone** (⋯ → Share with everyone) — this completes the module. An examiner looks it over later, and once they accept it the shared entry is Checked; you don't wait on that to finish your certification.",
       "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
       "You now have a submitted, portable, well-documented workflow."
     ],
@@ -320,9 +324,9 @@
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
-      "1": "Submit a workflow for verification",
-      "2": "Have 1+ workflow approved by an examiner",
-      "3": "Have 2+ workflows approved by an examiner"
+      "1": "Share a workflow with everyone",
+      "2": "Have 1+ shared workflow accepted by an examiner (Checked)",
+      "3": "Have 2+ shared workflows accepted by an examiner (Checked)"
     }
   }
 }

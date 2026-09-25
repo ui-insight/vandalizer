@@ -55,6 +55,12 @@ jobs:
           - image_name: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile
+          # Non-root nginx on 8080 for Kubernetes/OpenShift (the Helm chart's
+          # default frontend image). Same context; only the build target differs.
+          - image_name: frontend-unprivileged
+            context: ./frontend
+            dockerfile: ./frontend/Dockerfile
+            target: runtime-unprivileged
     permissions:
       contents: read
       packages: write
@@ -73,6 +79,8 @@ jobs:
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
+          # Empty for most entries, which builds the Dockerfile's final stage.
+          target: ${{ matrix.target || '' }}
           push: true
           # The Sentry args are only consumed by the frontend Dockerfile;
           # the backend image declares no matching ARG and ignores them.
@@ -107,3 +115,4 @@ jobs:
             Container images published for this tag:
             - `ghcr.io/${{ github.repository }}-backend:${{ github.ref_name }}`
             - `ghcr.io/${{ github.repository }}-frontend:${{ github.ref_name }}`
+            - `ghcr.io/${{ github.repository }}-frontend-unprivileged:${{ github.ref_name }}`

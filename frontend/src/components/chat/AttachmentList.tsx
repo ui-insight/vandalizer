@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Loader2, Check } from 'lucide-react'
+import { X, FileText, ExternalLink, FolderOpen, BookOpen, Link2, Loader2, Check, Share2 } from 'lucide-react'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { AttachedKB } from '../../contexts/WorkspaceContext'
 
@@ -34,12 +34,14 @@ interface Props {
   onDeselectFolder?: (uuid: string) => void
   onDetachKB?: (uuid: string) => void
   onShareKB?: (kb: AttachedKB) => void
+  /** Copy a link that opens a chat with these knowledge bases, documents and folders attached. */
+  onShareSetup?: () => void
 }
 
 export function AttachmentList({
   fileAttachments, urlAttachments, selectedDocUuids, selectedDocNames, processingByUuid,
   selectedFolderUuids, selectedFolderNames, knowledgeBases,
-  onRemoveFile, onRemoveUrl, onDeselectDoc, onDeselectFolder, onDetachKB, onShareKB,
+  onRemoveFile, onRemoveUrl, onDeselectDoc, onDeselectFolder, onDetachKB, onShareKB, onShareSetup,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
 
@@ -205,6 +207,17 @@ export function AttachmentList({
           className={`${CHIP} border-gray-300 bg-white hover:bg-gray-100`}
         >
           Show fewer
+        </button>
+      )}
+      {onShareSetup && (
+        <button
+          type="button"
+          onClick={onShareSetup}
+          title="Copy a link that opens a new chat with these knowledge bases, documents and folders attached"
+          className={`${CHIP} ml-auto border-gray-300 bg-white font-semibold hover:bg-gray-100`}
+        >
+          <Share2 className="h-3 w-3 shrink-0" />
+          Share chat setup
         </button>
       )}
     </div>

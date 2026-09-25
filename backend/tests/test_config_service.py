@@ -20,6 +20,7 @@ from app.services.config_service import (
     get_llm_model_names,
     get_llm_models,
     get_user_model_name,
+    get_validation_judge_model,
     resolve_model_name,
 )
 
@@ -233,3 +234,32 @@ class TestGetUserModelName:
         ) as MockUserConfig:
             MockUserConfig.find_one = AsyncMock(return_value=None)
             assert await get_user_model_name("alice") == "gpt-4o"
+
+
+class TestGetValidationJudgeModel:
+    """The grader is one system-wide setting, not the runner's chat model."""
+
+    MODELS = [{"name": "openai/gpt-oss-120b", "tag": "oss"}, {"name": "qwen/qwen3.8-27b", "tag": "qwen"}]
+
+    async def _resolve(self, grader):
+        cfg = _system_config(available_models=self.MODELS, default_model="openai/gpt-oss-120b")
+        cfg.validation_judge_model = grader
+        with _patch_system_config(cfg):
+            return await get_validation_judge_model()
+
+    @pytest.mark.asyncio
+    async def test_unset_grades_with_the_default_model(self):
+        assert await self._resolve("") == ("openai/gpt-oss-120b", None)
+
+    @pytest.mark.asyncio
+    async def test_a_configured_grader_wins(self):
+        assert await self._resolve("qwen/qwen3.8-27b") == ("qwen/qwen3.8-27b", None)
+
+    @pytest.mark.asyncio
+    async def test_a_grader_no_longer_configured_falls_back_and_says_so(self):
+        model, note = await self._resolve("qwen/qwen3.6-27b")
+        assert model == "openai/gpt-oss-120b"
+        assert note == {
+            "configured": "qwen/qwen3.6-27b", "used": "openai/gpt-oss-120b",
+            "reason": "not in System Config",
+        }

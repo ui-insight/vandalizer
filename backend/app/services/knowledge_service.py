@@ -553,6 +553,7 @@ async def update_knowledge_base(
     organization_ids: list[str] | None = None,
     tags: list[str] | None = None,
     user_org_ancestry: list[str] | None = None,
+    url_refresh_interval: str | None = None,
 ) -> KnowledgeBase | None:
     kb = await get_knowledge_base(
         uuid,
@@ -575,6 +576,8 @@ async def update_knowledge_base(
         kb.description = description[:5000] or None
     if shared_with_team is not None:
         kb.shared_with_team = shared_with_team
+    if url_refresh_interval is not None:
+        kb.url_refresh_interval = None if url_refresh_interval == "off" else url_refresh_interval
     org_scope_changed = False
     if organization_ids is not None and organization_ids != list(kb.organization_ids or []):
         kb.organization_ids = organization_ids
@@ -1023,7 +1026,48 @@ async def set_source_reference(
     return source
 
 
-async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
+async def set_source_amends(
+    kb: KnowledgeBase,
+    source_uuid: str,
+    amends_source_uuids: list[str],
+) -> KnowledgeBaseSource | None:
+    """Record which sources in ``kb`` this source revises. Replaces the list.
+
+    Raises ValueError for a uuid that is this source or not a source of this
+    KB, so a typo can't silently point at nothing. Metadata only: chunks are
+    untouched; retrieval reads the relation at query time.
+    """
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    )
+    if not source:
+        return None
+
+    wanted = list(dict.fromkeys(u for u in amends_source_uuids if u))
+    if source_uuid in wanted:
+        raise ValueError("A source cannot amend itself")
+    if wanted:
+        found = {
+            s.uuid
+            for s in await KnowledgeBaseSource.find(
+                {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": wanted}},
+            ).to_list()
+        }
+        missing = [u for u in wanted if u not in found]
+        if missing:
+            raise ValueError(f"Not a source of this knowledge base: {', '.join(missing)}")
+
+    source.amends_source_uuids = wanted
+    await source.save()
+    return source
+
+
+async def remove_source(kb: KnowledgeBase, source_uuid: str, *, strict: bool = False) -> bool:
+    """Remove a source and its chunks. With ``strict``, a failure to delete the
+    chunks raises and the source row is kept — the caller reports the KB as
+    still holding the content rather than leaving chunks answering with no
+    source row left to retry from."""
     source = await KnowledgeBaseSource.find_one(
         KnowledgeBaseSource.uuid == source_uuid,
         KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
@@ -1035,9 +1079,78 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
         await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
     except Exception as e:
         logger.error(f"Error deleting KB source from ChromaDB: {e}")
+        if strict:
+            raise
     await source.delete()
+    # Nothing may go on claiming to amend a source that is gone.
+    try:
+        await KnowledgeBaseSource.find(
+            {"knowledge_base_uuid": kb.uuid, "amends_source_uuids": source_uuid},
+        ).update({"$pull": {"amends_source_uuids": source_uuid}})
+    except Exception as e:
+        logger.warning("Could not clear amends links to removed source %s: %s", source_uuid, e)
     await recalculate_stats(kb)
     return True
+
+
+async def remove_document_from_knowledge_bases(
+    doc_uuid: str, user: User,
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Remove every knowledge-base source built from ``doc_uuid``, chunks and all.
+
+    Deleting a document leaves its KB sources in place — each one answers from
+    its own ingested copy — so "delete this file everywhere" has to be asked for
+    and done here. Only the knowledge bases the delete dialog listed are in
+    scope — those in the caller's own tenants (``document_usage``'s rule), so
+    an admin's delete never reaches another team's KB. Of those, only ones the
+    user may manage are touched; the rest are returned as ``kept`` so the
+    caller can say which copies remain. One failing KB never stops the others.
+
+    Returns ``(removed, kept)``, each a list of ``{uuid, title}``.
+    """
+    from app.services import organization_service
+    from app.services.document_usage import in_caller_tenants
+
+    sources = await KnowledgeBaseSource.find({"document_uuid": doc_uuid}).to_list()
+    if not sources:
+        return [], []
+    try:
+        user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+        team_access = await access_control.get_team_access_context(user)
+        visible_teams = team_access.team_uuids | team_access.team_object_ids
+    except Exception:
+        # The file is already deleted; never turn that into a 500.
+        logger.exception("Could not resolve access for removing document %s from KBs", doc_uuid)
+        return [], []
+    removed: list[dict[str, str]] = []
+    kept: list[dict[str, str]] = []
+    kb_uuids = list(dict.fromkeys(s.knowledge_base_uuid for s in sources if s.knowledge_base_uuid))
+    for kb_uuid in kb_uuids:
+        try:
+            kb = await get_knowledge_base(
+                kb_uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+            )
+            if kb is not None and not in_caller_tenants(kb, visible_teams):
+                continue  # not in the dialog's list — another tenant's KB
+            if kb is None:
+                viewable = await get_knowledge_base(
+                    kb_uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+                )
+                # A KB the user cannot even see, or another tenant's, is not named.
+                if viewable is not None and in_caller_tenants(viewable, visible_teams):
+                    kept.append({"uuid": kb_uuid, "title": viewable.title})
+                continue
+            for source in sources:
+                if source.knowledge_base_uuid == kb_uuid:
+                    await remove_source(kb, source.uuid, strict=True)
+        except Exception:
+            logger.exception("Failed to remove document %s from KB %s", doc_uuid, kb_uuid)
+            title = kb.title if kb is not None else None
+            if title:
+                kept.append({"uuid": kb_uuid, "title": title})
+            continue
+        removed.append({"uuid": kb.uuid, "title": kb.title})
+    return removed, kept
 
 
 # --- Clone ---
@@ -1502,6 +1615,10 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
                     content = doc.raw_text or None
                 ingestion_warnings = document_service.ingestion_warnings(doc)
         exported_sources.append({
+            # The importer mints new uuids; these two let it rebuild the
+            # amends links between the new sources.
+            "uuid": s.uuid,
+            "amends_source_uuids": list(getattr(s, "amends_source_uuids", None) or []),
             "source_type": s.source_type,
             "document_uuid": s.document_uuid,
             "document_title": document_title,
@@ -1564,6 +1681,8 @@ async def import_knowledge_base(
 
     imported = 0
     dm = _get_dm()
+    new_uuid_for: dict[str, str] = {}
+    amends_to_link: list[tuple[KnowledgeBaseSource, list[str]]] = []
 
     for src in payload.get("sources", []) or []:
         source_type = src.get("source_type")
@@ -1588,6 +1707,10 @@ async def import_knowledge_base(
         if not await _insert_source_unless_duplicate(new_src):
             continue
         imported += 1
+        if src.get("uuid"):
+            new_uuid_for[src["uuid"]] = new_src.uuid
+        if src.get("amends_source_uuids"):
+            amends_to_link.append((new_src, list(src["amends_source_uuids"])))
 
         if content and content.strip():
             label = (
@@ -1618,6 +1741,14 @@ async def import_knowledge_base(
         else:
             new_src.status = "error"
             new_src.error_message = "Imported source had no content and no URL to re-fetch"
+            await new_src.save()
+
+    # Links are by uuid, and every imported source got a new one. A link to a
+    # source that did not come across is dropped.
+    for new_src, old_targets in amends_to_link:
+        mapped = [new_uuid_for[u] for u in old_targets if u in new_uuid_for]
+        if mapped:
+            new_src.amends_source_uuids = mapped
             await new_src.save()
 
     await recalculate_stats(kb)
@@ -1714,6 +1845,30 @@ def _reject_fetched_page(result: WebFetchResult) -> str | None:
 _REFRESH_COLLAPSE_RATIO = 0.25
 
 
+def _kb_text_cap() -> int:
+    """Characters of extracted text a KB source may carry.
+
+    Read at call time, not import time, so a deployment can raise or lower it
+    without a code change — and so tests can set it per case.
+    """
+    from app.config import Settings
+
+    return Settings().kb_url_max_chars
+
+
+def _kb_snapshot(text: str) -> str:
+    """The stored copy of a source's text.
+
+    Bounded by the same limit that bounded the ingest, so the snapshot is the
+    text that was indexed rather than a shorter copy of it. That identity is
+    load-bearing in two places: ``_reject_collapsed_refresh`` measures a
+    refetch against this snapshot and would read a capped one as the page
+    having shrunk, and the source inspector presents it as "the extracted
+    text" the answers were built from.
+    """
+    return text[:_kb_text_cap()]
+
+
 def _reject_collapsed_refresh(
     previous_text: str | None, new_text: str, last_collapsed_hash: str | None = None,
 ) -> str | None:
@@ -1743,6 +1898,24 @@ def _reject_collapsed_refresh(
         f"{previous_len:,} — this looks like the site's shell or an error page, "
         "not the content. If the page really is this short now, refresh again "
         "and the same text will be accepted"
+    )
+
+
+def _reject_crawled_navigation_page(result: WebFetchResult, url: str) -> str | None:
+    """The crawler's navigation-page gate, for refreshing a page it found.
+
+    A crawl only keeps pages with real content (see ``_crawl_from_source``);
+    a refresh must hold a crawled page to the same bar, or a page that has
+    since turned into a link hub gets embedded over the content it replaced.
+    A page added by hand is exempt, as it was on first ingest.
+    """
+    from app.config import Settings
+    from app.utils.page_quality import describe_low_value_page
+
+    return describe_low_value_page(
+        result.text,
+        len(_crawlable_links(result, url)),
+        min_chars=Settings().kb_crawl_min_content_chars,
     )
 
 
@@ -1784,7 +1957,7 @@ async def refresh_url_source(
     try:
         from app.services.web_fetcher import fetch_url
 
-        result = await fetch_url(source.url)
+        result = await fetch_url(source.url, max_chars=_kb_text_cap())
         reason = _reject_fetched_page(result)
         if reason is None:
             reason = _reject_collapsed_refresh(
@@ -1796,6 +1969,8 @@ async def refresh_url_source(
             source.last_collapsed_hash = (
                 currency.content_fingerprint(result.text) if reason else None
             )
+        if reason is None and getattr(source, "parent_source_uuid", None):
+            reason = _reject_crawled_navigation_page(result, source.url)
     except Exception as e:
         logger.warning("Refresh fetch failed for KB source %s (%s): %s", source.uuid, source.url, e)
         reason = describe_fetch_error(e)[:1800]
@@ -1826,6 +2001,9 @@ async def refresh_url_source(
         source.url_title = result.title or source.url_title
         source.status = "ready"
         source.error_message = None
+        # The fetch is what carries the caveat, so a successful fetch
+        # rewrites it: a clean refetch clears an earlier one.
+        source.warnings = list(result.advisories)
         source.last_refresh_outcome = currency.OUTCOME_UNCHANGED
         source.last_refresh_error = None
         await source.save()
@@ -1834,22 +2012,29 @@ async def refresh_url_source(
     name = source.custom_name or result.title or source.url_title or source.url
     try:
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        # New chunks go in before the old ones come out, so a failed embed
+        # leaves the source answering from its previous text.
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, raw_text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, raw_text,
         )
     except Exception as e:
         logger.error(f"Error re-embedding refreshed KB source {source.uuid}: {e}")
-        source.status = "error"
-        source.error_message = f"Refresh failed while re-indexing: {e}"[:2000]
+        reason = f"Refresh failed while re-indexing: {e}"[:2000]
         source.last_refresh_outcome = currency.OUTCOME_INGESTION_FAILED
-        source.last_refresh_error = source.error_message
+        source.last_refresh_error = reason
+        if previous_status == "ready":
+            source.status = "ready"
+            source.error_message = f"Refresh failed while re-indexing — previous content kept: {e}"[:2000]
+        else:
+            source.status = "error"
+            source.error_message = reason
         await source.save()
-        return source.error_message
+        return reason
 
-    source.content = raw_text[:500000]
+    source.content = _kb_snapshot(raw_text)
     source.url_title = result.title or source.url_title
     source.truncated = bool(result.truncated)
+    source.warnings = list(result.advisories)
     source.chunk_count = chunk_count
     source.status = "ready"
     source.error_message = None
@@ -1877,7 +2062,7 @@ async def _ingest_url_source(
     try:
         from app.services.web_fetcher import fetch_url
 
-        result = await fetch_url(source.url)
+        result = await fetch_url(source.url, max_chars=_kb_text_cap())
         raw_text = result.text
 
         reject_reason = _reject_fetched_page(result)
@@ -1897,9 +2082,12 @@ async def _ingest_url_source(
                 # Not an error — the caller still wants the links off this page.
                 return result
 
-        source.content = raw_text[:500000]
+        source.content = _kb_snapshot(raw_text)
         source.url_title = result.title
         source.truncated = bool(result.truncated)
+        # e.g. a fetched PDF whose hidden-text scrub could not run: the text
+        # is indexed, and the source row says what was not checked.
+        source.warnings = list(result.advisories)
 
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(
@@ -1962,17 +2150,19 @@ async def ingest_text_into_source(
             or "Text Source"
         )
         dm = _get_dm()
-        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
         chunk_count = await asyncio.to_thread(
-            dm.add_to_kb, kb.uuid, source.uuid, name, text,
+            dm.replace_kb_source, kb.uuid, source.uuid, name, text,
         )
-        source.content = text[:500000]
+        source.content = _kb_snapshot(text)
         if label:
             source.url_title = label[:500]
         source.chunk_count = chunk_count
         # Caller-supplied text is chunked in full (dm.add_to_kb gets the whole
         # string), so re-ingesting here repairs any earlier fetch truncation.
         source.truncated = False
+        # Caller-supplied text never went through the fetcher's PDF scrub,
+        # so a fetch-time caveat no longer describes what is indexed.
+        source.warnings = []
         source.status = "ready"
         source.error_message = None
         currency.stamp_ingested(source, text)

@@ -41,6 +41,15 @@ class SmartDocument(Document):
     # None = not measured (legacy docs, or docs whose text bypassed extraction).
     extraction_nonletter_ratio: Optional[float] = None
 
+    # A non-OCR reading of this file was refused as unreadable and nothing
+    # has replaced it yet. Any forced re-read must use OCR. Set by the retry
+    # route when it dispatches an OCR-required retry and by the extraction
+    # task when the reader refuses the layer; cleared by the extraction task
+    # when it stores a successful reading, so a document that OCR read fine
+    # — or whose ratio was a false positive — is not pinned to OCR-only
+    # retries for the rest of its life.
+    text_layer_rejected: bool = False
+
     # Ingestion warnings — machine-readable codes for the ways an extraction can
     # succeed and still not be the whole document. Emptiness and garbling are
     # already covered (task_status="error" and the ratio above); these are the
@@ -50,8 +59,13 @@ class SmartDocument(Document):
     #   "sparse_text"  — far too few characters for the PDF's page count. A
     #                    400-page scan yielding 150 characters clears the
     #                    whole-document minimum and is still a failure.
+    #   "unread_pages" — pages that show content (an image of a page, with no
+    #                    text layer) that no reader got text from; they are
+    #                    missing from raw_text. Numbers in ``unread_pages``.
     # None/[] = measured and clean, or never measured (legacy documents).
     ingestion_warnings: list[str] = []
+    # 1-indexed PDF pages behind the "unread_pages" warning.
+    unread_pages: list[int] = []
 
     # Per-location char-offset markers from text extraction, used to attach
     # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for

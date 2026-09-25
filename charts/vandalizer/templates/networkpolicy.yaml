@@ -1,0 +1,144 @@
+{{- if .Values.networkPolicy.enabled }}
+{{/*
+Two jobs at once:
+
+1. Compensating control — the application offers no way to put credentials on
+   Redis or ChromaDB (and the chart's MongoDB runs unauthenticated,
+   compose-style), so only this release's backend pods may reach the
+   datastores, and only the frontend (plus explicitly allowed namespaces) may
+   reach the api.
+
+2. Default-deny compatibility — clusters with a baseline deny-all need every
+   flow explicitly allowed, so the chart also grants what the app needs:
+   ingress to the frontend from the edge, frontend egress to the api and DNS,
+   and unrestricted backend egress (LLM/OCR/web-crawl endpoints are
+   arbitrary, per-deployment, and configured at runtime in the admin UI — a
+   tighter egress rule here would just be wrong somewhere). On permissive
+   clusters these extra allows change nothing.
+
+The datastores get no egress rule at all: they initiate nothing, so under a
+cluster default-deny their egress stays denied, which is the right posture.
+
+Caveat: a platform AdminNetworkPolicy with a hard Deny outranks namespace
+NetworkPolicies entirely — if flows stay blocked with these applied, the
+allow has to come from the cluster admin.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-datastores
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "vandalizer.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [mongodb, redis, chromadb]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              vandalizer.io/role: backend
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-api
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "api") | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "frontend") | nindent 14 }}
+        # Backend pods probe the api too (the bootstrap Job gates on
+        # /api/health before seeding).
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: {{ .Release.Name }}
+              vandalizer.io/role: backend
+        {{- with .Values.networkPolicy.apiExtraIngressFrom }}
+        # Extra peers admitted to the api directly: split-edge routing,
+        # Prometheus scraping /api/metrics, etc.
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      ports:
+        - port: 8001
+          protocol: TCP
+---
+{{/*
+Frontend: reachable from outside the namespace (the Ingress controller or
+Gateway lives elsewhere); talks only to the api and DNS.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-frontend
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "frontend") | nindent 6 }}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        {{- if .Values.networkPolicy.frontendIngressFrom }}
+        {{- toYaml .Values.networkPolicy.frontendIngressFrom | nindent 8 }}
+        {{- else }}
+        # Any namespace — the edge's namespace varies per cluster. Set
+        # networkPolicy.frontendIngressFrom to pin it down (use an ipBlock
+        # for hostNetwork edges, which arrive from node IPs).
+        - namespaceSelector: {}
+        {{- end }}
+      ports:
+        - port: {{ .Values.frontend.containerPort }}
+          protocol: TCP
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "vandalizer.selectorLabels" (dict "ctx" . "component" "api") | nindent 14 }}
+      ports:
+        - port: 8001
+          protocol: TCP
+    # DNS — kube-dns/CoreDNS location varies, so scope by port only.
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+{{/*
+Backend egress: deliberately allow-all. The api and workers call
+per-deployment LLM/OCR endpoints, crawl arbitrary web sources for knowledge
+bases, and reach M365/SMTP — all configured at runtime, none knowable here.
+The rule exists so backend pods keep working under a cluster-wide
+default-deny baseline.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "vandalizer.fullname" . }}-backend-egress
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "networkpolicy") | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      vandalizer.io/role: backend
+  policyTypes: [Egress]
+  egress:
+    - {}
+{{- end }}

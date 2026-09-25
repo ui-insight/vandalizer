@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled }}
+{{/*
+Sends ALL paths (including /api) to the frontend, whose nginx proxies the API
+with the SSE/body-size/OAuth behaviors the app needs — no controller-specific
+annotations required for those. Add controller annotations (TLS issuers,
+rate limits, ...) via ingress.annotations.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "vandalizer.fullname" . }}
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" . "component" "frontend") | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ required "set hostname or ingress.host when ingress.enabled=true" (default .Values.hostname .Values.ingress.host) | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "vandalizer.fullname" . }}-frontend
+                port:
+                  name: http
+{{- end }}

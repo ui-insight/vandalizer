@@ -6,7 +6,7 @@
     "seed_id": "kb-nih-gps",
     "display_name": "NIH Grants Policy Statement",
     "description": "NIH Grants Policy Statement (GPS) - the authoritative reference for NIH grant application, review, and management policies.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": ["federal-agency", "reference-knowledge"]
   },
   "items": [{

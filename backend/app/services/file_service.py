@@ -201,6 +201,7 @@ async def render_xlsx_sheets(
         return None
 
     from app.services.document_readers import (
+        DocumentReadError,
         extract_sheet_json_from_csv,
         extract_sheet_json_from_xls,
         extract_sheet_json_from_xlsx,
@@ -217,6 +218,10 @@ async def render_xlsx_sheets(
         tmp.write(data)
         tmp.close()
         return readers[extension](tmp.name)
+    except DocumentReadError:
+        # A refusal with a user-facing message (a binary named .csv): the
+        # router turns it into a 4xx the viewer shows, not a bare 404.
+        raise
     except Exception as e:
         logger.warning("sheet-json rendering failed for %s: %s", doc_uuid, e)
         return None

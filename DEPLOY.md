@@ -14,6 +14,29 @@ After the first run, the same script is the entry point for ongoing operations: 
 
 The frontend is available at the URL you configured (defaults to `http://localhost`) and the API at `http://localhost:8001` when setup completes.
 
+### Container engine: Docker or podman
+
+The deploy path is engine-agnostic. `setup.sh`, `status.sh` and `upgrade.sh`
+look for `docker` first and fall back to `podman`, and for a Compose
+implementation in the order `docker compose` → `docker-compose` →
+`podman-compose`; they find containers by Compose labels and `inspect` rather
+than Docker-only `ps` fields, and accept both the `project-svc` and
+`project_svc` container-name conventions. Image references in the Dockerfiles
+and `compose.yaml` are fully qualified (`docker.io/...`, `ghcr.io/...`), because
+podman cannot answer its short-name prompt without a TTY and a distro
+short-name alias can silently redirect a bare `mongo` to a registry that
+rejects the pull. The api, celery and frontend services declare their
+healthchecks at the Compose level as well as in the Dockerfiles, since
+OCI-format builds drop Dockerfile `HEALTHCHECK`.
+
+Verified end to end on RHEL 10 with podman 5.8 and podman-compose 1.5 (full
+stack healthy, health endpoints answering through the published port). Where
+this guide and [OPERATIONS.md](OPERATIONS.md) say `docker compose ...`, read
+`podman-compose ...` on a podman host; the subcommands are the same. One
+visible difference from earlier releases: a fully stopped stack now counts as
+an existing deployment, so `./setup.sh` offers repair/upgrade rather than a
+fresh install until you remove it.
+
 ### Escape hatch: manual Docker Compose
 
 This path exists for operators who need to script each step themselves (CI builds, golden images, configuration-management tools). The interactive wizard above is the supported path for everyone else.
@@ -232,6 +255,7 @@ Key notes:
 - **`MONGO_HOST`**: Use the Docker service name (`mongo`) if running in Docker Compose, or the hostname/IP of your MongoDB instance if externalized.
 - **`UPLOAD_DIR`**: Directory where user-uploaded documents are stored. Must be a persistent volume.
 - **`FRONTEND_URL`**: The public URL users will access. Used for CORS and redirect configuration.
+- **`OUTBOUND_URL_ALLOWED_HOSTS`** (optional): Server-side HTTP from workflow API Call / Fetch steps, automation callbacks and credential token endpoints refuses any URL that resolves to a private, loopback or link-local address. If a workflow needs to call a service that only has such an address -- an institutional LLM router on the campus network, say -- a superadmin can list its exact hostname under Admin → System Config → Endpoints → Allowed private hosts (takes effect immediately, audit-logged), or an operator can set it here (comma-separated for several; restart the api and celery containers after changing it). The two lists are merged. The match is on the hostname, not the address, so nothing else on that network is opened up, and the cloud metadata hostnames can never be exempted.
 - **`CHROMADB_HOST`**: Hostname:port of the Chroma server. Required for any multi-process deployment — the Python `PersistentClient` is not process-safe for concurrent writers, so FastAPI workers + Celery workers sharing a persist directory will hit "attempt to write a readonly database" errors. Leave unset only for single-process local development.
 
 ### LLM Configuration
@@ -398,6 +422,14 @@ server {
 }
 ```
 
+### Single sign-on (SSO)
+
+Vandalizer authenticates with local passwords by default. A superadmin can add identity providers under **Admin → System Config → Authentication**: **Azure AD** (OAuth) and **SAML 2.0** (Shibboleth is verified against a live IdP; other SAML 2.0 IdPs follow the same setup). Providers are stored in System Config and take effect on save; nothing SSO-related goes in `backend/.env`.
+
+- **SAML setup.** Paste the IdP's metadata URL or XML into *Import from IdP metadata* and the entity ID, SSO URL and signing certificate fill in. An IdP that publishes separate signing and encryption certificates (the standard Shibboleth layout) is read correctly; the first signing certificate is used. Register Vandalizer with the IdP using its SP metadata at `https://<your-host>/api/auth/saml/metadata`; the assertion consumer service is `https://<your-host>/api/auth/saml/acs`.
+- **Create accounts on first sign-in (JIT provisioning).** On by default, per provider: any identity the IdP asserts gets an account on first login. Turn it off to require that an account already exist. An unknown identity is then denied, the denial is audit-logged as `user.login_denied` with the asserted ID, and the person lands on a page saying the account has not been set up. Existing users are unaffected either way, because the flag gates account creation only.
+- **Behind a TLS-terminating proxy, forward the scheme.** SAML builds its issuer and ACS URLs, and validates the IdP's response, from the `X-Forwarded-Proto` header. The frontend container passes an upstream `X-Forwarded-Proto` through and falls back to its own scheme only when none arrives, so whatever terminates TLS in front of it (the nginx example above, Caddy, Traefik, Cloudflare, a load balancer) must send `X-Forwarded-Proto: https`. Without it, SAML requests carry `http://` URLs and the IdP's response is rejected as received over HTTP.
+
 ### Post-Deploy Verification
 
 Run the status script to check all services, health, and seed data:
@@ -422,6 +454,33 @@ If anything is broken, run `./setup.sh --repair` to diagnose and fix.
 - **Celery workers** can be scaled independently. Add more replicas or run separate containers per queue (e.g., `uploads`, `extraction`, `quality`) to isolate workloads.
 - **FastAPI workers** are configured via the `--workers` flag in the uvicorn command. The default is 4; increase for higher API concurrency.
 - **MongoDB and Redis** can be externalized to managed services (MongoDB Atlas, AWS ElastiCache, etc.) by updating `MONGO_HOST` and `REDIS_HOST`.
+
+## Kubernetes (Helm)
+
+A Helm chart lives at [`charts/vandalizer/`](charts/vandalizer/README.md). It
+deploys the api, one Celery worker Deployment per queue plus the beat
+scheduler, the frontend (defaulting to the non-root
+`vandalizer-frontend-unprivileged` image), and optional in-cluster MongoDB,
+Redis, and ChromaDB — each replaceable with an external endpoint.
+
+What you need up front:
+
+- **Storage**: a ReadWriteMany-capable storage class for the shared uploads
+  volume on multi-node clusters (any RWX provisioner works — Ceph NFS, EFS,
+  Azure Files, ...). All storage classes, access modes, and sizes are
+  values-driven, and every volume accepts an `existingClaim`.
+- **Edge**: either a classic Ingress (`ingress.enabled=true`) or Gateway API
+  (`httpRoute.enabled=true` with your Gateway's `parentRefs`).
+- **Secrets**: a JWT signing key and a Fernet `CONFIG_ENCRYPTION_KEY`
+  (back it up — it encrypts credentials stored in MongoDB).
+- **Bootstrap**: the chart runs `bootstrap_install.py` as a post-install Job
+  (admin account + catalog seed); set `bootstrap.adminEmail`/`adminPassword`
+  or point `bootstrap.existingSecret` at a Secret.
+
+See the [chart README](charts/vandalizer/README.md) for a quickstart, the
+routing topology, external-datastore examples, and OpenShift notes. Validate
+chart changes locally with `make helm-lint` (requires `helm` and
+`kubeconform`).
 
 ## Architecture
 

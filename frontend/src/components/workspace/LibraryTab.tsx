@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { useTeams } from '../../hooks/useTeams'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
@@ -63,6 +64,7 @@ export function LibraryTab() {
   const confirm = useConfirm()
   const { user } = useAuth()
   const teamId = user?.current_team ?? undefined
+  const { teams } = useTeams()
   const { libraries, loading: libLoading, error, refresh } = useLibraries(teamId)
 
   const [scope, setScope] = useState('mine' as ScopeTab)
@@ -218,20 +220,24 @@ export function LibraryTab() {
   }
   const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
   const handleShare = (itemId: string) => {
-    if (!teamId) {
-      toast('Switch to a team before sharing items.', 'info')
+    if (teams.length === 0) {
+      toast('Join or create a team before sharing items.', 'info')
       return
     }
     const item = items.find((i) => i.id === itemId)
     setShareDialogItem({ id: itemId, name: item?.name ?? 'this item' })
   }
-  const confirmShare = async (comment: string) => {
-    if (!shareDialogItem || !teamId) return
+  // The dialog lets the user pick any team they belong to (default: current
+  // team), so the destination is always shown and never assumed.
+  const confirmShare = async (comment: string, destTeamId?: string) => {
+    const targetTeamId = destTeamId ?? teamId
+    if (!shareDialogItem || !targetTeamId) return
     const { id, name } = shareDialogItem
+    const teamName = teams.find((t) => t.id === targetTeamId)?.name ?? 'the team'
     setShareDialogItem(null)
     try {
-      await shareToTeam(id, teamId, comment || undefined)
-      toast('Shared to team library', 'success')
+      await shareToTeam(id, targetTeamId, comment || undefined)
+      toast(`Shared to ${teamName}'s library`, 'success')
       refreshItems()
     } catch (err) {
       // 409: this item was already shared to the team — re-sharing would
@@ -241,7 +247,7 @@ export function LibraryTab() {
           title: 'Already shared to team',
           message: (
             <>
-              <strong>{name}</strong> is already in this team's library. Sharing again
+              <strong>{name}</strong> is already in {teamName}'s library. Sharing again
               creates a separate copy that can be edited independently of the first.
             </>
           ),
@@ -249,8 +255,8 @@ export function LibraryTab() {
         })
         if (!ok) return
         try {
-          await shareToTeam(id, teamId, comment || undefined, true)
-          toast('Shared a new copy to team library', 'success')
+          await shareToTeam(id, targetTeamId, comment || undefined, true)
+          toast(`Shared a new copy to ${teamName}'s library`, 'success')
           refreshItems()
         } catch (err2) {
           const msg = err2 instanceof ApiError ? err2.message : 'Failed to share to team'
@@ -755,7 +761,7 @@ export function LibraryTab() {
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
-            { key: 'explore' as const, label: 'Explore' },
+            { key: 'explore' as const, label: 'Everyone' },
             { key: 'quality' as const, label: 'Quality Inbox' },
           ]).map(({ key, label }) => {
             const active = scope === key
@@ -1324,7 +1330,7 @@ export function LibraryTab() {
                 <p style={{ margin: '10px 0 18px', color: '#5f6368', fontSize: 13, lineHeight: 1.55 }}>
                   {hasActiveFilters
                     ? 'Try clearing a filter or searching with a different term.'
-                    : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work.'}
+                    : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work, or start from a ready-made one in the catalog.'}
                 </p>
                 {hasActiveFilters ? (
                   <button
@@ -1339,13 +1345,23 @@ export function LibraryTab() {
                     Clear filters
                   </button>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => openCreateModal('workflow')}
-                    style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--library-highlight-ink, #1f1b00)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    Create a workflow
-                  </button>
+                  <div style={{ display: 'flex', gap: 14, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={() => openCreateModal('workflow')}
+                      style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--library-highlight-ink, #1f1b00)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                    >
+                      Create a workflow
+                    </button>
+                    {/* Ready-made starting points live under Everyone (#961). */}
+                    <button
+                      type="button"
+                      onClick={() => setScope('explore')}
+                      style={{ border: 0, padding: 0, background: 'none', color: '#303030', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+                    >
+                      Browse the catalog →
+                    </button>
+                  </div>
                 )}
               </div>
             ) : (
@@ -1839,6 +1855,8 @@ export function LibraryTab() {
       {shareDialogItem && (
         <ShareWithTeamDialog
           itemName={shareDialogItem.name}
+          teams={teams.map((t) => ({ id: t.id, name: t.name }))}
+          defaultTeamId={teamId}
           onCancel={() => setShareDialogItem(null)}
           onConfirm={confirmShare}
         />

@@ -11,6 +11,7 @@ import re
 from pydantic_ai.exceptions import ModelAPIError
 
 from app.celery_app import celery_app
+from app.models.activity import ActivityType
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
 logger = logging.getLogger(__name__)
@@ -70,6 +71,48 @@ STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT = 30
 # a row still failed this long after the flip is past any legitimate runtime
 # (the Celery hard time limit is 3660s) and genuinely dead.
 _EXTRACTION_BELL_DELAY_SECONDS = 5400
+
+_REAPED_EXTRACTION_ERROR = (
+    "Timed out — the run stopped reporting progress and never finished. The "
+    "worker likely crashed or was restarted mid-run."
+)
+
+
+def _bell_reaped_extraction(db, row: dict) -> None:
+    """Tell an extraction's owner that the rail reaper failed its run."""
+    from app.services.failure_notifications import notify_extraction_failed
+
+    notify_extraction_failed(
+        db,
+        user_id=row.get("user_id"),
+        search_set_uuid=row.get("search_set_uuid"),
+        search_set_name=row.get("title"),
+        error=_REAPED_EXTRACTION_ERROR,
+    )
+
+
+# Who tells the owner when a reaper fails a row of this type. A type missing
+# here is a test failure, not a silent default: adding an activity type is a
+# decision about disclosure, made here and nowhere else.
+#
+#   callable        — this reaper rings it, from the delayed bell sweep in
+#                     reap_stale_running_task, once per row.
+#   OWNED_ELSEWHERE — another reaper owns the row's truth and rings the bell;
+#                     this reaper may flip the rail row but must stay silent.
+#   None            — silent by design.
+OWNED_ELSEWHERE = "owned_elsewhere"
+REAP_BELL_OWNERS: dict = {
+    # Extraction's only backstop: its task's final-attempt bell never fires
+    # when the worker dies without running a handler.
+    ActivityType.SEARCH_SET_RUN.value: _bell_reaped_extraction,
+    # reap_stale_workflow_runs_task owns the WorkflowResult and notifies once,
+    # with run-level truth (and the automation owner for scheduled runs).
+    ActivityType.WORKFLOW_RUN.value: OWNED_ELSEWHERE,
+    # The user was watching the stream drop.
+    ActivityType.CONVERSATION.value: None,
+    # Written already-terminal by quality_tasks; never running, never reaped.
+    ActivityType.QUALITY_ALERT.value: None,
+}
 
 
 def _resolve_stale_threshold_minutes(db) -> int:
@@ -308,6 +351,61 @@ def generate_activity_description_task(
         _mark_done()
 
 
+def _as_utc(value):
+    """Sync pymongo hands back naive datetimes; compare them as UTC."""
+    if value is not None and getattr(value, "tzinfo", None) is None:
+        return value.replace(tzinfo=datetime.timezone.utc)
+    return value
+
+
+def _workflow_rail_rows_without_live_run(db, rail_rows: list[dict], cutoff) -> list[dict]:
+    """Return the workflow_run rail rows whose WorkflowResult is not alive.
+
+    The run's ``last_progress_at`` is the one clock (see
+    reap_stale_running_task). A rail row is kept at "running" when its run has
+    heartbeated since ``cutoff`` or sits at ``pending_approval`` — a state the
+    run reaper's approved-but-never-resumed sweep owns. A rail row with no
+    linked run at all (the run was never created, or the row predates the
+    link fields) has nothing to follow and is flipped as before. Linked by the
+    result id when the run got far enough to set it, by session otherwise —
+    the same ``rail_or`` pairing reap_stale_workflow_runs_task uses in the
+    other direction. One batched lookup, not a find_one per row.
+    """
+    result_ids = [r["workflow_result"] for r in rail_rows if r.get("workflow_result")]
+    session_ids = [
+        r["workflow_session_id"] for r in rail_rows if r.get("workflow_session_id")
+    ]
+    link_or = []
+    if result_ids:
+        link_or.append({"_id": {"$in": result_ids}})
+    if session_ids:
+        link_or.append({"session_id": {"$in": session_ids}})
+    if not link_or:
+        return list(rail_rows)
+
+    runs = list(db.workflow_result.find(
+        {"$or": link_or},
+        {"session_id": 1, "status": 1, "last_progress_at": 1},
+    ))
+    by_id = {run["_id"]: run for run in runs}
+    by_session = {run["session_id"]: run for run in runs if run.get("session_id")}
+
+    def _is_live(run: dict) -> bool:
+        if run.get("status") == "pending_approval":
+            return True
+        heartbeat = _as_utc(run.get("last_progress_at"))
+        return heartbeat is not None and heartbeat >= cutoff
+
+    dead = []
+    for row in rail_rows:
+        run = by_id.get(row.get("workflow_result")) or by_session.get(
+            row.get("workflow_session_id"),
+        )
+        if run is None or not _is_live(run):
+            dead.append(row)
+    return dead
+
+
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_running")
 def reap_stale_running_task(self) -> None:
     """Mark activity events stuck in running/queued as failed.
@@ -322,6 +420,19 @@ def reap_stale_running_task(self) -> None:
     so reaping on elapsed time marked every review left overnight as a timeout.
     The approval paths (resume, reject, expire) clear the marker, which puts the
     row back under this sweep.
+
+    One clock for workflow runs. A workflow run has two rows — the rail row
+    here and the WorkflowResult — written by different writers on different
+    cadences. The rail row's ``last_updated_at`` is refreshed by the same
+    progress writes that stamp the run's ``last_progress_at``, but the two
+    reapers used different thresholds (this one ~30 min, the run reaper 2×
+    the hard time limit), so a long step could see the rail flipped to
+    "failed" while the run stayed "running" and the SSE poller kept streaming
+    — the rail contradicting the run it describes (#835). The run's
+    ``last_progress_at`` is the authoritative clock and the rail follows it:
+    a workflow_run rail row is only flipped here when its run has no
+    heartbeat newer than this sweep's cutoff (or no run at all), and never
+    when the run reaper owns the row's fate (``pending_approval``).
     """
     db = _get_db()
     threshold_minutes = _resolve_stale_threshold_minutes(db)
@@ -337,27 +448,52 @@ def reap_stale_running_task(self) -> None:
         "meta_summary.pending_review_uuid": None,
     }
 
+    # Fetch the candidates rather than flipping blind: workflow_run rows have
+    # a second clock to consult before the verdict (see the docstring).
+    candidates = list(db.activity_event.find(
+        stale_filter,
+        {"type": 1, "workflow_result": 1, "workflow_session_id": 1},
+    ))
+    workflow_rows = [
+        r for r in candidates if r.get("type") == ActivityType.WORKFLOW_RUN.value
+    ]
+    to_flip = [
+        r["_id"] for r in candidates
+        if r.get("type") != ActivityType.WORKFLOW_RUN.value
+    ]
+    if workflow_rows:
+        to_flip.extend(
+            r["_id"] for r in _workflow_rail_rows_without_live_run(
+                db, workflow_rows, cutoff,
+            )
+        )
+
     # The flip stamps reaper_flipped_at so the bell sweep at the bottom can
     # notify — later, and only if the verdict stands. Ringing here off a
     # pre-flip snapshot had two failure modes: an extraction that completed
     # between the find and the update_many got a timeout bell for results
     # already on screen, and (because extractions report no mid-run progress)
     # a merely *slow* run past the threshold got belled and then finished.
-    result = db.activity_event.update_many(
-        stale_filter,
-        {
-            "$set": {
-                "status": "failed",
-                "finished_at": now,
-                "last_updated_at": now,
-                "meta_summary.reaper_flipped_at": now,
-                "error": (
-                    f"Timed out — no progress reported for over "
-                    f"{threshold_minutes} minutes."
-                ),
+    # The status guard is kept on the write: a row that completed between the
+    # find and here is left alone.
+    flipped_count = 0
+    if to_flip:
+        result = db.activity_event.update_many(
+            {"_id": {"$in": to_flip}, "status": {"$in": ["running", "queued"]}},
+            {
+                "$set": {
+                    "status": "failed",
+                    "finished_at": now,
+                    "last_updated_at": now,
+                    "meta_summary.reaper_flipped_at": now,
+                    "error": (
+                        f"Timed out — no progress reported for over "
+                        f"{threshold_minutes} minutes."
+                    ),
+                },
             },
-        },
-    )
+        )
+        flipped_count = result.modified_count
 
     # A row parked on a review is exempt from the sweep above, but only while
     # that review is actually pending. approve_review returns as soon as the
@@ -393,62 +529,52 @@ def reap_stale_running_task(self) -> None:
         },
     )
 
-    if result.modified_count or orphaned.modified_count:
+    if flipped_count or orphaned.modified_count:
         logger.info(
             "Reaped %d stale activity events and %d parked on a decided review "
             "(threshold=%d min)",
-            result.modified_count, orphaned.modified_count, threshold_minutes,
+            flipped_count, orphaned.modified_count, threshold_minutes,
         )
 
-    # Bell sweep: tell extraction owners about reaped runs, once, and only
-    # when the reaper's verdict is conclusive. This reaper is extraction's
-    # only backstop (its task's own final-attempt bell never fires when the
-    # worker dies without running a handler) — but extractions report no
-    # mid-run progress, so the flip above happens for slow runs too, and the
-    # completion write then corrects the rail. The bell therefore waits
-    # _EXTRACTION_BELL_DELAY_SECONDS after the flip: no task outlives the
-    # Celery hard time limit, so a row still failed then is genuinely dead.
-    # The atomic reap_notified claim makes the bell fire exactly once even
-    # across overlapping ticks. Workflow runs are deliberately NOT belled
-    # from this sweep — reap_stale_workflow_runs_task owns the WorkflowResult
-    # and notifies once, with run-level truth. Conversations stay silent: the
-    # user was watching the stream drop.
+    # Bell sweep: tell owners about reaped runs, once, and only when the
+    # reaper's verdict is conclusive. Which types ring is REAP_BELL_OWNERS'
+    # call, not this loop's — only types whose entry is a callable are
+    # queried. Extractions report no mid-run progress, so the flip above
+    # happens for slow runs too, and the completion write then corrects the
+    # rail. The bell therefore waits _EXTRACTION_BELL_DELAY_SECONDS after the
+    # flip: no task outlives the Celery hard time limit, so a row still
+    # failed then is genuinely dead. The atomic reap_notified claim makes the
+    # bell fire exactly once even across overlapping ticks.
     bell_cutoff = now - datetime.timedelta(seconds=_EXTRACTION_BELL_DELAY_SECONDS)
+    belled_types = [
+        type_value for type_value, owner in REAP_BELL_OWNERS.items()
+        if callable(owner)
+    ]
     bell_rows = list(db.activity_event.find(
         {
-            "type": "search_set_run",
+            "type": {"$in": belled_types},
             "status": "failed",
             "meta_summary.reaper_flipped_at": {"$lte": bell_cutoff},
             "meta_summary.reap_notified": {"$ne": True},
         },
-        {"user_id": 1, "search_set_uuid": 1, "title": 1},
-    ))
+        {"type": 1, "user_id": 1, "search_set_uuid": 1, "title": 1},
+    )) if belled_types else []
     for row in bell_rows:
         try:
+            bell = REAP_BELL_OWNERS.get(row.get("type"))
+            if not callable(bell):
+                continue
             claimed = db.activity_event.update_one(
                 {"_id": row["_id"], "meta_summary.reap_notified": {"$ne": True}},
                 {"$set": {"meta_summary.reap_notified": True}},
             )
             if not claimed.modified_count:
                 continue
-
-            from app.services.failure_notifications import notify_extraction_failed
-
-            notify_extraction_failed(
-                db,
-                user_id=row.get("user_id"),
-                search_set_uuid=row.get("search_set_uuid"),
-                search_set_name=row.get("title"),
-                error=(
-                    "Timed out — the run stopped reporting progress and never "
-                    "finished. The worker likely crashed or was restarted "
-                    "mid-run."
-                ),
-            )
+            bell(db, row)
         except Exception:
             logger.exception(
-                "Failed to notify owner of reaped extraction activity %s",
-                row.get("_id"),
+                "Failed to notify owner of reaped %s activity %s",
+                row.get("type"), row.get("_id"),
             )
 
 
@@ -488,6 +614,12 @@ def reap_stale_workflow_runs_task(self) -> None:
     Runs on the default queue on purpose: parking it on the workflows queue
     would let the very worker outage it exists to detect also silence it.
     """
+    # This task is the bell for workflow runs; the contract map must agree,
+    # or a rail-side change would double the bell (or drop it) unnoticed.
+    assert REAP_BELL_OWNERS.get(ActivityType.WORKFLOW_RUN.value) is OWNED_ELSEWHERE, (
+        "reap_stale_workflow_runs_task rings the workflow_run bell; "
+        "REAP_BELL_OWNERS must mark that type OWNED_ELSEWHERE"
+    )
     db = _get_db()
     now = datetime.datetime.now(datetime.timezone.utc)
     progress_cutoff = now - datetime.timedelta(seconds=STALE_WORKFLOW_RUN_AGE_SECONDS)
@@ -507,7 +639,8 @@ def reap_stale_workflow_runs_task(self) -> None:
             },
         ]},
         {"workflow": 1, "session_id": 1, "status": 1, "last_progress_at": 1,
-         "start_time": 1},
+         "start_time": 1, "is_passive": 1, "trigger_type": 1, "automation_id": 1,
+         "input_context.automation_id": 1, "input_context.automation_name": 1},
     ))
 
     # Sweep 3: approved at the gate, never resumed. The reject and expire
@@ -522,7 +655,8 @@ def reap_stale_workflow_runs_task(self) -> None:
     parked = list(db.workflow_result.find(
         {"status": "pending_approval"},
         {"workflow": 1, "session_id": 1, "approval_request_id": 1, "status": 1,
-         "start_time": 1},
+         "start_time": 1, "is_passive": 1, "trigger_type": 1, "automation_id": 1,
+         "input_context.automation_id": 1, "input_context.automation_name": 1},
     ))
     if parked:
         approved_old = {
@@ -564,6 +698,30 @@ def reap_stale_workflow_runs_task(self) -> None:
                 {"_id": raw_id}, {"name": 1, "user_id": 1},
             ) or {}
         return workflow_cache[raw_id]
+
+    # A scheduled automation has no one watching it, so the bell must reach
+    # the person who set the schedule — who need not own the workflow. This
+    # mirrors passive_tasks' retry-exhausted path, which is the only other
+    # place a passive run is failed. Cached per sweep like the workflow docs:
+    # a nightly automation that dies every night reaps as a batch. Runs
+    # written before WorkflowResult.automation_id existed carry the same id
+    # in input_context (the trigger context has always been copied there),
+    # so they resolve too; a passive run with neither keeps today's fallback
+    # — the workflow owner's bell.
+    automation_cache: dict = {}
+
+    def _automation_doc(run: dict) -> dict:
+        if not (run.get("is_passive") or run.get("trigger_type")):
+            return {}
+        ctx = run.get("input_context") or {}
+        automation_id = run.get("automation_id") or ctx.get("automation_id")
+        if not automation_id:
+            return {}
+        if automation_id not in automation_cache:
+            from app.tasks.passive_tasks import _find_automation
+
+            automation_cache[automation_id] = _find_automation(db, automation_id) or {}
+        return automation_cache[automation_id]
 
     # A mature install's first sweep finds every run stranded before this
     # reaper existed — months of history. Flip them (housekeeping), but only
@@ -635,12 +793,27 @@ def reap_stale_workflow_runs_task(self) -> None:
 
             from app.services.failure_notifications import notify_workflow_failed
 
-            notify_workflow_failed(
-                db,
-                workflow_doc=_workflow_doc(run.get("workflow")),
-                error=error_msg,
-                user_id=(rail or {}).get("user_id"),
-            )
+            automation_doc = _automation_doc(run)
+            if automation_doc:
+                # "Automation failed: <name>" to the person who scheduled it.
+                notify_workflow_failed(
+                    db,
+                    workflow_doc=_workflow_doc(run.get("workflow")),
+                    error=error_msg,
+                    user_id=automation_doc.get("user_id"),
+                    automation_name=(
+                        (run.get("input_context") or {}).get("automation_name")
+                        or automation_doc.get("name")
+                        or None
+                    ),
+                )
+            else:
+                notify_workflow_failed(
+                    db,
+                    workflow_doc=_workflow_doc(run.get("workflow")),
+                    error=error_msg,
+                    user_id=(rail or {}).get("user_id"),
+                )
         except Exception:
             logger.exception("Failed to reap stale workflow run %s", run.get("_id"))
 

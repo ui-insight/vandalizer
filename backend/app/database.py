@@ -1,3 +1,5 @@
+import logging
+
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
@@ -135,6 +137,8 @@ ALL_MODELS = [
 ]
 
 
+logger = logging.getLogger(__name__)
+
 # Process-wide Motor client, created once in init_db() and reused everywhere
 # (e.g. the health check). Never construct a new AsyncIOMotorClient per request:
 # each one opens sockets + a topology-monitor thread that are not promptly
@@ -155,6 +159,40 @@ def get_client() -> AsyncIOMotorClient:
     if _client is None:
         raise RuntimeError("Database not initialized; init_db() must run first")
     return _client
+
+
+async def _run_pre_index_migrations(db) -> None:
+    """Data fixes that must land before Beanie builds indexes.
+
+    A unique index declared in a model's ``Settings.indexes`` is built by
+    ``init_beanie``; building it over data that already violates it fails,
+    and that failure crashes every process at startup. Anything that clears
+    such violations runs here, against the raw Motor database, right before
+    ``init_beanie``. Each step is best-effort and logged: a step that cannot
+    run must not itself block startup, and if duplicates remain the index
+    build will say so.
+
+    (The KB source URL unique index takes the other route — built outside
+    Beanie by ``knowledge_service.ensure_source_url_unique_index`` after init,
+    healing on failure — because deleting a duplicate source also has to drop
+    its chunks, which needs the ODM.)
+    """
+    from app.services.kb_test_query_ids import dedupe_test_query_external_ids
+
+    try:
+        cleared = await dedupe_test_query_external_ids(db[KBTestQuery.Settings.name])
+        if cleared:
+            logger.warning(
+                "Cleared duplicate test-query IDs from %d row(s) before building "
+                "the (knowledge_base_uuid, external_id) unique index",
+                cleared,
+            )
+    except Exception:
+        logger.warning(
+            "Pre-index dedup of KB test-query IDs failed; the unique index build "
+            "will fail if duplicates remain",
+            exc_info=True,
+        )
 
 
 async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
@@ -180,6 +218,8 @@ async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
         socketTimeoutMS=30000,
     )
     effective_skip = skip_indexes or _indexes_ensured
+    if not effective_skip:
+        await _run_pre_index_migrations(_client[settings.mongo_db])
     await init_beanie(
         database=_client[settings.mongo_db],
         document_models=ALL_MODELS,

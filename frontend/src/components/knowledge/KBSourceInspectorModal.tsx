@@ -2,18 +2,21 @@ import { useEffect, useState } from 'react'
 import { describeSourceCurrency, formatCurrencyDateTime } from './sourceCurrency'
 import { FocusTrap } from 'focus-trap-react'
 import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
-import { getKBSource, setKBSourceReference } from '../../api/knowledge'
+import { getKBSource, setKBSourceAmends, setKBSourceReference } from '../../api/knowledge'
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
 import { DocumentViewer } from '../files/DocumentViewer'
+import { sourceDisplayName } from './sourceName'
 
 interface Props {
   kbUuid: string
   source: KnowledgeBaseSource  // initial summary from the list — used for instant header
+  /** The KB's other sources, offered as what this one can amend. */
+  otherSources?: KnowledgeBaseSource[]
   onClose: () => void
   onUpdated?: () => void  // called after the source's provenance is edited, so the list refreshes
 }
 
-export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: Props) {
+export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onClose, onUpdated }: Props) {
   const [detail, setDetail] = useState<KnowledgeBaseSourceDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -21,6 +24,8 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
   // default when nothing was entered yet; the user can override either type.
   const [sourceDraft, setSourceDraft] = useState('')
   const [savingSource, setSavingSource] = useState(false)
+  const [amends, setAmends] = useState<string[]>(source.amends_source_uuids ?? [])
+  const [savingAmends, setSavingAmends] = useState(false)
   // For document sources, default to the extracted text the KB actually
   // indexed (what "view the source" should mean), with a toggle to the
   // original file.
@@ -65,6 +70,28 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
     } finally {
       setSavingSource(false)
     }
+  }
+
+  const saveAmends = async (next: string[]) => {
+    if (savingAmends) return
+    const previous = amends
+    setAmends(next)
+    setSavingAmends(true)
+    try {
+      const updated = await setKBSourceAmends(kbUuid, source.uuid, next)
+      setAmends(updated.amends_source_uuids ?? next)
+      onUpdated?.()
+    } catch (err) {
+      setAmends(previous)
+      setError(err instanceof Error ? err.message : 'Failed to save what this source amends')
+    } finally {
+      setSavingAmends(false)
+    }
+  }
+  const amendable = otherSources.filter(s => s.uuid !== source.uuid)
+  const nameOf = (uuid: string) => {
+    const s = amendable.find(o => o.uuid === uuid)
+    return s ? sourceDisplayName(s) : 'Removed source'
   }
 
   const isDoc = source.source_type === 'document'
@@ -243,6 +270,64 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
             </button>
           )}
         </div>
+
+        {/* Amends — which sources this one revises. Retrieval searches this
+            source whenever one of those is retrieved, and tells the model
+            this one governs where they conflict. */}
+        {amendable.length > 0 && (
+          <div style={{
+            display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+            padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
+          }}>
+            <span
+              id="kb-source-amends-label"
+              style={{ fontSize: 11, color: '#888', flexShrink: 0 }}
+              title="Mark this source as a supplement, notice or revision of other sources. Questions that retrieve those sources will also search this one, and answers will treat it as the current rule."
+            >
+              Amends
+            </span>
+            {amends.map(uuid => (
+              <span
+                key={uuid}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  fontSize: 12, color: '#e5e5e5', backgroundColor: '#2a2a2a',
+                  border: '1px solid #3a3a3a', borderRadius: 12, padding: '2px 4px 2px 8px',
+                }}
+              >
+                {nameOf(uuid)}
+                <button
+                  type="button"
+                  aria-label={`Stop amending ${nameOf(uuid)}`}
+                  onClick={() => saveAmends(amends.filter(u => u !== uuid))}
+                  disabled={savingAmends}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#888', display: 'inline-flex' }}
+                >
+                  <X size={12} aria-hidden="true" />
+                </button>
+              </span>
+            ))}
+            {amendable.some(s => !amends.includes(s.uuid)) && (
+              <select
+                aria-labelledby="kb-source-amends-label"
+                value=""
+                onChange={e => { if (e.target.value) saveAmends([...amends, e.target.value]) }}
+                disabled={savingAmends}
+                style={{
+                  fontSize: 12, color: '#e5e5e5', backgroundColor: '#161616',
+                  border: '1px solid #2e2e2e', borderRadius: 5, padding: '3px 6px', fontFamily: 'inherit',
+                  maxWidth: 320,
+                }}
+              >
+                <option value="">{amends.length ? 'Add another…' : 'Nothing — pick a source this one revises…'}</option>
+                {amendable.filter(s => !amends.includes(s.uuid)).map(s => (
+                  <option key={s.uuid} value={s.uuid}>{sourceDisplayName(s)}</option>
+                ))}
+              </select>
+            )}
+            {savingAmends && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#888' }} aria-hidden="true" />}
+          </div>
+        )}
 
         {/* Body */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>

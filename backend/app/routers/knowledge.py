@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.dependencies import get_current_user
 from app.rate_limit import limiter
 from app.models.user import User
-from app.models.validation_run import ValidationRun
+from app.models.validation_run import SMOKE_TEST_SOURCE, ValidationRun
 from app.models.kb_optimization_run import KBOptimizationRun
 from app.models.library import LibraryItemKind
 from app.models.verification import VerifiedItemMetadata
@@ -155,6 +155,10 @@ def _kb_response(
             last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
         ),
         can_manage=can_manage,
+        url_refresh_interval=(
+            kb.url_refresh_interval
+            if isinstance(getattr(kb, "url_refresh_interval", None), str) else None
+        ),
     )
 
 
@@ -228,10 +232,12 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
 
     out: dict[str, _TrustSummary] = {}
 
-    # Manual validation runs.
+    # Manual validation runs. A smoke test over a few chosen queries is not
+    # the KB's trust signal.
     vruns = await ValidationRun.find({
         "item_kind": "knowledge_base",
         "item_id": {"$in": kb_uuids},
+        "source": {"$ne": SMOKE_TEST_SOURCE},
     }).sort("-created_at").to_list()
     for r in vruns:
         if r.item_id in out:
@@ -285,10 +291,12 @@ def _source_response(
         url_title=s.url_title or "",
         custom_name=s.custom_name,
         source_reference=getattr(s, "source_reference", None),
+        amends_source_uuids=list(getattr(s, "amends_source_uuids", None) or []),
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
         truncated=bool(getattr(s, "truncated", False)),
+        warnings=list(getattr(s, "warnings", None) or []),
         ingestion_warnings=warnings,
         ingestion_warning_text=(
             "; ".join(INGESTION_WARNING_LABELS[c] for c in warnings) or None
@@ -659,6 +667,7 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
             organization_ids=req.organization_ids,
             tags=req.tags,
             user_org_ancestry=user_org_ancestry,
+            url_refresh_interval=req.url_refresh_interval,
         )
     except DuplicateNameError as e:
         raise HTTPException(status_code=409, detail=str(e))
@@ -874,17 +883,68 @@ async def refresh_source(
             status_code=400,
             detail="Only URL sources can be refreshed — re-upload the document to update a document source",
         )
-    if source.status == "processing":
-        raise HTTPException(status_code=409, detail="This source is already being processed")
+    from app.services import kb_url_refresh
+
+    # Queued counts as in progress too — a second click used to queue a
+    # second fetch of the same page.
+    if kb_url_refresh.is_in_flight(source, datetime.datetime.now(tz=datetime.timezone.utc)):
+        raise HTTPException(status_code=409, detail="This source is already being refreshed")
 
     from app.tasks.kb_validation_tasks import refresh_url_source_task
 
     source.status = "pending"
+    source.refresh_queued_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await source.save()
+    queued_stamp = source.refresh_queued_at.isoformat()
     kb.status = "building"
     await kb.save()
-    refresh_url_source_task.delay(kb.uuid, source.uuid)
+    refresh_url_source_task.delay(kb.uuid, source.uuid, queued_stamp)
     return {"ok": True, "status": "queued", "source_uuid": source.uuid}
+
+
+@router.post("/{uuid}/source/{source_uuid}/reprocess")
+@limiter.limit("10/minute")
+async def reprocess_source(
+    request: Request, uuid: str, source_uuid: str, user: User = Depends(get_current_user),
+):
+    """Run one source through extraction, chunking and embedding again, in place.
+
+    Web sources re-fetch (the same work as ``/refresh``). Document sources
+    re-index the document's text, re-reading the document first only when it
+    has no usable text. The response's ``mode`` says which: ``refetch``,
+    ``reindex``, ``reextract``, or ``waiting`` (an extraction already running
+    will index it). The source reports ``pending``/``processing`` until it
+    lands, then ``ready`` with its new chunk count and dates, or ``error``
+    with the reason. 409 while already in progress.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+    from app.services.kb_source_reprocess import ReprocessRefused, reprocess_source as _reprocess
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    try:
+        return await _reprocess(kb, source, user)
+    except ReprocessRefused as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+
+
+@router.post("/{uuid}/refresh-web-sources")
+@limiter.limit("5/minute")
+async def refresh_web_sources(request: Request, uuid: str, user: User = Depends(get_current_user)):
+    """Re-fetch every web source in the KB, each exactly as its own Refresh
+    would. Sources already being refreshed are left alone and counted in
+    ``in_progress``. A failed fetch keeps that source's previous text."""
+    from app.services import kb_url_refresh
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+    result = await kb_url_refresh.refresh_all(kb)
+    return {"ok": True, **result}
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)
@@ -974,9 +1034,11 @@ async def update_source(
 ):
     """Update a single source within a KB.
 
-    Send ``custom_name`` to set a user-facing label, or ``source_reference`` to
-    set the verifiable provenance shown as "Source: …". Only fields explicitly
-    present in the request are applied; an empty string clears that field.
+    Send ``custom_name`` to set a user-facing label, ``source_reference`` to
+    set the verifiable provenance shown as "Source: …", or
+    ``amends_source_uuids`` to say which sources in this KB this one revises.
+    Only fields explicitly present in the request are applied; an empty string
+    (or list) clears that field.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
@@ -989,6 +1051,11 @@ async def update_source(
         source = await svc.update_source_name(kb, source_uuid, req.custom_name)
     if "source_reference" in fields_set:
         source = await svc.set_source_reference(kb, source_uuid, req.source_reference)
+    if "amends_source_uuids" in fields_set:
+        try:
+            source = await svc.set_source_amends(kb, source_uuid, req.amends_source_uuids or [])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
     if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
     titles = await _resolve_document_titles([source])
@@ -1027,6 +1094,11 @@ async def validate_knowledge_base(
       - mode: "judge" (default) or "judge+baseline" (analysis mode with lift).
       - skip_judge: bool — skip the LLM judge entirely (cheap re-run).
       - async: bool — enqueue a Celery task and return {task_id} instead of running inline.
+      - query_uuids: list[str] — run only these test queries (a smoke test).
+        The run lands in history and exports like any other but is tagged
+        so it never becomes the KB's quality score. 400 when empty, when more
+        than ``_VALIDATE_SELECTED_MAX`` are given, or when any of them is not
+        a test query of this KB (a stale selection must not shrink silently).
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.get_knowledge_base(
@@ -1046,16 +1118,74 @@ async def validate_knowledge_base(
     skip_judge = bool(body.get("skip_judge", False))
     async_run = bool(body.get("async", False))
 
+    query_uuids: list[str] | None = None
+    if "query_uuids" in body:
+        raw = body.get("query_uuids")
+        if not isinstance(raw, list) or not raw or not all(isinstance(u, str) and u for u in raw):
+            raise HTTPException(status_code=400, detail="query_uuids must be a non-empty list of test query uuids")
+        query_uuids = list(dict.fromkeys(raw))
+        if len(query_uuids) > _VALIDATE_SELECTED_MAX:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Cannot run more than {_VALIDATE_SELECTED_MAX} selected test queries at once "
+                    f"({len(query_uuids)} requested) — narrow the selection or run a full validation"
+                ),
+            )
+        from app.models.kb_test_query import KBTestQuery
+        owned = await KBTestQuery.find(
+            {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": query_uuids}},
+        ).count()
+        if owned == 0:
+            raise HTTPException(status_code=400, detail="None of the selected test queries belong to this knowledge base")
+        # A stale selection (queries deleted or regenerated since the list was
+        # loaded) must not quietly shrink into a smaller run: the service would
+        # drop the unknown uuids and the row would say "selected 2/150" when the
+        # user picked 5. Refuse and say how many are gone.
+        if owned != len(query_uuids):
+            missing = len(query_uuids) - owned
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"{missing} of the {len(query_uuids)} selected test queries no longer exist on this "
+                    "knowledge base — refresh the list and select again"
+                ),
+            )
+
     if async_run:
         from app.tasks.kb_validation_tasks import validate_kb_task
-        task = validate_kb_task.delay(kb.uuid, user.user_id, mode, skip_judge)
+        task = validate_kb_task.delay(kb.uuid, user.user_id, mode, skip_judge, query_uuids)
         return {"task_id": task.id, "status": "queued"}
 
     from app.services import kb_validation_service
     result = await kb_validation_service.run_kb_validation(
-        kb.uuid, user.user_id, mode=mode, skip_judge=skip_judge,
+        kb.uuid, user.user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids,
     )
     return result
+
+
+@router.get("/{uuid}/validation-grader")
+async def get_validation_grader(uuid: str, user: User = Depends(get_current_user)):
+    """The model that will grade this KB's next validation run.
+
+    One system-wide setting (Admin → System Config), shown on the Run tab
+    before a run starts so nobody has to infer it from History afterwards.
+    ``configured`` is False when it is the system default by omission;
+    ``fallback`` is set when the configured grader is no longer available.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.system_config import SystemConfig
+    from app.services.config_service import get_validation_judge_model
+
+    model, fallback = await get_validation_judge_model()
+    cfg = await SystemConfig.get_config()
+    configured = bool((getattr(cfg, "validation_judge_model", "") or "").strip())
+    return {"model": model or None, "configured": configured, "fallback": fallback}
 
 
 @router.get("/{uuid}/source-health")
@@ -1114,6 +1244,11 @@ async def export_kb_validation_run(
     def _has_details(run: ValidationRun) -> bool:
         return bool((run.result_snapshot or {}).get("retrieval_precision"))
 
+    def _is_full_run(run: ValidationRun) -> bool:
+        # "latest" means the latest full run; a smoke test over chosen
+        # queries exports only by its own uuid.
+        return _has_details(run) and getattr(run, "source", None) != SMOKE_TEST_SOURCE
+
     if run_uuid == "latest":
         recent = await (
             ValidationRun.find(
@@ -1125,7 +1260,7 @@ async def export_kb_validation_run(
             .limit(30)
             .to_list()
         )
-        vr = next((r for r in recent if _has_details(r)), None)
+        vr = next((r for r in recent if _is_full_run(r)), None)
         if not vr:
             raise HTTPException(
                 status_code=404,
@@ -1183,7 +1318,7 @@ async def export_kb_validation_run(
         from fastapi.responses import Response
 
         return Response(
-            content=render_results_xlsx(run_meta, rows),
+            content=render_results_xlsx(run_meta, rows, payload.get("kb_sources")),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{base_name}.xlsx"'},
         )
@@ -1285,6 +1420,11 @@ def _serialize_test_query(q) -> dict:
         "category": q.category,
         "notes": getattr(q, "notes", None),
         "external_id": getattr(q, "external_id", None),
+        "import_batch_id": getattr(q, "import_batch_id", None),
+        "import_batch_label": getattr(q, "import_batch_label", None),
+        "import_batch_at": (
+            q.import_batch_at.isoformat() if getattr(q, "import_batch_at", None) else None
+        ),
         "auto_generated": q.auto_generated,
         "source_chunk_ids": q.source_chunk_ids,
         "last_judged_score": q.last_judged_score,
@@ -1303,6 +1443,9 @@ async def list_test_queries(uuid: str, user: User = Depends(get_current_user)):
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     from app.models.kb_test_query import KBTestQuery
+    # Read-only: a member who can only view the KB lands here, so nothing is
+    # written. Auto-generated queries from before IDs existed get theirs on
+    # the next generation or import (kb_test_query_ids.backfill_auto_query_ids).
     queries = await KBTestQuery.find(
         KBTestQuery.knowledge_base_uuid == kb.uuid,
     ).sort("-created_at").to_list()
@@ -1354,6 +1497,7 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
     """
     import base64
     import datetime as _datetime
+    import uuid as _uuid
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
@@ -1389,6 +1533,14 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
         raise HTTPException(status_code=400, detail=str(e))
 
     from app.models.kb_test_query import KBTestQuery
+    from app.services.kb_test_query_ids import backfill_auto_query_ids
+    # A write path, so auto-generated queries from before IDs existed get
+    # theirs now (listing never writes). The import must still go through if
+    # the backfill cannot.
+    try:
+        await backfill_auto_query_ids(kb)
+    except Exception:
+        logger.exception("Could not backfill auto-query IDs for KB %s", kb.uuid)
     existing = await KBTestQuery.find(
         KBTestQuery.knowledge_base_uuid == kb.uuid,
     ).to_list()
@@ -1399,6 +1551,14 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
 
     created = updated = skipped = 0
     now = _datetime.datetime.now(tz=_datetime.timezone.utc)
+    # Every row this file writes — new or updated — joins one batch, so the
+    # Run tab can validate exactly this file's questions on their own.
+    batch_id = _uuid.uuid4().hex
+    batch = {
+        "import_batch_id": batch_id,
+        "import_batch_label": filename[:200],
+        "import_batch_at": now,
+    }
     for row in rows:
         target = by_external_id.get(row["external_id"]) if row["external_id"] else None
         if target is not None:
@@ -1409,6 +1569,9 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
             target.category = row["category"]
             target.notes = row["notes"]
             target.updated_at = now
+            target.import_batch_id = batch["import_batch_id"]
+            target.import_batch_label = batch["import_batch_label"]
+            target.import_batch_at = batch["import_batch_at"]
             await target.save()
             seen_questions.add(row["query"].strip().lower())
             updated += 1
@@ -1426,6 +1589,7 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
             notes=row["notes"],
             external_id=row["external_id"],
             user_id=user.user_id,
+            **batch,
         )
         await tq.insert()
         seen_questions.add(row["query"].strip().lower())
@@ -1463,6 +1627,8 @@ async def import_test_queries(uuid: str, request: Request, user: User = Depends(
         "total_rows": len(rows) + len(row_errors),
         "errors": row_errors,
         "unmatched_source_labels": unmatched,
+        # None when the file wrote nothing, so there is no batch to select.
+        "import_batch_id": batch_id if (created or updated) else None,
     }
 
 
@@ -1758,6 +1924,10 @@ async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get
 # questions is a large one. Cap the batch well above that so a malformed
 # client can't ask for an unbounded delete.
 _TEST_QUERY_BULK_DELETE_MAX = 2000
+# Upper bound on ``query_uuids`` for POST /{uuid}/validate ("Run selected").
+# A selection that large is a full run in disguise — and an unbounded ``$in``
+# list is a free way to make Mongo and the judge do arbitrary work.
+_VALIDATE_SELECTED_MAX = 500
 
 
 class BulkDeleteTestQueriesBody(BaseModel):
@@ -1983,10 +2153,15 @@ async def get_active_kb_optimization(uuid: str, user: User = Depends(get_current
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     from app.models.kb_optimization_run import KBOptimizationRun
+    from app.services import kb_optimizer as _kb_optimizer
     run = await KBOptimizationRun.find_one(
         KBOptimizationRun.kb_uuid == kb.uuid,
         {"status": {"$in": ["queued", "running"]}},
     )
+    # Self-heal an orphaned run on read; if reaped it's no longer active.
+    run = await _kb_optimizer.reap_one(run)
+    if run is not None and run.status not in ("queued", "running"):
+        run = None
     return {"run": _serialize_optimization_run(run) if run else None}
 
 
@@ -2070,6 +2245,9 @@ async def get_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(get
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
+    # Self-heal a forever-"Running…" run the next time it's polled.
+    from app.services import kb_optimizer as _kb_optimizer
+    run = await _kb_optimizer.reap_one(run)
     return _serialize_optimization_run(run)
 
 

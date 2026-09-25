@@ -23,6 +23,11 @@ class KnowledgeBaseSource(Document):
     # from Files, and without this the row has nothing to show but its UUID.
     document_title: Optional[str] = None
     source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
+    # Sources in the same KB that this one revises (a supplement, policy
+    # notice or FAQ that amends a base document). Retrieval searches this
+    # source whenever one of those is retrieved, and tells the model this one
+    # governs where they conflict. Set by the KB owner; see set_source_amends.
+    amends_source_uuids: list[str] = Field(default_factory=list)
     content: Optional[str] = None
     # "skipped" is transient: the crawler marks a navigation page skipped and
     # then deletes the record, so it should not be seen on a stored source.
@@ -33,6 +38,13 @@ class KnowledgeBaseSource(Document):
     # size cap — the source is "ready" but incomplete, so the UI shows a warning
     # rather than a clean check. Only set for URL sources.
     truncated: bool = False
+    # Caveats recorded by the last successful fetch that are not failures
+    # (``WebFetchResult.advisories``): currently ``"hidden_text_unchecked"``,
+    # a fetched PDF whose hidden-text scrub could not inspect the file, so its
+    # indexed text may include content the page never displays. Replaced —
+    # so cleared — by every later successful fetch. Rows from before this
+    # field existed read as empty. Only set for URL sources.
+    warnings: list[str] = Field(default_factory=list)
     # Crawl fields
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
@@ -57,6 +69,9 @@ class KnowledgeBaseSource(Document):
     content_hash: Optional[str] = None  # sha256 of the text handed to the indexer
     last_refresh_outcome: Optional[str] = None  # refreshed | unchanged | retrieval_failed | ingestion_failed
     last_refresh_error: Optional[str] = None
+    # When a refresh was last queued — tells a queued refresh from one whose
+    # worker died (see kb_url_refresh.is_in_flight).
+    refresh_queued_at: Optional[datetime.datetime] = None
     # sha256 of a fetch refused by the collapse gate. If the next refresh
     # returns the same bytes, the page really is that short now and the gate
     # steps aside -- a transient shell does not come back identical twice.
@@ -157,6 +172,9 @@ class KnowledgeBase(Document):
     rag_config_override: Optional[dict] = None
     rag_config_override_set_at: Optional[datetime.datetime] = None
     rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
+    # Re-fetch web sources automatically: None (off) | daily | weekly | monthly.
+    # See services/kb_url_refresh.py.
+    url_refresh_interval: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

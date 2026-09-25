@@ -1,6 +1,7 @@
 """Automation API routes."""
 
 import asyncio
+import datetime
 import logging
 import uuid as _uuid
 from pathlib import Path
@@ -23,6 +24,8 @@ from app.schemas.automations import (
     RunNowResponse,
     AutomationResponse,
     CreateAutomationRequest,
+    SchedulePreviewRequest,
+    SchedulePreviewResponse,
     TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
@@ -30,6 +33,7 @@ from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
 from app.services import automation_run_now
+from app.services import automation_schedule
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -80,6 +84,48 @@ async def _authorize_existing_documents(document_uuids: list[str], user: User) -
             raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
         authorized_document_uuids.append(doc.uuid)
     return authorized_document_uuids
+
+
+# A schedule names what it runs on up front and runs unattended, so the
+# folder or documents it names must be ones the person setting it can open.
+MAX_SCHEDULE_DOCUMENTS = 500
+
+
+async def _prepare_schedule_config(trigger_config: dict | None, user: User) -> dict:
+    """Normalize a schedule ``trigger_config`` (422 on a bad pick) and check
+    the caller may use the folder or documents it names (404 otherwise)."""
+    try:
+        cfg = automation_schedule.normalize_schedule_config(trigger_config)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    uuids = cfg.get("document_uuids") or []
+    if len(uuids) > MAX_SCHEDULE_DOCUMENTS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"A schedule can name at most {MAX_SCHEDULE_DOCUMENTS} documents; choose a folder instead.",
+        )
+    if uuids:
+        cfg["document_uuids"] = await _authorize_existing_documents(uuids, user)
+    folder_id = cfg.get("folder_id")
+    if folder_id and not await access_control.get_authorized_folder(folder_id, user):
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return cfg
+
+
+def _schedule_times(auto) -> tuple[str | None, str | None]:
+    """``(next_run_at, last_run_at)`` as ISO strings for a schedule automation."""
+    if auto.trigger_type != "schedule" or not (auto.trigger_config or {}).get("cron_expression"):
+        return None, None
+    last = getattr(auto, "last_scheduled_run_at", None)
+    if not isinstance(last, datetime.datetime):
+        last = None
+    try:
+        now = datetime.datetime.now(tz=datetime.timezone.utc)
+        base = automation_schedule.last_run_base(auto, now)
+        next_run = automation_schedule.next_runs(auto.trigger_config, base)[0]
+    except Exception:
+        return None, last.isoformat() if last else None
+    return next_run.isoformat(), last.isoformat() if last else None
 
 
 async def _resolve_action_name(action_type: str | None, action_id: str | None) -> str | None:
@@ -173,6 +219,7 @@ async def _to_response(
     # in — including None for a deleted target — to avoid a per-row N+1.
     if action_name is _UNRESOLVED:
         action_name = await _resolve_action_name(auto.action_type, auto.action_id)
+    next_run_at, last_run_at = _schedule_times(auto)
     return AutomationResponse(
         id=str(auto.id),
         name=auto.name,
@@ -190,6 +237,8 @@ async def _to_response(
         created_at=auto.created_at.isoformat(),
         updated_at=auto.updated_at.isoformat(),
         can_manage=can_manage,
+        next_run_at=next_run_at,
+        last_run_at=last_run_at,
     )
 
 
@@ -224,13 +273,34 @@ async def _load_authorized_automation(
     return auto, team_access
 
 
+@router.post("/schedule/preview", response_model=SchedulePreviewResponse)
+async def preview_schedule(req: SchedulePreviewRequest, user: User = Depends(get_current_user)):
+    """The next three run times for a schedule pick, before it is saved — the
+    same computation the scheduler uses, so the wizard shows what will happen."""
+    try:
+        cfg = automation_schedule.normalize_schedule_config(req.trigger_config)
+        runs = automation_schedule.next_runs(
+            cfg, datetime.datetime.now(tz=datetime.timezone.utc), count=3,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return SchedulePreviewResponse(
+        cron_expression=cfg["cron_expression"],
+        timezone=cfg["timezone"],
+        next_runs=[r.isoformat() for r in runs],
+    )
+
+
 @router.post("", response_model=AutomationResponse)
 async def create_automation(req: CreateAutomationRequest, user: User = Depends(get_current_user)):
     await _validate_action_target(req.action_type, req.action_id, user)
+    trigger_config = req.trigger_config
+    if req.trigger_type == "schedule":
+        trigger_config = await _prepare_schedule_config(trigger_config, user)
     team_id = str(user.current_team) if user.current_team else None
     auto = await svc.create_automation(
         req.name, user.user_id, req.description,
-        req.trigger_type, trigger_config=req.trigger_config,
+        req.trigger_type, trigger_config=trigger_config,
         action_type=req.action_type, action_id=req.action_id,
         team_id=team_id, shared_with_team=req.shared_with_team,
         output_config=req.output_config,
@@ -470,13 +540,19 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
     action_id = None if clear_action_id else (req.action_id if req.action_id is not None else current.action_id)
     await _validate_action_target(action_type, action_id, user)
 
+    # The editor saves a changed schedule without restating trigger_type, so
+    # the effective type decides whether this config is a schedule.
+    trigger_config = req.trigger_config
+    if trigger_config and (req.trigger_type or current.trigger_type) == "schedule":
+        trigger_config = await _prepare_schedule_config(trigger_config, user)
+
     auto = await svc.apply_automation_update(
         current,
         name=req.name,
         description=req.description,
         enabled=req.enabled,
         trigger_type=req.trigger_type,
-        trigger_config=req.trigger_config,
+        trigger_config=trigger_config,
         action_type=req.action_type,
         action_id=req.action_id,
         clear_action_id=clear_action_id,
@@ -612,9 +688,9 @@ async def trigger_automation(
 
     # Validate callback_url if provided (SSRF protection)
     if callback_url:
-        from app.utils.url_validation import validate_outbound_url
+        from app.utils.url_validation import load_allowed_hosts, validate_outbound_url
         try:
-            validate_outbound_url(callback_url)
+            validate_outbound_url(callback_url, allowed_hosts=await load_allowed_hosts())
         except ValueError as e:
             raise HTTPException(status_code=400, detail=f"Invalid callback_url: {e}")
 

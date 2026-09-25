@@ -4,6 +4,7 @@ import hashlib
 import logging
 import re
 import threading
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -340,8 +341,41 @@ class DocumentManager:
             meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
-        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        self._add_in_batches(collection, ids, documents, metadatas)
         return len(text_splits)
+
+    # ChromaDB refuses a single ``add`` larger than its client-reported maximum
+    # (5,461 on the bundled build — a SQLite bound-variable limit, not a tuning
+    # knob), and raises rather than writing what fits. Nothing enforced that
+    # ceiling, so ingestion simply worked until a document was long enough and
+    # then failed outright: at the default 1,000/200 chunking that is about
+    # 4.4 M characters, which no cap allowed a URL source to reach until
+    # ``kb_url_max_chars`` did. The fallback matters as much as the number —
+    # a client that cannot report a maximum gets a conservative one rather
+    # than an unbounded write.
+    _FALLBACK_MAX_ADD_BATCH = 5000
+
+    def _max_add_batch(self) -> int:
+        try:
+            reported = int(self.client.get_max_batch_size())
+        except Exception as e:  # noqa: BLE001 — any client that won't say gets the fallback
+            logger.warning(
+                "ChromaDB did not report a max batch size (%s); using %d",
+                e, self._FALLBACK_MAX_ADD_BATCH,
+            )
+            return self._FALLBACK_MAX_ADD_BATCH
+        return reported if reported >= 1 else self._FALLBACK_MAX_ADD_BATCH
+
+    def _add_in_batches(self, collection, ids, documents, metadatas) -> None:
+        """``collection.add`` split to respect ChromaDB's per-call maximum."""
+        size = self._max_add_batch()
+        for start in range(0, len(ids), size):
+            stop = start + size
+            collection.add(
+                ids=ids[start:stop],
+                documents=documents[start:stop],
+                metadatas=metadatas[start:stop],
+            )
 
     def query_documents(
         self,
@@ -433,12 +467,17 @@ class DocumentManager:
         source_name: str,
         raw_text: str,
         text_markers: Optional[list[dict]] = None,
+        id_prefix: Optional[str] = None,
     ) -> int:
         """Chunk text, embed, and add to a KB collection. Returns chunk count.
 
         ``text_markers`` lets KB ingestion preserve page/sheet citations the
         same way per-user ingestion does. Sources without markers (web URLs,
         plaintext) just omit the page metadata.
+
+        ``id_prefix`` replaces ``source_id`` in the chunk ids (metadata still
+        carries ``source_id``), so :meth:`replace_kb_source` can write a new
+        set of chunks beside the old one instead of colliding with it.
         """
         text_splits = _split_text_with_offsets(raw_text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
@@ -455,7 +494,7 @@ class DocumentManager:
         documents = []
         metadatas = []
         for i, (chunk, offset) in enumerate(text_splits):
-            ids.append(f"{source_id}_chunk_{i}")
+            ids.append(f"{id_prefix or source_id}_chunk_{i}")
             documents.append(chunk)
             meta: dict = {
                 "source_id": source_id,
@@ -467,7 +506,7 @@ class DocumentManager:
             meta.update(span_meta(offset, len(chunk), markers))
             metadatas.append(meta)
 
-        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        self._add_in_batches(collection, ids, documents, metadatas)
         return len(text_splits)
 
     def query_kb(
@@ -582,13 +621,62 @@ class DocumentManager:
         except Exception as e:
             logger.error(f"Error deleting KB collection {collection_name}: {e}")
 
-    def delete_kb_source(self, kb_uuid: str, source_id: str) -> None:
-        """Remove all chunks for a single source from a KB collection."""
+    def delete_kb_source(self, kb_uuid: str, source_id: str) -> bool:
+        """Remove all chunks for a single source from a KB collection.
+
+        Returns True when the delete ran, False when it raised. The failure is
+        still logged and still swallowed, so callers wanting best effort can go
+        on ignoring the answer; a caller that re-adds the same source
+        afterwards cannot, because add_to_kb writes the same deterministic ids
+        and Chroma's ``add`` skips ids that already exist.
+        """
         try:
             collection = self.get_kb_collection(kb_uuid)
             collection.delete(where={"source_id": source_id})
+            return True
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
+            return False
+
+    def replace_kb_source(
+        self,
+        kb_uuid: str,
+        source_id: str,
+        source_name: str,
+        raw_text: str,
+        text_markers: Optional[list[dict]] = None,
+    ) -> int:
+        """Swap a source's chunks for ones built from ``raw_text``. Returns chunk count.
+
+        Delete-then-add left a window in which the source had no chunks, and
+        a failed embed after the delete left it with none at all. Worse, a
+        delete that failed quietly let the add skip every deterministic id,
+        so the old text stayed indexed while the source was marked refreshed.
+        This writes the new chunks under fresh ids first and removes the old
+        ones only once the new set is in. If this raises, the old chunks are
+        still the ones indexed (the new ones are cleaned up best-effort).
+        """
+        collection = self.get_kb_collection(kb_uuid)
+        old_ids = collection.get(where={"source_id": source_id}, include=[]).get("ids") or []
+
+        prefix = f"{source_id}_{uuid.uuid4().hex[:8]}"
+        try:
+            count = self.add_to_kb(
+                kb_uuid, source_id, source_name, raw_text,
+                text_markers=text_markers, id_prefix=prefix,
+            )
+            if old_ids:
+                collection.delete(ids=old_ids)
+        except Exception:
+            try:
+                new_ids = collection.get(where={"source_id": source_id}, include=[]).get("ids") or []
+                stale = [i for i in new_ids if i.startswith(f"{prefix}_chunk_")]
+                if stale:
+                    collection.delete(ids=stale)
+            except Exception as cleanup_error:
+                logger.error(f"Error cleaning up partial chunks for KB source {source_id}: {cleanup_error}")
+            raise
+        return count
 
     def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
         """Rewrite source_name on every chunk for this source.

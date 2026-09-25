@@ -22,6 +22,10 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }))
 
+vi.mock('../../hooks/useTeams', () => ({
+  useTeams: () => ({ teams: [], currentTeam: null, loading: false }),
+}))
+
 vi.mock('../../contexts/ToastContext', () => ({
   useToast: () => ({ toast: vi.fn() }),
 }))
@@ -65,6 +69,7 @@ vi.mock('../../hooks/useProjectPins', () => ({
 }))
 
 const refreshKBSource = vi.fn().mockResolvedValue({ ok: true, status: 'queued', source_uuid: 'src-1' })
+const reprocessKBSource = vi.fn().mockResolvedValue({ ok: true, status: 'queued', mode: 'reindex', source_uuid: 'src-2' })
 const cloneKnowledgeBase = vi.fn().mockResolvedValue({ uuid: 'kb-copy', title: 'Export Control Regulations (copy)' })
 
 vi.mock('../../api/knowledge', () => ({
@@ -72,6 +77,7 @@ vi.mock('../../api/knowledge', () => ({
   getKBQuality: vi.fn().mockResolvedValue({}),
   getKBSourceHealth: vi.fn().mockResolvedValue({}),
   refreshKBSource: (uuid: string, sourceUuid: string) => refreshKBSource(uuid, sourceUuid),
+  reprocessKBSource: (uuid: string, sourceUuid: string) => reprocessKBSource(uuid, sourceUuid),
   cloneKnowledgeBase: (uuid: string) => cloneKnowledgeBase(uuid),
 }))
 
@@ -260,6 +266,67 @@ describe('KnowledgePanel add-source permissions', () => {
 
     expect(screen.queryByLabelText('Refresh source')).not.toBeInTheDocument()
     expect(screen.getByLabelText('Remove source')).toBeInTheDocument()
+  }, 30000)
+
+  // Support ticket: rebuilding one source meant deleting and re-adding it.
+  it('reprocesses a document source in place', async () => {
+    reprocessKBSource.mockClear()
+    detail.current = makeDetail({
+      can_manage: true,
+      sources: [{
+        uuid: 'src-2',
+        source_type: 'document',
+        document_uuid: 'doc-1',
+        document_title: 'Uploaded policy.pdf',
+        status: 'ready',
+        chunk_count: 4,
+        created_at: '2026-01-01T00:00:00Z',
+      }],
+    })
+    await openDetail()
+
+    fireEvent.click(screen.getByLabelText('Reprocess source'))
+    await waitFor(() => expect(reprocessKBSource).toHaveBeenCalledWith('kb-1', 'src-2'))
+  }, 30000)
+
+  it('offers Try again on a failed source, and nothing to a viewer', async () => {
+    reprocessKBSource.mockClear()
+    const failed = {
+      uuid: 'src-2',
+      source_type: 'document' as const,
+      document_uuid: 'doc-1',
+      document_title: 'Scanned award.pdf',
+      status: 'error' as const,
+      error_message: 'Document has no extractable text',
+      chunk_count: 0,
+      created_at: '2026-01-01T00:00:00Z',
+    }
+    detail.current = makeDetail({ can_manage: true, sources: [failed] })
+    await openDetail()
+
+    expect(screen.getByText('Document has no extractable text')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    await waitFor(() => expect(reprocessKBSource).toHaveBeenCalledWith('kb-1', 'src-2'))
+  }, 30000)
+
+  it('hides Reprocess and Try again from a viewer', async () => {
+    detail.current = makeDetail({
+      can_manage: false,
+      sources: [{
+        uuid: 'src-2',
+        source_type: 'document',
+        document_uuid: 'doc-1',
+        document_title: 'Scanned award.pdf',
+        status: 'error',
+        error_message: 'Document has no extractable text',
+        chunk_count: 0,
+        created_at: '2026-01-01T00:00:00Z',
+      }],
+    })
+    await openDetail()
+
+    expect(screen.queryByLabelText('Reprocess source')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument()
   }, 30000)
 })
 

@@ -1,0 +1,36 @@
+# Example: route /api at the Gateway instead of through the frontend nginx.
+#
+# The default topology proxies /api through the frontend so nginx handles SSE
+# buffering, the 200M body limit, and the OAuth callback identically on every
+# Gateway. With split routing the Gateway owns those concerns — make sure
+# yours allows large request bodies and long-lived responses.
+#
+# The additional rule matches /api before the catch-all frontend rule
+# (Gateway API prefers the more specific path match). The api NetworkPolicy
+# must admit the Gateway's namespace — set networkPolicy.apiExtraIngressFrom
+# (use an ipBlock instead if the Gateway data plane runs hostNetwork).
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateways
+  hostnames:
+    - vandalizer.example.edu
+  additionalRules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+        - path:
+            type: Exact
+            value: /login/azure/authorized
+      timeouts:
+        request: 0s
+      backendRefs:
+        - name: RELEASE-NAME-vandalizer-api   # adjust to your release fullname
+          port: 8001
+networkPolicy:
+  apiExtraIngressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: gateways

@@ -1100,7 +1100,7 @@ class TestPauseActivityBookkeeping:
 
 
 # ---------------------------------------------------------------------------
-# _build_steps_data — one builder for the initial run and every resume pass
+# build_steps_data — one builder for the initial run and every resume pass
 # ---------------------------------------------------------------------------
 
 class TestBuildStepsData:
@@ -1124,12 +1124,12 @@ class TestBuildStepsData:
     def test_extraction_field_metadata_is_resolved(self):
         """The resume copy of this builder dropped field_metadata entirely, so
         enum/optional constraints were silently lost after an approval gate."""
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db_with_extraction_step()
         wf = _make_workflow_doc(step_ids=[step_id])
 
-        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+        steps_data, _ = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
 
         task_data = steps_data[1]["tasks"][0]["data"]
         assert task_data["keys"] == ["amount", "status"]
@@ -1140,7 +1140,7 @@ class TestBuildStepsData:
 
     def test_fixed_documents_are_merged(self):
         """Also missing from the resume copy: fixed inputs vanished on resume."""
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db_with_extraction_step()
         db.smart_document.find_one.side_effect = lambda q, *a, **k: {
@@ -1149,12 +1149,12 @@ class TestBuildStepsData:
         wf = _make_workflow_doc(step_ids=[step_id])
         wf["input_config"] = {"fixed_documents": [{"uuid": "fixed1"}]}
 
-        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
+        steps_data, _ = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
 
         assert steps_data[1]["tasks"][0]["data"]["doc_texts"] == ["text-u1", "text-fixed1"]
 
     def test_no_input_mode_excludes_fixed_documents(self):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db_with_extraction_step()
         db.smart_document.find_one.side_effect = lambda q, *a, **k: {
@@ -1165,12 +1165,12 @@ class TestBuildStepsData:
             "trigger_type": "no_input", "fixed_documents": [{"uuid": "fixed1"}],
         }
 
-        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+        steps_data, _ = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
 
         assert "doc_texts" not in steps_data[1]["tasks"][0]["data"]
 
     def test_output_step_names_are_collected(self):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         step_a, step_b = _fake_oid(), _fake_oid()
         db = _mock_db(step_docs=[
@@ -1179,7 +1179,7 @@ class TestBuildStepsData:
         ])
         wf = _make_workflow_doc(step_ids=[step_a, step_b])
 
-        _, output_step_names = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+        _, output_step_names = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
 
         assert output_step_names == ["Final_Step"]
 
@@ -1649,11 +1649,11 @@ class TestBuildStepsDataFormFiller:
         return db, step_id
 
     def test_form_filler_gets_doc_metas_aligned_with_doc_texts(self):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db("FormFiller", {"template": "{{a}}", "input_sources": ["workflow_documents", "select_document"], "selected_document_uuid": "S"})
         wf = _make_workflow_doc(step_ids=[step_id])
-        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1", "u2"]})
+        steps_data, _ = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1", "u2"]})
 
         data = steps_data[1]["tasks"][0]["data"]
         assert data["doc_texts"] == ["text-u1", "text-u2"]
@@ -1664,22 +1664,22 @@ class TestBuildStepsDataFormFiller:
         assert "template_pdf_b64" not in data  # text mode
 
     def test_other_tasks_do_not_get_metas(self):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db("Prompt", {"prompt": "x"})
         wf = _make_workflow_doc(step_ids=[step_id])
-        steps_data, _ = _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
+        steps_data, _ = build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": ["u1"]})
         data = steps_data[1]["tasks"][0]["data"]
         assert data["doc_texts"] == ["text-u1"]
         assert "doc_metas" not in data
 
     @patch("app.tasks.workflow_tasks._preload_form_filler_template")
     def test_pdf_template_preload_is_called_for_form_filler(self, mock_preload):
-        from app.tasks.workflow_tasks import _build_steps_data
+        from app.tasks.workflow_tasks import build_steps_data
 
         db, step_id = self._db("FormFiller", {"template_source": "pdf", "template_document_uuid": "T"})
         wf = _make_workflow_doc(step_ids=[step_id])
-        _build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
+        build_steps_data(db, wf, str(wf["_id"]), {"doc_uuids": []})
         mock_preload.assert_called_once()
         assert mock_preload.call_args.args[1]["template_document_uuid"] == "T"
 

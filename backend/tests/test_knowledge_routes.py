@@ -1142,11 +1142,89 @@ class TestKnowledgeDocSources:
 
         assert resp.status_code == 200
         assert resp.json() == {"ok": True, "status": "queued", "source_uuid": "src-1"}
-        mock_delay.assert_called_once_with(kb.uuid, "src-1")
+        mock_delay.assert_called_once()
+        assert mock_delay.call_args.args[:2] == (kb.uuid, "src-1")
+        assert mock_delay.call_args.args[2] == src.refresh_queued_at.isoformat()
         assert src.status == "pending"
         assert kb.status == "building"
         # The refresh must not run inline — the service isn't touched here.
         mock_svc.refresh_url_source.assert_not_called()
+
+    async def _post_reprocess(self, client, src, reprocess):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource.find_one", AsyncMock(return_value=src)),
+            patch("app.services.kb_source_reprocess.reprocess_source", reprocess),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            return await client.post(
+                "/api/knowledge/kb-uuid-1/source/src-1/reprocess",
+                cookies=cookies,
+                headers=headers,
+            )
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_reports_what_it_queued(self, client):
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="error")
+        body = {"ok": True, "status": "queued", "mode": "reindex", "source_uuid": "src-1"}
+        reprocess = AsyncMock(return_value=body)
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 200
+        assert resp.json() == body
+        assert reprocess.await_args.args[1] is src
+
+    @pytest.mark.asyncio
+    async def test_reprocess_source_refusal_carries_its_status_and_reason(self, client):
+        from app.services.kb_source_reprocess import ReprocessRefused
+
+        src = SimpleNamespace(uuid="src-1", source_type="document", status="processing")
+        reprocess = AsyncMock(side_effect=ReprocessRefused(409, "This source is already being processed"))
+
+        resp = await self._post_reprocess(client, src, reprocess)
+
+        assert resp.status_code == 409
+        assert resp.json()["detail"] == "This source is already being processed"
+
+    @pytest.mark.asyncio
+    async def test_reprocess_unknown_source_is_404(self, client):
+        resp = await self._post_reprocess(client, None, AsyncMock())
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_validation_grader_names_the_system_grader(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        note = {"configured": "qwen/qwen3.6-27b", "used": "openai/gpt-oss-120b", "reason": "not in System Config"}
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.services.config_service.get_validation_judge_model",
+                  AsyncMock(return_value=("openai/gpt-oss-120b", note))),
+            patch("app.models.system_config.SystemConfig.get_config",
+                  AsyncMock(return_value=SimpleNamespace(validation_judge_model="qwen/qwen3.6-27b"))),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            resp = await client.get(
+                "/api/knowledge/kb-uuid-1/validation-grader", cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"model": "openai/gpt-oss-120b", "configured": True, "fallback": note}
 
     @pytest.mark.asyncio
     async def test_refresh_source_rejects_document_sources(self, client):
@@ -2089,6 +2167,55 @@ class TestUpdateSourceFields:
         assert resp.json()["source_reference"] == "APM Ch.45"
 
 
+    async def _patch_amends(self, client, set_amends):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.routers.knowledge.svc.set_source_amends", set_amends),
+            patch("app.routers.knowledge.svc.update_source_name", new_callable=AsyncMock) as mock_rename,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock, return_value={}),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.patch(
+                "/api/knowledge/kb-1/source/s1",
+                json={"amends_source_uuids": ["s-base"]},
+                cookies=cookies,
+                headers=headers,
+            )
+        mock_rename.assert_not_awaited()
+        return resp
+
+    @pytest.mark.asyncio
+    async def test_amends_routes_to_set_source_amends(self, client):
+        updated = _make_source()
+        updated.amends_source_uuids = ["s-base"]
+        set_amends = AsyncMock(return_value=updated)
+
+        resp = await self._patch_amends(client, set_amends)
+
+        assert resp.status_code == 200
+        assert set_amends.await_args.args[1:] == ("s1", ["s-base"])
+        assert resp.json()["amends_source_uuids"] == ["s-base"]
+
+    @pytest.mark.asyncio
+    async def test_amends_naming_a_foreign_source_is_a_400(self, client):
+        set_amends = AsyncMock(side_effect=ValueError("Not a source of this knowledge base: s-base"))
+
+        resp = await self._patch_amends(client, set_amends)
+
+        assert resp.status_code == 400
+        assert "Not a source of this knowledge base" in resp.json()["detail"]
+
+
 class TestAdminKBInventory:
     @pytest.mark.asyncio
     async def test_non_admin_forbidden(self, client):
@@ -2241,6 +2368,7 @@ class TestTestQueryImport:
             "category": None,
             "notes": None,
             "external_id": None,
+            "auto_generated": False,
             "updated_at": None,
             "user_id": "user1",
         }
@@ -2327,6 +2455,14 @@ class TestTestQueryImport:
         assert existing_by_id.category == "summary"
         assert existing_by_id.expected_source_labels == ["Doc B"]
         assert existing_by_id.updated_at is not None
+        # Both rows this file wrote join one batch, returned so the client
+        # can select exactly this import; the skipped row is left alone.
+        batch_id = body["import_batch_id"]
+        assert batch_id
+        assert created[0].import_batch_id == batch_id
+        assert existing_by_id.import_batch_id == batch_id
+        assert created[0].import_batch_label == existing_by_id.import_batch_label == "set.csv"
+        assert getattr(existing_dup, "import_batch_id", None) is None
 
     @pytest.mark.asyncio
     async def test_import_reports_row_errors_without_failing(self, client):
@@ -2588,6 +2724,91 @@ class TestTestQueryImport:
         assert resp.json()["created"] == 1
         assert resp.json()["unmatched_source_labels"] == []
 
+    @pytest.mark.asyncio
+    async def test_import_numbers_legacy_auto_queries_before_reading_the_set(self, client):
+        """Import is a write path, so pre-#876 auto-generated rows get their
+        IDs here (#886 moved this off the GET)."""
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        fake_cls, _created = self._fake_query_cls([])
+        backfill = AsyncMock(return_value=1)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+            patch("app.services.kb_test_query_ids.backfill_auto_query_ids", backfill),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.get_kb_sources = AsyncMock(return_value=[])
+            mock_svc.resolve_document_titles = AsyncMock(return_value={})
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/test-queries/import",
+                json=self._payload("Question,Source\nQ1,Doc A\n"),
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        backfill.assert_awaited_once_with(kb)
+
+
+class TestTestQueryList:
+    """GET /{uuid}/test-queries — a read, reachable by members who can only view."""
+
+    @pytest.mark.asyncio
+    async def test_list_does_not_write_ids_onto_legacy_auto_queries(self, client):
+        """The review of #876: the GET ran the ID backfill, so a read-only
+        member's page view wrote external_id onto rows. Listing must be
+        side-effect free; the legacy row simply shows no ID (#886)."""
+        from datetime import datetime, timezone
+        from types import SimpleNamespace
+
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        legacy = SimpleNamespace(
+            uuid="legacy-1", query="Old auto question?", expected_source_labels=[],
+            expected_answer_contains=None, expected_answer="A", category=None, notes=None,
+            external_id=None, auto_generated=True, source_chunk_ids=[],
+            last_judged_score=None, last_judged_at=None,
+            created_at=datetime(2026, 1, 1, tzinfo=timezone.utc), updated_at=None,
+        )
+        legacy.save = AsyncMock()
+        fake_cls = MagicMock()
+        fake_cls.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[legacy])
+        backfill = AsyncMock(return_value=1)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.kb_test_query.KBTestQuery", fake_cls),
+            patch("app.services.kb_test_query_ids.backfill_auto_query_ids", backfill),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.get(
+                "/api/knowledge/kb-uuid-1/test-queries",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["test_queries"][0]["external_id"] is None
+        backfill.assert_not_awaited()
+        legacy.save.assert_not_awaited()
+        fake_cls.find_one.assert_not_called()
+
 
 class TestTestQueryBulkDelete:
     """POST /{uuid}/test-queries/bulk-delete — prune a large test set."""
@@ -2747,6 +2968,113 @@ class TestTestQueryBulkDelete:
             )
 
         assert resp.status_code == 403
+
+
+class TestValidateSelectedQueries:
+    """POST /{uuid}/validate with ``query_uuids`` — run a smoke test over
+    chosen test queries."""
+
+    def _ctx(self, owned: int):
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        find = MagicMock()
+        find.count = AsyncMock(return_value=owned)
+        task = MagicMock()
+        task.delay = MagicMock(return_value=MagicMock(id="task-1"))
+        return kb, find, task
+
+    async def _post(self, client, body, owned=2):
+        user = _make_user("mgr")
+        cookies, headers = _auth("mgr")
+        kb, find, task = self._ctx(owned)
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "mgr", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock, return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find) as find_mock,
+            patch("app.tasks.kb_validation_tasks.validate_kb_task", task),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/knowledge/kb-1/validate", json=body, cookies=cookies, headers=headers,
+            )
+        return resp, find_mock, task
+
+    @pytest.mark.asyncio
+    async def test_selected_uuids_reach_the_task_deduplicated(self, client):
+        resp, find, task = await self._post(
+            client, {"async": True, "mode": "judge", "query_uuids": ["q-1", "q-2", "q-1"]},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {"task_id": "task-1", "status": "queued"}
+        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, ["q-1", "q-2"])
+        # Ownership is checked against this KB's queries before enqueueing.
+        find.assert_called_once_with({"knowledge_base_uuid": "kb-1", "uuid": {"$in": ["q-1", "q-2"]}})
+
+    @pytest.mark.asyncio
+    async def test_a_full_run_passes_no_selection(self, client):
+        resp, find, task = await self._post(client, {"async": True})
+        assert resp.status_code == 200
+        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, None)
+        find.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_empty_or_malformed_selection_is_a_400(self, client):
+        for bad in ([], "q-1", [1], [""]):
+            resp, _find, task = await self._post(client, {"async": True, "query_uuids": bad})
+            assert resp.status_code == 400, bad
+            task.delay.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_selection_owned_by_no_query_of_this_kb_is_a_400(self, client):
+        resp, _find, task = await self._post(
+            client, {"async": True, "query_uuids": ["other-kb-q"]}, owned=0,
+        )
+        assert resp.status_code == 400
+        assert "belong" in resp.json()["detail"]
+        task.delay.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_selection_over_the_cap_is_a_400_before_any_lookup(self, client):
+        from app.routers.knowledge import _VALIDATE_SELECTED_MAX
+
+        too_many = [f"q-{i}" for i in range(_VALIDATE_SELECTED_MAX + 1)]
+        resp, find, task = await self._post(client, {"async": True, "query_uuids": too_many})
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert str(_VALIDATE_SELECTED_MAX) in detail
+        assert str(_VALIDATE_SELECTED_MAX + 1) in detail
+        # Rejected on size alone — no ``$in`` query of that length hits Mongo.
+        find.assert_not_called()
+        task.delay.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_selection_exactly_at_the_cap_is_accepted(self, client):
+        from app.routers.knowledge import _VALIDATE_SELECTED_MAX
+
+        at_cap = [f"q-{i}" for i in range(_VALIDATE_SELECTED_MAX)]
+        resp, _find, task = await self._post(
+            client, {"async": True, "query_uuids": at_cap}, owned=_VALIDATE_SELECTED_MAX,
+        )
+        assert resp.status_code == 200
+        task.delay.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_partially_stale_selection_is_a_400_naming_the_missing_count(self, client):
+        # 5 requested, only 2 still exist on this KB: refuse rather than run a
+        # quietly smaller smoke test.
+        resp, _find, task = await self._post(
+            client, {"async": True, "query_uuids": ["q-1", "q-2", "q-3", "q-4", "q-5"]}, owned=2,
+        )
+        assert resp.status_code == 400
+        detail = resp.json()["detail"]
+        assert "3 of the 5 selected test queries no longer exist" in detail
+        assert "refresh" in detail
+        task.delay.assert_not_called()
 
 
 class TestValidationRunExport:

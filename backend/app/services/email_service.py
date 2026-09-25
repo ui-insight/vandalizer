@@ -488,7 +488,7 @@ def verification_submitted_email(
 ) -> tuple[str, str]:
     """Returns (subject, html_body) telling a reviewer a new submission is queued."""
     kind_label = item_kind.replace("_", " ")
-    subject = f'New verification submission: "{item_name}"'
+    subject = f'New sharing request: "{item_name}"'
     # Link to the submission, not the queue. A reviewer clicking through
     # otherwise has to find the right row themselves, which is worst at exactly
     # this moment — they have the least context about which item the mail was
@@ -511,7 +511,7 @@ def verification_submitted_email(
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>New submission awaiting review</h1>
-      <p>Hi {reviewer_name}, <strong style="color:#fff">{submitter_name}</strong> submitted the {kind_label} <span class="highlight">{item_name}</span> for verification.</p>
+      <p>Hi {reviewer_name}, <strong style="color:#fff">{submitter_name}</strong> asked to share the {kind_label} <span class="highlight">{item_name}</span> with everyone.</p>
       {summary_block}
       <p style="margin-top:24px"><a class="btn" href="{queue_link}">{button_label}</a></p>
       <div class="footer">Vandalizer</div>
@@ -564,16 +564,16 @@ def verification_status_email(
     reviewer_notes: str | None,
     frontend_url: str,
 ) -> tuple[str, str]:
-    """Returns (subject, html_body) for a verification status change."""
+    """Returns (subject, html_body) for a catalog review status change."""
     status_labels = {
-        "approved": ("Approved", "Your submission has been verified and added to the catalog."),
-        "rejected": ("Not Approved", "Your submission did not meet verification requirements."),
-        "returned": ("Needs Revision", "Your submission has been returned with feedback."),
+        "approved": ("Accepted", "An examiner checked it over and shared it with everyone here, with its measured score."),
+        "rejected": ("Declined", "The examiner decided not to share this one."),
+        "returned": ("Sent back", "The examiner sent it back with a note on what would get it there."),
         "in_review": ("Under Review", "An examiner has started reviewing your submission."),
     }
     label, default_body = status_labels.get(new_status, (new_status.title(), ""))
     body_text = reviewer_notes or default_body
-    subject = f'Verification update: "{item_name}" - {label}'
+    subject = f'Sharing request: "{item_name}" - {label}'
 
     notes_block = ""
     if reviewer_notes:

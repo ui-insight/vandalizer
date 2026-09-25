@@ -7,7 +7,7 @@
     "seed_id": "wf-post-award-progress-report",
     "display_name": "Progress Report Analyzer",
     "description": "Reviews a progress report for completeness, alignment with project objectives, and adequacy of explanations for any delays or problems.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "post-award"
     ]

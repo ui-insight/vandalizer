@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -12,12 +12,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
+import { CatalogSignals } from './CatalogSignals'
+import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type KindFilter, type QualityFilter, type SortOption } from './useCatalogBrowser'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import { AuthorChip } from '../shared/AuthorChip'
-import {
-  listVerifiedItems, browseCollections, listFeaturedCollections,
-  listLibraries,
-} from '../../api/library'
+import { listLibraries } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
 import { ApiError } from '../../api/client'
 import { listTeams } from '../../api/teams'
@@ -38,11 +37,6 @@ const KIND_TO_PIN_TYPE: Record<string, string> = {
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
-type SortOption = '' | 'quality' | 'name' | 'validations'
-type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
-
-const PAGE_SIZE = 30
 
 // ---------------------------------------------------------------------------
 // Markdown renderer
@@ -102,10 +96,12 @@ function KindBadge({ kind }: { kind: string }) {
 // Quality tier styling
 // ---------------------------------------------------------------------------
 
+// Keyed on the tiers compute_quality_tier emits — the only vocabulary a
+// measured item can carry. Matches the colours QualityBadge uses for them.
 const TIER_STYLES = {
-  gold: { ring: 'ring-amber-300', glow: 'shadow-amber-100', accent: 'text-amber-600', bg: 'bg-amber-50' },
-  silver: { ring: 'ring-gray-300', glow: 'shadow-gray-100', accent: 'text-gray-500', bg: 'bg-gray-50' },
-  bronze: { ring: 'ring-orange-200', glow: 'shadow-orange-50', accent: 'text-orange-600', bg: 'bg-orange-50' },
+  excellent: { ring: 'ring-green-300', glow: 'shadow-green-100', accent: 'text-green-700', bg: 'bg-green-50' },
+  good: { ring: 'ring-blue-300', glow: 'shadow-blue-100', accent: 'text-blue-700', bg: 'bg-blue-50' },
+  fair: { ring: 'ring-yellow-300', glow: 'shadow-yellow-100', accent: 'text-yellow-700', bg: 'bg-yellow-50' },
 } as const
 
 // ---------------------------------------------------------------------------
@@ -186,8 +182,11 @@ export function ItemDetailModal({
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
+              variant="catalog"
             />
+            <CatalogSignals item={item} className="text-white/70" />
             {item.validation_run_count > 0 && (
               <span className="text-white/70">{item.validation_run_count} validation{item.validation_run_count !== 1 ? 's' : ''}</span>
             )}
@@ -362,7 +361,9 @@ function CatalogCard({
   onTagClick: (tag: string) => void
   onClick: () => void
 }) {
-  const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
+  // An asserted tier gets no ring: the ring is the card-level version of the
+  // badge colour, and the badge renders assertions in neutral.
+  const tierStyle = item.quality_asserted ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
 
   return (
     <button
@@ -374,9 +375,7 @@ function CatalogCard({
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1.5 mb-1">
-            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
-              item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-500' : 'text-green-500'
-            }`} />
+            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${tierStyle ? tierStyle.accent : 'text-gray-400'}`} />
             <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
             <span className="text-sm font-semibold text-gray-900 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
@@ -387,13 +386,11 @@ function CatalogCard({
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
+              asserted={item.quality_asserted}
               regressionPending={item.regression_pending_review}
+              variant="catalog"
             />
-            {item.validation_run_count > 0 && (
-              <span className="text-[10px] text-gray-500">
-                {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}
-              </span>
-            )}
+            <CatalogSignals item={item} className="text-[10px] text-gray-500" />
           </div>
         </div>
       </div>
@@ -501,51 +498,24 @@ export function ExploreTab() {
     }
   }
 
-  // Data
-  const [items, setItems] = useState<VerifiedCatalogItem[]>([])
-  const [total, setTotal] = useState(0)
-  // Unfiltered catalog count for the "All Items" badge — `total` tracks the
-  // active query, so it shrinks whenever a kind/collection/search filter is on.
-  const [allTotal, setAllTotal] = useState<number | null>(null)
-  const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
+  const browser = useCatalogBrowser({
+    loadErrorMessage: 'Failed to load catalog items. Please try again.',
+    onLoadMoreError: (m) => toast(m, 'error'),
+  })
+  const {
+    items, total, allTotal, collections, featuredCollections,
+    loading, loadingMore, error,
+    searchQuery, setSearchQuery, kindFilter, setKindFilter, qualityFilter, setQualityFilter,
+    tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
+    refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
+    topItems, otherItems,
+  } = browser
   const [libraries, setLibraries] = useState<Library[]>([])
   const [currentTeamName, setCurrentTeamName] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  // Filters
-  const [searchQuery, setSearchQuery] = useState('')
-  const [kindFilter, setKindFilter] = useState<KindFilter>('')
-  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
-  const [tagFilter, setTagFilter] = useState('')
-  const [sortOption, setSortOption] = useState<SortOption>('')
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
 
   // Detail + dialogs
   const [detailItem, setDetailItem] = useState<VerifiedCatalogItem | null>(null)
   const [addToLibraryItem, setAddToLibraryItem] = useState<VerifiedCatalogItem | null>(null)
-
-  // Debounced search
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [debouncedSearch, setDebouncedSearch] = useState('')
-
-  useEffect(() => {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
-    searchTimerRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300)
-    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
-  }, [searchQuery])
-
-  // Load collections once
-  useEffect(() => {
-    browseCollections()
-      .then(d => setCollections(d.collections))
-      .catch(() => setError('Failed to load collections'))
-    listFeaturedCollections()
-      .then(d => setFeaturedCollections(d.collections))
-      .catch(() => {})
-  }, [])
 
   // Load user libraries
   useEffect(() => {
@@ -563,78 +533,6 @@ export function ExploreTab() {
       .then(teams => setCurrentTeamName(teams.find(t => t.uuid === user.current_team_uuid)?.name ?? null))
       .catch(() => {})
   }, [user?.current_team_uuid])
-
-  // Fetch items when filters change
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const data = await listVerifiedItems({
-        kind: kindFilter || undefined,
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: 0,
-        limit: PAGE_SIZE,
-      })
-      setItems(data.items)
-      setTotal(data.total)
-      // Sort doesn't change the result count, so any fetch without narrowing
-      // filters carries the true "all items" total.
-      if (!kindFilter && !debouncedSearch && !qualityFilter && !tagFilter && !selectedCollectionId) {
-        setAllTotal(data.total)
-      }
-    } catch {
-      setError('Failed to load catalog items. Please try again.')
-    } finally {
-      setLoading(false)
-    }
-  }, [kindFilter, debouncedSearch, qualityFilter, tagFilter, sortOption, selectedCollectionId])
-
-  useEffect(() => { refresh() }, [refresh])
-
-  const handleLoadMore = async () => {
-    setLoadingMore(true)
-    try {
-      const data = await listVerifiedItems({
-        kind: kindFilter || undefined,
-        search: debouncedSearch || undefined,
-        quality_tier: qualityFilter || undefined,
-        tag: tagFilter || undefined,
-        collection_id: selectedCollectionId || undefined,
-        sort: sortOption || undefined,
-        skip: items.length,
-        limit: PAGE_SIZE,
-      })
-      setItems(prev => [...prev, ...data.items])
-    } catch {
-      toast('Failed to load more items', 'error')
-    } finally {
-      setLoadingMore(false)
-    }
-  }
-
-  const hasMore = items.length < total
-
-  const activeCollection = selectedCollectionId
-    ? collections.find(c => c.id === selectedCollectionId) ?? null
-    : null
-
-  const clearFilters = () => {
-    setSearchQuery('')
-    setKindFilter('')
-    setQualityFilter('')
-    setTagFilter('')
-    setSortOption('')
-    setSelectedCollectionId(null)
-  }
-
-  const hasActiveFilters = !!(kindFilter || qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
-
-  // Show the hero landing when no filters are active
-  const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -697,20 +595,6 @@ export function ExploreTab() {
     ['search_set', 'Extractions'],
     ['knowledge_base', 'Knowledge Bases'],
   ]
-
-  const sortOptions: [SortOption, string][] = [
-    ['', 'Newest'],
-    ['quality', 'Highest Quality'],
-    ['name', 'Name A-Z'],
-    ['validations', 'Most Validated'],
-  ]
-
-  // Split items by tier for the hero landing
-  const goldItems = useMemo(() => items.filter(i => i.quality_tier === 'gold'), [items])
-  const otherItems = useMemo(
-    () => showHero ? items.filter(i => i.quality_tier !== 'gold') : items,
-    [items, showHero],
-  )
 
   return (
     <>
@@ -778,8 +662,9 @@ export function ExploreTab() {
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Explore the Catalog</h2>
-                    <p className="text-sm text-gray-500">Validated workflows, extractions, and knowledge bases ready to use</p>
+                    <h2 className="text-xl font-bold text-gray-900">Shared with everyone here</h2>
+                    <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases — checked, scored, and free to copy</p>
+                    <p className="text-xs text-gray-500 mt-1">Have something that works for you? Share it from its ⋯ menu in Mine — it doesn't need to be finished.</p>
                   </div>
                 </div>
               </div>
@@ -841,10 +726,9 @@ export function ExploreTab() {
                 aria-label="Filter by quality"
                 className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
               >
-                <option value="">Any quality</option>
-                <option value="gold">Gold</option>
-                <option value="silver">Silver</option>
-                <option value="bronze">Bronze</option>
+                {QUALITY_FILTER_OPTIONS.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
               </select>
 
               <div className="flex items-center gap-1">
@@ -855,7 +739,7 @@ export function ExploreTab() {
                   aria-label="Sort items"
                   className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
                 >
-                  {sortOptions.map(([val, label]) => (
+                  {SORT_OPTIONS.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
                   ))}
                 </select>
@@ -903,7 +787,7 @@ export function ExploreTab() {
               <div className="text-center py-20">
                 <ShieldCheck className="h-14 w-14 text-gray-200 mx-auto mb-4" />
                 <h3 className="text-base font-semibold text-gray-700 mb-1">
-                  {hasActiveFilters ? 'No matching items' : 'No verified items yet'}
+                  {hasActiveFilters ? 'No matching items' : 'Nothing shared yet'}
                 </h3>
                 <p className="text-sm text-gray-500 max-w-sm mx-auto">
                   {hasActiveFilters
@@ -937,16 +821,16 @@ export function ExploreTab() {
                   </div>
                 )}
 
-                {/* Gold tier spotlight (hero landing only) */}
-                {showHero && !activeCollection && goldItems.length > 0 && (
+                {/* Top-tier spotlight (hero landing only) */}
+                {showHero && !activeCollection && topItems.length > 0 && (
                   <div className="mb-8">
                     <div className="flex items-center gap-2 mb-3">
-                      <div className="h-4 w-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600" />
+                      <div className="h-4 w-4 rounded-full bg-gradient-to-br from-green-400 to-green-600" />
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
-                      <span className="text-xs text-gray-500">{goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-500">{topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
-                      {goldItems.slice(0, 6).map(item => (
+                      {topItems.slice(0, 6).map(item => (
                         <CatalogCard
                           key={item.id}
                           item={item}
@@ -960,7 +844,7 @@ export function ExploreTab() {
 
                 {/* Main grid */}
                 <div className="mb-2">
-                  {showHero && !activeCollection && goldItems.length > 0 && (
+                  {showHero && !activeCollection && topItems.length > 0 && (
                     <h3 className="text-sm font-bold text-gray-900 mb-3">All Items</h3>
                   )}
                   {!showHero && !loading && (

@@ -50,7 +50,9 @@ class CredentialError(Exception):
     """Raised for malformed payloads, failed exchanges, etc."""
 
 
-def validate_payload(credential_type: str, payload: dict) -> None:
+def validate_payload(
+    credential_type: str, payload: dict, *, allowed_hosts: frozenset[str] | None = None,
+) -> None:
     """Raise CredentialError if *payload* is missing required fields for *credential_type*."""
     if credential_type not in CREDENTIAL_TYPES:
         raise CredentialError(f"Unknown credential type: {credential_type!r}")
@@ -66,7 +68,7 @@ def validate_payload(credential_type: str, payload: dict) -> None:
                 raise CredentialError(f"oauth_client_credentials credential is missing {field!r}")
         # token_endpoint must be a safe outbound URL
         try:
-            validate_outbound_url(payload["token_endpoint"])
+            validate_outbound_url(payload["token_endpoint"], allowed_hosts=allowed_hosts)
         except ValueError as e:
             raise CredentialError(f"token_endpoint rejected: {e}") from e
 
@@ -271,6 +273,7 @@ def apply_auth(
     *,
     credential_doc: dict,
     headers: dict[str, str],
+    allowed_hosts: frozenset[str] | None = None,
 ) -> dict[str, str]:
     """Mutate *headers* in place per the credential's auth strategy. Return headers.
 
@@ -288,7 +291,7 @@ def apply_auth(
         return headers
 
     if cred_type == "oauth_client_credentials":
-        validate_payload(cred_type, payload)
+        validate_payload(cred_type, payload, allowed_hosts=allowed_hosts)
         cred_id = str(credential_doc.get("_id") or credential_doc.get("id") or "")
         if not cred_id:
             raise CredentialError("Cannot apply OAuth credential without an id")
@@ -358,6 +361,7 @@ def run_connection_test(
     payload: dict,
     *,
     test_url: str | None = None,
+    allowed_hosts: frozenset[str] | None = None,
 ) -> dict:
     """Try a credential for real and report what happened, step by step.
 
@@ -371,7 +375,7 @@ def run_connection_test(
     headers: dict[str, str] = {}
 
     try:
-        validate_payload(cred_type, payload)
+        validate_payload(cred_type, payload, allowed_hosts=allowed_hosts)
     except CredentialError as e:
         _step(steps, "Configuration", False, str(e))
         return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}
@@ -413,7 +417,7 @@ def run_connection_test(
         return {"ok": True, "steps": steps, "status_code": None, "elapsed_ms": None}
 
     try:
-        validate_outbound_url(test_url)
+        validate_outbound_url(test_url, allowed_hosts=allowed_hosts)
     except ValueError as e:
         _step(steps, "Test request", False, f"Test URL not allowed: {e}")
         return {"ok": False, "steps": steps, "status_code": None, "elapsed_ms": None}

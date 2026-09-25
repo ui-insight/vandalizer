@@ -576,3 +576,76 @@ class TestProjectKbMirrorFailure:
         notify.assert_called_once()
         assert notify.call_args.kwargs["project"]["uuid"] == "p1"
         assert notify.call_args.kwargs["doc"]["uuid"] == "d1"
+        # Nothing was indexed before, so the bell keeps the wording it has
+        # always had: saved, but never added.
+        assert notify.call_args.kwargs["failed_at"] == "insert"
+
+    def test_a_failed_refresh_bells_the_owner_the_same_way(self):
+        """The refresh branch (#887 follow-up) raises like the insert branch
+        does; _ingest_into_project_kb is still the only thing that catches, and
+        it rings the same bell. No new notification type."""
+        import app.tasks.document_tasks as dt
+        from app.utils import kb_source_currency as currency
+
+        db = MagicMock()
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = True
+        dm.add_to_kb.side_effect = RuntimeError("chroma collection gone")
+        # A row exists and its fingerprint does not match: the refresh branch.
+        db.knowledge_base_sources.find_one.return_value = {
+            "_id": ObjectId(),
+            "status": "ready",
+            "chunk_count": 3,
+            "content_hash": currency.content_fingerprint("the first extraction"),
+        }
+        with patch.object(dt, "_find_project_for_folder", return_value={
+            "uuid": "p1", "title": "NSF Renewal",
+            "owner_user_id": "p-owner", "kb_uuid": "kb-p1",
+        }), patch(
+            "app.services.failure_notifications.notify_project_kb_sync_failed"
+        ) as notify:
+            # Must not raise — best-effort by design, but never silently.
+            synced = dt._ingest_into_project_kb(
+                db, dm, {"uuid": "d1", "title": "Doc", "user_id": "u1", "folder": "f1"},
+                "the re-extracted text",
+            )
+
+        assert synced is False
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["project"]["uuid"] == "p1"
+        assert notify.call_args.kwargs["doc"]["uuid"] == "d1"
+        # Same bell, but it has to say the true thing: the old chunks are
+        # gone and the new ones never landed.
+        assert notify.call_args.kwargs["failed_at"] == "replace"
+
+    def test_a_delete_that_failed_is_belled_as_its_own_case(self):
+        """The delete failing and the re-add failing leave opposite states —
+        old chunks still answering vs. no chunks at all — so the mirror has to
+        tell the bell which one it was, not just that a refresh failed."""
+        import app.tasks.document_tasks as dt
+        from app.utils import kb_source_currency as currency
+
+        db = MagicMock()
+        dm = MagicMock()
+        dm.delete_kb_source.return_value = False
+        db.knowledge_base_sources.find_one.return_value = {
+            "_id": ObjectId(),
+            "status": "ready",
+            "chunk_count": 3,
+            "content_hash": currency.content_fingerprint("the first extraction"),
+        }
+        with patch.object(dt, "_find_project_for_folder", return_value={
+            "uuid": "p1", "title": "NSF Renewal",
+            "owner_user_id": "p-owner", "kb_uuid": "kb-p1",
+        }), patch(
+            "app.services.failure_notifications.notify_project_kb_sync_failed"
+        ) as notify:
+            synced = dt._ingest_into_project_kb(
+                db, dm, {"uuid": "d1", "title": "Doc", "user_id": "u1", "folder": "f1"},
+                "the re-extracted text",
+            )
+
+        assert synced is False
+        dm.add_to_kb.assert_not_called()
+        notify.assert_called_once()
+        assert notify.call_args.kwargs["failed_at"] == "delete"

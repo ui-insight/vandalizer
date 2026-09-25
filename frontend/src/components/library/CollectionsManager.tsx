@@ -348,9 +348,9 @@ export function CollectionsManager() {
                                 </span>
                                 {item?.quality_tier && (
                                   <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
-                                    item.quality_tier === 'gold' ? 'bg-yellow-50 text-yellow-700'
-                                      : item.quality_tier === 'silver' ? 'bg-gray-100 text-gray-600'
-                                      : 'bg-orange-50 text-orange-700'
+                                    item.quality_tier === 'excellent' ? 'bg-green-50 text-green-700'
+                                      : item.quality_tier === 'good' ? 'bg-blue-50 text-blue-700'
+                                      : 'bg-yellow-50 text-yellow-700'
                                   }`}>
                                     {item.quality_tier}
                                   </span>
@@ -394,7 +394,7 @@ export function CollectionsManager() {
                     {showAddItem && (
                       <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-white">
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-xs font-semibold text-gray-700">Add Verified Item</span>
+                          <span className="text-xs font-semibold text-gray-700">Add shared item</span>
                           <button type="button" aria-label="Close" onClick={() => { setShowAddItem(false); setAddSearch('') }} className="p-1 rounded hover:bg-gray-100 text-gray-500">
                             <X className="h-4 w-4" />
                           </button>
@@ -403,7 +403,7 @@ export function CollectionsManager() {
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                           <input
                             type="text"
-                            aria-label="Search verified items to add"
+                            aria-label="Search shared items to add"
                             value={addSearch}
                             onChange={(e) => setAddSearch(e.target.value)}
                             placeholder="Search items..."

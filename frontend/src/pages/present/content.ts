@@ -502,7 +502,7 @@ const team: Track = {
     {
       id: 'knowledge',
       heading: 'Knowledge bases',
-      body: 'Collect documents, URLs, and notes into a reusable knowledge base that becomes searchable context for chat. Keep it personal or share it with your team; administrators can curate verified knowledge bases for everyone.',
+      body: 'Collect documents, URLs, and notes into a reusable knowledge base that becomes searchable context for chat. Keep it personal, share it with your team, or share it with everyone once an examiner has checked it over.',
     },
     {
       id: 'chat',

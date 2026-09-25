@@ -12,7 +12,7 @@ import { useAuth } from '../hooks/useAuth'
 type Tab = 'queue' | 'catalog' | 'coverage' | 'collections' | 'examiners'
 
 const TABS: { key: Tab; label: string; icon: typeof ShieldCheck; adminOnly?: boolean }[] = [
-  { key: 'queue', label: 'Queue', icon: ShieldCheck },
+  { key: 'queue', label: 'Requests', icon: ShieldCheck },
   { key: 'catalog', label: 'Catalog', icon: BookOpen },
   { key: 'coverage', label: 'Coverage', icon: Pin },
   { key: 'collections', label: 'Collections', icon: FolderOpen },
@@ -52,7 +52,7 @@ export default function Verification() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <ShieldCheck size={20} color="#6b7280" />
-            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Verification</h1>
+            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Shared items</h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
             {visibleTabs.map(tab => {

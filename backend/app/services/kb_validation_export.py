@@ -22,6 +22,25 @@ from typing import Any
 
 EXPORT_FORMAT_TAG = "vandalizer.kb-validation-results.v1"
 
+# One row per KB source on the XLSX "Sources" sheet, in this order.
+SOURCE_COLUMNS = [
+    "source_uuid",
+    "name",
+    "source_type",
+    "document_uuid",
+    "url",
+    "source_reference",
+    "status",
+    "health",
+    "chunk_count",
+    "truncated",
+    "content_hash",
+    "content_hash_recorded",
+    "content_retrieved_at",
+    "last_ingested_at",
+    "created_at",
+]
+
 RUN_SCORE_MEANING = (
     "Overall quality score (0-100): a weighted composite of answer accuracy, "
     "retrieval precision, source health, and chunk coverage — see "
@@ -64,6 +83,13 @@ RUN_META_CSV_COLUMNS = [
     "kb_title",
     "mode",
     "judge_model",
+    # Rows from concatenated exports group by the set they were scored on.
+    "question_set_fingerprint",
+    # The KB as the run found it, repeated per row so concatenated exports
+    # from different runs show which KB state each row was scored against.
+    "kb_source_fingerprint",
+    "kb_source_count",
+    "kb_chunk_count",
     "run_score",
     "score_formula",
     "avg_judge_score",
@@ -78,6 +104,7 @@ RESULT_COLUMNS = [
     "category",
     "expected_answer",
     "expected_sources",
+    "notes",
     "retrieved_sources",
     "retrieval_precision",
     "answer_match",
@@ -101,6 +128,12 @@ RESULT_COLUMNS = [
 ]
 
 
+def _answer_model(snap: dict, vr) -> str | None:
+    """The model that generated the run's graded answers, if recorded."""
+    recorded = snap.get("answer_model") or getattr(vr, "model", None)
+    return recorded if isinstance(recorded, str) and recorded else None
+
+
 def build_kb_validation_results_export(
     *,
     kb,
@@ -118,6 +151,7 @@ def build_kb_validation_results_export(
     """
     snap = vr.result_snapshot or {}
     rp = snap.get("retrieval_precision") or {}
+    kb_sources = _kb_sources(snap)
     details = rp.get("details") or []
     scoring = _score_explanation(snap, rp)
 
@@ -144,6 +178,8 @@ def build_kb_validation_results_export(
                 or (getattr(tq, "expected_answer", None) if tq else None) or "",
             "expected_sources": det.get("expected_sources")
                 or (list(getattr(tq, "expected_source_labels", []) or []) if tq else []),
+            "notes": det.get("notes")
+                or (getattr(tq, "notes", None) if tq else None) or "",
             "retrieved_sources": det.get("retrieved_sources") or [],
             "retrieval_precision": det.get("precision"),
             "answer_match": det.get("answer_match"),
@@ -177,6 +213,21 @@ def build_kb_validation_results_export(
         "kb_title": kb.title,
         "mode": snap.get("mode"),
         "judge_model": snap.get("judge_model"),
+        # {"selected": n, "total": N} when the run covered hand-picked
+        # queries only ("Run selected" on the Test Queries tab). Such a run
+        # is a smoke test, not the KB's quality score.
+        "query_selection": snap.get("query_selection"),
+        # Identifies the exact question set the run measured: two runs with
+        # different fingerprints scored different questions or expectations
+        # and are not directly comparable. None on runs that predate it.
+        "question_set_fingerprint": (snap.get("question_set") or {}).get("fingerprint"),
+        "question_set_categories": (snap.get("question_set") or {}).get("category_counts"),
+        # The model that generated the graded answers. Older runs recorded
+        # neither; ``answer_model_fallback`` is set when the KB's applied
+        # override named a model System Config no longer had, so the user's
+        # model answered instead of the tuned one.
+        "answer_model": _answer_model(snap, vr),
+        "answer_model_fallback": snap.get("answer_model_fallback"),
         # ``run_score`` is the OVERALL quality score: a weighted composite of
         # answer accuracy, retrieval precision, source health, and chunk
         # coverage (see ``score_formula`` / ``score_components``). It is not
@@ -202,9 +253,19 @@ def build_kb_validation_results_export(
         "chunk_coverage_ratio": (snap.get("chunk_coverage") or {}).get("ratio"),
         "catalog_version": catalog_version,
         "kb_seed_id": (getattr(kb, "resource_config", None) or {}).get("seed_id"),
-        # The KB's RAG override as of export time. Validation runs don't
-        # snapshot the config they ran under, so for historical runs this may
-        # differ from what the run actually used — hence the explicit name.
+        # The KB's sources, versions and chunk counts at run time (see
+        # kb_source_snapshot). ``kb_sources_recorded`` is False for a run from
+        # before these were recorded: its list then comes from the run's
+        # source-health check and carries no versions or per-source chunks.
+        "kb_source_fingerprint": (kb_sources or {}).get("fingerprint"),
+        "kb_source_count": (kb_sources or {}).get("total_sources"),
+        "kb_chunk_count": (kb_sources or {}).get("total_chunks"),
+        "kb_sources_recorded": bool((kb_sources or {}).get("recorded")),
+        # The retrieval override the run answered under; absent (None) on
+        # runs from before it was recorded.
+        "rag_config_override_at_run": snap.get("rag_config_override"),
+        # The KB's RAG override as of export time, for comparison. For a run
+        # that predates the field above this may differ from what it used.
         "rag_config_override_current": getattr(kb, "rag_config_override", None),
     }
 
@@ -220,9 +281,19 @@ def build_kb_validation_results_export(
             "total_chunks": getattr(kb, "total_chunks", None),
         },
         "validation_run": run_meta,
+        "kb_sources": kb_sources,
         "results": rows,
     }
     return payload, run_meta, rows
+
+
+def _kb_sources(snap: dict) -> dict | None:
+    """The run's source snapshot, or the thinner record an older run kept."""
+    recorded = snap.get("kb_sources")
+    if isinstance(recorded, dict):
+        return recorded
+    from app.services.kb_source_snapshot import legacy_source_snapshot
+    return legacy_source_snapshot(snap)
 
 
 def _flatten_cell(value: Any) -> Any:
@@ -249,9 +320,10 @@ def render_results_csv(run_meta: dict, rows: list[dict]) -> str:
     return out.getvalue()
 
 
-def render_results_xlsx(run_meta: dict, rows: list[dict]) -> bytes:
-    """Two-sheet workbook: Summary (run metadata as key/value) + Results
-    (one row per test query)."""
+def render_results_xlsx(run_meta: dict, rows: list[dict], kb_sources: dict | None = None) -> bytes:
+    """Workbook: Summary (run metadata as key/value), Results (one row per
+    test query), and — when the run recorded any — Sources (one row per KB
+    source as the run found it)."""
     import io
 
     from openpyxl import Workbook
@@ -296,6 +368,15 @@ def render_results_xlsx(run_meta: dict, rows: list[dict]) -> bytes:
     for row in rows:
         results.append([_cell(row.get(k)) for k in RESULT_COLUMNS])
     results.freeze_panes = "A2"
+
+    if kb_sources and kb_sources.get("sources"):
+        sheet = wb.create_sheet("Sources")
+        sheet.append(SOURCE_COLUMNS)
+        for c in sheet[1]:
+            c.font = bold
+        for src in kb_sources["sources"]:
+            sheet.append([_cell(src.get(k)) for k in SOURCE_COLUMNS])
+        sheet.freeze_panes = "A2"
 
     buf = io.BytesIO()
     wb.save(buf)

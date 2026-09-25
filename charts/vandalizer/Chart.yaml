@@ -1,0 +1,24 @@
+apiVersion: v2
+name: vandalizer
+description: >-
+  AI-powered document intelligence platform for research administration.
+  Deploys the FastAPI backend, Celery workers, React frontend, and
+  (optionally) MongoDB, Redis, and ChromaDB.
+type: application
+# Chart version — bump on any chart change (semver).
+version: 0.1.0
+# Default image tag for the application images. Matches the release tags
+# published by .github/workflows/release.yaml (compose users know this value
+# as VANDALIZER_VERSION). Override per-image via image.*.tag. The first
+# release to publish vandalizer-frontend-unprivileged is the one that ships
+# this chart; scripts/cut_release.sh warns when this lags the tag being cut.
+appVersion: "v4.14.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/ui-insight/vandalizer
+sources:
+  - https://github.com/ui-insight/vandalizer
+keywords:
+  - document-intelligence
+  - research-administration
+  - fastapi
+  - celery

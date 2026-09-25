@@ -1,0 +1,524 @@
+# Default values for the vandalizer chart.
+#
+# The defaults mirror compose.yaml as closely as Kubernetes allows, with
+# restricted-Pod-Security-compliant securityContexts. Values you MUST set
+# for a working install:
+#   config.frontendUrl
+#   secrets.jwtSecretKey and secrets.configEncryptionKey (or secrets.existingSecret)
+#   bootstrap.adminEmail / bootstrap.adminPassword (or disable bootstrap)
+# and a ReadWriteMany-capable storage class for `uploads` (or an existingClaim).
+
+# The public hostname users reach the app at, stated once. Derives, unless
+# individually overridden: config.frontendUrl (as https://<hostname>),
+# httpRoute.hostnames, and ingress.host.
+hostname: ""
+
+image:
+  backend:
+    repository: ghcr.io/ui-insight/vandalizer-backend
+    # Defaults to the chart appVersion when empty.
+    tag: ""
+  frontend:
+    # The unprivileged variant (non-root nginx on 8080) is the default so the
+    # chart works under the restricted Pod Security Standard and on OpenShift.
+    # To use the root-nginx port-80 image Docker users get, see
+    # values-frontend-root.yaml at the chart root.
+    repository: ghcr.io/ui-insight/vandalizer-frontend-unprivileged
+    tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Extra labels added to every rendered resource.
+commonLabels: {}
+
+config:
+  # development | staging | production. Outside "development" the backend
+  # refuses to start with a default JWT_SECRET_KEY.
+  environment: production
+  # Public URL users reach the app at — feeds CORS and cookie-security
+  # decisions in the backend. Defaults to https://<hostname>; set this only
+  # when the scheme or URL differs (e.g. plain http on an intranet).
+  frontendUrl: ""
+  # Where uploaded files live inside backend pods; the uploads volume is
+  # mounted here on the api, every celery worker, beat, and the bootstrap job.
+  uploadDir: /app/static/uploads
+  # Uvicorn workers per api pod. Prefer scaling api.replicaCount for HA;
+  # raise this for per-pod throughput.
+  webWorkers: 2
+  # Arbitrary additional non-secret environment variables for the backend
+  # (api + celery + bootstrap), e.g. GRAPH_NOTIFICATION_URL,
+  # VANDALIZER_BASE_URL, SMTP settings, LOG_FORMAT. Keys are used verbatim.
+  # Since v4.12.0 this is also where OUTBOUND_URL_ALLOWED_HOSTS goes: the
+  # comma-separated hostnames exempted from the SSRF guard on server-side
+  # HTTP (e.g. an on-campus LLM router on a private address). Admins can
+  # manage the same list in Admin > System Config > Endpoints; both apply.
+  extraEnv: {}
+  # Optional: token counting can read HuggingFace tokenizer vocabularies from
+  # TOKENIZER_CACHE_ROOT (default /hf-cache; without it the app estimates and
+  # logs that it did). To provide one, mount a volume there on api and celery
+  # via api.extraVolumes/extraVolumeMounts and celery.extraVolumes/
+  # extraVolumeMounts — compose parity is the ${HF_CACHE_PATH} bind mount.
+
+secrets:
+  # Name of a pre-existing Secret to use instead of the chart-managed one.
+  # It is injected via envFrom, so its keys must be the environment variable
+  # names themselves: JWT_SECRET_KEY, CONFIG_ENCRYPTION_KEY, and optionally
+  # SMTP_PASSWORD, RESEND_API_KEY, SENTRY_DSN, GRAPH_TOKEN_KEY,
+  # GRAPH_CLIENT_STATE_SECRET, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET,
+  # AZURE_TENANT_ID. When set, every value below is ignored and no Secret is
+  # rendered.
+  existingSecret: ""
+  # Session-signing key. Required (generate with `openssl rand -hex 32`).
+  jwtSecretKey: ""
+  # Fernet key encrypting LLM API keys and OAuth secrets stored in MongoDB.
+  # Required. Generate once with:
+  #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+  # BACK IT UP — losing or rotating it makes every stored credential
+  # undecryptable.
+  configEncryptionKey: ""
+  smtpPassword: ""
+  resendApiKey: ""
+  sentryDsn: ""
+  # Microsoft 365 / Graph integration (all optional).
+  azure:
+    clientId: ""
+    clientSecret: ""
+    tenantId: ""
+  graph:
+    tokenKey: ""
+    clientStateSecret: ""
+
+# Shared uploads volume, mounted at config.uploadDir on the api and every
+# celery pod. MUST be ReadWriteMany on multi-node clusters (api and workers
+# are separate pods); any RWX-capable storage class works (Ceph NFS, EFS,
+# Azure Files, ...). Single-node clusters can use ReadWriteOnce.
+uploads:
+  # Use a PVC you manage yourself instead of chart-created one.
+  existingClaim: ""
+  # "" = cluster default storage class, "-" = storageClassName: "" (none).
+  storageClass: ""
+  accessModes:
+    - ReadWriteMany
+  size: 50Gi
+  annotations:
+    # Keep uploaded documents when the release is uninstalled.
+    helm.sh/resource-policy: keep
+
+api:
+  replicaCount: 1
+  # Streaming chat/workflow responses (SSE) are served in-process; scaling
+  # beyond 1 replica works for normal traffic but has had less soak time.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    # Published backend images declare their user by name (appuser), which
+    # runAsNonRoot cannot verify — the numeric uid must be stated here.
+    # OpenShift: set runAsUser/runAsGroup/fsGroup to null (the SCC assigns them).
+    runAsUser: 1000
+    runAsGroup: 1000
+    # Makes the uploads volume writable by uid 1000.
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+celery:
+  # Longer than the app's task_time_limit (3660s) so a terminating worker can
+  # finish in-flight tasks instead of losing them.
+  terminationGracePeriodSeconds: 3720
+  podSecurityContext:
+    runAsNonRoot: true
+    # See the note on api.podSecurityContext.runAsUser.
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: {}
+  extraVolumes: []
+  extraVolumeMounts: []
+  # One Deployment per key. Each entry accepts: concurrency (required),
+  # replicas, resources, nodeSelector, tolerations, affinity, extraEnv.
+  queues:
+    documents:
+      concurrency: 8
+      replicas: 1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    workflows:
+      concurrency: 6
+      replicas: 1
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+    uploads:
+      concurrency: 4
+      replicas: 1
+      resources:
+        requests:
+          cpu: 250m
+          memory: 512Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+    passive:
+      concurrency: 2
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+    default:
+      concurrency: 2
+      replicas: 1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: "1"
+          memory: 1Gi
+
+beat:
+  # The Celery scheduler. Always exactly one replica — running two double-fires
+  # every scheduled task.
+  enabled: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+frontend:
+  replicaCount: 1
+  # Must match the listen port of the chosen frontend image: 8080 for the
+  # default unprivileged image, 80 for the root variant.
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  # Templated into the nginx config (see configmap-frontend-nginx.yaml).
+  clientMaxBodySize: 200M
+  # Applies to proxied /api requests; SSE streams need it generous.
+  proxyReadTimeout: 300s
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    # The unprivileged nginx image declares its user by name, which
+    # runAsNonRoot cannot verify — state the numeric uid here.
+    # OpenShift: set to null. Root-image variant: see values-frontend-root.yaml.
+    runAsUser: 101
+    runAsGroup: 101
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pdb:
+    enabled: false
+    minAvailable: 1
+
+mongodb:
+  # Render an in-cluster single-replica MongoDB. Set false and fill
+  # external.uri to use an existing server.
+  enabled: true
+  image:
+    repository: docker.io/library/mongo
+    tag: 7.0.16
+    # Independent of image.pullPolicy: side-loaded app images (pullPolicy
+    # Never) must not stop the datastores from pulling.
+    pullPolicy: IfNotPresent
+  external:
+    # Full connection URI, e.g. mongodb://user:pass@mongo.example.edu:27017/
+    # Used only when enabled=false.
+    uri: ""
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 1Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    # uid/gid of the mongodb user in the official image.
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  persistence:
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+    annotations:
+      helm.sh/resource-policy: keep
+
+redis:
+  # Celery broker + cache. The application hardcodes redis://<host>:6379 with
+  # no auth or TLS, so in-cluster Redis is unauthenticated (compensated by the
+  # NetworkPolicy) and an external server must also answer unauthenticated on
+  # 6379.
+  enabled: true
+  image:
+    repository: docker.io/library/redis
+    tag: 7.4-alpine
+    pullPolicy: IfNotPresent
+  external:
+    # Hostname only (no port, no scheme). Used only when enabled=false.
+    host: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    # uid/gid of the redis user in the official image.
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  persistence:
+    # Off by default (compose parity): the broker holds only queued tasks and
+    # short-lived results; a restart loses queued-but-unstarted tasks.
+    enabled: false
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 1Gi
+    annotations: {}
+
+chromadb:
+  # Vector store for RAG. The app requires a network Chroma server in
+  # Kubernetes (its embedded fallback is not multi-process safe). Keep the
+  # image pinned: the backend speaks the v1 API (client chromadb 0.5.x);
+  # Chroma >=1.0 servers are v2-only and will not work.
+  enabled: true
+  image:
+    repository: docker.io/chromadb/chroma
+    tag: 0.6.3
+    pullPolicy: IfNotPresent
+  external:
+    # Used only when enabled=false. Rendered as host:port — CHROMADB_HOST is
+    # not a URL.
+    host: ""
+    port: 8000
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "2"
+      memory: 2Gi
+  # The 0.6.x image writes chroma.log into its root-owned workdir, so unlike
+  # the other components it cannot run as an arbitrary non-root user — it
+  # keeps the image's root user (capabilities still dropped). On clusters
+  # enforcing restricted Pod Security on this namespace, run ChromaDB
+  # elsewhere and set chromadb.enabled=false with external.host.
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: ["ALL"]
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  persistence:
+    existingClaim: ""
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+    size: 20Gi
+    annotations:
+      helm.sh/resource-policy: keep
+
+# --- Edge routing -----------------------------------------------------------
+# Default topology: ALL traffic (including /api) goes to the frontend Service;
+# its nginx proxies /api to the api Service with the SSE, body-size, and OAuth
+# callback behaviors the app depends on. Enable exactly one of ingress or
+# httpRoute (both simultaneously is allowed for migrations). With both off,
+# reach the app via port-forward (see NOTES.txt).
+
+ingress:
+  enabled: false
+  className: ""
+  # e.g. vandalizer.example.edu
+  host: ""
+  annotations: {}
+  # - secretName: vandalizer-tls
+  #   hosts: [vandalizer.example.edu]
+  tls: []
+
+httpRoute:
+  enabled: false
+  # parentRefs of the Gateway to attach to, e.g.
+  # - name: campus-gateway
+  #   namespace: gateways
+  #   sectionName: https
+  parentRefs: []
+  # e.g. [vandalizer.example.edu]
+  hostnames: []
+  annotations: {}
+  # SSE streams are long-lived; "0s" disables the request timeout where the
+  # Gateway implementation supports it. Set a duration if yours rejects 0s.
+  timeouts:
+    request: 0s
+  # Extra HTTPRouteRule entries appended verbatim before the default
+  # catch-all rule — see values-split-routing.yaml for routing /api at the
+  # edge instead of through the frontend nginx.
+  additionalRules: []
+
+# Compensating control for the unauthenticated in-cluster datastores:
+# default-denies their ingress except from this release's backend pods, and
+# restricts api ingress to the frontend (plus monitoring when the
+# ServiceMonitor is enabled).
+networkPolicy:
+  # Renders policies that both restrict (only backend pods reach the
+  # unauthenticated datastores; only the frontend and allowed namespaces
+  # reach the api) and grant (frontend ingress from the edge, frontend egress
+  # to api+DNS, unrestricted backend egress) — the grants make the chart work
+  # on clusters with a default-deny baseline. Note: a platform-level
+  # AdminNetworkPolicy with a hard Deny cannot be overridden here.
+  enabled: true
+  # Peers allowed to reach the frontend on its container port. Verbatim
+  # NetworkPolicyPeer entries, so namespaceSelector, podSelector, and ipBlock
+  # all work. Empty = any namespace (the edge's location varies per cluster).
+  # A hostNetwork ingress controller or Gateway arrives from NODE IPs, which
+  # no selector matches — use an ipBlock covering the node CIDR for those:
+  #   frontendIngressFrom:
+  #     - namespaceSelector:
+  #         matchLabels: {kubernetes.io/metadata.name: gateway-system}
+  #     - ipBlock:
+  #         cidr: 10.0.0.0/24   # node CIDR, hostNetwork edges only
+  frontendIngressFrom: []
+  # Additional peers (beyond this release's frontend and backend pods) allowed
+  # to reach the api on :8001 — split-edge routing sending /api straight to
+  # the api Service, or Prometheus scraping /api/metrics. Same verbatim form.
+  apiExtraIngressFrom: []
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+  automountServiceAccountToken: false
+
+# One-time install bootstrap: creates the admin account, default team, and
+# seeds the workflow catalog. Runs as a post-install hook Job ONLY — re-running
+# it resets the admin password, so upgrades never trigger it. To re-run
+# deliberately, see NOTES.txt.
+bootstrap:
+  enabled: true
+  adminEmail: ""
+  adminPassword: ""
+  adminName: ""
+  defaultTeamName: ""
+  orgName: ""
+  # Pre-existing Secret with keys ADMIN_EMAIL, ADMIN_PASSWORD (and optionally
+  # ADMIN_NAME, DEFAULT_TEAM_NAME, ORG_NAME). Overrides the values above.
+  existingSecret: ""
+  # Catalog seeding embeds knowledge-base content in-process (it downloads
+  # ChromaDB's ONNX embedding model), so the Job needs real memory headroom.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 2Gi
+
+metrics:
+  serviceMonitor:
+    # Scrapes the backend's /api/metrics (NOTE: the endpoint is
+    # unauthenticated). Requires the Prometheus Operator CRDs.
+    enabled: false
+    interval: 30s
+    labels: {}

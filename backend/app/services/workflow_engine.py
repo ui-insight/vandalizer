@@ -510,6 +510,16 @@ class Node:
         return result
 
 
+    def _allowed_hosts(self) -> frozenset[str]:
+        """Private-address hosts this deployment lets outbound steps reach:
+        the operator's env list plus the admin's System Config list, which
+        rides on the engine's config snapshot so a Celery thread needs no
+        database read to honour it."""
+        from app.utils.url_validation import allowed_private_hosts
+
+        return allowed_private_hosts(self._sys_cfg)
+
+
 class MultiTaskNode(Node):
     def __init__(self, name: str) -> None:
         super().__init__(name)
@@ -953,7 +963,7 @@ class DescribeImageNode(Node):
             with httpx.Client(timeout=30, follow_redirects=False) as client:
                 for _hop in range(5):
                     try:
-                        validate_outbound_url(url)
+                        validate_outbound_url(url, allowed_hosts=self._allowed_hosts())
                     except ValueError as e:
                         return f"Blocked URL: {e}"
                     with client.stream("GET", url) as resp:
@@ -1144,7 +1154,7 @@ class CrawlerNode(Node):
         from app.utils.url_validation import validate_outbound_url
 
         try:
-            validate_outbound_url(start_url)
+            validate_outbound_url(start_url, allowed_hosts=self._allowed_hosts())
         except ValueError as e:
             return {
                 "output": f"Blocked URL: {e}",
@@ -1208,7 +1218,7 @@ class CrawlerNode(Node):
                     abs_url = urljoin(url, link["href"])
                     if url_in_crawl_scope(abs_url, scope) and normalize_crawl_url(abs_url) not in visited:
                         try:
-                            validate_outbound_url(abs_url)
+                            validate_outbound_url(abs_url, allowed_hosts=self._allowed_hosts())
                             to_visit.append(abs_url)
                         except ValueError:
                             continue
@@ -1455,7 +1465,7 @@ class APICallNode(Node):
         from app.utils.url_validation import validate_outbound_url
 
         try:
-            validate_outbound_url(url)
+            validate_outbound_url(url, allowed_hosts=self._allowed_hosts())
         except ValueError as e:
             return self._error_result(f"Blocked URL: {e}", inputs)
 
@@ -1501,7 +1511,9 @@ class APICallNode(Node):
                     inputs,
                 )
             try:
-                credentials_service.apply_auth(credential_doc=cred_doc, headers=headers)
+                credentials_service.apply_auth(
+                    credential_doc=cred_doc, headers=headers, allowed_hosts=self._allowed_hosts(),
+                )
             except credentials_service.CredentialError as e:
                 return self._error_result(f"Auth setup failed: {e}", inputs)
 

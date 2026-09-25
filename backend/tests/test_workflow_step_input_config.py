@@ -191,37 +191,18 @@ class TestEveryPathThatBuildsStepsDataResolvesInput:
     """`apply_step_input_config` has to run before a path preloads documents,
     or the preload reads the task's keys while the engine resolves the step's.
 
-    There are three places that assemble steps_data. Two go through the engine
-    builder; `passive_tasks` keeps its own copy, which is how it missed both
-    this and the workflow default model (#842). A structural test rather than
-    a behavioural one, because standing up a folder-watch trigger end to end
-    costs far more than it pins -- and the failure is not a crash, it is a
-    scheduled run answering over the wrong document, or over no text at all,
-    without erroring.
+    There is one place that assembles steps_data -- `build_steps_data` -- and
+    the scheduled / folder-watch path and the optimizer both call it (#862).
+    They used to keep copies of the loop, which is how the scheduled path
+    missed this fix and the workflow default model (#842) in turn. The
+    ordering is pinned once, on the builder; the delegation is pinned in
+    test_steps_data_single_builder.
     """
-
-    def test_the_scheduled_run_path_applies_step_input_before_preloading(self):
-        import inspect
-
-        from app.tasks import passive_tasks
-
-        src = inspect.getsource(passive_tasks.execute_workflow_passive)
-        assert "apply_step_input_config" in src, (
-            "the scheduled/folder-watch path builds steps_data without "
-            "resolving step-level input; its document preload would read the "
-            "task's keys while the engine resolves the step's"
-        )
-        apply_at = src.index("apply_step_input_config")
-        preload_at = src.index("_wants_selected_document")
-        assert apply_at < preload_at, (
-            "step input must be resolved BEFORE the selected-document preload, "
-            "or the preload fetches the wrong document"
-        )
 
     def test_the_celery_run_path_still_applies_it_before_preloading(self):
         import inspect
 
         from app.tasks import workflow_tasks
 
-        src = inspect.getsource(workflow_tasks._build_steps_data)
+        src = inspect.getsource(workflow_tasks.build_steps_data)
         assert src.index("apply_step_input_config") < src.index("_wants_selected_document")

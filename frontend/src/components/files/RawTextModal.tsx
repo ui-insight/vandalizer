@@ -14,7 +14,7 @@ interface RawTextModalProps {
 
 type LoadState =
   | { kind: 'loading' }
-  | { kind: 'ok'; text: string }
+  | { kind: 'ok'; text: string; lowQuality: boolean }
   | { kind: 'error'; message: string; canRetry: boolean }
   | { kind: 'processing'; status: string | null }
 
@@ -44,7 +44,11 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             canRetry: true,
           })
         } else {
-          setState({ kind: 'ok', text: res.raw_text || '' })
+          setState({
+            kind: 'ok',
+            text: res.raw_text || '',
+            lowQuality: Boolean(res.extraction_low_quality),
+          })
         }
       })
       .catch(() => {
@@ -218,15 +222,69 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           )}
 
           {state.kind === 'ok' && (
-            <div
-              className="chat-markdown"
-              style={{
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: '#333',
-              }}
-              dangerouslySetInnerHTML={{ __html: renderedHtml }}
-            />
+            <>
+              {/* The extraction succeeded, so nothing above shows an error —
+                  but the text below is mojibake. Without this the only way
+                  to reach Retry extraction was to be in the error branch. */}
+              {state.lowQuality && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '10px 12px',
+                    marginBottom: 12,
+                    fontSize: 13,
+                    lineHeight: 1.4,
+                    color: '#92400e',
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fcd34d',
+                    borderRadius: 6,
+                  }}
+                >
+                  <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
+                  <span style={{ flex: 1 }}>
+                    Text extracted poorly &mdash; most of the stored text is unreadable.
+                  </span>
+                  <button
+                    onClick={handleRetry}
+                    disabled={retrying}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flexShrink: 0,
+                      padding: '5px 10px',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 6,
+                      cursor: retrying ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <RefreshCw
+                      style={{
+                        width: 13,
+                        height: 13,
+                        animation: retrying ? 'spin 1s linear infinite' : undefined,
+                      }}
+                    />
+                    {retrying ? 'Retrying...' : 'Retry extraction'}
+                  </button>
+                </div>
+              )}
+              <div
+                className="chat-markdown"
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.7,
+                  color: '#333',
+                }}
+                dangerouslySetInnerHTML={{ __html: renderedHtml }}
+              />
+            </>
           )}
         </div>
       </div>

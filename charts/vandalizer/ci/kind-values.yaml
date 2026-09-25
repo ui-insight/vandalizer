@@ -1,0 +1,99 @@
+# Smoke-test values for a single-node kind cluster.
+#
+# kind's local-path provisioner cannot provision ReadWriteMany claims, so the
+# uploads volume drops to ReadWriteOnce — safe on one node, where every pod
+# can still mount it. Images are side-loaded (`kind load ...`), hence
+# pullPolicy Never. NetworkPolicy stays enabled — kind's kindnet CNI enforces
+# policies in current releases, so the smoke validates them for real.
+config:
+  frontendUrl: http://localhost:8080
+  environment: production
+  # One uvicorn worker — smoke clusters are small.
+  webWorkers: 1
+secrets:
+  jwtSecretKey: kind-smoke-jwt-secret
+  configEncryptionKey: REPLACE_WITH_FERNET_KEY
+bootstrap:
+  adminEmail: smoke@example.edu
+  adminPassword: kind-smoke-password
+image:
+  backend:
+    repository: localhost/vandalizer-backend
+    tag: kind-smoke
+  frontend:
+    repository: localhost/vandalizer-frontend-unprivileged
+    tag: kind-smoke
+  pullPolicy: Never
+uploads:
+  accessModes:
+    - ReadWriteOnce
+  size: 2Gi
+  annotations: {}
+mongodb:
+  persistence:
+    size: 2Gi
+    annotations: {}
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      # mongod's WiredTiger cache plus the seeded catalog need real room even
+      # on a smoke cluster; 512Mi OOM-loops during bootstrap.
+      memory: 1Gi
+chromadb:
+  persistence:
+    size: 2Gi
+    annotations: {}
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 512Mi
+# Keep the smoke footprint small: a single worker queue proves the per-queue
+# template; requests near zero so everything schedules on one small node.
+celery:
+  queues:
+    documents:
+      concurrency: 1
+      replicas: 1
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          memory: 1Gi
+    # null deletes the key at merge time — only the documents queue runs.
+    workflows: null
+    uploads: null
+    passive: null
+    default: null
+beat:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 768Mi
+api:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 1536Mi
+frontend:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      memory: 128Mi
+redis:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      memory: 128Mi

@@ -18,6 +18,8 @@ class UpdateKBRequest(BaseModel):
     shared_with_team: Optional[bool] = None
     organization_ids: Optional[list[str]] = None
     tags: Optional[list[str]] = None
+    # "off" clears it; None leaves it as it is.
+    url_refresh_interval: Optional[Literal["off", "daily", "weekly", "monthly"]] = None
 
 
 class AddDocumentsRequest(BaseModel):
@@ -86,12 +88,19 @@ class KBSourceResponse(BaseModel):
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; UI prefers this over title/url
     source_reference: Optional[str] = None  # user-verifiable provenance, shown as "Source: …"
+    amends_source_uuids: list[str] = []  # sources in this KB that this one revises
     status: str
     error_message: Optional[str] = None
     chunk_count: int = 0
     # URL source whose extracted text was cut off at the fetcher size cap:
     # "ready" but incomplete, so the UI warns instead of showing a clean check.
     truncated: bool = False
+    # URL source caveats recorded at fetch time that are not incompleteness
+    # (``hidden_text_unchecked``: a fetched PDF the hidden-text scrub could not
+    # inspect). Distinct from ``ingestion_warnings`` on purpose — that list
+    # means "only part of the document is indexed"; this one means "all of it
+    # is, and possibly more than the page shows". No UI badge yet.
+    warnings: list[str] = []
     # Document source whose document the pipeline recorded as only partly
     # converted (``partial_ocr``, ``sparse_text``): the same "ready but
     # incomplete" shape as ``truncated``, read live from the document.
@@ -134,6 +143,9 @@ class UpdateSourceRequest(BaseModel):
     an empty string clears that field (reverts to the auto-derived value)."""
     custom_name: Optional[str] = None
     source_reference: Optional[str] = None
+    # Replaces the list; [] clears it. Every uuid must be another source in
+    # the same knowledge base.
+    amends_source_uuids: Optional[list[str]] = None
 
 
 class KBOptimizationStatusResponse(BaseModel):
@@ -191,6 +203,8 @@ class KBResponse(BaseModel):
     # endpoints that don't set it explicitly (create/import/adopt) only ever
     # return a KB the requester just became the owner of.
     can_manage: bool = True
+    # Automatic re-fetch of web sources: None (off) | daily | weekly | monthly.
+    url_refresh_interval: Optional[str] = None
     # Set by KB Autovalidate's apply path. Presence (not value) is what the UI
     # surfaces as a small "Optimized" chip.
     has_optimized_config: bool = False

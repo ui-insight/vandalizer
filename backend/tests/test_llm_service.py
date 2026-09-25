@@ -565,7 +565,23 @@ class TestTruncationCapture:
 
         text = describe_truncation([{"model": "qwen3", "max_tokens": 8192}])
         assert "8,192-token output limit" in text
-        assert "Response reserve" in text
+
+    def test_describe_truncation_names_only_user_remedies(self):
+        """The warning is stored on the run and shown to whoever opens it.
+
+        Regular users cannot reach Admin → System Config, so the stored text
+        must not send them there; the UI appends that remedy for admins only.
+        """
+        from app.services.llm_service import TRUNCATION_WARNING_PREFIX, describe_truncation
+
+        text = describe_truncation([{"model": "qwen3", "max_tokens": 8192}])
+        assert text.startswith(TRUNCATION_WARNING_PREFIX)
+        assert "Admin" not in text
+        assert "Response reserve" not in text
+        assert "System Config" not in text
+        assert "tighter output format" in text
+        assert "smaller steps" in text
+        assert "per document" in text
 
     def test_describe_truncation_without_a_known_cap(self):
         from app.services.llm_service import describe_truncation

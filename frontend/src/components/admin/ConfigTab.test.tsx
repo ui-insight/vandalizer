@@ -35,6 +35,7 @@ const mockTestModel = vi.fn()
 const mockTestPrompt = vi.fn()
 const mockProbeModel = vi.fn()
 const mockGetReadiness = vi.fn()
+const mockProbeOcrReadiness = vi.fn()
 const mockAddOAuthProvider = vi.fn()
 const mockUpdateOAuthProvider = vi.fn()
 const mockDeleteOAuthProvider = vi.fn()
@@ -54,6 +55,7 @@ vi.mock('../../api/admin', () => ({
   testPrompt: (...a: unknown[]) => mockTestPrompt(...a),
   probeModel: (...a: unknown[]) => mockProbeModel(...a),
   getReadiness: (...a: unknown[]) => mockGetReadiness(...a),
+  probeOcrReadiness: (...a: unknown[]) => mockProbeOcrReadiness(...a),
   addOAuthProvider: (...a: unknown[]) => mockAddOAuthProvider(...a),
   updateOAuthProvider: (...a: unknown[]) => mockUpdateOAuthProvider(...a),
   deleteOAuthProvider: (...a: unknown[]) => mockDeleteOAuthProvider(...a),
@@ -129,6 +131,7 @@ function makeConfig(overrides: Partial<SystemConfigData> = {}): SystemConfigData
     ],
     default_model: 'gpt-4o',
     ocr_endpoint: 'https://ocr.example.edu',
+    outbound_url_allowed_hosts: [],
     ocr_api_key: '***',
     web_search_provider: '',
     web_search_endpoint: '',
@@ -172,11 +175,16 @@ beforeEach(() => {
   mockUpdateModel.mockReset().mockResolvedValue({ status: 'ok', models: [] })
   mockDeleteModel.mockReset().mockResolvedValue({ status: 'ok' })
   mockSetDefaultModel.mockReset().mockResolvedValue({ status: 'ok', default_model: '' })
-  mockTestOcr.mockReset().mockResolvedValue({ status: 'ok', status_code: 200, message: 'OK' })
+  mockTestOcr.mockReset().mockResolvedValue({
+    ok: true, summary: 'OCR is working — converted a test page in 812 ms.',
+    endpoint: 'https://ocr.example', provider: 'raw',
+    convert_url: 'https://ocr.example', checks: [], chars: 76, latency_ms: 812,
+  })
   mockTestModel.mockReset().mockResolvedValue({ ok: true, checks: [], summary: 'Connected' })
   mockTestPrompt.mockReset()
   mockProbeModel.mockReset()
   mockGetReadiness.mockReset().mockResolvedValue({ ready: true, blockers_remaining: 0, items: [] })
+  mockProbeOcrReadiness.mockReset().mockResolvedValue({ item: null, probe: { ok: true } })
   mockAddOAuthProvider.mockReset().mockResolvedValue({ status: 'ok' })
   mockUpdateOAuthProvider.mockReset().mockResolvedValue({ status: 'ok' })
   mockDeleteOAuthProvider.mockReset().mockResolvedValue({ status: 'ok' })
@@ -288,17 +296,101 @@ describe('ConfigTab — OCR provider', () => {
     expect((screen.getByLabelText('Use async conversion API') as HTMLInputElement).checked).toBe(true)
   })
 
-  it('sends the provider with the connection test and surfaces a warning verdict', async () => {
+  it('sends the provider with the connection test and surfaces a failing verdict', async () => {
+    // The regression: a GET-based probe called this endpoint healthy because
+    // it answered at all. The verdict now comes from a real conversion.
     mockTestOcr.mockResolvedValue({
-      status: 'warning', status_code: 404, message: 'Docling-Serve health check returned 404',
+      ok: false,
+      summary: 'OCR service returned HTTP 500',
+      endpoint: 'https://ocr.example', provider: 'docling',
+      convert_url: 'https://ocr.example/v1/convert/file',
+      checks: [
+        { label: 'Live conversion', ok: false, detail: 'OCR service returned HTTP 500 (after 210 ms).' },
+      ],
+      error: {
+        category: 'service', title: 'OCR service returned HTTP 500',
+        why: 'The endpoint is reachable but the service failed to convert the page.',
+        fix: 'Report the error to whoever operates the OCR service.',
+        raw: 'HTTP 500: Internal server error',
+      },
     })
     await renderConfigTab()
 
     selectProvider('docling')
     fireEvent.click(screen.getByRole('button', { name: /Test Connection/i }))
 
-    await screen.findByText(/Docling-Serve health check returned 404/)
+    await screen.findAllByText(/OCR service returned HTTP 500/)
+    // The step that failed, and what to do about it, are both on screen.
+    await screen.findByText(/Live conversion/)
+    await screen.findByText(/Report the error to whoever operates the OCR service/)
     expect(mockTestOcr.mock.calls[0][0]).toMatchObject({ ocr_provider: 'docling' })
+  })
+
+  it('shows a broken OCR service in the setup checklist without being asked', async () => {
+    // The outage's real cost: nobody clicked Test for a month. The checklist
+    // probes on its own and turns the row red.
+    mockGetReadiness.mockResolvedValue({
+      ready: true,
+      blockers_remaining: 0,
+      items: [{
+        key: 'ocr', title: 'Enable OCR for scanned PDFs', severity: 'recommended',
+        status: 'configured', summary: 'OCR endpoint configured (raw provider).',
+        unlocks: 'High-quality text from scanned and image-only PDFs.',
+        action_label: 'Configure OCR', action_target: 'ocr',
+      }],
+    })
+    mockProbeOcrReadiness.mockResolvedValue({
+      item: {
+        key: 'ocr', title: 'Enable OCR for scanned PDFs', severity: 'recommended',
+        status: 'broken', summary: 'OCR service returned HTTP 500',
+        unlocks: 'High-quality text from scanned and image-only PDFs.',
+        action_label: 'Diagnose OCR', action_target: 'ocr',
+      },
+      probe: { ok: false },
+    })
+
+    await renderConfigTab()
+
+    await screen.findByText('Not working')
+    await screen.findByText('OCR service returned HTTP 500')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 1c. Allowed private hosts (SSRF exemptions managed in-app)
+// ---------------------------------------------------------------------------
+
+describe('ConfigTab — allowed private hosts', () => {
+  it('round-trips the stored list one host per line and shows the operator env list read-only', async () => {
+    mockGetSystemConfig.mockResolvedValue(makeConfig({
+      outbound_url_allowed_hosts: ['mindrouter.example.edu', 'data-api.example.edu'],
+      outbound_url_env_allowed_hosts: ['legacy.example.edu'],
+    }))
+    await renderConfigTab()
+
+    const field = screen.getByLabelText('Allowed private hosts') as HTMLTextAreaElement
+    expect(field.value).toBe('mindrouter.example.edu\ndata-api.example.edu')
+    expect(screen.getByText(/Also allowed by the server operator/)).toHaveTextContent('legacy.example.edu')
+  })
+
+  it('saves the hosts as a trimmed list, accepting newline or comma separators', async () => {
+    await renderConfigTab()
+
+    fireEvent.change(screen.getByLabelText('Allowed private hosts'), {
+      target: { value: ' mindrouter.example.edu \n\ndata-api.example.edu, third.example.edu\n' },
+    })
+    fireEvent.click(screen.getAllByRole('button', { name: /Save Configuration/i })[0])
+
+    await waitFor(() => expect(mockUpdateSystemConfig).toHaveBeenCalledTimes(1))
+    const payload = mockUpdateSystemConfig.mock.calls[0][0] as Record<string, unknown>
+    expect(payload.outbound_url_allowed_hosts).toEqual([
+      'mindrouter.example.edu', 'data-api.example.edu', 'third.example.edu',
+    ])
+  })
+
+  it('does not mention the env list when the operator set none', async () => {
+    await renderConfigTab()
+    expect(screen.queryByText(/Also allowed by the server operator/)).not.toBeInTheDocument()
   })
 })
 

@@ -232,7 +232,9 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
     <div className="w-full max-w-sm mx-auto">
       {oauthError && (
         <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
-          Authentication failed. Please try again.
+          {oauthError === 'sso_user_not_provisioned'
+            ? 'Your account has not been set up in this system. Contact your administrator for access.'
+            : 'Authentication failed. Please try again.'}
         </div>
       )}
 

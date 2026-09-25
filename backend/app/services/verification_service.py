@@ -1,5 +1,6 @@
 """Verification queue service  - submit, review, approve, reject."""
 
+import copy
 import datetime
 import logging
 
@@ -14,7 +15,7 @@ from app.models.verification import (
     VerifiedCollection,
     VerifiedItemMetadata,
 )
-from app.models.knowledge import KnowledgeBase
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference
 from app.models.system_config import SystemConfig
 from app.models.workflow import Workflow
 from app.models.search_set import SearchSet
@@ -151,7 +152,9 @@ async def submit_for_verification(
         raise ValueError("A verification request is already pending for this item")
 
     # Fetch latest validation for quality gate checks
-    from app.services.quality_service import get_latest_validation, compute_quality_tier
+    from app.services.quality_service import (
+        get_latest_validation, compute_quality_tier, evaluate_submission_gates,
+    )
 
     item_ref = str(getattr(obj, 'uuid', '')) if item_kind == "search_set" and hasattr(obj, 'uuid') else str(obj_id)
     latest = await get_latest_validation(item_kind, item_ref)
@@ -170,30 +173,13 @@ async def submit_for_verification(
             )
         latest = None  # ignore any stale validation; explicitly an unvalidated path
     else:
-        # Quality gate: require validation before submission
-        if gates.get("require_validation") and not latest:
-            raise ValueError("This item must be validated before submitting for verification. Run validation first.")
-
-        # Enforce minimum sample size thresholds
-        if latest:
-            result_snap = latest.get("result_snapshot", {})
-            min_tc = gates.get("min_test_cases", 0)
-            min_runs = gates.get("min_runs", 0)
-            min_score_gate = gates.get("min_score", 0)
-
-            num_tc = len(result_snap.get("test_cases", result_snap.get("sources", [])))
-            num_runs_val = result_snap.get("num_runs", 1)
-            val_score = latest.get("score", 0)
-
-            issues = []
-            if min_tc > 0 and num_tc < min_tc:
-                issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
-            if min_runs > 0 and num_runs_val < min_runs:
-                issues.append(f"Validation used {num_runs_val} run(s), minimum is {min_runs}")
-            if min_score_gate > 0 and val_score < min_score_gate:
-                issues.append(f"Quality score is {val_score:.0f}, minimum is {min_score_gate}")
-            if issues:
-                raise ValueError("Submission requirements not met: " + "; ".join(issues))
+        # One reading of the gates, shared with check_verification_readiness,
+        # so the advisory an author sees is exactly what is enforced here.
+        verdict = evaluate_submission_gates(item_kind, latest, qc)
+        if verdict["issues"]:
+            if not latest:
+                raise ValueError(verdict["issues"][0])
+            raise ValueError("Submission requirements not met: " + "; ".join(verdict["issues"]))
 
     validation_snapshot = latest.get("result_snapshot") if latest else None
     validation_score = latest.get("score") if latest else None
@@ -543,6 +529,94 @@ def catalog_row_is_openable(item, underlying) -> bool:
     return bool(getattr(underlying, "verified", True))
 
 
+# The one tier vocabulary: what compute_quality_tier emits. Ordered best-first.
+_TIER_ORDER = {"excellent": 0, "good": 1, "fair": 2}
+
+# Tier names from before the vocabulary was unified. Rows written then still
+# carry them until a re-seed touches them — and rows the seeds no longer cover
+# never get re-seeded — so every read maps them rather than trusting storage.
+LEGACY_TIERS = {"gold": "excellent", "silver": "good", "bronze": "fair"}
+
+
+def normalize_tier(tier: str | None) -> str | None:
+    return LEGACY_TIERS.get(tier, tier) if tier else tier
+
+
+def adoption_counts(
+    library_rows: list,
+    kb_refs: list,
+    kb_uuid_to_id: dict[str, str],
+    creator_map: dict[tuple[str, str], str] | None = None,
+) -> dict[tuple[str, str], int]:
+    """Distinct people who adopted each catalog item, keyed (kind, item_id).
+
+    A workflow or extraction is adopted by "Add to Library" from Explore,
+    which writes a non-verified LibraryItem pointing at the same object; a
+    knowledge base by a KnowledgeBaseReference. Counting distinct users
+    rather than rows means re-adding, or moving a bookmark between personal
+    and team, does not inflate it. The item's own author is not an adopter —
+    creating an item bookmarks it for them — nor is the system user.
+    """
+    adopters: dict[tuple[str, str], set[str]] = {}
+    for row in library_rows:
+        if getattr(row, "verified", False):
+            continue  # the catalog's own row is not an adoption
+        key = (row.kind.value if hasattr(row.kind, "value") else str(row.kind), str(row.item_id))
+        adopters.setdefault(key, set()).add(row.added_by_user_id)
+    for ref in kb_refs:
+        kb_id = kb_uuid_to_id.get(ref.source_kb_uuid)
+        if kb_id:
+            adopters.setdefault((LibraryItemKind.KNOWLEDGE_BASE.value, kb_id), set()).add(ref.user_id)
+    creators = creator_map or {}
+    for key, users in adopters.items():
+        users.discard(creators.get(key))
+        users.discard("system")
+    return {key: len(users) for key, users in adopters.items()}
+
+
+# What a validation run writes onto VerifiedItemMetadata (quality_service.update_quality_metadata).
+_MEASURED_FIELDS = (
+    "quality_score", "quality_tier", "quality_grade", "last_validated_at",
+    "validation_run_count", "test_case_count", "consistency",
+)
+
+
+def _aware_dt(value):
+    if value is None:
+        return None
+    return value if value.tzinfo else value.replace(tzinfo=datetime.timezone.utc)
+
+
+def with_measured_quality(meta, measured):
+    """The catalog row, carrying the newer validation result when there is one.
+
+    Extraction and KB validation runs are recorded under the item's uuid, so
+    their results land on a uuid-keyed metadata row, while the catalog's row
+    (display name, description, org visibility) is keyed by the ObjectId.
+    Reading only the ObjectId row dropped every extraction and KB result —
+    score, tier, case count and consistency never reached Explore.
+    """
+    if measured is None or measured is meta or measured.last_validated_at is None:
+        return meta
+    if meta is None:
+        return measured
+    if meta.last_validated_at and _aware_dt(meta.last_validated_at) >= _aware_dt(measured.last_validated_at):
+        return meta
+    merged = copy.copy(meta)
+    for field in _MEASURED_FIELDS:
+        setattr(merged, field, getattr(measured, field, None))
+    return merged
+
+
+def _quality_sort_key(entry: dict) -> tuple:
+    """Sort key for ``sort=quality``: best tier first, and within a tier a
+    measured score outranks a hand-asserted tier (score None) — a catalog
+    author typing "excellent" must never rank above a run that earned it."""
+    tier = entry.get("quality_tier") or ""
+    score = entry.get("quality_score")
+    return (_TIER_ORDER.get(tier, 99), 1 if score is None else 0, -(score or 0))
+
+
 async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
@@ -596,10 +670,17 @@ async def list_verified_items(
 
     name_map: dict[str, str] = {}
     creator_map: dict[tuple[str, str], str] = {}
+    # Bundled starter examples carry the seed marker the catalog seeder writes;
+    # the listing says so per item, since nobody *here* shared those. Copies
+    # ("Add to my library") carry the marker too, so the system owner is what
+    # makes one a starter — a colleague's edited copy is their own share.
+    starter_ids: set[str] = set()
     if wf_ids:
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
+            if (wf.resource_config or {}).get("seed_id") and wf.user_id == "system":
+                starter_ids.add(str(wf.id))
             creator_id = wf.created_by_user_id or wf.user_id
             if creator_id:
                 creator_map[(LibraryItemKind.WORKFLOW.value, str(wf.id))] = creator_id
@@ -609,12 +690,16 @@ async def list_verified_items(
         for ss in ssets:
             name_map[str(ss.id)] = ss.title
             ss_map[str(ss.id)] = ss
+            if (ss.extraction_config or {}).get("seed_id") and ss.user_id == "system":
+                starter_ids.add(str(ss.id))
             if ss.user_id:
                 creator_map[(LibraryItemKind.SEARCH_SET.value, str(ss.id))] = ss.user_id
     if kb_ids:
         kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
         for kb in kbs:
             name_map[str(kb.id)] = kb.title
+            if (kb.resource_config or {}).get("seed_id") and kb.user_id == "system":
+                starter_ids.add(str(kb.id))
             if kb.user_id:
                 creator_map[(LibraryItemKind.KNOWLEDGE_BASE.value, str(kb.id))] = kb.user_id
 
@@ -654,6 +739,20 @@ async def list_verified_items(
         for kb in kb_docs:
             kb_map[str(kb.id)] = kb
 
+    # "N people use it" — the signal the catalog never had. Adoptions of
+    # workflows/extractions are non-verified LibraryItems on the same object;
+    # KB adoptions are references keyed by the KB's uuid.
+    adoption_rows = (
+        await LibraryItem.find({"item_id": {"$in": all_object_ids}, "verified": {"$ne": True}}).to_list()
+        if all_object_ids else []
+    )
+    kb_uuid_to_id = {kb.uuid: kb_id for kb_id, kb in kb_map.items()}
+    kb_refs = (
+        await KnowledgeBaseReference.find({"source_kb_uuid": {"$in": list(kb_uuid_to_id)}}).to_list()
+        if kb_uuid_to_id else []
+    )
+    adoption_map = adoption_counts(adoption_rows, kb_refs, kb_uuid_to_id, creator_map)
+
     # --- Build result entries (applying search and org filters) ---
     search_lower = search.lower() if search else None
     results = []
@@ -661,6 +760,13 @@ async def list_verified_items(
         item_id_str = str(item.item_id)
         name = name_map.get(item_id_str, "Unknown")
         meta = meta_map.get((item.kind.value, item_id_str))
+        underlying_obj = (
+            ss_map.get(item_id_str) if item.kind == LibraryItemKind.SEARCH_SET
+            else kb_map.get(item_id_str) if item.kind == LibraryItemKind.KNOWLEDGE_BASE
+            else None
+        )
+        if underlying_obj is not None and getattr(underlying_obj, "uuid", None):
+            meta = with_measured_quality(meta, meta_map.get((item.kind.value, underlying_obj.uuid)))
 
         # Search: match against name, display_name, description, and tags
         if search_lower:
@@ -680,7 +786,7 @@ async def list_verified_items(
                 continue
 
         # Quality tier filter
-        item_tier = meta.quality_tier if meta else None
+        item_tier = normalize_tier(meta.quality_tier) if meta else None
         if quality_tier and item_tier != quality_tier:
             continue
 
@@ -723,6 +829,12 @@ async def list_verified_items(
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
+            # What qualifies the score: how many cases, how consistent, and
+            # how many people already rely on it.
+            "test_case_count": meta.test_case_count if meta else 0,
+            "consistency": meta.consistency if meta else None,
+            "adoption_count": adoption_map.get((item.kind.value, item_id_str), 0),
+            "starter": item_id_str in starter_ids,
             # The catalog is where an unfamiliar user picks something to trust,
             # so a regression nobody has reviewed has to travel with the row.
             "regression_pending_review": bool(meta and meta.regression_pending_review),
@@ -762,12 +874,13 @@ async def list_verified_items(
 
     # --- Sort ---
     if sort == "quality":
-        tier_order = {"gold": 0, "silver": 1, "bronze": 2}
-        results.sort(key=lambda e: (tier_order.get(e.get("quality_tier") or "", 99), -(e.get("quality_score") or 0)))
+        results.sort(key=_quality_sort_key)
     elif sort == "name":
         results.sort(key=lambda e: (e.get("display_name") or e.get("name") or "").lower())
     elif sort == "validations":
         results.sort(key=lambda e: -(e.get("validation_run_count") or 0))
+    elif sort == "adoption":
+        results.sort(key=lambda e: -(e.get("adoption_count") or 0))
     # default: already sorted by created_at desc from the DB query
 
     total = len(results)
@@ -836,10 +949,12 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
         "quality_score": meta.quality_score,
-        "quality_tier": meta.quality_tier,
+        "quality_tier": normalize_tier(meta.quality_tier),
         "quality_grade": meta.quality_grade,
         "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
         "validation_run_count": meta.validation_run_count,
+        "test_case_count": meta.test_case_count,
+        "consistency": meta.consistency,
         "official_baseline": meta.official_baseline,
         "official_baseline_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta.official_baseline_pinned_at else None,
         "official_baseline_source_run_uuid": meta.official_baseline_source_run_uuid,
@@ -1134,7 +1249,7 @@ async def list_catalog_coverage(
             "coverage": coverage,
             "coverage_order": coverage_order.get(coverage, 99),
             "quality_score": meta.quality_score if meta else None,
-            "quality_tier": meta.quality_tier if meta else None,
+            "quality_tier": normalize_tier(meta.quality_tier) if meta else None,
             "quality_asserted": bool(meta and meta.quality_tier and meta.quality_score is None),
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "official_baseline_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta and meta.official_baseline_pinned_at else None,
@@ -1672,7 +1787,7 @@ async def _notify_examiners(req: VerificationRequest) -> None:
                 user_id=reviewer.user_id,
                 kind="verification_submitted",
                 title=f'New submission: "{item_name}"',
-                body=f"{submitter_display} submitted a {req.item_kind.replace('_', ' ')} for verification.",
+                body=f"{submitter_display} asked to share a {req.item_kind.replace('_', ' ')} with everyone.",
                 link=f"/verification?request={req.uuid}",
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
@@ -1713,18 +1828,18 @@ async def _notify_submitter(
     status_config = {
         VerificationStatus.APPROVED.value: {
             "kind": "verification_approved",
-            "title": f'"{item_name}" has been approved',
-            "body": reviewer_notes or "Your submission has been verified and added to the catalog.",
+            "title": f'"{item_name}" is now shared with everyone',
+            "body": reviewer_notes or "An examiner checked it over and shared it with everyone here, with its measured score.",
         },
         VerificationStatus.REJECTED.value: {
             "kind": "verification_rejected",
-            "title": f'"{item_name}" was not approved',
-            "body": reviewer_notes or "Your submission did not meet verification requirements.",
+            "title": f'"{item_name}" was declined',
+            "body": reviewer_notes or "The examiner decided not to share this one.",
         },
         VerificationStatus.RETURNED.value: {
             "kind": "verification_returned",
-            "title": f'"{item_name}" needs revision',
-            "body": reviewer_notes or "Your submission has been returned with feedback.",
+            "title": f'"{item_name}" was sent back',
+            "body": reviewer_notes or "The examiner sent it back with a note on what would get it there.",
         },
         VerificationStatus.IN_REVIEW.value: {
             "kind": "verification_in_review",

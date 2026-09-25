@@ -1,0 +1,17 @@
+# Lint/render values: classic Ingress edge with TLS.
+config:
+  frontendUrl: https://vandalizer.ci.example.edu
+secrets:
+  jwtSecretKey: ci-only-jwt-secret
+  configEncryptionKey: ci-only-fernet-key
+bootstrap:
+  adminEmail: ci@example.edu
+  adminPassword: ci-only-password
+ingress:
+  enabled: true
+  className: nginx
+  host: vandalizer.ci.example.edu
+  tls:
+    - secretName: vandalizer-tls
+      hosts:
+        - vandalizer.ci.example.edu

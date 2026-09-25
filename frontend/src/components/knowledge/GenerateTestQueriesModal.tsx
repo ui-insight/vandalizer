@@ -56,6 +56,16 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
           require retrieval, useful for measuring how much your KB lifts answer
           quality vs. a no-KB baseline.
         </div>
+        <div style={{ fontSize: 11, color: '#888', marginBottom: 14 }}>
+          Each question gets the same columns as an imported set — expected answer,
+          category, source, notes — and an ID such as{' '}
+          <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: '#a78bfa' }}>
+            FCOI-AUTO-Q001
+          </code>
+          , numbered on from any it already has. An ID is assigned once and kept
+          across runs and exports; regenerating creates new IDs rather than reusing
+          old ones. Imported IDs are kept as provided.
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
           {OPTIONS.map(opt => {

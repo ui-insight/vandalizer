@@ -7,7 +7,7 @@
     "seed_id": "wf-pre-award-compliance-checker",
     "display_name": "Sponsor Compliance Checker",
     "description": "Checks a proposal against solicitation requirements, identifying formatting violations, missing sections, and eligibility concerns.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "pre-award",
       "compliance"

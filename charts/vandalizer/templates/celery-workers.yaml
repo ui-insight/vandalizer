@@ -1,0 +1,125 @@
+{{/*
+One Deployment per entry in .Values.celery.queues. Workers run celery in the
+foreground (logging to stderr) rather than via run_celery.sh, which detaches
+five workers plus beat behind file logs — the right shape for one container,
+the wrong one for Kubernetes.
+*/}}
+{{- $root := . }}
+{{- range $queue, $cfg := .Values.celery.queues }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "vandalizer.fullname" $root }}-celery-{{ $queue }}
+  labels:
+    {{- include "vandalizer.labels" (dict "ctx" $root "component" (printf "celery-%s" $queue)) | nindent 4 }}
+spec:
+  replicas: {{ $cfg.replicas | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "vandalizer.selectorLabels" (dict "ctx" $root "component" (printf "celery-%s" $queue)) | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- include "vandalizer.backendChecksums" $root | nindent 8 }}
+        {{- with $root.Values.celery.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "vandalizer.selectorLabels" (dict "ctx" $root "component" (printf "celery-%s" $queue)) | nindent 8 }}
+        vandalizer.io/role: backend
+        {{- with $root.Values.celery.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "vandalizer.serviceAccountName" $root }}
+      # Longer than the app's celery task_time_limit so in-flight tasks can
+      # finish during a rollout instead of being killed and retried.
+      terminationGracePeriodSeconds: {{ $root.Values.celery.terminationGracePeriodSeconds }}
+      {{- with $root.Values.celery.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: celery-{{ $queue }}
+          image: {{ include "vandalizer.backendImage" $root }}
+          imagePullPolicy: {{ $root.Values.image.pullPolicy }}
+          {{- with $root.Values.celery.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          command:
+            - celery
+            - -A
+            - celery_worker.celery_app
+            - worker
+            - --queues={{ $queue }}
+            - --concurrency={{ required (printf "celery.queues.%s.concurrency is required" $queue) $cfg.concurrency }}
+            - --loglevel=info
+          {{- include "vandalizer.backendEnvFrom" $root | nindent 10 }}
+          {{- if or $root.Values.celery.extraEnv $cfg.extraEnv }}
+          env:
+            {{- range $key, $value := $root.Values.celery.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- range $key, $value := $cfg.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- end }}
+          # The worker registers with the broker before it is useful; ping it
+          # by its own node name so a wedged worker gets restarted without a
+          # broker-wide fan-out.
+          startupProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A celery_worker.celery_app inspect ping -d celery@$HOSTNAME
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A celery_worker.celery_app inspect ping -d celery@$HOSTNAME
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          {{- with $cfg.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: uploads
+              mountPath: {{ $root.Values.config.uploadDir }}
+            {{- with $root.Values.celery.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: {{ include "vandalizer.uploadsClaimName" $root }}
+        {{- with $root.Values.celery.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with ($cfg.nodeSelector | default $root.Values.celery.nodeSelector) }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($cfg.tolerations | default $root.Values.celery.tolerations) }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with ($cfg.affinity | default $root.Values.celery.affinity) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -29,6 +29,7 @@ from app.services.access_control import (
     get_authorized_document,
     get_authorized_workflow,
     get_team_access_context,
+    has_open_verification_review_access,
 )
 from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
@@ -171,6 +172,11 @@ async def get_workflow(
         if wf:
             team_access = await get_team_access_context(user)
             can_manage = can_manage_workflow(wf, user, team_access)
+            # Examiners may author validation artifacts on a submission
+            # they are reviewing without being able to edit the workflow.
+            can_validate = can_manage or await has_open_verification_review_access(
+                "workflow", wf.id, user,
+            )
         elif share_token:
             try:
                 wf = await Workflow.get(PydanticObjectId(workflow_id))
@@ -179,6 +185,7 @@ async def get_workflow(
             if not wf or not wf.share_token or wf.share_token != share_token:
                 return None
             can_manage = False
+            can_validate = False
         else:
             return None
     else:
@@ -188,6 +195,7 @@ async def get_workflow(
         # Without a user (e.g. internal export), assume manage to preserve
         # existing behavior — callers that gate on this pass a user.
         can_manage = True
+        can_validate = True
 
     steps = []
     for step_id in wf.steps:
@@ -224,6 +232,7 @@ async def get_workflow(
         "validation_plan": _sanitize_for_json(wf.validation_plan),
         "validation_inputs": _sanitize_for_json(wf.validation_inputs),
         "can_manage": can_manage,
+        "can_validate": can_validate,
         "created_by_user_id": wf.created_by_user_id or wf.user_id,
     }
 
@@ -674,6 +683,7 @@ async def get_workflow_status(
         "workflow_name": workflow_name,
         "workflow_id": str(result.workflow) if result.workflow else None,
         "document_title": result.document_title,
+        "start_time": result.start_time,
     }
 
 
@@ -980,6 +990,7 @@ async def get_batch_completed_outputs(
             "output_step_names": r.output_step_names,
             "workflow_name": workflow_name,
             "document_title": r.document_title,
+            "start_time": r.start_time,
         })
     return outputs
 
@@ -1325,7 +1336,7 @@ async def update_validation_plan(workflow_id: str, checks: list[dict], user: Use
     A manual plan save means the user is looking at the current workflow, so
     it also re-stamps the definition hash (blessing the current definition).
     """
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise ValueError("Workflow not found")
     wf_data = await get_workflow(workflow_id)
@@ -1494,7 +1505,7 @@ async def get_validation_inputs(workflow_id: str, user: User) -> list[dict]:
 
 
 async def update_validation_inputs(workflow_id: str, inputs: list[dict], user: User) -> list[dict]:
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise ValueError("Workflow not found")
     wf.validation_inputs = inputs
@@ -1547,7 +1558,7 @@ async def save_expected_output(
     This is the workflow equivalent of extraction test cases — it stores
     ground truth that future validations can compare against deterministically.
     """
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         raise ValueError("Workflow not found")
 
@@ -1597,7 +1608,7 @@ async def get_expected_outputs(workflow_id: str, user: User) -> list[dict]:
 
 async def delete_expected_output(workflow_id: str, expected_id: str, user: User) -> bool:
     """Remove a stored expected output."""
-    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    wf = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf:
         return False
     before = len(wf.validation_inputs)
@@ -1731,9 +1742,18 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     from app.services.llm_service import create_chat_agent
     from app.models.system_config import SystemConfig
 
-    # Authorize before proceeding (manage=True since this modifies the plan)
-    wf_check = await get_authorized_workflow(workflow_id, user, manage=True)
+    # Authorize before proceeding (validate=True since this writes the plan).
+    wf_check = await get_authorized_workflow(workflow_id, user, validate=True)
     if not wf_check:
+        # Distinguish "can see it but can't author its plan" from "doesn't
+        # exist / can't see it": a view-only team member who just ran the
+        # workflow must not be told it was not found.
+        if await get_authorized_workflow(workflow_id, user):
+            raise PermissionError(
+                "You don't have permission to create a validation plan for this "
+                "workflow. Only the workflow owner, a team admin, or an examiner "
+                "reviewing its verification request can validate it."
+            )
         raise ValueError("Workflow not found")
 
     wf_data = await get_workflow(workflow_id)

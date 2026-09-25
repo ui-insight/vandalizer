@@ -310,7 +310,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                   ? `You haven't created any ${kindPlural} yet.`
                   : scope === 'team'
                     ? `No team ${kindPlural} found.`
-                    : `No verified ${kindPlural} available.`
+                    : `No ${kindPlural} shared with everyone yet.`
               }
             </div>
           ) : (

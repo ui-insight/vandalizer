@@ -24,7 +24,7 @@ export function JourneyMap({
       {/* Course-size line: time-strapped RAs decide whether to start here. */}
       <p className="text-xs text-gray-500 flex items-center gap-1.5 -mb-4">
         <Clock size={12} aria-hidden="true" />
-        {modules.length} bite-sized modules, 10\u201325 minutes each \u2014 about {Math.round(totalMinutes / 60 * 2) / 2} hours in total.
+        {modules.length} bite-sized modules, 10–25 minutes each — about {Math.round(totalMinutes / 60 * 2) / 2} hours in total.
         Do one whenever you have a gap; your place is always saved.
       </p>
       {TIERS.map((tier, tierIdx) => {

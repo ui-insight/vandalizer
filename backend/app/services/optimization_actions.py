@@ -58,6 +58,12 @@ async def start_kb_optimization(
     if autogen_coverage not in ("quick", "standard", "exhaustive"):
         autogen_coverage = "standard"
 
+    # Sweep orphaned runs first, like the extraction and workflow paths: a run
+    # whose worker died past the hard time limit would otherwise hold the
+    # active check below until the hourly janitor fired (#835).
+    from app.services.kb_optimizer import reap_stale_runs
+    await reap_stale_runs(kb.uuid)
+
     active = await KBOptimizationRun.find_one(
         KBOptimizationRun.kb_uuid == kb.uuid,
         {"status": {"$in": ["queued", "running"]}},

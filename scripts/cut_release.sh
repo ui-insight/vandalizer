@@ -103,6 +103,13 @@ if [[ -f CHANGELOG.md ]] && ! grep -q "\[${tag}\]" CHANGELOG.md; then
   echo "warning: CHANGELOG.md has no [${tag}] section — stamp the release notes first." >&2
 fi
 
+# The Helm chart's default image tag is appVersion; a stale one installs the
+# previous release. Bump it in the release PR alongside the CHANGELOG stamp.
+chart=charts/vandalizer/Chart.yaml
+if [[ -f "$chart" ]] && ! grep -q "^appVersion: \"${tag}\"" "$chart"; then
+  echo "warning: $chart appVersion is not \"${tag}\" — bump it in the release PR." >&2
+fi
+
 # Build release notes from non-merge commit subjects since the previous tag.
 if [[ -n "$prev_tag" ]]; then
   range="${prev_tag}..HEAD"

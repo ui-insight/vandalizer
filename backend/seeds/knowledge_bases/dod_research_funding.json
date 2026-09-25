@@ -6,7 +6,7 @@
     "seed_id": "kb-dod-research",
     "display_name": "DOD Research Funding & DFARS",
     "description": "Department of Defense research funding policies, DFARS clauses, and DARPA/ONR/AFOSR-specific guidance.",
-    "quality_tier": "gold",
+    "quality_tier": "excellent",
     "collections": [
       "federal-agency",
       "reference-knowledge"

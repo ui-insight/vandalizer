@@ -36,6 +36,27 @@ def _audit(db, action: str, **kwargs) -> None:
     })
 
 
+def _attachment_rejection(filename: str, content_bytes: bytes) -> str | None:
+    """Why an attachment must not become a document, or None if it may.
+
+    The same two checks the upload endpoint runs. Intake used to skip them
+    and store every attachment as a SmartDocument (``ext or "bin"``), so each
+    signature image, .exe, or zero-byte stub got a document row, was queued,
+    fully read, and only then refused — a permanent error-state document per
+    attachment (#834). Never logs or returns content.
+    """
+    from app.utils.file_validation import is_allowed_file, is_valid_file_content
+
+    ext = Path(filename).suffix.lstrip(".").lower()
+    if not is_allowed_file(filename):
+        return f"unsupported file type .{ext}" if ext else "no file extension"
+    if not content_bytes:
+        return "empty file"
+    if not is_valid_file_content(content_bytes, ext):
+        return f"content does not match .{ext}"
+    return None
+
+
 def _save_attachment_as_document(
     db,
     content_bytes: bytes,
@@ -139,13 +160,25 @@ def ingest_email_message(
 
     # Download attachments
     attachment_ids = []
+    # Attachments refused at intake, recorded on the WorkItem so what was
+    # dropped from the email is visible rather than silently absent.
+    skipped_attachments: list[dict] = []
     if msg.get("hasAttachments"):
         try:
             raw_attachments = client.get_message_attachments(message_id, mailbox=mailbox)
             for att in raw_attachments:
                 if att.get("@odata.type") == "#microsoft.graph.fileAttachment":
+                    name = att.get("name") or "attachment"
                     content = base64.b64decode(att.get("contentBytes", ""))
-                    doc = _save_attachment_as_document(db, content, att.get("name", "attachment"), user_id)
+                    reason = _attachment_rejection(name, content)
+                    if reason:
+                        logger.info(
+                            "Skipping attachment %r on message %s: %s",
+                            name, message_id, reason,
+                        )
+                        skipped_attachments.append({"name": name, "reason": reason})
+                        continue
+                    doc = _save_attachment_as_document(db, content, name, user_id)
                     _trigger_text_extraction(doc)
                     attachment_ids.append(doc["_id"])
         except GraphAPIError as e:
@@ -176,6 +209,7 @@ def ingest_email_message(
         "body_text": body_text[:100_000],
         "attachments": attachment_ids,
         "attachment_count": len(attachment_ids),
+        "skipped_attachments": skipped_attachments,
         "intake_config": intake["_id"],
         "owner_user_id": user_id,
         "team_id": intake.get("team_id"),
@@ -186,7 +220,11 @@ def ingest_email_message(
     work_item["_id"] = result.inserted_id
 
     _audit(db, "ingest", actor_type="graph_webhook", work_item_id=work_item["uuid"],
-           intake_config_id=intake.get("uuid"), detail={"source": "email", "message_id": message_id})
+           intake_config_id=intake.get("uuid"),
+           detail={
+               "source": "email", "message_id": message_id,
+               "skipped_attachments": skipped_attachments,
+           })
 
     triage_work_item.delay(str(work_item["_id"]))
     return {"status": "ingested", "work_item_uuid": work_item["uuid"]}
@@ -258,6 +296,19 @@ def ingest_drive_item(
     except GraphAPIError as e:
         logger.error("Failed to download drive item %s: %s", item_id, e)
         return {"error": str(e)}
+
+    reason = _attachment_rejection(filename, content)
+    if reason:
+        # The intake's own type filter ran above on the extension alone; this
+        # is the content check the upload endpoint applies. No document row
+        # and no WorkItem for a file that could never be read — the audit
+        # trail records the drop instead.
+        logger.info("Skipping drive item %s (%r): %s", item_id, filename, reason)
+        _audit(db, "ingest_skipped", actor_type="graph_webhook",
+               intake_config_id=intake.get("uuid"),
+               detail={"source": "onedrive", "item_id": item_id,
+                       "filename": filename, "reason": reason})
+        return {"status": "filtered_out", "reason": f"Attachment rejected: {reason}"}
 
     doc = _save_attachment_as_document(db, content, filename, user_id)
     _trigger_text_extraction(doc)

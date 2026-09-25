@@ -29,19 +29,34 @@ def _run_async(coro):
     max_retries=2,
     default_retry_delay=10,
 )
-def validate_kb_task(self, kb_uuid: str, user_id: str, mode: str = "judge", skip_judge: bool = False):
-    """Run a KB validation in the background and persist a ValidationRun."""
-    return _run_async(_validate_kb_async(kb_uuid, user_id, mode, skip_judge))
+def validate_kb_task(
+    self,
+    kb_uuid: str,
+    user_id: str,
+    mode: str = "judge",
+    skip_judge: bool = False,
+    query_uuids: list[str] | None = None,
+):
+    """Run a KB validation in the background and persist a ValidationRun.
+
+    ``query_uuids`` restricts the run to those test queries (a smoke test).
+    """
+    return _run_async(_validate_kb_async(kb_uuid, user_id, mode, skip_judge, query_uuids))
 
 
-async def _validate_kb_async(kb_uuid: str, user_id: str, mode: str, skip_judge: bool):
+async def _validate_kb_async(
+    kb_uuid: str, user_id: str, mode: str, skip_judge: bool,
+    query_uuids: list[str] | None = None,
+):
     from app.config import Settings
     from app.database import init_db
 
     await init_db(Settings())
 
     from app.services.kb_validation_service import run_kb_validation
-    result = await run_kb_validation(kb_uuid, user_id, mode=mode, skip_judge=skip_judge)
+    result = await run_kb_validation(
+        kb_uuid, user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids,
+    )
     # Compact return value — the full result is in the persisted ValidationRun.
     return {
         "kb_uuid": kb_uuid,
@@ -163,15 +178,31 @@ async def _add_urls_async(
     retry_backoff=True,
     max_retries=2,
     default_retry_delay=10,
-    soft_time_limit=900,  # 15 min — one page (or one large PDF) fetch + embed
-    time_limit=960,
+    # One page fetch + embed. A long page is indexed in full (millions of
+    # characters, thousands of chunks), so this matches that, not a prompt.
+    soft_time_limit=3600,
+    time_limit=3660,
 )
-def refresh_url_source_task(self, kb_uuid: str, source_uuid: str):
+def refresh_url_source_task(self, kb_uuid: str, source_uuid: str, queued_at: str | None = None):
     """Re-fetch one URL source in place. See knowledge_service.refresh_url_source."""
-    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid))
+    return _run_async(_refresh_url_source_async(kb_uuid, source_uuid, queued_at))
 
 
-async def _refresh_url_source_async(kb_uuid: str, source_uuid: str):
+def _same_stamp(stored, queued_at: str | None) -> bool:
+    """Whether this task is the latest queueing of the source's refresh."""
+    if queued_at is None or stored is None:
+        return True  # a task queued before stamps were passed along
+    import datetime as _dt
+
+    if stored.tzinfo is None:
+        stored = stored.replace(tzinfo=_dt.timezone.utc)
+    try:
+        return abs((stored - _dt.datetime.fromisoformat(queued_at)).total_seconds()) < 1
+    except ValueError:
+        return True
+
+
+async def _refresh_url_source_async(kb_uuid: str, source_uuid: str, queued_at: str | None = None):
     from app.config import Settings
     from app.database import init_db
 
@@ -194,10 +225,57 @@ async def _refresh_url_source_async(kb_uuid: str, source_uuid: str):
         await svc.recalculate_stats(kb)
         return {"kb_uuid": kb_uuid, "refreshed": False}
 
-    reason = await svc.refresh_url_source(source, kb)
+    if not _same_stamp(getattr(source, "refresh_queued_at", None), queued_at):
+        # Queued again since (the previous task sat past the abandoned-refresh
+        # window); that later task owns the refresh. Two would race each other
+        # deleting and re-adding the same chunks.
+        logger.info("Refresh of KB source %s superseded by a later queueing; skipping.", source_uuid)
+        return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": False, "reason": "superseded"}
+
+    try:
+        reason = await svc.refresh_url_source(source, kb)
+    except TRANSIENT_EXCEPTIONS:
+        raise  # Celery retries these; the stale-refresh window covers the rest.
+    except Exception as e:
+        # refresh_url_source handles fetch and embed failures itself; anything
+        # else (a failed save, a bug) used to leave the source "processing"
+        # for good. Put it back: its chunks are whatever the index holds.
+        logger.exception("Refresh of KB source %s crashed", source_uuid)
+        reason = f"Refresh failed: {e}"[:2000]
+        source.status = "ready" if source.chunk_count else "error"
+        source.error_message = reason
+        source.last_refresh_error = reason
+        try:
+            await source.save()
+        except Exception:
+            logger.exception("Could not restore KB source %s after a failed refresh", source_uuid)
     # Unconditional: the router set status="building" before dispatching.
     await svc.recalculate_stats(kb)
     return {"kb_uuid": kb_uuid, "source_uuid": source_uuid, "refreshed": reason is None, "reason": reason}
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.refresh_due_url_sources",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+)
+def refresh_due_url_sources_task(self):
+    """Beat: queue a refresh for every web source due under its KB's
+    ``url_refresh_interval``. See services/kb_url_refresh.py."""
+    return _run_async(_refresh_due_url_sources_async())
+
+
+async def _refresh_due_url_sources_async():
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.services import kb_url_refresh
+
+    return await kb_url_refresh.refresh_due_sources()
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +356,8 @@ async def _optimize_kb_async(
 # workflow, extraction — and marks stuck docs failed. Extraction also reaps
 # on start and from its read endpoints, and workflow reaps on start; the
 # janitor adds the time dimension so a run nobody polls or restarts still
-# heals instead of spinning until someone edits the database.
+# heals instead of spinning until someone edits the database. All three
+# collections now also reap on start and from their read endpoints (#835).
 #
 # 2× the optimizer tasks' soft_time_limit (5400s) is the cutoff. Anything
 # older than that hasn't legitimately been running this whole time — the
@@ -316,28 +395,24 @@ async def _optimization_janitor_async() -> dict:
     reaped = 0
     scanned = 0
 
-    # KB runs are finalized inline: no Celery task id on the doc to revoke,
-    # so finalizing it is the whole job. The query matches status in
-    # {queued, running} so a never-picked-up run (broker dropped the task)
-    # is also recovered.
+    # KB runs: the cutoff pre-filters the candidates (a never-picked-up run
+    # is matched too, since status covers queued), and kb_optimizer.reap_one
+    # owns the finalization write -- the same function the KB start path and
+    # read endpoints call, so the janitor and the on-demand sweeps cannot
+    # disagree about what "stuck" means or how it is recorded.
+    from app.services import kb_optimizer
+
     stuck = await KBOptimizationRun.find(
         {"status": {"$in": ["queued", "running"]}, "started_at": {"$lt": cutoff}},
     ).to_list()
     scanned += len(stuck)
     for run in stuck:
-        run.status = "failed"
-        run.phase = "failed"
-        run.error_message = (
-            "Optimization run abandoned — worker crashed or exceeded the "
-            f"{ORPHAN_RUN_AGE_SECONDS // 60}-minute soft cap. Run was reaped "
-            "by tasks.passive.optimization_janitor."
-        )
-        run.completed_at = _dt.datetime.now(tz=_dt.timezone.utc)
         try:
-            await run.save()
-            reaped += 1
+            updated = await kb_optimizer.reap_one(run)
+            if updated is not None and updated.status not in ("queued", "running"):
+                reaped += 1
         except Exception as e:  # pragma: no cover — defensive
-            logger.warning("Janitor could not save run %s: %s", run.uuid, e)
+            logger.warning("Janitor could not reap run %s: %s", run.uuid, e)
 
     # Extraction and workflow runs each have their own reap_one — both revoke
     # the run's Celery task (so a still-queued copy can't resurrect the doc)
