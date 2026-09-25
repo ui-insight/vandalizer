@@ -1307,6 +1307,33 @@ export function LibraryTab() {
           <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
             {itemsLoading ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading...</div>
+            ) : items.length === 0 && !search && viewFilter === 'all' ? (
+              // The whole library is empty (not a search, kind, or folder miss):
+              // point at the catalog under Everyone instead of "No items found."
+              <div style={{ padding: '48px 24px', textAlign: 'center', color: '#5f6368', fontSize: 13, lineHeight: 1.5 }}>
+                <Layers size={28} style={{ color: '#c4c7c5', marginBottom: 10 }} />
+                <div style={{ fontSize: 14, fontWeight: 500, color: '#3c4043', marginBottom: 4 }}>
+                  {scope === 'team' ? 'Your team library is empty' : 'Your library is empty'}
+                </div>
+                <div style={{ maxWidth: 340, margin: '0 auto 14px' }}>
+                  Not sure where to start? The catalog has ready-made workflows and extractions you can try and add here.
+                </div>
+                <button
+                  onClick={() => setScope('explore')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: 'inherit',
+                    color: 'var(--library-highlight, #eab308)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Browse the catalog →
+                </button>
+              </div>
             ) : sorted.length === 0 ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>No items found.</div>
             ) : (
