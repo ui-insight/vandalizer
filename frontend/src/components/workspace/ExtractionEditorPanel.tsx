@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
 import { useConfirm } from '../shared/useConfirm'
+import { splitFieldTerms } from '../../utils/extractionTerms'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import { getProjectDocuments } from '../../api/projects'
 import { uploadFile } from '../../api/files'
@@ -249,13 +250,21 @@ export function ExtractionEditorPanel() {
   }
 
   // --- Add item ---
-  const handleAddItem = async () => {
-    const phrase = newTerm.trim()
-    if (!phrase) return
+  // Commas separate fields, as in the workflow task's field input, so a pasted
+  // "PI Name, Institution, Total Budget" becomes three fields.
+  const addTerms = async (text: string) => {
+    if (!text.trim()) return
     if (blockedByVerified()) return
-    await add(phrase)
+    const terms = splitFieldTerms(text, items.map(i => i.searchphrase))
     setNewTerm('')
+    if (terms.length === 0) {
+      toast('Already in this extraction', 'info')
+      return
+    }
+    for (const term of terms) await add(term)
   }
+
+  const handleAddItem = () => addTerms(newTerm)
 
   // --- Run ---
   const handleRun = async () => {
@@ -1061,6 +1070,13 @@ export function ExtractionEditorPanel() {
               aria-label="Add term to extract"
               onChange={(e) => setNewTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
+              onPaste={(e) => {
+                const pasted = e.clipboardData.getData('text')
+                if (!pasted.includes(',')) return
+                e.preventDefault()
+                const { selectionStart: start, selectionEnd: end } = e.currentTarget
+                addTerms(newTerm.slice(0, start ?? newTerm.length) + pasted + newTerm.slice(end ?? newTerm.length))
+              }}
               placeholder="Add term to extract..."
               style={{
                 width: '100%',

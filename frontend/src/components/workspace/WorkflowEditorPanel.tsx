@@ -77,6 +77,7 @@ import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import type { ReviewDetail } from '../../api/reviews'
 import { ColdStartHero } from '../shared/ColdStartHero'
 import { TermDef } from '../shared/TermDef'
+import { splitFieldTerms } from '../../utils/extractionTerms'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -2737,10 +2738,8 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
   const inputRef = useRef<HTMLInputElement>(null)
 
   const addTag = (value: string) => {
-    const trimmed = value.trim()
-    if (trimmed && !tags.includes(trimmed)) {
-      onChange([...tags, trimmed])
-    }
+    const newTags = splitFieldTerms(value, tags)
+    if (newTags.length) onChange([...tags, ...newTags])
     setInputValue('')
   }
 
@@ -2757,7 +2756,7 @@ function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tag
     const pasted = e.clipboardData.getData('text')
     if (pasted.includes(',')) {
       e.preventDefault()
-      const newTags = pasted.split(',').map(s => s.trim()).filter(s => s && !tags.includes(s))
+      const newTags = splitFieldTerms(pasted, tags)
       if (newTags.length) onChange([...tags, ...newTags])
     }
   }
