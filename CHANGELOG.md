@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **An empty library points you to the catalog.** With nothing in Mine or Team, the Library said only "No items found.", leaving a new user with nothing to choose from and no hint that ready-made workflows and extractions exist. It now says the library is empty and offers **Browse the catalog →**, which opens the catalog under Everyone. A search, filter or folder that matches nothing still says "No items found."
+
 ### Fixed
 - **The certification certificate now prints names outside Latin-1.** Every line was drawn in ReportLab's built-in Helvetica, which only has Latin-1 glyphs, so "Nguyễn Văn A" came out garbled and "張三" left the name line blank. Each name, level and credential ID now gets a font that covers all its characters: Helvetica as before when it can, else the bundled DejaVu Sans (Latin Extended, Vietnamese, Greek, Cyrillic; ~1.4 MB, license alongside in `backend/app/assets/fonts/`), else a built-in CJK font picked by script (Chinese, Japanese, Korean), which needs no font file. (#954)
 
