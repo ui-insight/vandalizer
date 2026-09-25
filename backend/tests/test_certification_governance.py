@@ -29,8 +29,10 @@ def _model(items):
     return m
 
 
-def _request(status="submitted"):
-    return SimpleNamespace(item_kind="workflow", submitter_user_id="alice", status=status)
+def _request(status="submitted", item_id="wf-1"):
+    return SimpleNamespace(
+        item_kind="workflow", item_id=item_id, submitter_user_id="alice", status=status,
+    )
 
 
 async def _run(workflows, requests):
@@ -53,7 +55,7 @@ async def test_passes_on_submission_without_approval():
     assert "not required to pass" in detail
     # Module 10 says "share with everyone" and "Checked"; the progress check
     # used to say "verification", which learners read as Module 8's validation.
-    assert detail.startswith("Shared 1 workflow(s) with everyone")
+    assert detail.startswith("Asked to share 1 workflow(s) with everyone")
     assert "verif" not in detail.lower()
 
 
@@ -71,7 +73,7 @@ async def test_approval_earns_the_second_star():
 async def test_two_approvals_earn_the_third_star():
     out = await _run(
         [SimpleNamespace(verified=True), SimpleNamespace(verified=True)],
-        [_request("approved"), _request("approved")],
+        [_request("approved", "wf-1"), _request("approved", "wf-2")],
     )
     assert out["stars"] == 3
 
@@ -84,3 +86,34 @@ async def test_preexisting_verified_workflows_still_count_for_stars():
     )
     assert out["passed"] is True
     assert out["stars"] == 3
+
+
+async def test_repeat_requests_for_one_workflow_count_once():
+    """The detail used to report every request as a shared workflow (#956)."""
+    out = await _run(
+        [SimpleNamespace(verified=False)],
+        [_request("returned"), _request("submitted"), _request("in_review")],
+    )
+    detail = out["checks"][0]["detail"]
+    assert detail.startswith("Asked to share 1 workflow(s) with everyone")
+    assert "declined" not in detail
+
+
+async def test_a_declined_request_still_passes_and_says_so():
+    """Asking is the module's action; a rejection doesn't undo it, but the
+    detail must not claim the workflow was shared (#956)."""
+    out = await _run([SimpleNamespace(verified=False)], [_request("rejected")])
+    assert out["passed"] is True
+    assert out["stars"] == 1
+    detail = out["checks"][0]["detail"]
+    assert detail.startswith("Asked to share 1 workflow(s) with everyone")
+    assert "1 declined by an examiner" in detail
+    assert "Shared" not in detail
+
+
+async def test_repeat_approvals_of_one_workflow_earn_one_star_not_two():
+    out = await _run(
+        [SimpleNamespace(verified=True)],
+        [_request("approved"), _request("approved")],
+    )
+    assert out["stars"] == 2

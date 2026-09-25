@@ -800,17 +800,31 @@ async def _validate_governance(user_id: str) -> dict:
     requests = await VerificationRequest.find(
         {"item_kind": "workflow", "submitter_user_id": user_id}
     ).to_list()
-    submitted_count = len(requests)
-    approved_count = sum(1 for r in requests if r.status == VerificationStatus.APPROVED.value)
+    # Passing means the learner asked at least once, whatever came of it: a
+    # declined request still performed the module's action. The counts shown
+    # are distinct workflows, so repeat requests for one workflow count once.
+    asked_count = len({str(r.item_id) for r in requests})
+    open_count = len({
+        str(r.item_id) for r in requests if r.status != VerificationStatus.REJECTED.value
+    })
+    approved_count = len({
+        str(r.item_id) for r in requests if r.status == VerificationStatus.APPROVED.value
+    })
 
     # Users who already earned stars against verified workflows keep them, even
     # if the request record is missing (pre-queue verifications, seeded items).
     verified_count = max(approved_count, sum(1 for wf in workflows if wf.verified))
 
-    detail = f"Shared {submitted_count} workflow(s) with everyone (need 1+)"
-    if submitted_count:
-        detail += f" — {verified_count} accepted by an examiner so far; that is not required to pass"
-    checks.append({"name": "Asked to share with everyone", "passed": submitted_count >= 1, "detail": detail})
+    detail = f"Asked to share {asked_count} workflow(s) with everyone (need 1+)"
+    if requests:
+        declined = asked_count - open_count
+        if declined:
+            detail += f" — {declined} declined by an examiner"
+        detail += (
+            f" — {verified_count} accepted by an examiner so far; "
+            "acceptance is not required to pass"
+        )
+    checks.append({"name": "Asked to share with everyone", "passed": len(requests) >= 1, "detail": detail})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
