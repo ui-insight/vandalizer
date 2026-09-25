@@ -46,6 +46,35 @@ def test_long_name_stays_on_the_page():
         assert all(page.rect.contains(r) for r in hits)
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "Ada Lovelace",
+        "Nguyễn Văn A",  # Vietnamese: outside Latin-1, garbled by Helvetica (#954)
+        "Ада Лавлейс",  # Cyrillic
+        "張三",  # CJK: rendered blank by Helvetica (#954)
+        "김민준",  # Hangul
+        "やまだ たろう",  # Kana
+    ],
+)
+def test_non_latin1_name_round_trips_and_is_drawn(name):
+    pdf = render_certificate_pdf(
+        name=name, level="architect",
+        certified_at=datetime.datetime(2026, 9, 4), credential_id="X",
+    )
+    with fitz.open(stream=pdf, filetype="pdf") as doc:
+        page = doc[0]
+        assert name in page.get_text()
+        hits = page.search_for(name)
+        assert hits, "name not rendered in one piece"
+        # Text extraction alone passes for invisible glyphs too, so check the
+        # name's box actually has ink: at least some dark pixels.
+        box = hits[0]
+        pix = page.get_pixmap(clip=box, dpi=72, colorspace=fitz.csGRAY)
+        dark = sum(1 for v in pix.samples if v < 128)
+        assert dark > 0.05 * pix.width * pix.height, f"name box is blank for {name!r}"
+
+
 def _user(**kw):
     return SimpleNamespace(user_id="u1", name=None, email=None, **kw)
 
