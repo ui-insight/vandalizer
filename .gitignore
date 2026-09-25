@@ -82,3 +82,7 @@ scripts/ui_endpoint_map.*
 .cursor/
 .kiro/
 .qoder/
+
+# Backups left by patch(1) and merge tools.
+*.orig
+*.rej
