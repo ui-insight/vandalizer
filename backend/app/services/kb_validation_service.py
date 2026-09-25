@@ -589,7 +589,8 @@ class AmendmentLinks(BaseModel):
     """A KB's amends relation, keyed by the source ids chunks carry.
 
     A crawled URL's chunks carry its children's uuids, not the parent's, so
-    both sides are expanded to crawl children.
+    both sides are expanded to crawl children. In a project's implicit KB a
+    document's chunks carry its document_uuid, so that is the key there.
     """
     # chunk source_id of an amended source -> amender uuids
     amenders_of: dict[str, list[str]] = {}
@@ -621,6 +622,11 @@ async def load_amendment_links(kb_uuid: str) -> AmendmentLinks:
         return AmendmentLinks()
 
 
+async def _kb_is_implicit(kb_uuid: str) -> bool:
+    kb = await KnowledgeBase.find_one({"uuid": kb_uuid})
+    return bool(kb is not None and getattr(kb, "implicit", False))
+
+
 async def _load_amendment_links(kb_uuid: str) -> AmendmentLinks:
     amenders = await KnowledgeBaseSource.find(
         {"knowledge_base_uuid": kb_uuid, "amends_source_uuids.0": {"$exists": True}},
@@ -636,10 +642,21 @@ async def _load_amendment_links(kb_uuid: str) -> AmendmentLinks:
         },
     ).to_list()
     by_uuid = {s.uuid: s for s in related}
+    # A project's implicit KB keys a document's chunks by its document_uuid
+    # (kb_ingest_document, _ingest_into_project_kb); every other source's
+    # chunks carry the source's own uuid.
+    implicit = await _kb_is_implicit(kb_uuid)
+
+    def chunk_id(u: str) -> str:
+        s = by_uuid.get(u)
+        doc_uuid = getattr(s, "document_uuid", None) if s is not None else None
+        return doc_uuid if implicit and doc_uuid else u
+
     family: dict[str, list[str]] = {u: [u] for u in roots}
     for s in related:
         if s.parent_source_uuid in family:
             family[s.parent_source_uuid].append(s.uuid)
+    family = {root: [chunk_id(u) for u in members] for root, members in family.items()}
 
     links = AmendmentLinks()
     for a in amenders:

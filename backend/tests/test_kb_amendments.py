@@ -58,11 +58,20 @@ def _find_returning(*batches):
     return find
 
 
-def _src(uuid, amends=(), parent=None, name=None):
+def _src(uuid, amends=(), parent=None, name=None, document_uuid=None):
     return SimpleNamespace(
         uuid=uuid, amends_source_uuids=list(amends), parent_source_uuid=parent,
-        custom_name=name, url_title=None, document_title=None, url=None, document_uuid=None,
+        custom_name=name, url_title=None, document_title=None, url=None,
+        document_uuid=document_uuid,
     )
+
+
+async def _load(*batches, implicit=False):
+    with patch.object(kb_validation_service.KnowledgeBaseSource, "find",
+                      side_effect=_find_returning(*batches)), \
+         patch.object(kb_validation_service.KnowledgeBase, "find_one",
+                      new=AsyncMock(return_value=SimpleNamespace(uuid="kb-1", implicit=implicit))):
+        return await kb_validation_service.load_amendment_links("kb-1")
 
 
 # ---------------------------------------------------------------------------
@@ -78,9 +87,7 @@ async def test_links_cover_crawled_children_on_both_sides():
         supp, _src("supp-child", parent="supp"),
         _src("base", name="Chapter IV"), _src("base-child", parent="base"),
     ]
-    find = _find_returning([supp], related)
-    with patch.object(kb_validation_service.KnowledgeBaseSource, "find", side_effect=find):
-        links = await kb_validation_service.load_amendment_links("kb-1")
+    links = await _load([supp], related)
 
     assert links.amenders_of == {"base": ["supp"], "base-child": ["supp"]}
     assert sorted(links.search_ids["supp"]) == ["supp", "supp-child"]
@@ -90,10 +97,54 @@ async def test_links_cover_crawled_children_on_both_sides():
 @pytest.mark.asyncio
 async def test_a_link_to_a_missing_source_is_ignored():
     supp = _src("supp", amends=["gone"])
-    find = _find_returning([supp], [supp])
-    with patch.object(kb_validation_service.KnowledgeBaseSource, "find", side_effect=find):
-        links = await kb_validation_service.load_amendment_links("kb-1")
+    links = await _load([supp], [supp])
     assert links.is_empty()
+
+
+@pytest.mark.asyncio
+async def test_project_kb_links_are_keyed_by_document_uuid():
+    """A project's implicit KB stores a document's chunks under its
+    document_uuid, not the source row's uuid (#956)."""
+    supp = _src("supp", amends=["base"], name="Supplement 1", document_uuid="doc-supp")
+    base = _src("base", name="Chapter IV", document_uuid="doc-base")
+    links = await _load([supp], [supp, base], implicit=True)
+
+    assert links.amenders_of == {"doc-base": ["supp"]}
+    assert links.search_ids == {"supp": ["doc-supp"]}
+    assert links.amends_names == {"doc-supp": ["Chapter IV"]}
+    assert links.amender_name == {"supp": "Supplement 1"}
+
+
+@pytest.mark.asyncio
+async def test_a_normal_kb_keeps_source_uuids_even_for_documents():
+    supp = _src("supp", amends=["base"], name="Supplement 1", document_uuid="doc-supp")
+    base = _src("base", name="Chapter IV", document_uuid="doc-base")
+    links = await _load([supp], [supp, base], implicit=False)
+
+    assert links.amenders_of == {"base": ["supp"]}
+    assert links.search_ids == {"supp": ["supp"]}
+    assert links.amends_names == {"supp": ["Chapter IV"]}
+
+
+@pytest.mark.asyncio
+async def test_project_kb_amendment_reaches_retrieval_end_to_end():
+    """Loaded links drive the amender search on project-KB chunk ids."""
+    supp = _src("supp", amends=["base"], name="Supplement 1", document_uuid="doc-supp")
+    base = _src("base", name="Chapter IV", document_uuid="doc-base")
+    links = await _load([supp], [supp, base], implicit=True)
+    base_chunk = _chunk("doc-base", "Chapter IV.pdf", 0)
+    supp_chunk = _chunk("doc-supp", "Supplement.pdf", 1)
+
+    dm = MagicMock()
+    dm.query_kb.return_value = [supp_chunk]
+    with patch.object(kb_validation_service, "_get_dm", return_value=dm):
+        hits = await kb_validation_service.retrieve_amendment_chunks("kb-1", [base_chunk], "q", links)
+    assert hits == [supp_chunk]
+    assert dm.query_kb.call_args.kwargs["where"] == {"source_id": "doc-supp"}
+
+    marked = kb_validation_service.annotate_amendments([base_chunk, supp_chunk], links)
+    assert marked[0]["amended_by"] == ["Supplement 1"]
+    assert marked[1]["amends"] == ["Chapter IV"]
 
 
 @pytest.mark.asyncio
