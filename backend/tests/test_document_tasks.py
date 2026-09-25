@@ -371,7 +371,8 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False,
+                   local_on_ocr_outage=False, on_stage=None):
             report["text_layer_rejected"] = True
             report["text_layer_rejected_reason"] = "classifier"
             return "", []
@@ -409,7 +410,8 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False,
+                   local_on_ocr_outage=False, on_stage=None):
             report["text_layer_rejected"] = True
             report["text_layer_rejected_reason"] = "ocr_required"
             return "", []
@@ -450,7 +452,8 @@ class TestPerformExtractionAndUpdate:
         settings.upload_dir = "/uploads"
         MockSettings.return_value = settings
 
-        def reject(path, extension, report=None, force_ocr=False, ocr_required=False, on_stage=None):
+        def reject(path, extension, report=None, force_ocr=False, ocr_required=False,
+                   local_on_ocr_outage=False, on_stage=None):
             report["text_layer_rejected"] = True
             return "", []
 
