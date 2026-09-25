@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - **Marking a source as amending another now works in project knowledge bases.** A project's KB stores a document's passages under the document's id rather than the source's, so the amends relation never matched them and the amending passage was never pulled in; the relation is now keyed by whichever id the passages carry (#956).
 - **The certification module 10 check no longer overstates what you shared.** It said "Shared N workflow(s) with everyone" while counting every request, including declined ones and repeats for the same workflow; it now reads "Asked to share N workflow(s)", counts distinct workflows, and notes any an examiner declined. Asking once still passes the module (#956).
+- **The certification certificate now prints names outside Latin-1.** Every line was drawn in ReportLab's built-in Helvetica, which only has Latin-1 glyphs, so "Nguyễn Văn A" came out garbled and "張三" left the name line blank. Each name, level and credential ID now gets a font that covers all its characters: Helvetica as before when it can, else the bundled DejaVu Sans (Latin Extended, Vietnamese, Greek, Cyrillic; ~1.4 MB, license alongside in `backend/app/assets/fonts/`), else a built-in CJK font picked by script (Chinese, Japanese, Korean), which needs no font file. (#954)
 
 ## [v4.14.0] - 2026-09-25
 
