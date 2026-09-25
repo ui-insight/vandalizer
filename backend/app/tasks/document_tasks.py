@@ -446,6 +446,16 @@ def _notify_document_processing_failed(db, document_uuid: str, message: str) -> 
     notify_document_failed(db, doc=doc, error=message)
 
 
+def _is_last_extraction_attempt(task) -> bool:
+    """True when an OCR outage raised now would not be retried. Never raises:
+    unsure means not final, which keeps today's retry-then-fail behavior."""
+    try:
+        max_retries = task.max_retries
+        return max_retries is not None and (task.request.retries or 0) >= max_retries
+    except Exception:  # noqa: BLE001 — deciding a fallback must never fail a read
+        return False
+
+
 # An OCR outage is measured in minutes — a GPU loading a model, a service
 # restarting during a deploy, a provider rate-limiting a burst. The previous
 # budget (backoff from 5s, 3 retries) was exhausted inside a minute and the
@@ -541,11 +551,24 @@ def perform_extraction_and_update(
             # 25 minutes during an OCR outage. Without it the UI sat on
             # "Extracting text from each page" for all of it, naming the one
             # stage that had already finished.
+            # On the last attempt an OCR outage no longer has a retry to wait
+            # for: a PDF sent to OCR only for pages the local reading can't
+            # see is stored with those pages named, rather than failed (#955).
+            final_attempt = _is_last_extraction_attempt(self)
             raw_text, text_markers = extract_text_with_markers(
                 str(absolute_path), extension, report=ocr_report,
                 force_ocr=force_ocr, ocr_required=ocr_required,
+                local_on_ocr_outage=final_attempt,
                 on_stage=lambda stage: advance_task_status(db, document_uuid, stage),
             )
+            if ocr_report.get("ocr_unavailable_local_fallback"):
+                logger.warning(
+                    "OCR still unavailable for document %s on the final attempt "
+                    "(%d/%d) — stored the local reading with page(s) %s unread "
+                    "instead of failing",
+                    document_uuid, self.request.retries + 1, self.max_retries + 1,
+                    ocr_report.get("unread_pages"),
+                )
             # Read from the PDF rather than the markers so the count is exact on
             # both the OCR and the direct-extraction path. Returns 0 if the file
             # can't be opened, which is the same as the model default.
@@ -734,8 +757,10 @@ def perform_extraction_and_update(
             raise
         # Out of retries. Say *why* it failed — "we couldn't reach OCR" is a
         # different instruction to the user than "this file has no text in it".
+        # The reader already declined to store a local reading (see #955).
         logger.warning(
-            "OCR still unavailable for document %s after %d attempts",
+            "OCR still unavailable for document %s after %d attempts — no "
+            "usable local reading to store, failing",
             document_uuid, self.max_retries,
         )
         message = (

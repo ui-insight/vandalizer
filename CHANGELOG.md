@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **An OCR outage no longer fails a PDF whose only unreadable page is an image.** Since v4.14.0 a PDF with a page no reader could get text from goes to OCR, so while OCR was configured but down such a document retried for about 25 minutes and then failed, where it used to be stored with that page missing. On the extraction task's final attempt, when the local PyMuPDF reading has text, reports unread pages and is otherwise good, it is now stored with the existing "page N could not be read" warning and `unread_pages` list instead; **Retry extraction** re-reads it with OCR once the service is back. Earlier attempts still retry OCR. A fully scanned document (no local text), a text layer the classifier calls unreadable, a low-quality reading, and a retry forced because the stored text was refused still fail as before, and the worker log says which path was taken (#955).
+
 ## [v4.14.0] - 2026-09-25
 
 ### Added

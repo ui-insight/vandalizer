@@ -1296,6 +1296,78 @@ def _text_layer_untrustworthy(classification) -> bool:
     )
 
 
+def _local_reading_for_ocr_outage(
+    pdf_path: str, classification, report: dict,
+) -> tuple[str, list[dict]] | None:
+    """The local reading to store when OCR is down for good, or None to fail.
+
+    Since #946 a PDF with a page no reader got text from (usually a picture
+    of a page) skips the fast path for OCR, so an OCR outage failed the
+    whole document where it used to be stored with that page missing. On the
+    task's last attempt this takes the PyMuPDF reading instead, with the
+    ``unread_pages`` it reports — the same warning #946 added — so the user
+    gets the document and a visible "page N could not be read" note (#955).
+
+    Only for that case. None — the outage then fails the document as before —
+    when the reading is empty (a fully scanned file: nothing to store), when
+    it reports no unread pages (OCR was wanted for something else, such as
+    pages whose text layer the classifier distrusts), when the classifier
+    calls the text layer glyph-ID mojibake, or when the text is low quality
+    by the same ratio that refuses a stored reading. Never raises.
+    """
+    try:
+        if _text_layer_untrustworthy(classification):
+            logger.warning(
+                "OCR outage on final attempt for %s: classifier says image_based, "
+                "so the local text layer is not stored — failing", pdf_path,
+            )
+            return None
+        local_report: dict = {}
+        text, markers = _pymupdf_extract_with_pages(pdf_path, report=local_report)
+        unread = local_report.get("unread_pages") or []
+        if not text.strip():
+            logger.warning(
+                "OCR outage on final attempt for %s: no local text to store — failing",
+                pdf_path,
+            )
+            return None
+        if not unread:
+            logger.warning(
+                "OCR outage on final attempt for %s: OCR was needed for more than "
+                "unread pages, so the local reading is not stored — failing",
+                pdf_path,
+            )
+            return None
+        from app.config import Settings
+        from app.utils.extraction_quality import nonletter_ratio
+
+        ratio = nonletter_ratio(text)
+        if ratio > Settings().extraction_max_nonletter_ratio:
+            logger.warning(
+                "OCR outage on final attempt for %s: local reading is low quality "
+                "(non-letter ratio %.2f) — failing rather than storing it",
+                pdf_path, ratio,
+            )
+            return None
+    except Exception as e:  # noqa: BLE001 — a fallback must never replace the outage
+        logger.warning(
+            "OCR outage on final attempt for %s: local reading failed (%s) — failing",
+            pdf_path, e,
+        )
+        return None
+    # Anything the failed OCR attempts recorded describes text not being used.
+    report.pop("partial", None)
+    report.pop("errors", None)
+    report["unread_pages"] = unread
+    report["ocr_unavailable_local_fallback"] = True
+    logger.warning(
+        "OCR outage on final attempt for %s: storing the local reading with "
+        "page(s) %s marked unread instead of failing the document",
+        pdf_path, unread,
+    )
+    return text, markers
+
+
 def _report_stage(on_stage: Callable[[str], None] | None, stage: str) -> None:
     """Tell the caller the read has reached ``stage``, and never fail over it.
 
@@ -1315,6 +1387,7 @@ def _report_stage(on_stage: Callable[[str], None] | None, stage: str) -> None:
 def _extract_pdf_text_and_markers(
     file_path: str, report: dict | None = None, *,
     force_ocr: bool = False, ocr_required: bool = False,
+    local_on_ocr_outage: bool = False,
     on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """The one PDF path: read the text, then remove what the page hides.
@@ -1329,7 +1402,8 @@ def _extract_pdf_text_and_markers(
     """
     text, markers = _read_pdf_text_and_markers(
         file_path, report=report, force_ocr=force_ocr,
-        ocr_required=ocr_required, on_stage=on_stage,
+        ocr_required=ocr_required, local_on_ocr_outage=local_on_ocr_outage,
+        on_stage=on_stage,
     )
     return pdf_hidden_text.scrub_pdf(file_path, text, markers, report=report)
 
@@ -1337,6 +1411,7 @@ def _extract_pdf_text_and_markers(
 def _read_pdf_text_and_markers(
     file_path: str, report: dict | None = None, *,
     force_ocr: bool = False, ocr_required: bool = False,
+    local_on_ocr_outage: bool = False,
     on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """Extract a PDF's text and page markers with the best reader available.
@@ -1365,6 +1440,12 @@ def _read_pdf_text_and_markers(
     anything is the outcome it exists to forbid. It has no effect where OCR
     was never asked — no endpoint on this deployment — since there is nothing
     there to require.
+
+    ``local_on_ocr_outage`` is the task's last attempt speaking: OCR is still
+    down, and no retry follows. Where the only thing OCR was needed for is
+    pages the local reading reports as unread, that local reading is stored
+    with those pages named rather than the whole document failed — see
+    ``_local_reading_for_ocr_outage`` for what it will and won't accept (#955).
     """
     # A local dict when the caller passed none: the partial-conversion signal
     # the OCR client records here decides below whether page markers can be
@@ -1419,6 +1500,10 @@ def _read_pdf_text_and_markers(
                     file_path,
                 )
                 return fast_path
+        if local_on_ocr_outage and not ocr_required:
+            local = _local_reading_for_ocr_outage(file_path, classification, report)
+            if local is not None:
+                return local
         # Otherwise deliberately not swallowed: a transient outage must reach
         # the task layer so the whole extraction is retried later, rather than
         # being degraded to whatever PyMuPDF can scrape off a scanned page now.
@@ -1538,6 +1623,7 @@ def _read_pdf_text_and_markers(
 def extract_text_with_markers(
     file_path: str, file_extension: str, report: dict | None = None,
     *, force_ocr: bool = False, ocr_required: bool = False,
+    local_on_ocr_outage: bool = False,
     on_stage: Callable[[str], None] | None = None,
 ) -> tuple[str, list[dict]]:
     """Like extract_text_from_file, but also returns per-location char offsets.
@@ -1552,7 +1638,9 @@ def extract_text_with_markers(
     first, skipping the local fast path, so a retry re-reads the pages
     through OCR; ``ocr_required`` (PDF only) additionally refuses any
     non-OCR reading of those pages, for a retry forced because the stored
-    text was low quality.
+    text was low quality. ``local_on_ocr_outage`` (PDF only) lets the task's
+    final attempt store a good local reading with its unread pages named
+    when OCR is down, instead of failing the document.
 
     ``on_stage`` (PDF only) is called with a pipeline stage name when the read
     reaches one worth reporting — currently ``"ocr"``, just before the OCR
@@ -1564,7 +1652,8 @@ def extract_text_with_markers(
     if ext == "pdf":
         return _extract_pdf_text_and_markers(
             file_path, report=report, force_ocr=force_ocr,
-            ocr_required=ocr_required, on_stage=on_stage,
+            ocr_required=ocr_required, local_on_ocr_outage=local_on_ocr_outage,
+            on_stage=on_stage,
         )
 
     if ext == "xlsx":

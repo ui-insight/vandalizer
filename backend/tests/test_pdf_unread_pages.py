@@ -177,3 +177,140 @@ def test_task_stores_the_warning_and_the_pages(MockSettings, mock_get_db):
     update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
     assert "unread_pages" in update_set["ingestion_warnings"]
     assert update_set["unread_pages"] == [2]
+
+
+class TestOcrOutage:
+    """#955: since #946 an unread page sends the PDF to OCR, so an OCR outage
+    failed documents that used to be stored with that page missing. On the
+    last attempt a good local reading is stored with the page named."""
+
+    def _read(self, path, *, final=True, ocr_required=False, classification=None):
+        from app.services.ocr_client import OcrUnavailableError
+
+        report: dict = {}
+        with patch.object(dr, "ocr_extract_text_from_pdf",
+                          side_effect=OcrUnavailableError("OCR down")), \
+             patch.object(dr, "_classify_pdf", return_value=classification):
+            text, markers = dr._extract_pdf_text_and_markers(
+                path, report=report, ocr_required=ocr_required,
+                local_on_ocr_outage=final,
+            )
+        return text, [m["value"] for m in markers], report
+
+    def test_final_attempt_stores_the_local_reading_with_the_page_named(self, tmp_path):
+        text, pages, report = self._read(_ledger(tmp_path, totals_as_image=True))
+        assert "Line item 0" in text
+        assert pages == [1]
+        assert report["unread_pages"] == [2]
+        assert report["ocr_unavailable_local_fallback"] is True
+
+    def test_earlier_attempts_still_raise_for_a_retry(self, tmp_path):
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._read(_ledger(tmp_path, totals_as_image=True), final=False)
+
+    def test_ocr_required_still_raises(self, tmp_path):
+        """A retry forced because the stored text was refused may never
+        re-store the local reading, final attempt or not."""
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._read(_ledger(tmp_path, totals_as_image=True), ocr_required=True)
+
+    def test_low_quality_local_reading_still_raises(self, tmp_path):
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with patch("app.utils.extraction_quality.nonletter_ratio", return_value=0.9), \
+             pytest.raises(OcrUnavailableError):
+            self._read(_ledger(tmp_path, totals_as_image=True))
+
+    def test_image_based_verdict_still_raises(self, tmp_path):
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        verdict = SimpleNamespace(pdf_type="image_based", confidence=1.0, pages_needing_ocr=[1])
+        with pytest.raises(OcrUnavailableError):
+            self._read(_ledger(tmp_path, totals_as_image=True), classification=verdict)
+
+    def test_an_empty_local_reading_still_raises(self, tmp_path):
+        """A fully scanned document has nothing local to store."""
+        import pymupdf
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        src = pymupdf.open()
+        src.new_page().insert_text((50, 60), TOTALS, fontsize=14)
+        png = src[0].get_pixmap(dpi=100).tobytes("png")
+        doc = pymupdf.open()
+        page = doc.new_page()
+        page.insert_image(page.rect, stream=png)
+        path = tmp_path / "scan.pdf"
+        doc.save(str(path))
+        with pytest.raises(OcrUnavailableError):
+            self._read(str(path))
+
+    def test_no_unread_pages_still_raises(self, tmp_path):
+        """OCR was wanted for something other than unread pages (a distrusted
+        layer on a flagged page): the local reading isn't what was missing."""
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._read(_ledger(tmp_path, totals_as_image=False))
+
+
+class TestOcrOutageTask:
+    def _run(self, tmp_path, retries):
+        from unittest.mock import MagicMock
+
+        from app.services.ocr_client import OcrUnavailableError
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        _ledger(tmp_path, totals_as_image=True)
+        db = MagicMock()
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "ledger.pdf"}
+        settings = MagicMock(upload_dir=str(tmp_path), extraction_max_nonletter_ratio=0.25)
+        task = perform_extraction_and_update
+        task.push_request(retries=retries)
+        try:
+            with patch("app.tasks.document_tasks.get_sync_db", return_value=db), \
+                 patch("app.config.Settings", return_value=settings), \
+                 patch.object(dr, "ocr_extract_text_from_pdf",
+                              side_effect=OcrUnavailableError("OCR down")), \
+                 patch("app.tasks.document_tasks._notify_document_processing_failed") as notify:
+                out = task.run("doc-1", "pdf")
+        finally:
+            task.pop_request()
+        return out, db, notify
+
+    def test_final_attempt_stores_the_document_with_the_warning(self, tmp_path):
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        out, db, notify = self._run(tmp_path, perform_extraction_and_update.max_retries)
+        assert "Line item 0" in out
+        written = next(
+            c[0][1]["$set"] for c in db.smart_document.update_one.call_args_list
+            if "raw_text" in c[0][1].get("$set", {})
+        )
+        assert written["unread_pages"] == [2]
+        assert "unread_pages" in written["ingestion_warnings"]
+        assert written.get("task_status") != "error"
+        assert not notify.called
+
+    def test_earlier_attempt_still_retries(self, tmp_path):
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._run(tmp_path, 0)
