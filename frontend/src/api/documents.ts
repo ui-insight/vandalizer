@@ -46,3 +46,14 @@ export function searchDocuments(query: string = '', limit: number = 20, folder?:
     `/api/documents/search?${params}`
   )
 }
+
+/** Titles of the documents and folders the caller can view; the rest are left out. */
+export function resolveTitles(documentUuids: string[], folderUuids: string[]) {
+  return apiFetch<{
+    documents: { uuid: string; title: string }[]
+    folders: { uuid: string; title: string }[]
+  }>('/api/documents/titles', {
+    method: 'POST',
+    body: JSON.stringify({ document_uuids: documentUuids, folder_uuids: folderUuids }),
+  })
+}

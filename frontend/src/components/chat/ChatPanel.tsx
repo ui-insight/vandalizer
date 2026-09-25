@@ -13,7 +13,7 @@ import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, MAX_ATTACHED_KBS, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useBranding } from '../../contexts/BrandingContext'
-import { useShareLink } from '../../lib/shareLink'
+import { buildChatSetupUrl, useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { convertDocumentsToKB } from '../../api/knowledge'
@@ -385,6 +385,31 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
+  // Share what this chat is looking at, so a co-worker doesn't rebuild it
+  // (support ticket). Only library items travel: a file uploaded into this chat
+  // or an attached web link belongs to this conversation, not the library.
+  const handleShareSetup = async () => {
+    const url = buildChatSetupUrl({
+      kbUuids: activeKBs.map(kb => kb.uuid),
+      docUuids: selectedDocUuids,
+      folderUuids: selectedFolderUuids,
+    })
+    const parts = [
+      activeKBs.length && `${activeKBs.length} knowledge base${activeKBs.length === 1 ? '' : 's'}`,
+      selectedDocUuids.length && `${selectedDocUuids.length} document${selectedDocUuids.length === 1 ? '' : 's'}`,
+      selectedFolderUuids.length && `${selectedFolderUuids.length} folder${selectedFolderUuids.length === 1 ? '' : 's'}`,
+    ].filter(Boolean)
+    const leftOut = fileAttachments.length + urlAttachments.length > 0
+      ? ' Files uploaded into this chat and web links aren\u2019t included.'
+      : ''
+    try {
+      await navigator.clipboard.writeText(url)
+      toast(`Chat setup link copied: ${parts.join(', ')}. Whoever opens it needs access to each one.${leftOut}`, 'success')
+    } catch {
+      toast('Could not copy link to clipboard.', 'error')
+    }
+  }
+
   const handleAttachLink = async (url: string) => {
     setAttachLoading(true)
     try {
@@ -531,6 +556,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         knowledgeBases={activeKBs}
         onDetachKB={detachKB}
         onShareKB={(kb) => shareLink('kb', kb.uuid, kb.title || undefined)}
+        onShareSetup={
+          activeKBs.length + selectedDocUuids.length + selectedFolderUuids.length > 0
+            ? handleShareSetup
+            : undefined
+        }
         onDeselectFolder={(uuid) => {
           setSelectedFolderUuids(selectedFolderUuids.filter(u => u !== uuid))
           const next = { ...selectedFolderNames }
