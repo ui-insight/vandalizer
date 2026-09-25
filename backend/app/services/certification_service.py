@@ -692,29 +692,40 @@ async def _validate_output_delivery(user_id: str) -> dict:
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
     output_types: set[str] = set()
     has_execution = False
+    has_zip_bundle = False
 
     output_task_names = {"DocumentRenderer", "DataExport", "PackageBuilder", "FormFiller"}
 
     for wf in workflows:
+        deliverable_steps = 0
         for step_id in wf.steps:
             step = await WorkflowStep.get(step_id)
             if not step:
                 continue
+            if step.is_output:
+                deliverable_steps += 1
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name in output_task_names:
                     output_types.add(task.name)
-        if wf.num_executions and wf.num_executions >= 1:
+        ran = bool(wf.num_executions and wf.num_executions >= 1)
+        if ran:
             has_execution = True
+        # A run workflow with 2+ steps marked "Include in deliverables"
+        # downloads as a ZIP bundle. The Package Builder node is still
+        # "Coming Soon" in the editor palette, so this is the reachable way to
+        # earn the ZIP star; a PackageBuilder task still counts for when it ships.
+        if ran and deliverable_steps >= 2:
+            has_zip_bundle = True
 
-    checks.append({"name": "Output node", "passed": len(output_types) >= 1, "detail": "Use DocumentRenderer, DataExport, PackageBuilder, or FormFiller"})
+    checks.append({"name": "Output node", "passed": len(output_types) >= 1, "detail": "Use a Document Renderer, Data Export, or Form Filler"})
     checks.append({"name": "Workflow executed", "passed": has_execution, "detail": "Run the workflow to produce output"})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
     if passed and len(output_types) >= 2:
         stars = 2
-    if passed and "PackageBuilder" in output_types:
+    if passed and (has_zip_bundle or "PackageBuilder" in output_types):
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
