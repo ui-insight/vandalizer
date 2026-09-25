@@ -119,7 +119,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               <p className="text-sm text-gray-500">
                 {module.subtitle}
                 {module.estimatedMinutes && (
-                  <span className="text-gray-500"> \u00b7 ~{module.estimatedMinutes} min \u2014 your place is saved if you leave</span>
+                  <span className="text-gray-500"> · ~{module.estimatedMinutes} min — your place is saved if you leave</span>
                 )}
               </p>
             </div>

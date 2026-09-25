@@ -183,9 +183,9 @@
       "Budget Spent": ["$287,500", "287500", "287,500"]
     },
     "star_criteria": {
-      "1": "Use a Document Renderer, Data Export, Package Builder, or Form Filler and run the workflow",
+      "1": "Use a Document Renderer, Data Export, or Form Filler and run the workflow",
       "2": "Use 2+ different output node types",
-      "3": "Use a Package Builder to create a ZIP archive with multiple output files"
+      "3": "Turn on Include in deliverables for 2+ steps and run the workflow, so the download is a ZIP with multiple output files"
     }
   },
   "validation_qa": {
