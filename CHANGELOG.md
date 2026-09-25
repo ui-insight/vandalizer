@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **An empty library points you to the catalog.** With nothing in Mine or Team, the Library said only "No items found.", leaving a new user with nothing to choose from and no hint that ready-made workflows and extractions exist. It now says the library is empty and offers **Browse the catalog →**, which opens the catalog under Everyone. A search, filter or folder that matches nothing still says "No items found."
+
 ### Changed
 - **The frontend test runner is on vitest 5 (was 4.1).** `vitest` and `@vitest/coverage-v8` move together to 5.0.2, which dependabot's coverage-only bump (#933) could not do. jest-dom's matcher types now hook vitest 5's `Matchers` interface through `src/vitest-matchers.d.ts`, because jest-dom 7's own augmentation targets vitest 4's `Assertion` shape (#953).
 

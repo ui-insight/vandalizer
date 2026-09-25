@@ -46,7 +46,7 @@ vi.mock('../../lib/shareLink', () => ({
   buildShareUrl: vi.fn(),
 }))
 
-vi.mock('../library/ExploreTab', () => ({ ExploreTab: () => null }))
+vi.mock('../library/ExploreTab', () => ({ ExploreTab: () => <div>Catalog browser</div> }))
 vi.mock('../library/ShareWithTeamDialog', () => ({ ShareWithTeamDialog: () => null }))
 
 const mockItems: { current: LibraryItem[] } = { current: [] }
@@ -250,5 +250,31 @@ describe('LibraryTab delete flow', () => {
     // dialog — no "Delete permanently" option should ever render.
     await waitFor(() => expect(removeItemMock).toHaveBeenCalledWith('li-wf'))
     expect(screen.queryByText('Delete permanently')).toBeNull()
+  })
+})
+
+describe('LibraryTab empty state', () => {
+  it('suggests the catalog when the library has no items and links to it', async () => {
+    mockItems.current = []
+    render(<LibraryTab />)
+    expect(screen.getByText('Your library is empty')).toBeTruthy()
+    expect(screen.queryByText('No items found.')).toBeNull()
+    fireEvent.click(screen.getByText('Browse the catalog →'))
+    expect(await screen.findByText('Catalog browser')).toBeTruthy()
+  })
+
+  it('keeps the plain message when a search matches nothing', () => {
+    mockItems.current = []
+    render(<LibraryTab />)
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'zzz' } })
+    expect(screen.getByText('No items found.')).toBeTruthy()
+    expect(screen.queryByText('Browse the catalog →')).toBeNull()
+  })
+
+  it('does not show the nudge when a kind filter hides existing items', () => {
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByText(/^Workflows/))
+    expect(screen.getByText('No items found.')).toBeTruthy()
+    expect(screen.queryByText('Your library is empty')).toBeNull()
   })
 })
