@@ -487,6 +487,80 @@ def test_run_meta_answer_model_falls_back_to_the_run_label_for_older_runs():
     assert run_meta["answer_model_fallback"] is None
 
 
+KB_SOURCES = {
+    "recorded": True, "fingerprint": "abc123def456", "total_sources": 2, "total_chunks": 50,
+    "sources": [
+        {"source_uuid": "s-1", "name": "PAPPG Ch. 2", "source_type": "url", "url": "https://nsf.gov/p",
+         "status": "ready", "chunk_count": 40, "content_hash": "sha-1", "content_hash_recorded": True,
+         "last_ingested_at": "2026-08-01T00:00:00+00:00"},
+        {"source_uuid": "s-2", "name": "Budget.pdf", "source_type": "document", "document_uuid": "d-2",
+         "status": "ready", "chunk_count": 10, "content_hash": "sha-2", "content_hash_recorded": True},
+    ],
+}
+
+
+def _build_with(vr):
+    return build_kb_validation_results_export(
+        kb=_make_kb(), vr=vr, test_queries=_make_queries(), catalog_version=None,
+        exported_by_user_id="u", exported_at="2026-09-24T00:00:00+00:00",
+    )
+
+
+def test_export_carries_the_kb_sources_the_run_measured():
+    """Support ticket: exports had no source list, versions or chunk counts,
+    so an older run could not be reproduced once the KB changed."""
+    vr = _make_vr()
+    vr.result_snapshot["kb_sources"] = KB_SOURCES
+    vr.result_snapshot["rag_config_override"] = {"k": 8}
+
+    payload, run_meta, rows = _build_with(vr)
+
+    assert payload["kb_sources"] is KB_SOURCES
+    assert run_meta["kb_source_fingerprint"] == "abc123def456"
+    assert run_meta["kb_source_count"] == 2
+    assert run_meta["kb_chunk_count"] == 50
+    assert run_meta["kb_sources_recorded"] is True
+    assert run_meta["rag_config_override_at_run"] == {"k": 8}
+
+    parsed = list(csv.reader(io.StringIO(render_results_csv(run_meta, rows))))
+    first = dict(zip(parsed[0], parsed[1]))
+    assert first["kb_source_fingerprint"] == "abc123def456"
+    assert first["kb_chunk_count"] == "50"
+
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows, payload["kb_sources"])))
+    sheet = wb["Sources"]
+    header = [c.value for c in sheet[1]]
+    by_uuid = {r[0]: dict(zip(header, r)) for r in sheet.iter_rows(min_row=2, values_only=True)}
+    assert by_uuid["s-1"]["content_hash"] == "sha-1"
+    assert by_uuid["s-1"]["chunk_count"] == 40
+    assert by_uuid["s-2"]["document_uuid"] == "d-2"
+
+
+def test_an_older_run_exports_its_thinner_source_record_labelled_as_such():
+    vr = _make_vr()
+    vr.result_snapshot["source_health"] = {"ratio": 1.0, "total": 1, "details": [
+        {"uuid": "s-1", "source_type": "url", "name": "PAPPG Ch. 2", "status": "healthy"},
+    ]}
+    vr.result_snapshot["chunk_coverage"] = {"ratio": 0.9, "total_chunks": 120}
+
+    payload, run_meta, rows = _build_with(vr)
+
+    assert run_meta["kb_sources_recorded"] is False
+    assert run_meta["kb_source_fingerprint"] is None
+    assert run_meta["kb_chunk_count"] == 120
+    assert payload["kb_sources"]["sources"][0]["health"] == "healthy"
+    assert run_meta["rag_config_override_at_run"] is None
+
+
+def test_a_run_with_no_source_record_exports_without_a_sources_sheet():
+    payload, run_meta, rows = _build_with(_make_vr())
+    assert payload["kb_sources"] is None
+    from openpyxl import load_workbook
+    wb = load_workbook(io.BytesIO(render_results_xlsx(run_meta, rows, payload["kb_sources"])))
+    assert "Sources" not in wb.sheetnames
+
+
 def test_export_names_the_question_set_the_run_measured():
     """Concatenated exports from runs over different question sets must be
     tellable apart row by row; older runs without a snapshot export blank."""

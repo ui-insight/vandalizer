@@ -1956,6 +1956,12 @@ async def run_kb_validation(
     if not kb:
         raise ValueError("Knowledge base not found")
 
+    # The KB as this run finds it — sources, their versions, chunk counts —
+    # taken before anything is measured, so the record matches what was
+    # queried even if a source changes while the run is in flight.
+    from app.services.kb_source_snapshot import snapshot_kb_sources
+    kb_sources = await snapshot_kb_sources(kb_uuid)
+
     # Run health and coverage checks in parallel
     health_task = check_source_health(kb_uuid)
     coverage_task = check_chunk_coverage(kb_uuid)
@@ -2142,6 +2148,14 @@ async def run_kb_validation(
         "score_formula": scoring["formula"],
         "num_test_queries": len(test_queries),
         "num_sources": health["total"],
+        # Sources, their versions (content hash + retrieved/indexed dates)
+        # and chunk counts at run time, so the run stays reproducible and
+        # comparable after the KB changes. See kb_source_snapshot.
+        "kb_sources": kb_sources,
+        # The applied retrieval override the run answered under.
+        "rag_config_override": (
+            dict(kb.rag_config_override) if isinstance(kb.rag_config_override, dict) else None
+        ),
         # Match the shape expected by persist_validation_run
         "sources": [{"label": s["name"], "status": s["status"]} for s in health["details"]],
         "num_runs": 1,

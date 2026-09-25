@@ -17,6 +17,9 @@ from app.models.validation_run import SMOKE_TEST_SOURCE
 from app.services import kb_validation_service
 
 
+SNAPSHOT = {"recorded": True, "fingerprint": "f00", "total_sources": 1, "total_chunks": 4, "sources": []}
+
+
 def _tq(uuid: str, **overrides) -> SimpleNamespace:
     fields = {
         "uuid": uuid, "query": f"Q {uuid}?", "expected_answer": "A", "category": None,
@@ -62,6 +65,9 @@ async def _run(query_uuids, all_uuids=("q1", "q2", "q3"), queries=None):
         ))
         stack.enter_context(patch.object(
             kb_validation_service, "check_chunk_coverage", AsyncMock(return_value={"ratio": 1.0}),
+        ))
+        stack.enter_context(patch(
+            "app.services.kb_source_snapshot.snapshot_kb_sources", AsyncMock(return_value=SNAPSHOT),
         ))
         stack.enter_context(patch.object(
             kb_validation_service, "check_retrieval_precision", AsyncMock(side_effect=fake_precision),
@@ -112,6 +118,9 @@ async def test_a_full_run_is_untagged_and_records_no_selection():
     assert len(judged) == 3
     assert result["query_selection"] is None
     assert persisted["source"] is None
+    # The KB as the run found it is part of the persisted result.
+    assert result["kb_sources"] is SNAPSHOT
+    assert persisted["result"]["kb_sources"] is SNAPSHOT
 
 
 @pytest.mark.asyncio

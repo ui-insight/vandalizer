@@ -1318,7 +1318,7 @@ async def export_kb_validation_run(
         from fastapi.responses import Response
 
         return Response(
-            content=render_results_xlsx(run_meta, rows),
+            content=render_results_xlsx(run_meta, rows, payload.get("kb_sources")),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{base_name}.xlsx"'},
         )
