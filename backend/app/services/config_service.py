@@ -42,6 +42,27 @@ async def get_default_model_name() -> str:
     return ""
 
 
+async def get_validation_judge_model() -> tuple[str, dict | None]:
+    """The model that grades validation runs, and a fallback note if any.
+
+    ``SystemConfig.validation_judge_model`` when it names a configured model,
+    else the system default. Deliberately not the caller's chat model: that
+    varied the grader with whoever pressed Run, so two runs of one set could
+    not be compared. When the configured grader is no longer in System Config
+    the default grades instead, and the note ``{"configured", "used",
+    "reason"}`` says so, for the run to record.
+    """
+    config = await SystemConfig.get_config()
+    configured = (getattr(config, "validation_judge_model", "") or "").strip() if config else ""
+    default = await get_default_model_name()
+    if not configured:
+        return default, None
+    match = await get_llm_model_by_name(configured)
+    if match:
+        return match.get("name") or configured, None
+    return default, {"configured": configured, "used": default, "reason": "not in System Config"}
+
+
 async def get_llm_model_names() -> set[str]:
     """Return set of configured model names."""
     models = await get_llm_models()

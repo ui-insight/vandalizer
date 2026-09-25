@@ -1201,6 +1201,32 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_validation_grader_names_the_system_grader(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        note = {"configured": "qwen/qwen3.6-27b", "used": "openai/gpt-oss-120b", "reason": "not in System Config"}
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.services.config_service.get_validation_judge_model",
+                  AsyncMock(return_value=("openai/gpt-oss-120b", note))),
+            patch("app.models.system_config.SystemConfig.get_config",
+                  AsyncMock(return_value=SimpleNamespace(validation_judge_model="qwen/qwen3.6-27b"))),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            resp = await client.get(
+                "/api/knowledge/kb-uuid-1/validation-grader", cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"model": "openai/gpt-oss-120b", "configured": True, "fallback": note}
+
+    @pytest.mark.asyncio
     async def test_refresh_source_rejects_document_sources(self, client):
         user = _make_user()
         cookies, headers = _auth()

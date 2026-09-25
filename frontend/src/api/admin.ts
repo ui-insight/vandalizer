@@ -364,6 +364,8 @@ export interface SystemConfigData {
   available_models: { id: string; name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null; temperature?: number | null }[]
   default_model: string
   long_document_model?: string
+  /** The model that grades every validation run; empty = the default model. */
+  validation_judge_model?: string
   ocr_endpoint: string
   ocr_api_key: string
   ocr_provider: OcrProvider
@@ -519,6 +521,14 @@ export function deleteModel(modelId: string) {
 
 export function setLongDocumentModel(name: string) {
   return apiFetch<{ status: string; long_document_model: string }>('/api/admin/config/models/long-document', {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
+}
+
+/** Choose the model that grades every validation run ('' = the default model). */
+export function setValidationJudgeModel(name: string) {
+  return apiFetch<{ status: string; validation_judge_model: string }>('/api/admin/config/models/validation-judge', {
     method: 'PUT',
     body: JSON.stringify({ name }),
   })

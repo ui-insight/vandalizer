@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Play, Loader2, ChevronDown, ChevronRight, Download } from 'lucide-react'
 import {
+  type KBValidationGrader,
   type KBTestQuery,
   type KBValidationExportFormat,
   type KBValidationMode,
@@ -34,10 +35,12 @@ interface Props {
   /** Downloads the displayed run's per-query results. Absent until the run's
    * persisted uuid is known (i.e. before any run has landed this session). */
   onExport?: (format: KBValidationExportFormat) => void | Promise<void>
+  /** The system-wide grader the next run will use; null until loaded. */
+  grader?: KBValidationGrader | null
 }
 
 export function KBValidationRunTab({
-  kbReady, canManage, queries, selectedUuids = null, latestRun, running, error, onRun, onExport,
+  kbReady, canManage, queries, selectedUuids = null, latestRun, running, error, onRun, onExport, grader = null,
 }: Props) {
   const handed = !!selectedUuids?.length
   // A handed-over selection keeps "Run selected"'s old cost profile (judge
@@ -198,6 +201,21 @@ export function KBValidationRunTab({
             <option value="judge">Score only</option>
           </select>
         </label>
+        {grader?.model && (
+          <span
+            data-testid="validation-grader"
+            title={
+              'Every validation run is graded by one model, set by your administrator in System Config, '
+              + 'whoever starts the run. Scores graded by different models are not directly comparable.'
+            }
+            style={{ fontSize: 11, color: grader.fallback ? '#f59e0b' : '#888' }}
+          >
+            Graded by {grader.model}
+            {grader.fallback
+              ? ` — the chosen grader ${grader.fallback.configured} is no longer configured`
+              : grader.configured ? '' : ' (default model)'}
+          </span>
+        )}
       </div>
 
       {error && (
@@ -247,6 +265,19 @@ export function KBValidationRunTab({
             </div>
           )}
 
+          {latestRun.judge_model_fallback && (
+            <div
+              role="note"
+              style={{
+                fontSize: 11, color: '#fbbf24', padding: '6px 10px', marginBottom: 10,
+                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 6,
+              }}
+            >
+              Graded by {latestRun.judge_model_fallback.used}, not the chosen grader{' '}
+              {latestRun.judge_model_fallback.configured} (no longer in System Config). Compare this
+              score only with runs graded by the same model.
+            </div>
+          )}
           {latestRun.question_set && (
             <div
               style={{ fontSize: 10, color: '#888', marginBottom: 10 }}

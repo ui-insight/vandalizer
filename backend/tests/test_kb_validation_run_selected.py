@@ -67,6 +67,9 @@ async def _run(query_uuids, all_uuids=("q1", "q2", "q3"), queries=None):
             kb_validation_service, "check_retrieval_precision", AsyncMock(side_effect=fake_precision),
         ))
         stack.enter_context(patch(
+            "app.services.config_service.get_validation_judge_model", AsyncMock(return_value=("m", None)),
+        ))
+        stack.enter_context(patch(
             "app.services.config_service.get_user_model_name", AsyncMock(return_value="m"),
         ))
         stack.enter_context(patch.object(kb_validation_service, "judge_test_queries", judge))

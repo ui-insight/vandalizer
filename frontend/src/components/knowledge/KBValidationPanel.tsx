@@ -3,10 +3,12 @@ import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucid
 import {
   listKBTestQueries,
   getKBQuality,
+  getKBValidationGrader,
   runKBValidationAsync,
   downloadKBValidationRunExport,
   type KBTestQuery,
   type KBValidationExportFormat,
+  type KBValidationGrader,
   type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
@@ -113,6 +115,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     setHandedSelection(null)
     setTab(id)
   }
+  // The system-wide grader, named on the Run tab before a run starts.
+  const [grader, setGrader] = useState<KBValidationGrader | null>(null)
   // Bumped whenever a run finishes so the History tab refetches even if it's
   // already mounted (it otherwise only loads on mount, so a freshly persisted
   // run wouldn't appear until a full page reload).
@@ -258,6 +262,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     setLoading(true)
     Promise.all([refreshQueries(), refreshHistory()]).finally(() => setLoading(false))
   }, [refreshQueries, refreshHistory])
+
+  // Re-read on entry to the Run tab: an admin can change the grader at any time.
+  useEffect(() => {
+    if (tab !== 'run') return
+    let cancelled = false
+    getKBValidationGrader(kbUuid)
+      .then(g => { if (!cancelled) setGrader(g) })
+      .catch(() => { /* optional context; the run works without it */ })
+    return () => { cancelled = true }
+  }, [tab, kbUuid])
 
   // Re-pull the test-query list on every entry to the Test Queries tab. The
   // Validate-tab wizard generates and persists queries server-side, so the
@@ -487,6 +501,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           error={runError}
           onRun={runValidation}
           onExport={latestRunUuid ? exportLatestRun : undefined}
+          grader={grader}
         />
       ) : (
         <KBQualityHistoryTab

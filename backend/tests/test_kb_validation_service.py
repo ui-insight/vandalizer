@@ -1470,7 +1470,11 @@ def _run_kb_validation_patches(fake_kb, judge_payload, persisted: dict):
         patch.object(kb_validation_service, "check_chunk_coverage", AsyncMock(return_value={"ratio": 1.0})),
         patch.object(kb_validation_service, "check_retrieval_precision",
                      AsyncMock(return_value={"total_queries": 1, "avg_precision": 1.0, "details": [{"query": "Q?"}]})),
+        # The runner's model answers; the system grader judges. Distinct on
+        # purpose, so a test can tell which one reached which role.
         patch("app.services.config_service.get_user_model_name", AsyncMock(return_value="qwen/qwen3.8-27b")),
+        patch("app.services.config_service.get_validation_judge_model",
+              AsyncMock(return_value=("openai/gpt-oss-120b", None))),
         patch.object(kb_validation_service, "judge_test_queries", judge),
         patch("app.models.validation_run.ValidationRun"),
         patch("app.services.quality_service.persist_validation_run", AsyncMock(side_effect=fake_persist)),
@@ -1565,3 +1569,64 @@ async def test_run_kb_validation_no_fallback_note_when_override_is_a_tag_that_re
     assert result["answer_model"] == "qwen/qwen3.8-27b"
     assert result["answer_model_fallback"] is None
     assert judge.call_args.kwargs["answer_config"].model == "qwen/qwen3.8-27b"
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_grades_with_the_system_grader_not_the_runner_model():
+    """Support ticket: one KB, one question set, graded by gpt-oss-120b one
+    day and qwen3.8-27b the next, because the grader was whichever chat model
+    the person pressing Run had picked. The grader is now system-wide; the
+    runner's model still answers."""
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "NSF PAPPG"
+    fake_kb.rag_config_override = None
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+
+    result, persisted, judge = await _run_with(fake_kb, judge_payload)
+
+    assert judge.call_args.kwargs["judge_model"] == "openai/gpt-oss-120b"
+    # Answers come from the runner's model, as before.
+    assert judge.call_args.args[2] == "qwen/qwen3.8-27b"
+    assert result["judge_model"] == "openai/gpt-oss-120b"
+    assert result["answer_model"] == "qwen/qwen3.8-27b"
+    assert result["judge_model_fallback"] is None
+    assert persisted["model_settings"]["judge_model"] == "openai/gpt-oss-120b"
+
+
+@pytest.mark.asyncio
+async def test_run_kb_validation_records_a_grader_fallback():
+    fake_kb = MagicMock()
+    fake_kb.uuid, fake_kb.title = "kb-1", "NSF PAPPG"
+    fake_kb.rag_config_override = None
+    judge_payload = {
+        "details": [{"query_uuid": "q1", "judge": {"score": 1.0, "verdict": "PASS"}}],
+        "avg_judge_score": 1.0, "num_queries_judged": 1,
+    }
+    note = {"configured": "qwen/qwen3.6-27b", "used": "openai/gpt-oss-120b", "reason": "not in System Config"}
+    # Swap the helper's grader patch for one that reports a fallback.
+    persisted: dict = {}
+    cms, find, judge = _run_kb_validation_patches(fake_kb, judge_payload, persisted)
+    cms = [c for c in cms if getattr(c, "attribute", None) != "get_validation_judge_model"]
+    cms.append(patch(
+        "app.services.config_service.get_validation_judge_model",
+        AsyncMock(return_value=("openai/gpt-oss-120b", note)),
+    ))
+    token = kb_validation_service._active_system_config_doc.set(_MODELS_DOC)
+    try:
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            mocks = {getattr(c, "attribute", None): stack.enter_context(c) for c in cms}
+            mocks["KnowledgeBase"].find_one = AsyncMock(return_value=fake_kb)
+            mocks["KBTestQuery"].find = MagicMock(return_value=find)
+            mocks["ValidationRun"].find_one = AsyncMock(return_value=MagicMock())
+            mocks["SystemConfig"].get_config = AsyncMock(return_value=MagicMock())
+            result = await kb_validation_service.run_kb_validation("kb-1", "u1", mode="judge")
+    finally:
+        kb_validation_service._active_system_config_doc.reset(token)
+
+    assert result["judge_model"] == "openai/gpt-oss-120b"
+    assert result["judge_model_fallback"] == note
+    assert persisted["model_settings"]["judge_model_fallback"] == note
