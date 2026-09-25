@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Marking a source as amending another now works in project knowledge bases.** A project's KB stores a document's passages under the document's id rather than the source's, so the amends relation never matched them and the amending passage was never pulled in; the relation is now keyed by whichever id the passages carry (#956).
+- **The certification module 10 check no longer overstates what you shared.** It said "Shared N workflow(s) with everyone" while counting every request, including declined ones and repeats for the same workflow; it now reads "Asked to share N workflow(s)", counts distinct workflows, and notes any an examiner declined. Asking once still passes the module (#956).
+
 ## [v4.14.0] - 2026-09-25
 
 ### Added
