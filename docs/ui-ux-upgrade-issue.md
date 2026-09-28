@@ -4,6 +4,15 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Automation summaries and shared surfaces — September 28
+
+**131/169 checklist items implemented locally.** AUTO-02 and AUTO-05 are complete; changes are not deployed.
+
+- Cards and editors share a readable Trigger / Input / Action / Output summary. It resolves source/destination folder paths, distinguishes scheduled selections from API or Microsoft 365 intake, names the chosen action and reports configured storage, notifications, webhooks and follow-up delivery without exposing endpoint credentials. Missing names or configuration remain explicit; folder-name failures retry, and old team responses cannot replace current names.
+- Automation browsing and editing now use the same neutral surfaces, borders, readable metadata and brand selection treatment. Trigger labels are neutral; status keeps its own meaning. A concise empty state replaces the full promotional panel. Desktop file/section and Library/Assistant navigation is preserved.
+- Verification: 20 frontend tests across four files, TypeScript, production build and touched-file ESLint pass. The 21 summary/theme states plus 27 repeated filter/scope recovery states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched fixture requests. Long names, all trigger families, output destinations, folder-name failure/retry and empty content were inspected directly.
+- Evidence: `2026-09-28-automation-summary-review` and `2026-09-28-automation-filter-light`; recipe: `frontend/scripts/visual-review/automation-summaries.mjs`. APIs and execution are fixtures. This completes the automation surface items, not the wider VIS checklist or live delivery verification.
+
 ## Automation history — September 28
 
 **129/169 checklist items implemented locally.** AUTO-09 is complete; the issue remains open and changes are not deployed.
@@ -309,10 +318,10 @@ Acceptance: users can create, find, open and work within the correct project wit
 ## 6. Automations screen and editor
 
 - [x] **AUTO-01 · P2 · Fix:** Replace color-only state dots with explicit Enabled/Paused labels.
-- [ ] **AUTO-02 · P2 · Improve:** Present trigger, input location, action and output in a concise readable summary.
+- [x] **AUTO-02 · P2 · Improve:** Present trigger, input location, action and output in a concise readable summary.
 - [x] **AUTO-03 · P2 · Improve:** Show last outcome and next scheduled run when the API supplies them; clearly distinguish no history, unavailable data and a failed run.
 - [x] **AUTO-04 · P2 · Fix:** Give the editor sufficient width so normal titles and configuration fields do not wrap unnecessarily.
-- [ ] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
+- [x] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
 - [x] **AUTO-06 · P2 · Improve:** Keep enabled state, ownership/sharing, Save and Run now easy to distinguish; communicate unsaved edits.
 - [x] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
 - [ ] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.

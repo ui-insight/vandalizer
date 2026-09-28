@@ -10,6 +10,8 @@ import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
+import { AutomationSummary } from './AutomationSummary'
+import { useAutomationFolderNames } from '../../hooks/useAutomationFolderNames'
 import { AutomationRunHistory } from './AutomationRunHistory'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import { ScheduleConfigFields } from './ScheduleConfigFields'
@@ -33,6 +35,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string; e
 export function AutomationEditorPanel() {
   const { openAutomationId, closeAutomation } = useWorkspace()
   const { workflows } = useWorkflows()
+  const folderNames = useAutomationFolderNames()
   const { searchSets } = useSearchSets()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -155,7 +158,7 @@ export function AutomationEditorPanel() {
 
   if (loading) {
     return (
-      <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+      <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <EditorHeader title="Loading..." onClose={closeAfterSave} />
         <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading automation...</div>
       </div>
@@ -164,7 +167,7 @@ export function AutomationEditorPanel() {
 
   if (!automation) {
     return (
-      <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+      <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <EditorHeader title="Automation" onClose={closeAfterSave} />
         <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 13 }}>{loadError || 'Automation not found.'}<button type="button" onClick={refresh} style={{ display: 'block', margin: '12px auto' }}>Retry loading</button></div>
       </div>
@@ -172,7 +175,7 @@ export function AutomationEditorPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
+    <div className="automation-surface flex h-full flex-col" style={{ backgroundColor: 'var(--workspace-surface)', position: 'relative' }}>
       {/* Header */}
       <div style={{ padding: '16px 24px', width: '100%', maxWidth: 1040, margin: '0 auto', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -328,6 +331,8 @@ export function AutomationEditorPanel() {
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
         />
 
+        <AutomationSummary automation={automation} names={folderNames} actionName={automation.action_type === 'extraction' ? searchSets.find(item => item.uuid === automation.action_id || item.id === automation.action_id)?.title : workflows.find(item => item.id === automation.action_id)?.name} />
+        {folderNames.error && <div className="automation-folder-error" role="status">Folder names are unavailable. <button type="button" onClick={() => void folderNames.refresh()}>Retry folder names</button></div>}
         <div ref={runNowRegion} tabIndex={-1} hidden={!runNowOpen}>
           <AutomationRunNowPanel automation={automation} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
         </div>
@@ -350,8 +355,8 @@ export function AutomationEditorPanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px',
-                  backgroundColor: selected ? '#eff6ff' : '#fff',
-                  border: selected ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                  backgroundColor: selected ? 'var(--workspace-selected)' : '#fff',
+                  border: selected ? '2px solid var(--highlight-on-light)' : '1px solid #e5e7eb',
                   borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
                   textAlign: 'left', width: '100%',
                 }}
@@ -393,8 +398,8 @@ export function AutomationEditorPanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px',
-                  backgroundColor: selected && opt.enabled ? '#eff6ff' : '#fff',
-                  border: selected && opt.enabled ? '2px solid #3b82f6' : '1px solid #e5e7eb',
+                  backgroundColor: selected && opt.enabled ? 'var(--workspace-selected)' : '#fff',
+                  border: selected && opt.enabled ? '2px solid var(--highlight-on-light)' : '1px solid #e5e7eb',
                   borderRadius: 8, fontFamily: 'inherit',
                   textAlign: 'left', width: '100%',
                   cursor: opt.enabled ? 'pointer' : 'default',
@@ -733,7 +738,7 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
           type="checkbox"
           checked={batchMode}
           onChange={e => onSave({ trigger_config: { ...config, batch_mode: e.target.checked } })}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
         <span style={{ fontWeight: 500 }}>Batch mode</span>
         <span style={{ color: '#555e68', fontSize: 12 }}>wait and process files together</span>
@@ -978,7 +983,7 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           type="checkbox"
           checked={enabled}
           onChange={e => updateStorage({ enabled: e.target.checked })}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
         <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Save results to a folder</span>
       </label>
@@ -1104,7 +1109,7 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
           type="checkbox"
           checked={enabled}
           onChange={e => handleToggle(e.target.checked)}
-          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+          style={{ width: 16, height: 16, accentColor: 'var(--highlight-on-light)' }}
         />
         <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Send email notification</span>
       </label>
@@ -1133,7 +1138,7 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
               type="checkbox"
               checked={notifyOwner}
               onChange={e => updateNotification({ notify_owner: e.target.checked })}
-              style={{ width: 14, height: 14, accentColor: '#3b82f6' }}
+              style={{ width: 14, height: 14, accentColor: 'var(--highlight-on-light)' }}
             />
             <span style={{ fontSize: 13, color: '#374151' }}>Notify automation owner</span>
           </label>

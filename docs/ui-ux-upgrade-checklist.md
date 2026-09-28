@@ -95,10 +95,10 @@ Acceptance: users can create, find, open and work within the correct project wit
 ## 6. Automations screen and editor
 
 - [x] **AUTO-01 · P2 · Fix:** Replace color-only state dots with explicit Enabled/Paused labels.
-- [ ] **AUTO-02 · P2 · Improve:** Present trigger, input location, action and output in a concise readable summary.
+- [x] **AUTO-02 · P2 · Improve:** Present trigger, input location, action and output in a concise readable summary.
 - [x] **AUTO-03 · P2 · Improve:** Show last outcome and next scheduled run when the API supplies them; clearly distinguish no history, unavailable data and a failed run.
 - [x] **AUTO-04 · P2 · Fix:** Give the editor sufficient width so normal titles and configuration fields do not wrap unnecessarily.
-- [ ] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
+- [x] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
 - [x] **AUTO-06 · P2 · Improve:** Keep enabled state, ownership/sharing, Save and Run now easy to distinguish; communicate unsaved edits.
 - [x] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
 - [ ] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.

@@ -6,6 +6,7 @@ const mock = vi.hoisted(() => ({
   items: [] as Automation[], error: null as string | null, loading: false, refresh: vi.fn(), open: vi.fn(),
   project: null as string | null, pinned: new Set<string>(), pinsError: null as string | null, pinsLoading: false, refreshPins: vi.fn(),
 }))
+vi.mock('../../hooks/useAutomationFolderNames', () => ({ useAutomationFolderNames: () => ({ folders: [], loading: false, error: null, refresh: vi.fn() }) }))
 vi.mock('../../hooks/useAutomations', () => ({ useAutomations: () => ({ automations: mock.items, loading: mock.loading, error: mock.error, refresh: mock.refresh }) }))
 vi.mock('../../contexts/WorkspaceContext', () => ({ useWorkspace: () => ({ openAutomation: mock.open, activeProjectUuid: mock.project, activeProjectTitle: 'Project A', activeProjectRole: 'viewer' }) }))
 vi.mock('../../hooks/useWorkflows', () => ({ useWorkflows: () => ({ workflows: [] }) }))
@@ -44,7 +45,7 @@ describe('automation list filtering and recovery', () => {
   it('retries an unavailable list without claiming it is empty', () => {
     mock.items = []; mock.error = 'Service unavailable'; render(<AutomationsPanel />)
     expect(screen.getByRole('alert')).toHaveTextContent('Service unavailable')
-    expect(screen.queryByText('Create your first automation')).not.toBeInTheDocument()
+    expect(screen.queryByText('No automations yet')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry automations' })); expect(mock.refresh).toHaveBeenCalledOnce()
   })
   it('retains loaded rows and filters when refreshing fails', () => {

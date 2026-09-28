@@ -2,12 +2,21 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**129/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**131/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
+
+## Automation summaries and shared surfaces — September 28
+
+**131/169 checklist items implemented locally.** AUTO-02 and AUTO-05 are complete; changes are not deployed.
+
+- Cards and editors share a readable Trigger / Input / Action / Output summary. It resolves source/destination folder paths, distinguishes scheduled selections from API or Microsoft 365 intake, names the chosen action and reports configured storage, notifications, webhooks and follow-up delivery without exposing endpoint credentials. Missing names or configuration remain explicit; folder-name failures retry, and old team responses cannot replace current names.
+- Automation browsing and editing now use the same neutral surfaces, borders, readable metadata and brand selection treatment. Trigger labels are neutral; status keeps its own meaning. A concise empty state replaces the full promotional panel. Desktop file/section and Library/Assistant navigation is preserved.
+- Verification: 20 frontend tests across four files, TypeScript, production build and touched-file ESLint pass. The 21 summary/theme states plus 27 repeated filter/scope recovery states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched fixture requests. Long names, all trigger families, output destinations, folder-name failure/retry and empty content were inspected directly.
+- Evidence: `2026-09-28-automation-summary-review` and `2026-09-28-automation-filter-light`; recipe: `frontend/scripts/visual-review/automation-summaries.mjs`. APIs and execution are fixtures. This completes the automation surface items, not the wider VIS checklist or live delivery verification.
 
 ## Automation history — September 28
 
