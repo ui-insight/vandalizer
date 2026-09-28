@@ -89,6 +89,8 @@ export function useChat() {
   // badge until the backend consumes them (queue_consumed chunk), at which
   // point they become regular transcript messages.
   const [queuedMessages, setQueuedMessages] = useState<string[]>([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const historyLoadVersion = useRef(0)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -102,6 +104,11 @@ export function useChat() {
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
+      if (isLoadingHistory) return
+      if (conversationUuid && !activityId) {
+        setError('This conversation could not be resumed. Reopen it from Activity before sending.')
+        return
+      }
       lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
       setPlanTasks(null) // The previous turn's plan must not label this new action.
@@ -336,7 +343,7 @@ export function useChat() {
         setSegments([])
       }
     },
-    [activityId],
+    [activityId, conversationUuid, isLoadingHistory],
   )
 
   const stop = useCallback(() => {
@@ -344,19 +351,33 @@ export function useChat() {
   }, [])
 
   const loadHistory = useCallback(async (uuid: string) => {
+    const version = ++historyLoadVersion.current
+    setIsLoadingHistory(true)
+    setError(null)
+    setActivityId(null)
+    setConversationUuid(uuid)
+    setMessages([])
+    lastSendArgsRef.current = null
     try {
       const data = await getHistory(uuid)
+      if (version !== historyLoadVersion.current) return
       setMessages(data.messages)
-      setConversationUuid(uuid)
-      if (data.context_mode) setContextMode(data.context_mode)
-      if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      setActivityId(data.activity_id ?? null)
+      setContextMode(data.context_mode ?? 'full')
+      setContextCutoffIndex(data.context_cutoff_index ?? 0)
       setPlanTasks(data.active_plan ?? null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load history')
+      if (version === historyLoadVersion.current) {
+        setError(e instanceof Error ? e.message : 'Failed to load history')
+      }
+    } finally {
+      if (version === historyLoadVersion.current) setIsLoadingHistory(false)
     }
   }, [])
 
   const reset = useCallback(() => {
+    historyLoadVersion.current += 1
+    setIsLoadingHistory(false)
     setMessages([])
     setStreamingContent('')
     setThinkingContent('')
@@ -473,6 +494,7 @@ export function useChat() {
     send,
     stop,
     loadHistory,
+    isLoadingHistory,
     reset,
     setActivity,
   }

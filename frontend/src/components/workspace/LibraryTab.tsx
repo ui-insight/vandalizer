@@ -7,7 +7,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
-import { OptimizerInbox } from '../shared/OptimizerInbox'
+import { OrganizationHelp } from '../library/OrganizationHelp'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -43,7 +43,7 @@ import {
 import type { LibraryItem, VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
 
-type ScopeTab = 'mine' | 'team' | 'explore' | 'quality'
+type ScopeTab = 'mine' | 'team' | 'explore'
 type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
 // Tasks/Prompts/Formatters are all stored as `search_set` items, distinguished
 // by the underlying set_type. The filter chips split them out so each is
@@ -772,7 +772,6 @@ export function LibraryTab() {
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
             { key: 'explore' as const, label: 'Explore' },
-            { key: 'quality' as const, label: 'Quality Inbox' },
           ]).map(({ key, label }) => {
             const active = scope === key
             return (
@@ -808,8 +807,8 @@ export function LibraryTab() {
           })}
         </div>
 
-        {/* Row 3: Filter chips + sort (hidden for Explore — it has its own — and Quality Inbox) */}
-        <div className="library-filters" style={{ display: scope === 'explore' || scope === 'quality' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
+        {/* Row 3: Filter chips + sort (Explore has its own) */}
+        <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
             {KIND_FILTERS.map(({ value, label }) => <option key={value} value={value}>{label} ({kindCounts[value]})</option>)}
           </select>
@@ -877,21 +876,10 @@ export function LibraryTab() {
         </div>
       </div>
 
-      {/* ── Body: Explore + Quality Inbox get their own views; mine/team keep sidebar + results ── */}
+      {/* ── Body: Explore has its own view; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
           <ExploreTab />
-        </div>
-      ) : scope === 'quality' ? (
-        <div style={{ flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: 24 }}>
-          <div style={{ maxWidth: 768, margin: '0 auto' }}>
-            <p style={{ fontSize: 13, color: '#5f6368', marginBottom: 16 }}>
-              When quality monitoring detects a drop, the system auto-tunes the affected
-              knowledge base, extraction, or workflow in shadow mode. Candidates land here
-              for review. Nothing is applied without your say-so.
-            </p>
-            <OptimizerInbox />
-          </div>
         </div>
       ) : (
       <div className="library-body" style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -968,11 +956,7 @@ export function LibraryTab() {
             )
           })}
 
-          <details style={{ margin: '12px', fontSize: 12, color: '#555e68', lineHeight: 1.5 }}>
-            <summary style={{ cursor: 'pointer' }}>How organization works</summary>
-            <p>Favorites mark useful items. Pins appear first when sorting by recent use, followed by favorites. Folders group items in this library.</p>
-            <p>These choices do not add items to a project. Manage project pins from the project.</p>
-          </details>
+          <OrganizationHelp />
           {/* Folders section — personal and team scopes */}
           {(
             <div style={{ marginTop: 16 }}>

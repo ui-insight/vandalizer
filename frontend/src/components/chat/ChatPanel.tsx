@@ -20,6 +20,7 @@ import { AttachKBModal } from './AttachKBModal'
 import { useChat } from '../../hooks/useChat'
 import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
+import { useOpenActivity } from '../../hooks/useOpenActivity'
 import { useWorkspace, MAX_ATTACHED_KBS, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useBranding } from '../../contexts/BrandingContext'
@@ -94,6 +95,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     thinkingContent,
     thinkingDuration,
     isStreaming,
+    isLoadingHistory,
     activityId,
     conversationUuid,
     error,
@@ -143,6 +145,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }))
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
+  const { openActivityById } = useOpenActivity()
   const shareLink = useShareLink()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
@@ -508,6 +511,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [justDroppedUuids])
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+    if (isLoadingHistory) return
     if (chatUploads.uploading || linkLoading) {
       toast('Wait for the attachment transfer to finish before sending.', 'info')
       return
@@ -558,6 +562,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       handleSend('Show me what you can do with the content attached to this chat. Start with a brief summary, extract the most useful facts or action items, and cite the sources. Suggest a relevant next step based on what you find.')
       return
     }
+    if (isLoadingHistory) return
     if (chatUploads.uploading || linkLoading) {
       toast('Wait for the attachment transfer to finish before sending.', 'info')
       return
@@ -804,12 +809,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
-  const homeActionsDisabled = attachLoading || !!processingDoc
-  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !onboardingLoading
+  const homeActionsDisabled = isLoadingHistory || attachLoading || !!processingDoc
+  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
   const showReturningHome = !effectiveFirstSession
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
+    && !isLoadingHistory
     && !bannerProcessingDoc
     && !activeProjectUuid
     && !activeKBUuid
@@ -818,6 +824,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
+    && !isLoadingHistory
     && !showReturningHome
 
   return (
@@ -914,6 +921,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
         </div>
       )}
+      {isLoadingHistory && <div role="status" className="px-4 py-3 text-sm text-gray-600">Loading conversation…</div>}
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
@@ -951,6 +959,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               onFocusComposer={focusChat}
               onChooseKnowledgeBase={() => setShowAttachKB(true)}
               onSendMessage={(msg) => handleSend(msg)}
+              onOpenActivity={openActivityById}
               status={onboardingStatus}
               suggestionPills={onboardingPills}
             />
@@ -1046,6 +1055,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               || (!!onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer')) && (
               <div style={{ marginTop: 12 }}>
                 <WorkspaceBriefing
+                  onOpenActivity={openActivityById}
                   recentActivity={onboardingStatus!.recent_activity}
                   activeAlerts={onboardingStatus!.active_alerts ?? []}
                   maturityStage={onboardingStatus!.maturity_stage ?? 'newcomer'}
@@ -1579,7 +1589,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onAttachLink={handleAttachLink}
         onAddKnowledge={() => setShowAttachKB(true)}
         disabled={false}
-        sendDisabled={attachLoading}
+        sendDisabled={attachLoading || isLoadingHistory}
         isStreaming={isStreaming}
         onStop={stop}
         selectedModel={selectedModel}

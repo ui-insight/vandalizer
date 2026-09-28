@@ -21,12 +21,15 @@ import { useActivities } from '../../hooks/useActivities'
 import { useMyReviewCount } from '../../hooks/useMyReviewCount'
 import { deleteActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { pendingReviewUuid, useOpenActivity } from '../../hooks/useOpenActivity'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { LEVEL_CONFIG } from '../certification/constants'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
+
+export { pendingReviewUuid }
 
 function activityIcon(type: ActivityEvent['type']) {
   switch (type) {
@@ -69,16 +72,6 @@ function statusMetaClass(status: ActivityEvent['status']) {
   }
 }
 
-// A workflow run parked on an approval gate carries the pending review's uuid
-// in meta_summary. The status stays "running" (ActivityStatus has no paused
-// member), so this marker is what separates "waiting on a person" from
-// "waiting on a worker" everywhere in the rail.
-export function pendingReviewUuid(activity: ActivityEvent): string | null {
-  const uuid = (activity.meta_summary as { pending_review_uuid?: unknown } | undefined)
-    ?.pending_review_uuid
-  return typeof uuid === 'string' && uuid ? uuid : null
-}
-
 /** The review a row is *currently* waiting on, or null.
  *
  * The marker records that a run paused on a review; it does not record that it
@@ -108,7 +101,7 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
 }
 
 export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolean }) {
-  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
+  const { railDocked, toggleRailDocked, triggerNewChat, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
@@ -163,58 +156,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
     [refresh, toast, activities, confirm, currentConversationUuid, triggerNewChat],
   )
 
-  const handleClick = useCallback(
-    (activity: ActivityEvent) => {
-      if (activity.type === 'conversation' && activity.conversation_id) {
-        closeWorkflow()
-        closeExtraction()
-        closeAutomation()
-        setActiveRightTab('assistant')
-        setLoadConversationId(activity.conversation_id)
-      } else if (activity.type === 'workflow_run' && pendingReviewUuid(activity)) {
-        // The run is frozen at the gate — there is nothing to see in the editor
-        // that the review does not show, and the review is the only thing that
-        // moves it forward.
-        navigate({ to: '/reviews/$uuid', params: { uuid: pendingReviewUuid(activity)! } })
-      } else if (activity.type === 'workflow_run' && activity.workflow_id) {
-        openWorkflow(activity.workflow_id, activity.workflow_session_id ?? undefined)
-      } else if (activity.type === 'search_set_run' && activity.search_set_uuid) {
-        // Restore the extraction results from the activity snapshot so the
-        // editor re-opens with values rather than a blank slate.
-        const normalized = activity.result_snapshot?.normalized as Record<string, string> | undefined
-        const initialResults = normalized && typeof normalized === 'object' && Object.keys(normalized).length > 0
-          ? Object.fromEntries(Object.entries(normalized).map(([k, v]) => [k, v === null ? 'N/A' : String(v)]))
-          : undefined
-        const snapSources = activity.result_snapshot?.sources as import('../../api/extractions').ExtractionSourceMap | undefined
-        const initialSources = snapSources && typeof snapSources === 'object' && Object.keys(snapSources).length > 0
-          ? snapSources
-          : undefined
-        // The run's cross-field verdict is in the same snapshot. Restoring
-        // values without it re-opens a run that failed a budget rule looking
-        // exactly like one that passed.
-        type CFR = import('../../api/extractions').CrossFieldRunReport
-        type DW = import('../../api/extractions').DocumentWarning
-        const snap = activity.result_snapshot as {
-          cross_field?: CFR | null
-          cross_field_sets?: (CFR | null)[]
-          document_warnings?: DW[]
-        } | undefined
-        const snapCrossField = snap?.cross_field_sets
-          ?? (snap?.cross_field ? [snap.cross_field] : undefined)
-        const initialCrossField = snapCrossField?.length ? snapCrossField : undefined
-        // Same reasoning: values restored without the caveats attached to
-        // them re-open looking like values from documents read whole.
-        const initialWarnings = snap?.document_warnings?.length
-          ? snap.document_warnings
-          : undefined
-        openExtraction(
-          activity.search_set_uuid, initialResults, initialSources,
-          initialCrossField, initialWarnings,
-        )
-      }
-    },
-    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, navigate],
-  )
+  const { openActivity: handleClick } = useOpenActivity()
 
   const isRunning = (status: ActivityEvent['status']) =>
     status === 'running' || status === 'queued'

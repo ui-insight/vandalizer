@@ -448,21 +448,6 @@ function PromptButton({
   )
 }
 
-function activityResumeMessage(item: RecentActivityItem): string {
-  const title = item.title
-  if (item.type === 'search_set_run') {
-    if (item.status === 'failed') return `My "${title}" extraction failed. Help me understand what went wrong`
-    if (item.status === 'running') return `Check on my running "${title}" extraction`
-    return `Show me the results from my "${title}" extraction`
-  }
-  if (item.type === 'workflow_run') {
-    if (item.status === 'failed') return `My "${title}" workflow failed. Help me debug it`
-    if (item.status === 'running') return `Check on my running "${title}" workflow`
-    return `Show me the results from my "${title}" workflow run`
-  }
-  return `Continue our conversation about "${title}"`
-}
-
 function alertReviewMessage(itemName: string): string {
   return `Check quality of ${itemName}`
 }
@@ -504,6 +489,7 @@ interface ReturningPrimaryAction {
   cta: string
   icon: LucideIcon
   prompt?: string
+  activityId?: string
 }
 
 function processingPrompt(status: OnboardingStatus): string {
@@ -551,7 +537,7 @@ function deriveReturningPrimaryAction(
       description: recentActivityLabel(recent),
       cta: recent.type === 'conversation' ? 'Continue chat' : recent.status === 'failed' ? 'Debug run' : 'Open results',
       icon: ACTIVITY_ICONS[recent.type] ?? Clock3,
-      prompt: activityResumeMessage(recent),
+      activityId: recent.id,
     }
   }
 
@@ -625,6 +611,7 @@ function FocusNowCard({
   onFocusComposer,
   onChooseKnowledgeBase,
   onSendMessage,
+  onOpenActivity,
 }: {
   action: ReturningPrimaryAction
   disabled?: boolean
@@ -633,6 +620,7 @@ function FocusNowCard({
   onFocusComposer: () => void
   onChooseKnowledgeBase: () => void
   onSendMessage: (message: string) => void
+  onOpenActivity: (activityId: string) => void
 }) {
   const Icon = action.icon
 
@@ -647,6 +635,10 @@ function FocusNowCard({
     }
     if (action.kind === 'composer') {
       onFocusComposer()
+      return
+    }
+    if (action.activityId) {
+      onOpenActivity(action.activityId)
       return
     }
     if (action.prompt) {
@@ -828,9 +820,11 @@ function QueueItemButton({
 function ResumeQueue({
   status,
   onSendMessage,
+  onOpenActivity,
 }: {
   status: OnboardingStatus | null
   onSendMessage: (message: string) => void
+  onOpenActivity: (activityId: string) => void
 }) {
   if (!status) {
     return (
@@ -917,11 +911,11 @@ function ResumeQueue({
 
           {status.recent_activity.map((item) => (
             <QueueItemButton
-              key={`${item.type}-${item.title}-${item.relative_time}`}
+              key={item.id}
               icon={ACTIVITY_ICONS[item.type] ?? Clock3}
               title={item.title}
               subtitle={recentActivityLabel(item)}
-              onClick={() => onSendMessage(activityResumeMessage(item))}
+              onClick={() => onOpenActivity(item.id)}
             />
           ))}
 
@@ -1025,7 +1019,7 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
   )
 }
 
-export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, status, suggestionPills }: SharedHomeProps & { status: OnboardingStatus | null; suggestionPills: string[] }) {
+export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, status, suggestionPills }: SharedHomeProps & { onOpenActivity: (activityId: string) => void; status: OnboardingStatus | null; suggestionPills: string[] }) {
   const certCta = useCertificationCta()
   const primaryAction = deriveReturningPrimaryAction(status)
   const suggestions = starterSuggestions(status, suggestionPills).slice(0, 3)
@@ -1037,7 +1031,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
         {brandIcon && <img src={brandIcon} alt="" />}
         <div><span className="home-eyebrow">Your {orgName} workspace</span><h2>{returningHeroTitle(status)}</h2>{status?.daily_guidance && <p>{status.daily_guidance}</p>}</div>
       </div>
-      <FocusNowCard action={primaryAction} disabled={disabled} onRunDemo={onRunDemo} onAttachFiles={onAttachFiles} onFocusComposer={onFocusComposer} onChooseKnowledgeBase={onChooseKnowledgeBase} onSendMessage={onSendMessage} />
+      <FocusNowCard action={primaryAction} disabled={disabled} onRunDemo={onRunDemo} onAttachFiles={onAttachFiles} onFocusComposer={onFocusComposer} onChooseKnowledgeBase={onChooseKnowledgeBase} onSendMessage={onSendMessage} onOpenActivity={onOpenActivity} />
       <div className="home-primary-actions">
         {primaryAction.kind !== 'knowledge' && <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />}
         <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
@@ -1045,7 +1039,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
         {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}
       </div>
       <div className="home-two-columns">
-        {hasQueue && <ResumeQueue status={status} onSendMessage={onSendMessage} />}
+        {hasQueue && <ResumeQueue status={status} onSendMessage={onSendMessage} onOpenActivity={onOpenActivity} />}
         <SurfaceCard title="Suggested questions" subtitle="Start from your existing documents and tools.">
           {suggestions.map(suggestion => <PromptButton key={suggestion} label={suggestion} onClick={() => onSendMessage(suggestion)} />)}
         </SurfaceCard>

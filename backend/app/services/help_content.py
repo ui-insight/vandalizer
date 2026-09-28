@@ -487,7 +487,7 @@ HELP_TOPICS: list[dict] = [
             "applies can be reverted.\n\n"
             "**Where:** ask the chat to *\"optimize this\"*, use the "
             "Autovalidate panel in each editor, or review system-suggested "
-            "candidates in **Library → Quality Inbox** (quality monitoring "
+            "candidates on the **Tuning suggestions** page at **/tuning** (quality monitoring "
             "auto-tunes items in shadow mode when it detects drift)."
         ),
     },

@@ -59,6 +59,7 @@ class UpdateThemeConfigRequest(BaseModel):
 
 
 class RecentActivityItem(BaseModel):
+    id: str  # ActivityEvent id — the frontend opens the item by it
     type: str  # conversation | search_set_run | workflow_run
     title: str
     relative_time: str  # "2h ago", "yesterday"

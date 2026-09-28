@@ -17,30 +17,15 @@ const STATUS_STYLES: Record<string, { color: string; Icon: typeof CheckCircle2 }
   running: { color: 'var(--highlight-color, #eab308)', Icon: Loader2 },
 }
 
-function activityResumeMessage(item: RecentActivityItem): string {
-  const t = item.title
-  if (item.type === 'search_set_run') {
-    if (item.status === 'failed') return `My "${t}" extraction failed. Help me understand what went wrong`
-    if (item.status === 'running') return `Check on my running "${t}" extraction`
-    return `Show me the results from my "${t}" extraction`
-  }
-  if (item.type === 'workflow_run') {
-    if (item.status === 'failed') return `My "${t}" workflow failed. Help me debug it`
-    if (item.status === 'running') return `Check on my running "${t}" workflow`
-    return `Show me the results from my "${t}" workflow run`
-  }
-  // conversation
-  return `Continue our conversation about "${t}"`
-}
-
-function ActivityRow({ item, onSendMessage }: { item: RecentActivityItem; onSendMessage: (msg: string) => void }) {
+function ActivityRow({ item, onOpenActivity }: { item: RecentActivityItem; onOpenActivity: (id: string) => void }) {
   const Icon = TYPE_ICONS[item.type] ?? MessageSquare
   const status = STATUS_STYLES[item.status] ?? STATUS_STYLES.completed
   const StatusIcon = status.Icon
 
   return (
     <button
-      onClick={() => onSendMessage(activityResumeMessage(item))}
+      aria-label={`Open ${item.title}, ${item.relative_time}`}
+      onClick={() => onOpenActivity(item.id)}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -192,6 +177,7 @@ function NextStepNudge({ stage, unprocessedDocCount, onSendMessage }: { stage: M
 // ---------------------------------------------------------------------------
 
 interface WorkspaceBriefingProps {
+  onOpenActivity: (id: string) => void
   recentActivity: RecentActivityItem[]
   activeAlerts: ActiveAlertItem[]
   maturityStage: MaturityStage
@@ -203,6 +189,7 @@ interface WorkspaceBriefingProps {
 }
 
 export function WorkspaceBriefing({
+  onOpenActivity,
   recentActivity,
   activeAlerts,
   maturityStage,
@@ -327,8 +314,8 @@ export function WorkspaceBriefing({
           }}>
             Recent activity
           </div>
-          {recentActivity.map((item, i) => (
-            <ActivityRow key={i} item={item} onSendMessage={onSendMessage} />
+          {recentActivity.map((item) => (
+            <ActivityRow key={item.id} item={item} onOpenActivity={onOpenActivity} />
           ))}
         </div>
       )}

@@ -173,6 +173,7 @@ export function listConversations(limit: number = 50) {
 
 export function getHistory(conversationUuid: string) {
   return apiFetch<{
+    activity_id?: string | null
     messages: ChatMessage[]
     url_attachments: UrlAttachment[]
     file_attachments: FileAttachment[]
