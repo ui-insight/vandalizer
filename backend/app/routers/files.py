@@ -20,8 +20,15 @@ from app.schemas.documents import (
 from app.services import document_usage as document_usage_service
 from app.services import file_service
 from app.services import knowledge_service
+from app.utils.file_validation import ALLOWED_EXTS
 
 router = APIRouter()
+
+
+@router.get("/upload-policy")
+async def upload_policy(user: User = Depends(get_current_user), settings: Settings = Depends(get_settings)):
+    """The same deployment limits enforced by upload_document."""
+    return {"extensions": sorted(ALLOWED_EXTS), "max_size_bytes": settings.max_upload_size_mb * 1024 * 1024}
 
 
 _RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")

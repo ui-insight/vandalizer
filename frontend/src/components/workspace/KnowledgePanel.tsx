@@ -36,13 +36,13 @@ type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'mine', label: 'My KBs' },
   { key: 'team', label: 'Team' },
-  { key: 'explore', label: 'Everyone' },
+  { key: 'explore', label: 'Explore' },
 ]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
   empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
-  building: { label: 'Building', color: '#d97706', bg: '#fef3c7' },
-  ready: { label: 'Ready', color: '#15803d', bg: '#dcfce7' },
+  building: { label: 'Building', color: '#92400e', bg: '#fef3c7' },
+  ready: { label: 'Available', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
 }
 
@@ -57,7 +57,7 @@ export function KnowledgePanel() {
   const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
   const { teams, currentTeam } = useTeams()
-  const { toast } = useToast()
+  const { toast, toasts, dismiss } = useToast()
   const { knowledgeBases, create, remove, transferToTeam, refresh } = useKnowledgeBases()
   const projectPins = useProjectPins(activeProjectUuid)
   // Inside a project, default to showing only the KBs pinned to it; "Show all"
@@ -117,6 +117,17 @@ export function KnowledgePanel() {
   const [error, setError] = useState<string | null>(null)
   const [selectedKB, setSelectedKB] = useState<KnowledgeBaseDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const detailRequest = useRef(0)
+  const detailTarget = useRef<string | null>(null)
+  const sourceRequests = useRef(new Set<string>())
+  const [pendingSources, setPendingSources] = useState(new Set<string>())
+  const [sourceActionError, setSourceActionError] = useState<string | null>(null)
+  const closeDetail = () => {
+    detailTarget.current = null
+    detailRequest.current++
+    setSelectedKB(null)
+    setDetailLoading(false)
+  }
   const [showUrlModal, setShowUrlModal] = useState(false)
   const [showDocPicker, setShowDocPicker] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
@@ -131,8 +142,8 @@ export function KnowledgePanel() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   // Collapsible detail sections. Collapsing Validation also lifts the inner
   // scroll cap on the Sources list so long source lists become fully visible.
+  const [detailView, setDetailView] = useState<'sources' | 'validation'>('sources')
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
-  const [validationCollapsed, setValidationCollapsed] = useState(false)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const cancelTitleEdit = useRef(false)
   // Single commit path for the inline KB title editor: every exit from edit
@@ -149,7 +160,7 @@ export function KnowledgePanel() {
     if (selectedKB && t && t !== selectedKB.title) {
       try {
         await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
-        setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
+        setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? { ...prev, title: t } : prev)
         toast('Title updated', 'success')
         refresh()
       } catch (err) {
@@ -185,23 +196,54 @@ export function KnowledgePanel() {
   }
 
   const loadDetail = useCallback(async (uuid: string) => {
+    const request = ++detailRequest.current
+    detailTarget.current = uuid
     setDetailLoading(true)
     setVerificationSubmitted(false)
     try {
       const detail = await api.getKnowledgeBase(uuid)
-      setSelectedKB(detail)
+      if (request === detailRequest.current) setSelectedKB(detail)
     } catch (err) {
       console.error('Failed to load KB:', err)
-      toast(err instanceof Error ? err.message : 'Failed to open knowledge base', 'error')
+      if (request === detailRequest.current) toast(err instanceof Error ? err.message : 'Failed to open knowledge base', 'error')
     } finally {
-      setDetailLoading(false)
+      if (request === detailRequest.current) setDetailLoading(false)
     }
   }, [toast])
 
+  useEffect(() => () => { detailTarget.current = null; detailRequest.current++ }, [])
+
+  // Mutation completion refreshes only the KB still being viewed. It must
+  // not behave like navigation when a user has opened a different KB.
+  const refreshSelectedDetail = useCallback(async (uuid: string) => {
+    if (detailTarget.current !== uuid) return
+    try {
+      const detail = await api.getKnowledgeBase(uuid)
+      if (detailTarget.current === uuid) setSelectedKB(current => current?.uuid === uuid ? detail : current)
+    } catch {
+      if (detailTarget.current === uuid) setSourceActionError('The change was accepted, but source details could not refresh. Reopen this KB to refresh its status.')
+    }
+  }, [])
+
+  // Refresh server-derived quality without closing the active validation view.
+  const refreshValidationSummary = useCallback(async (uuid: string) => {
+    try {
+      const detail = await api.getKnowledgeBase(uuid)
+      setSelectedKB(current => current?.uuid === uuid ? detail : current)
+      refresh()
+    } catch {
+      toast('Results are ready, but the summary could not refresh. Reopen this knowledge base to retry.', 'error')
+    }
+  }, [refresh, toast])
+
   // A different KB starts with both detail sections expanded
   useEffect(() => {
+    setDetailView('sources')
     setSourcesCollapsed(false)
-    setValidationCollapsed(false)
+    setSourceActionError(null)
+    setRenamingSourceUuid(null)
+    setRenameDraft('')
+    setInspectingSource(null)
   }, [selectedKB?.uuid])
 
   // Sources still being chunked and embedded by a worker. Tracked separately
@@ -228,28 +270,32 @@ export function KnowledgePanel() {
       } else if (r.ok) {
         toast(`“${r.name}” reprocessed — ${chunks}, indexed just now.`, 'success')
       } else if (r.keptPrevious) {
-        toast(`Re-fetching “${r.name}” failed: ${r.error}. It still answers from its previous text; use Refresh to try again.`, 'error')
+        setSourceActionError(`Re-fetching “${r.name}” failed: ${r.error}. It still answers from its previous text; use Refresh to try again.`)
       } else {
-        toast(`Reprocessing “${r.name}” failed: ${r.error}. Use Try again on the source to retry.`, 'error')
+        setSourceActionError(`Reprocessing “${r.name}” failed: ${r.error}. Use Try again on the source to retry.`)
       }
     }
   }, [selectedKB, reprocessing, toast])
 
   // Poll while the KB is building or any source is still indexing
+  const pollingKbUuid = selectedKB?.uuid
+  const pollingKbStatus = selectedKB?.status
   useEffect(() => {
-    if (!selectedKB) return
-    if (selectedKB.status !== 'building' && inFlightCount === 0) return
+    if (!pollingKbUuid) return
+    if (pollingKbStatus !== 'building' && inFlightCount === 0) return
+    let cancelled = false
     const interval = setInterval(async () => {
       try {
-        const detail = await api.getKnowledgeBase(selectedKB.uuid)
-        setSelectedKB(detail)
+        const detail = await api.getKnowledgeBase(pollingKbUuid)
+        if (cancelled || detailTarget.current !== pollingKbUuid) return
+        setSelectedKB(current => current?.uuid === pollingKbUuid ? detail : current)
         if (detail.status !== 'building') {
           refresh()
         }
       } catch { /* ignore */ }
     }, 3000)
-    return () => clearInterval(interval)
-  }, [selectedKB?.uuid, selectedKB?.status, inFlightCount, refresh])
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [pollingKbUuid, pollingKbStatus, inFlightCount, refresh])
 
   const handleDelete = async (uuid: string) => {
     const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.uuid === uuid)
@@ -270,7 +316,7 @@ export function KnowledgePanel() {
     if (!ok) return
     try {
       await remove(uuid)
-      if (selectedKB?.uuid === uuid) setSelectedKB(null)
+      if (detailTarget.current === uuid) closeDetail()
       toast('Knowledge base deleted', 'success')
     } catch (err) {
       console.error('Failed to delete KB:', err)
@@ -306,11 +352,11 @@ export function KnowledgePanel() {
     try {
       if (choice === 'transfer') {
         await transferToTeam(kb.uuid)
-        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        if (detailTarget.current === kb.uuid) closeDetail()
         toast('Moved to Team Library', 'success')
       } else {
         await remove(kb.uuid, 'unshare_and_delete')
-        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        if (detailTarget.current === kb.uuid) closeDetail()
         toast('Knowledge base deleted', 'success')
       }
       setSharedDeleteTarget(null)
@@ -323,10 +369,6 @@ export function KnowledgePanel() {
   const handleAddDocuments = async (docUuids: string[]) => {
     if (!selectedKB || docUuids.length === 0) return
     setAddingDocs(true)
-    setShowDocPicker(false)
-    // Optimistically set status to building so the poller starts — indexing runs
-    // on a worker, so this call returns before any source is ready.
-    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     try {
       const result = await api.addDocumentsToKB(selectedKB.uuid, docUuids)
       const n = result?.added ?? docUuids.length
@@ -335,11 +377,11 @@ export function KnowledgePanel() {
       } else {
         toast(`Added ${n} document${n === 1 ? '' : 's'} — indexing in background`, 'success')
       }
-      loadDetail(selectedKB.uuid)
+      await refreshSelectedDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to add documents:', err)
-      toast(err instanceof Error ? err.message : 'Failed to add documents', 'error')
+      throw err
     } finally {
       setAddingDocs(false)
     }
@@ -348,8 +390,6 @@ export function KnowledgePanel() {
   const handleAddFolder = async (folderUuid: string, includeSubfolders: boolean) => {
     if (!selectedKB) return
     setAddingDocs(true)
-    setShowDocPicker(false)
-    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     try {
       const result = await api.addFolderToKB(selectedKB.uuid, folderUuid, includeSubfolders)
       const n = result?.added ?? 0
@@ -358,22 +398,20 @@ export function KnowledgePanel() {
       } else {
         toast(`Added ${n} document${n === 1 ? '' : 's'} from folder — indexing in background`, 'success')
       }
-      loadDetail(selectedKB.uuid)
+      await refreshSelectedDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to add folder:', err)
-      toast(err instanceof Error ? err.message : 'Failed to add folder', 'error')
+      throw err
     } finally {
       setAddingDocs(false)
     }
   }
 
-  const handleAddUrls = (urls: string[], crawlEnabled = false, maxCrawlPages = 5, allowedDomains = '') => {
+  const handleAddUrls = async (urls: string[], crawlEnabled = false, maxCrawlPages = 5, allowedDomains = '') => {
     if (!selectedKB) return
     setAddingUrls(true)
-    // Optimistically set status to building so the poller starts
-    setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
-    api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
+    return api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
       .then((result) => {
         const n = result?.added ?? urls.length
         const skipped = result?.skipped ?? 0
@@ -387,18 +425,18 @@ export function KnowledgePanel() {
           )
         } else if (skipped > 0) {
           toast(
-            `Added ${n} URL${plural(n)} — crawling in background. ${skipped} already in this KB and not re-fetched.`,
+            `Queued ${n} URL${plural(n)} for retrieval${crawlEnabled ? " and crawling" : ""}. ${skipped} already in this KB and not re-fetched.`,
             'success',
           )
         } else {
-          toast(`Added ${n} URL${plural(n)} — crawling in background`, 'success')
+          toast(`Queued ${n} URL${plural(n)} for retrieval${crawlEnabled ? " and crawling" : ""}.`, 'success')
         }
-        loadDetail(selectedKB.uuid)
+        refreshSelectedDetail(selectedKB.uuid)
         refresh()
       })
       .catch(err => {
         console.error('Failed to add URLs:', err)
-        toast(err instanceof Error ? err.message : 'Failed to add URLs', 'error')
+        throw err
       })
       .finally(() => setAddingUrls(false))
   }
@@ -406,61 +444,48 @@ export function KnowledgePanel() {
   const sourceName = (source: KnowledgeBaseSource) =>
     source.custom_name || source.document_title || source.url_title || source.url || 'Source'
 
-  /** Run one source through the pipeline again — re-fetch a page, re-index a
-   * document's text, or re-read a document that has none. Also the row's
-   * "Try again" after a failure. */
-  const handleReprocessSource = async (source: KnowledgeBaseSource) => {
+  const runSourceAction = async (source: KnowledgeBaseSource, action: 'refresh' | 'reprocess' | 'remove') => {
     if (!selectedKB) return
+    const kbUuid = selectedKB.uuid
+    const key = `${kbUuid}:${source.uuid}`
+    if (sourceRequests.current.has(key)) return
+    sourceRequests.current.add(key)
+    setPendingSources(new Set(sourceRequests.current))
+    setSourceActionError(null)
     try {
-      const { mode } = await api.reprocessKBSource(selectedKB.uuid, source.uuid)
-      setSelectedKB(prev => prev ? {
-        ...prev,
-        status: 'building',
-        sources: prev.sources.map(s => s.uuid === source.uuid
-          ? { ...s, status: 'pending' as const, error_message: undefined } : s),
-      } : prev)
-      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode, name: sourceName(source) } }))
-      toast(startMessage(mode, sourceName(source)), 'info')
-      loadDetail(selectedKB.uuid)
+      if (action === 'remove') {
+        await api.removeKBSource(kbUuid, source.uuid)
+        toast(`Removed “${sourceName(source)}” from this KB.`, 'success')
+      } else {
+        let mode: api.KBSourceReprocessMode
+        if (action === 'refresh') {
+          await api.refreshKBSource(kbUuid, source.uuid)
+          mode = 'refetch'
+        } else mode = (await api.reprocessKBSource(kbUuid, source.uuid)).mode
+        if (detailTarget.current === kbUuid) {
+          setSelectedKB(prev => prev?.uuid === kbUuid ? {
+            ...prev, status: 'building',
+            sources: prev.sources.map(s => s.uuid === source.uuid ? { ...s, status: 'pending' as const, error_message: undefined } : s),
+          } : prev)
+          setReprocessing(prev => ({ ...prev, [source.uuid]: { mode, name: sourceName(source) } }))
+        }
+        toast(startMessage(mode, sourceName(source)), 'info')
+      }
+      await refreshSelectedDetail(kbUuid)
       refresh()
     } catch (err) {
-      console.error('Failed to reprocess source:', err)
-      toast(err instanceof Error ? err.message : 'Failed to reprocess source', 'error')
+      const message = `Could not ${action} “${sourceName(source)}”: ${err instanceof Error ? err.message : 'Source service unavailable'}`
+      if (detailTarget.current === kbUuid) setSourceActionError(message)
+      else toast(message, 'error')
+    } finally {
+      sourceRequests.current.delete(key)
+      setPendingSources(new Set(sourceRequests.current))
     }
   }
 
-  const handleRefreshSource = async (source: KnowledgeBaseSource) => {
-    if (!selectedKB) return
-    try {
-      await api.refreshKBSource(selectedKB.uuid, source.uuid)
-      // Optimistically flip to building so the status poller starts.
-      setSelectedKB(prev => prev ? {
-        ...prev,
-        status: 'building',
-        sources: prev.sources.map(s => s.uuid === source.uuid ? { ...s, status: 'pending' as const } : s),
-      } : prev)
-      setReprocessing(prev => ({ ...prev, [source.uuid]: { mode: 'refetch', name: sourceName(source) } }))
-      toast('Re-fetching page in background — previous text is kept if the fetch fails', 'success')
-      loadDetail(selectedKB.uuid)
-      refresh()
-    } catch (err) {
-      console.error('Failed to refresh source:', err)
-      toast(err instanceof Error ? err.message : 'Failed to refresh source', 'error')
-    }
-  }
-
-  const handleRemoveSource = async (sourceUuid: string) => {
-    if (!selectedKB) return
-    try {
-      await api.removeKBSource(selectedKB.uuid, sourceUuid)
-      toast('Source removed', 'success')
-      loadDetail(selectedKB.uuid)
-      refresh()
-    } catch (err) {
-      console.error('Failed to remove source:', err)
-      toast(err instanceof Error ? err.message : 'Failed to remove source', 'error')
-    }
-  }
+  const handleReprocessSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'reprocess')
+  const handleRefreshSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'refresh')
+  const handleRemoveSource = (source: KnowledgeBaseSource) => runSourceAction(source, 'remove')
 
   const [renamingSourceUuid, setRenamingSourceUuid] = useState<string | null>(null)
   const [renameDraft, setRenameDraft] = useState('')
@@ -470,6 +495,7 @@ export function KnowledgePanel() {
     const current =
       source.custom_name
       || (source.source_type === 'url' ? (source.url_title || source.url || '') : (source.document_title || ''))
+    setSourceActionError(null)
     setRenamingSourceUuid(source.uuid)
     setRenameDraft(current || '')
   }
@@ -481,7 +507,7 @@ export function KnowledgePanel() {
   }
 
   const handleRenameSource = async () => {
-    if (!selectedKB || !renamingSourceUuid) return
+    if (!selectedKB || !renamingSourceUuid || savingRename) return
     const sourceUuid = renamingSourceUuid
     const current = selectedKB.sources.find(s => s.uuid === sourceUuid)
     const previous = current?.custom_name || ''
@@ -491,14 +517,15 @@ export function KnowledgePanel() {
       return
     }
     setSavingRename(true)
+    setSourceActionError(null)
     // Optimistic update so the row reflects the new name immediately
-    setSelectedKB(prev => prev ? {
+    setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? {
       ...prev,
       sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: next || null } : s),
     } : prev)
     try {
       const updated = await api.renameKBSource(selectedKB.uuid, sourceUuid, next)
-      setSelectedKB(prev => prev ? {
+      setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? {
         ...prev,
         sources: prev.sources.map(s => s.uuid === sourceUuid ? {
           ...s,
@@ -506,16 +533,17 @@ export function KnowledgePanel() {
         } : s),
       } : prev)
       toast(next ? 'Source renamed' : 'Custom name cleared', 'success')
+      if (detailTarget.current === selectedKB.uuid) cancelRenameSource()
     } catch (err) {
       console.error('Failed to rename source:', err)
-      toast(err instanceof Error ? err.message : 'Failed to rename source', 'error')
+      if (detailTarget.current === selectedKB.uuid) setSourceActionError(`Could not rename this source: ${err instanceof Error ? err.message : 'Service unavailable'}. Your draft is preserved; retry Save name.`)
       // Revert on failure
-      setSelectedKB(prev => prev ? {
+      setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? {
         ...prev,
         sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: previous || null } : s),
       } : prev)
     } finally {
-      cancelRenameSource()
+      setSavingRename(false)
     }
   }
 
@@ -542,7 +570,7 @@ export function KnowledgePanel() {
     try {
       const result = await api.shareKnowledgeBase(kb.uuid)
       toast(result.shared_with_team ? 'Shared with team' : 'Unshared from team', 'success')
-      if (selectedKB?.uuid === kb.uuid) loadDetail(kb.uuid)
+      if (detailTarget.current === kb.uuid) refreshSelectedDetail(kb.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to toggle sharing:', err)
@@ -557,7 +585,7 @@ export function KnowledgePanel() {
       await api.shareKnowledgeBase(kbUuid, comment || undefined)
       const teamName = shareTeamName(shareDialogKB)
       toast(teamName ? `Shared with ${teamName}` : 'Shared with team', 'success')
-      if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
+      if (detailTarget.current === kbUuid) refreshSelectedDetail(kbUuid)
       refresh()
     } catch (err) {
       console.error('Failed to share KB:', err)
@@ -579,7 +607,7 @@ export function KnowledgePanel() {
     try {
       await api.setKBOrganizations(selectedKB.uuid, selectedOrgIds)
       toast('Org visibility updated', 'success')
-      loadDetail(selectedKB.uuid)
+      refreshSelectedDetail(selectedKB.uuid)
       refresh()
       setShowOrgsModal(false)
     } catch (err) {
@@ -666,7 +694,7 @@ export function KnowledgePanel() {
       setVerifyCategory('')
       setVerificationSubmitted(true)
       toast('Sent — an examiner will look it over', 'success')
-      if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
+      if (detailTarget.current === kbUuid) refreshSelectedDetail(kbUuid)
       refresh()
     } catch (err) {
       console.error('Failed to share with everyone:', err)
@@ -697,7 +725,7 @@ export function KnowledgePanel() {
         <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
           <ShareLabel />
         </div>
-        <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 16 }}>
           {verifyKB.title}
         </div>
         <label htmlFor="verify-summary" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
@@ -789,10 +817,10 @@ export function KnowledgePanel() {
         {/* Header */}
         <div
           style={{
-            height: 50,
+            minHeight: 54,
             backgroundColor: 'var(--color-panel-dark)',
             boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-            padding: '0 12px',
+            padding: '10px 12px',
             display: 'flex',
             alignItems: 'center',
             gap: 8,
@@ -804,10 +832,10 @@ export function KnowledgePanel() {
           <button
             type="button"
             aria-label="Back to knowledge bases"
-            onClick={() => { setSelectedKB(null); setEditingTitle(false); refresh() }}
+            onClick={() => { closeDetail(); setEditingTitle(false); refresh() }}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
-            <ArrowLeft size={18} style={{ color: '#888' }} />
+            <ArrowLeft size={18} style={{ color: '#b8bec7' }} />
           </button>
           {editingTitle ? (
             <div
@@ -851,7 +879,7 @@ export function KnowledgePanel() {
                 title={canManageKB ? 'Click to rename' : noManageReason}
                 style={{
                   fontSize: 16, fontWeight: 600, color: '#fff',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  overflowWrap: 'anywhere', whiteSpace: 'normal',
                   cursor: canManageKB ? 'text' : 'default', borderRadius: 4, padding: '2px 0',
                   minWidth: 0,
                 }}
@@ -866,7 +894,7 @@ export function KnowledgePanel() {
                   title="Edit title"
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
-                    padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                    padding: 2, display: 'flex', color: '#b8bec7', flexShrink: 0,
                   }}
                 >
                   <Pencil size={13} />
@@ -886,7 +914,7 @@ export function KnowledgePanel() {
           <OptimizedBadge kb={selectedKB} withTime />
           <span
             style={{
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+              fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
               color: badge.color, backgroundColor: badge.bg,
             }}
           >
@@ -895,12 +923,12 @@ export function KnowledgePanel() {
         </div>
 
         {detailLoading ? (
-          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: '#b8bec7' }}>
             <Loader2 aria-hidden="true" style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
             <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', border: 0 }}>Loading knowledge base…</span>
           </div>
         ) : (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 84px' }}>
             {/* Description */}
             <div style={{ marginBottom: 12 }}>
               {editingDescription ? (
@@ -951,7 +979,7 @@ export function KnowledgePanel() {
                         setSavingDescription(true)
                         try {
                           await api.updateKnowledgeBase(selectedKB.uuid, { description: next })
-                          setSelectedKB(prev => prev ? { ...prev, description: next } : prev)
+                          setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? { ...prev, description: next } : prev)
                           refresh()
                           setEditingDescription(false)
                         } catch (err) {
@@ -981,7 +1009,7 @@ export function KnowledgePanel() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <div style={{
                     flex: 1, fontSize: 13, lineHeight: 1.5,
-                    color: selectedKB.description ? '#aaa' : '#666',
+                    color: selectedKB.description ? '#aaa' : '#aeb5bf',
                     fontStyle: selectedKB.description ? 'normal' : 'italic',
                     whiteSpace: 'pre-wrap',
                   }}>
@@ -1000,7 +1028,7 @@ export function KnowledgePanel() {
                       title="Edit description"
                       style={{
                         background: 'transparent', border: 'none', cursor: 'pointer',
-                        padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                        padding: 2, display: 'flex', color: '#b8bec7', flexShrink: 0,
                         marginTop: 2,
                       }}
                     >
@@ -1011,20 +1039,7 @@ export function KnowledgePanel() {
               )}
             </div>
 
-            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
-            <KBTrustBanner
-              score={selectedKB.last_validation_score}
-              baseline={selectedKB.last_validation_baseline_score}
-              lift={selectedKB.last_validation_lift}
-              validatedAt={selectedKB.last_validated_at}
-            />
-
-            {/* Stats */}
-            <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 12, color: '#999' }}>
-              <span>{selectedKB.total_sources} sources</span>
-              <span>{selectedKB.total_chunks} chunks</span>
-            </div>
-
+            <div className="kb-health-summary" data-attention={selectedKB.sources_failed > 0} role="status"><strong>{selectedKB.sources_ready} of {selectedKB.total_sources} sources ready</strong>{selectedKB.sources_failed > 0 && <span> · {selectedKB.sources_failed} need attention</span>}<span className="kb-health-caption">Answer quality is measured in Validation.</span></div>
             {/* Crawling / adding URLs progress banner */}
             {addingUrls && (
               <div role="status" aria-live="polite" style={{
@@ -1038,7 +1053,7 @@ export function KnowledgePanel() {
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
                     Adding URLs & crawling pages...
                   </div>
-                  <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }}>
                     Sources will appear below as they are processed.
                   </div>
                 </div>
@@ -1061,7 +1076,7 @@ export function KnowledgePanel() {
                       ? `Indexing ${inFlightCount} source${inFlightCount === 1 ? '' : 's'}...`
                       : 'Adding documents...'}
                   </div>
-                  <div style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }}>
                     Large documents can take a few minutes. Sources turn green below as they
                     finish — you can leave this page and come back.
                   </div>
@@ -1069,6 +1084,10 @@ export function KnowledgePanel() {
               </div>
             )}
 
+            <div role="tablist" aria-label="Knowledge base views" className="kb-detail-tabs">
+              {(['sources', 'validation'] as const).map(view => <button type="button" key={view} role="tab" id={`kb-view-${view}`} aria-selected={detailView === view} aria-controls={`kb-content-${view}`} tabIndex={detailView === view ? 0 : -1} onKeyDown={event => { if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); const next = event.key === 'Home' ? 'sources' : event.key === 'End' ? 'validation' : view === 'sources' ? 'validation' : 'sources'; setDetailView(next); document.getElementById(`kb-view-${next}`)?.focus() } }} onClick={() => setDetailView(view)}>{view === 'sources' ? `Sources (${selectedKB.total_sources})` : 'Validation'}</button>)}
+            </div>
+            <div role="tabpanel" id="kb-content-sources" aria-labelledby="kb-view-sources" hidden={detailView !== 'sources'}>
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
               <button
@@ -1112,7 +1131,7 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: canChatKB ? 'var(--highlight-text-color, #000)' : '#666',
+                  color: canChatKB ? 'var(--highlight-text-color, #000)' : '#aeb5bf',
                   backgroundColor: canChatKB ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
                   border: canChatKB ? 'none' : '1px solid #3a3a3a',
                   borderRadius: 6,
@@ -1123,6 +1142,7 @@ export function KnowledgePanel() {
                 <MessageSquare size={13} />
                 Chat with this KB
               </button>
+              <details className="kb-management"><summary>Manage knowledge base</summary><div className="kb-management-actions">
               {canPin && (() => {
                 const pinned = projectPins.isPinned('knowledge_base', selectedKB.uuid)
                 return (
@@ -1247,6 +1267,20 @@ export function KnowledgePanel() {
                   Org Visibility
                 </button>
               )}
+              </div>
+              <p style={{ color: '#bec4cc', fontSize: 12 }}>{selectedKB.total_chunks} indexed chunks across {selectedKB.total_sources} sources. Chunks are searchable passages split from your sources.</p>
+            {/* Tags editor */}
+            <KBTagsEditor
+              tags={selectedKB.tags || []}
+              canManage={canManageKB}
+              onSave={async (next) => {
+                await api.updateKnowledgeBase(selectedKB.uuid, { tags: next })
+                setSelectedKB(prev => prev && prev.uuid === selectedKB?.uuid ? { ...prev, tags: next } : prev)
+                refresh()
+              }}
+            />
+
+              </details>
             </div>
 
             {/* A disabled button's tooltip is unreachable by keyboard and touch,
@@ -1254,7 +1288,7 @@ export function KnowledgePanel() {
             {!canManageKB && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                marginTop: -8, marginBottom: 16, fontSize: 11, color: '#999',
+                marginTop: -8, marginBottom: 16, fontSize: 12, color: '#b8bec7',
               }}>
                 <ShieldCheck size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span>View only — {noManageReason}</span>
@@ -1271,7 +1305,7 @@ export function KnowledgePanel() {
                       key={gid}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
-                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+                        fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
                         color: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
                         border: '1px solid rgba(37, 99, 235, 0.2)',
                       }}
@@ -1283,17 +1317,6 @@ export function KnowledgePanel() {
                 })}
               </div>
             )}
-
-            {/* Tags editor */}
-            <KBTagsEditor
-              tags={selectedKB.tags || []}
-              canManage={canManageKB}
-              onSave={async (next) => {
-                await api.updateKnowledgeBase(selectedKB.uuid, { tags: next })
-                setSelectedKB(prev => prev ? { ...prev, tags: next } : prev)
-                refresh()
-              }}
-            />
 
             {/* Sources list */}
             <button
@@ -1308,13 +1331,14 @@ export function KnowledgePanel() {
                 textAlign: 'left',
               }}
             >
-              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: '#888' }} /> : <ChevronDown size={14} style={{ color: '#888' }} />}
+              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: '#b8bec7' }} /> : <ChevronDown size={14} style={{ color: '#b8bec7' }} />}
               <span style={{ fontSize: 13, fontWeight: 600 }}>Sources</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aeb5bf' }}>
                 {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
               </span>
             </button>
             {!sourcesCollapsed && (
+              <details className="kb-refresh-settings"><summary>Web source refresh settings</summary>
               <WebSourceRefreshBar
                 kbUuid={selectedKB.uuid}
                 sources={selectedKB.sources}
@@ -1322,14 +1346,16 @@ export function KnowledgePanel() {
                 canManage={canManageKB}
                 onChanged={message => {
                   if (message) toast(message, 'success')
-                  loadDetail(selectedKB.uuid)
+                  refreshSelectedDetail(selectedKB.uuid)
                   refresh()
                 }}
                 onError={message => toast(message, 'error')}
               />
+              </details>
             )}
+            {sourceActionError && <div role="alert" style={{ color: '#fca5a5', fontSize: 13, lineHeight: 1.6, margin: '10px 0', overflowWrap: 'anywhere' }}>{sourceActionError}</div>}
             {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#888', padding: '20px 0' }}>
+              <div style={{ fontSize: 12, color: '#b8bec7', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
@@ -1337,7 +1363,7 @@ export function KnowledgePanel() {
                 display: 'flex', flexDirection: 'column', gap: 6,
                 // With Validation collapsed the sources list gets the freed
                 // space: no inner scroll cap, the full list is visible.
-                maxHeight: validationCollapsed ? undefined : 320, overflowY: 'auto',
+                maxHeight: undefined, overflowY: 'auto',
                 paddingRight: 4,
               }}>
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
@@ -1377,23 +1403,13 @@ export function KnowledgePanel() {
                         : (/^www\./i.test(effectiveSource) ? `https://${effectiveSource}` : null))
                     : null
                   const isRenaming = renamingSourceUuid === source.uuid
+                  const requestPending = pendingSources.has(`${selectedKB.uuid}:${source.uuid}`)
                   const canInspect = source.status !== 'pending' && !isRenaming
                   return (
                     <div
                       key={source.uuid}
-                      onClick={() => { if (canInspect) setInspectingSource(source) }}
-                      role={canInspect ? 'button' : undefined}
-                      tabIndex={canInspect ? 0 : undefined}
-                      aria-label={canInspect ? `Inspect source: ${displayLabel}` : undefined}
-                      onKeyDown={canInspect ? (e) => {
-                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                          e.preventDefault()
-                          setInspectingSource(source)
-                        }
-                      } : undefined}
-                      title={canInspect ? 'Click to inspect this source' : undefined}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
+                        display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8,
                         padding: '8px 10px', backgroundColor: '#2a2a2a',
                         border: '1px solid #3a3a3a', borderRadius: 6,
                         cursor: canInspect ? 'pointer' : 'default',
@@ -1410,11 +1426,11 @@ export function KnowledgePanel() {
                       }}
                     >
                       {source.source_type === 'document' ? (
-                        <FileText size={14} style={{ color: '#888', flexShrink: 0 }} />
+                        <FileText size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
                       ) : (
-                        <Globe size={14} style={{ color: '#888', flexShrink: 0 }} />
+                        <Globe size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
                       )}
-                      <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                         {isRenaming ? (
                           <input
                             autoFocus
@@ -1436,15 +1452,15 @@ export function KnowledgePanel() {
                             }}
                           />
                         ) : (
-                          <div
-                            style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          <button type="button" disabled={!canInspect} onClick={() => { (toasts ?? []).filter(t => t.type !== 'error').forEach(t => dismiss(t.id)); setInspectingSource(source) }} aria-label={`Inspect source: ${displayLabel}`}
+                            style={{ background: 'transparent', padding: 0, border: 0, fontFamily: 'inherit', textAlign: 'left', cursor: canInspect ? 'pointer' : 'default', fontSize: 14, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
                             title={source.custom_name
                               ? `${displayLabel} (original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''})`
                               : (source.source_type === 'url' ? (source.url || '') : (source.document_uuid || ''))}
                           >
                             {displayLabel}
                             {source.custom_name && autoLabel && autoLabel !== source.custom_name && (
-                              <span style={{ color: '#888', marginLeft: 6, fontStyle: 'italic' }}>
+                              <span style={{ color: '#b8bec7', marginLeft: 6, fontStyle: 'italic' }}>
                                 · {autoLabel}
                               </span>
                             )}
@@ -1456,11 +1472,11 @@ export function KnowledgePanel() {
                                 · source deleted
                               </span>
                             )}
-                          </div>
+                          </button>
                         )}
                         {!isRenaming && effectiveSource && (
                           <div
-                            style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            style={{ fontSize: 12, color: '#b8bec7', marginTop: 2, overflowWrap: 'anywhere' }}
                             title={`Source: ${effectiveSource}`}
                           >
                             Source:{' '}
@@ -1486,24 +1502,26 @@ export function KnowledgePanel() {
                             .map(sourceDisplayName)
                           return names.length > 0 ? (
                             <div
-                              style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              style={{ fontSize: 12, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                               title={`Amends: ${names.join('; ')}`}
                             >
                               Amends: <span style={{ color: '#bcbcbc' }}>{names.join('; ')}</span>
                             </div>
                           ) : null
                         })()}
+                        {!isRenaming && <div style={{ fontSize: 12, color: '#c5c9d0', marginTop: 4 }}>{source.source_type === 'url' ? 'Web page' : 'Document'} · {requestPending ? 'Submitting change…' : source.status === 'ready' ? incompleteReason ? 'Partially indexed' : 'Ready' : source.status === 'error' ? 'Failed' : source.status === 'processing' ? 'Processing' : 'Queued'}</div>}
                         {!isRenaming && source.error_message && (
-                          <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 2 }}>
                             {source.error_message}
                             {canManageKB && source.status === 'error' && (
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
+                                disabled={requestPending}
                                 title="Run this source through extraction, chunking and embedding again"
                                 style={{
                                   marginLeft: 8, padding: 0, background: 'transparent', border: 'none',
-                                  fontSize: 11, fontFamily: 'inherit', fontWeight: 600,
+                                  fontSize: 12, fontFamily: 'inherit', fontWeight: 600,
                                   color: '#7aa2f7', textDecoration: 'underline', cursor: 'pointer',
                                 }}
                               >
@@ -1513,7 +1531,7 @@ export function KnowledgePanel() {
                           </div>
                         )}
                         {!isRenaming && isPartial && (
-                          <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
                             Only part of this document is indexed — {source.ingestion_warning_text}. Answers from it cover a fraction of the file.
                           </div>
                         )}
@@ -1526,10 +1544,11 @@ export function KnowledgePanel() {
                           // opening the original.
                           const cur = describeSourceCurrency(source.currency)
                           const hash = source.currency?.content_hash
-                          const toneColor = cur?.tone === 'warn' ? '#b45309' : cur?.tone === 'error' ? '#ef4444' : '#888'
+                          const toneColor = cur?.tone === 'warn' ? '#fbbf24' : cur?.tone === 'error' ? '#ef4444' : '#b8bec7'
                           return (
-                            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }} data-testid="source-currency">
+                            <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }} data-testid="source-currency">
                               {source.chunk_count} chunks
+                              {!cur && ' · Freshness not recorded'}
                               {cur && (
                                 <>
                                   {' · '}
@@ -1559,16 +1578,17 @@ export function KnowledgePanel() {
                           )
                         })()}
                         {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
-                          <div style={{ fontSize: 11, color: '#d97706', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
                             {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
-                          <div style={{ fontSize: 11, color: '#b45309', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
                             Page too long — text was cut off; later sections aren’t in this source.
                           </div>
                         )}
                       </div>
+                      <div className="kb-source-actions">
                       {isRenaming ? (
                         <>
                           <button
@@ -1589,7 +1609,7 @@ export function KnowledgePanel() {
                             title="Cancel"
                             style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
                           >
-                            <X size={14} style={{ color: '#888' }} />
+                            <X size={14} style={{ color: '#b8bec7' }} />
                           </button>
                         </>
                       ) : (
@@ -1609,18 +1629,19 @@ export function KnowledgePanel() {
                               <button
                                 type="button"
                                 aria-label="Rename source"
+                                disabled={requestPending}
                                 onClick={(e) => { e.stopPropagation(); beginRenameSource(source) }}
                                 title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                               >
-                                <Pencil size={12} style={{ color: '#888' }} />
+                                <Pencil size={12} style={{ color: '#b8bec7' }} />
                               </button>
                               {source.source_type === 'url' && (
                                 <button
                                   type="button"
                                   aria-label="Refresh source"
                                   onClick={(e) => { e.stopPropagation(); handleRefreshSource(source) }}
-                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  disabled={requestPending || source.status === 'processing' || source.status === 'pending'}
                                   title={
                                     source.processed_at
                                       ? `Re-fetch this page (last fetched ${new Date(source.processed_at).toLocaleDateString()})`
@@ -1628,7 +1649,7 @@ export function KnowledgePanel() {
                                   }
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                                 >
-                                  <RefreshCw size={12} style={{ color: '#888' }} />
+                                  <RefreshCw size={12} style={{ color: '#b8bec7' }} />
                                 </button>
                               )}
                               {source.source_type === 'document' && (
@@ -1636,46 +1657,61 @@ export function KnowledgePanel() {
                                   type="button"
                                   aria-label="Reprocess source"
                                   onClick={(e) => { e.stopPropagation(); handleReprocessSource(source) }}
-                                  disabled={source.status === 'processing' || source.status === 'pending'}
+                                  disabled={requestPending || source.status === 'processing' || source.status === 'pending'}
                                   title={
                                     'Reprocess: re-chunk and re-embed this document (it is read again first if it has no readable text)'
                                     + (source.processed_at ? `. Last indexed ${new Date(source.processed_at).toLocaleString()}` : '')
                                   }
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                                 >
-                                  <RotateCcw size={12} style={{ color: '#888' }} />
+                                  <RotateCcw size={12} style={{ color: '#b8bec7' }} />
                                 </button>
                               )}
                               <button
                                 type="button"
                                 aria-label="Remove source"
-                                onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
+                                disabled={requestPending}
+                                onClick={(e) => { e.stopPropagation(); handleRemoveSource(source) }}
                                 title="Remove source"
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                               >
-                                <X size={12} style={{ color: '#666' }} />
+                                <X size={12} style={{ color: '#aeb5bf' }} />
                               </button>
                             </>
                           )}
                         </>
                       )}
+                      </div>
                     </div>
                   )
                 })}
               </div>
             )}
 
+            </div>
+            <div role="tabpanel" id="kb-content-validation" aria-labelledby="kb-view-validation" hidden={detailView !== 'validation'}>
+            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
+            <KBTrustBanner
+              score={selectedKB.last_validation_score}
+              baseline={selectedKB.last_validation_baseline_score}
+              lift={selectedKB.last_validation_lift}
+              validatedAt={selectedKB.last_validated_at}
+              metric={selectedKB.last_validation_metric}
+              configState={selectedKB.last_validation_config_state}
+            />
+
             {/* Validation panel — gates on ready KB and management permission */}
             <KBValidationPanel
+              key={selectedKB.uuid}
               kbUuid={selectedKB.uuid}
+              onRunCompleted={refreshValidationSummary}
               kbReady={selectedKB.status === 'ready'}
               canManage={canManageKB}
               kbHasSources={hasSources}
               onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
-              collapsed={validationCollapsed}
-              onToggleCollapsed={() => setValidationCollapsed(c => !c)}
             />
 
+            </div>
             {/* "What are knowledge bases?" pill */}
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
               <button
@@ -1714,14 +1750,15 @@ export function KnowledgePanel() {
             kbUuid={selectedKB.uuid}
             source={inspectingSource}
             otherSources={selectedKB.sources}
+            canManage={canManageKB}
             onClose={() => setInspectingSource(null)}
-            onUpdated={() => { if (selectedKB) loadDetail(selectedKB.uuid) }}
+            onUpdated={() => { if (selectedKB) refreshSelectedDetail(selectedKB.uuid) }}
           />
         )}
 
         {showUrlModal && (
           <AddUrlsModal
-            onSubmit={(urls, crawlEnabled, maxCrawlPages, allowedDomains) => { handleAddUrls(urls, crawlEnabled, maxCrawlPages, allowedDomains); setShowUrlModal(false) }}
+            onSubmit={handleAddUrls}
             onClose={() => setShowUrlModal(false)}
           />
         )}
@@ -1747,11 +1784,11 @@ export function KnowledgePanel() {
               <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
                 Organization Visibility
               </div>
-              <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 16 }}>
                 No orgs selected = visible to everyone. Selected orgs restrict visibility to users in those orgs and below.
               </div>
               {allOrgs.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: '#b8bec7', padding: '20px 0', textAlign: 'center' }}>
                   No organizations available. Set up the org hierarchy in the admin page.
                 </div>
               ) : (
@@ -1783,7 +1820,7 @@ export function KnowledgePanel() {
                       />
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>{org.name}</div>
-                        <div style={{ fontSize: 11, color: '#888' }}>{org.org_type}</div>
+                        <div style={{ fontSize: 12, color: '#b8bec7' }}>{org.org_type}</div>
                       </div>
                     </label>
                   ))}
@@ -1952,7 +1989,7 @@ export function KnowledgePanel() {
               fontSize: 12,
               fontWeight: 600,
               fontFamily: 'inherit',
-              color: activeTab === tab.key ? '#fff' : '#888',
+              color: activeTab === tab.key ? '#fff' : '#b8bec7',
               backgroundColor: 'transparent',
               border: 'none',
               borderBottom: activeTab === tab.key ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
@@ -1985,7 +2022,7 @@ export function KnowledgePanel() {
             onClick={() => setProjectScoped(s => !s)}
             style={{
               marginLeft: 'auto', flexShrink: 0,
-              padding: '3px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: '#ccc', backgroundColor: 'transparent',
               border: '1px solid #3a3a3a', borderRadius: 12, cursor: 'pointer',
             }}
@@ -2020,7 +2057,7 @@ export function KnowledgePanel() {
       {activeTab === 'explore' ? (
         <KBExploreTab onAdopted={refresh} />
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 84px', position: 'relative' }}>
           <KBGridView
             scope={listScope}
             search={search}
@@ -2049,7 +2086,7 @@ export function KnowledgePanel() {
                     title: 'Remove from My KBs?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from the Everyone tab.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from Explore.
                       </>
                     ),
                     confirmLabel: 'Remove',
@@ -2071,7 +2108,7 @@ export function KnowledgePanel() {
             emptyComponent={!isProjectScoped && activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
             emptyMessage={
               isProjectScoped
-                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or from the Everyone tab, or switch to "Show all".`
+                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or from Explore, or switch to "Show all".`
                 : activeTab === 'team'
                   ? 'No knowledge bases shared with your team yet.'
                   : 'No knowledge bases found.'
@@ -2153,7 +2190,7 @@ function KBTagsEditor({
             key={t}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, fontWeight: 600, padding: '2px 4px 2px 8px', borderRadius: 8,
+              fontSize: 12, fontWeight: 600, padding: '2px 4px 2px 8px', borderRadius: 8,
               color: '#cbd5e1', backgroundColor: '#2f2f2f',
               border: '1px solid #3a3a3a',
             }}
@@ -2169,7 +2206,7 @@ function KBTagsEditor({
                 style={{
                   background: 'transparent', border: 'none',
                   cursor: saving ? 'default' : 'pointer',
-                  padding: 0, display: 'flex', color: '#888',
+                  padding: 0, display: 'flex', color: '#b8bec7',
                 }}
               >
                 <X size={11} />

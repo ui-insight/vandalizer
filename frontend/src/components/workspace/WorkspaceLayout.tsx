@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, X } from 'lucide-react'
+import { MessageSquare, X } from 'lucide-react'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
@@ -18,13 +18,20 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
+  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, setActiveRightTab } = useWorkspace()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
+  const [assistantMode, setAssistantMode] = useState<string | null>(null)
+  const previousFocus = useRef(focusChatSignal)
+  useEffect(() => {
+    if (previousFocus.current === focusChatSignal) return
+    previousFocus.current = focusChatSignal
+    setAssistantMode(workspaceMode)
+  }, [focusChatSignal, workspaceMode])
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 767px)')
@@ -73,8 +80,10 @@ export function WorkspaceLayout() {
   // On narrow screens, a desktop split makes both sides unusably thin. Chat
   // remains the full-width right panel; every other workspace mode uses its
   // purpose-built left panel as the full mobile view.
-  const showLeftOnly = isCompact && !isChat
-  const collapseLeft = !showLeftOnly && isChat && !chatSplitOpen
+  const hasEditor = !!(openAutomationId || openWorkflowId || openExtractionId)
+  const assistantOpen = assistantMode === workspaceMode
+  const showLeftOnly = !isChat && !hasEditor && !assistantOpen
+  const collapseLeft = !!openAutomationId || (isChat && (!chatSplitOpen || isCompact)) || (isCompact && (hasEditor || assistantOpen))
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
   const railWidth = isCompact ? 0 : railDocked ? 64 : 220
@@ -90,22 +99,22 @@ export function WorkspaceLayout() {
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
-    <div className="flex h-screen flex-col">
+    <div className="workspace-shell flex h-screen min-w-0 flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-highlight"
       >
         Skip to main content
       </a>
-      <Header />
+      <Header onOpenActivity={isCompact ? () => setActivityOpen(true) : undefined} />
       <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
       <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
       <h1 className="sr-only">{workspaceHeading}</h1>
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
-        <div
+        <main id="main-content"
           ref={containerRef}
-          className="flex flex-1 overflow-hidden"
+          className="flex min-w-0 flex-1 overflow-hidden relative"
           style={{
             marginRight: `${railWidth}px`,
             transition: 'margin-right 0.3s ease',
@@ -117,7 +126,8 @@ export function WorkspaceLayout() {
             className="overflow-hidden"
             style={{
               width: collapseLeft ? '0%' : showLeftOnly ? '100%' : `${panelSplit}%`,
-              minWidth: collapseLeft ? 0 : undefined,
+              minWidth: 0,
+              display: collapseLeft ? 'none' : undefined,
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
@@ -133,10 +143,12 @@ export function WorkspaceLayout() {
             />
           )}
 
-          <main id="main-content" className={showLeftOnly ? 'hidden' : 'overflow-hidden flex-1 relative'} style={{ zIndex: 11 }}>
-            <RightPanel />
-          </main>
-        </div>
+          <div className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
+            {!isChat && !hasEditor && <button type="button" className="context-assistant-close" onClick={() => setAssistantMode(null)}>Close assistant</button>}
+            <div style={{ flex: 1, minHeight: 0 }}><RightPanel /></div>
+          </div>
+          {!isChat && !hasEditor && !assistantOpen && <button type="button" className="context-assistant-launcher" onClick={() => { setAssistantMode(workspaceMode); setActiveRightTab('assistant') }}><MessageSquare size={17} /> Ask assistant</button>}
+        </main>
         {isCompact && activityOpen && (
           <button
             type="button"
@@ -144,16 +156,6 @@ export function WorkspaceLayout() {
             className="fixed inset-0 top-[69px] z-[640] cursor-default bg-black/30"
             onClick={() => setActivityOpen(false)}
           />
-        )}
-        {isCompact && !activityOpen && (
-          <button
-            type="button"
-            aria-label="Open activity"
-            className="fixed right-3 top-[81px] z-[630] flex h-10 w-10 items-center justify-center rounded-full border border-[#d2d2d2] bg-white text-[#303030] shadow-md transition-colors hover:bg-[#f0f2f5] focus:outline-none focus:ring-2 focus:ring-highlight"
-            onClick={() => setActivityOpen(true)}
-          >
-            <Activity className="h-4 w-4" />
-          </button>
         )}
         <div
           aria-label={isCompact ? 'Activity' : undefined}

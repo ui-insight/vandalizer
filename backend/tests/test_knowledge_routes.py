@@ -2980,13 +2980,17 @@ class TestValidateSelectedQueries:
         find = MagicMock()
         find.count = AsyncMock(return_value=owned)
         task = MagicMock()
-        task.delay = MagicMock(return_value=MagicMock(id="task-1"))
+        task.apply_async = MagicMock()
         return kb, find, task
 
     async def _post(self, client, body, owned=2):
         user = _make_user("mgr")
         cookies, headers = _auth("mgr")
         kb, find, task = self._ctx(owned)
+        receipt = MagicMock()
+        receipt.insert = AsyncMock()
+        receipt.uuid = "task-1"
+        receipt.options = {"mode": body.get("mode", "judge"), "skip_judge": False, "query_uuids": list(dict.fromkeys(body["query_uuids"])) if isinstance(body.get("query_uuids"), list) else None}
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "mgr", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
@@ -2997,6 +3001,8 @@ class TestValidateSelectedQueries:
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
             patch("app.models.kb_test_query.KBTestQuery.find", return_value=find) as find_mock,
             patch("app.tasks.kb_validation_tasks.validate_kb_task", task),
+            patch("app.services.kb_validation_lifecycle.KBValidationTask", return_value=receipt),
+            patch("app.services.kb_validation_lifecycle.uuid4", return_value="task-1"),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.post(
@@ -3010,8 +3016,9 @@ class TestValidateSelectedQueries:
             client, {"async": True, "mode": "judge", "query_uuids": ["q-1", "q-2", "q-1"]},
         )
         assert resp.status_code == 200
-        assert resp.json() == {"task_id": "task-1", "status": "queued"}
-        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, ["q-1", "q-2"])
+        assert resp.json()["task_id"] == "task-1"
+        assert resp.json()["status"] == "queued"
+        task.apply_async.assert_called_once_with(args=["kb-1", "mgr", "judge", False, ["q-1", "q-2"]], task_id="task-1", retry=False)
         # Ownership is checked against this KB's queries before enqueueing.
         find.assert_called_once_with({"knowledge_base_uuid": "kb-1", "uuid": {"$in": ["q-1", "q-2"]}})
 
@@ -3019,7 +3026,7 @@ class TestValidateSelectedQueries:
     async def test_a_full_run_passes_no_selection(self, client):
         resp, find, task = await self._post(client, {"async": True})
         assert resp.status_code == 200
-        task.delay.assert_called_once_with("kb-1", "mgr", "judge", False, None)
+        task.apply_async.assert_called_once_with(args=["kb-1", "mgr", "judge", False, None], task_id="task-1", retry=False)
         find.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3027,7 +3034,7 @@ class TestValidateSelectedQueries:
         for bad in ([], "q-1", [1], [""]):
             resp, _find, task = await self._post(client, {"async": True, "query_uuids": bad})
             assert resp.status_code == 400, bad
-            task.delay.assert_not_called()
+            task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_owned_by_no_query_of_this_kb_is_a_400(self, client):
@@ -3036,7 +3043,7 @@ class TestValidateSelectedQueries:
         )
         assert resp.status_code == 400
         assert "belong" in resp.json()["detail"]
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_over_the_cap_is_a_400_before_any_lookup(self, client):
@@ -3050,7 +3057,7 @@ class TestValidateSelectedQueries:
         assert str(_VALIDATE_SELECTED_MAX + 1) in detail
         # Rejected on size alone — no ``$in`` query of that length hits Mongo.
         find.assert_not_called()
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_selection_exactly_at_the_cap_is_accepted(self, client):
@@ -3061,7 +3068,7 @@ class TestValidateSelectedQueries:
             client, {"async": True, "query_uuids": at_cap}, owned=_VALIDATE_SELECTED_MAX,
         )
         assert resp.status_code == 200
-        task.delay.assert_called_once()
+        task.apply_async.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_partially_stale_selection_is_a_400_naming_the_missing_count(self, client):
@@ -3074,7 +3081,7 @@ class TestValidateSelectedQueries:
         detail = resp.json()["detail"]
         assert "3 of the 5 selected test queries no longer exist" in detail
         assert "refresh" in detail
-        task.delay.assert_not_called()
+        task.apply_async.assert_not_called()
 
 
 class TestValidationRunExport:

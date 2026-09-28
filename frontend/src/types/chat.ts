@@ -1,4 +1,6 @@
 export interface ChatMessage {
+  /** Local stream interruption; does not claim cancellation of server work. */
+  interruption?: 'stopped' | 'connection'
   role: 'system' | 'user' | 'assistant'
   content: string
   thinking?: string

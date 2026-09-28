@@ -218,6 +218,8 @@ class KBResponse(BaseModel):
     last_validation_score: Optional[float] = None
     last_validation_baseline_score: Optional[float] = None
     last_validation_lift: Optional[float] = None
+    last_validation_metric: Optional[Literal["answer_accuracy", "composite_quality"]] = None
+    last_validation_config_state: Optional[Literal["proposed", "applied", "reverted", "default"]] = None
     last_validated_at: Optional[str] = None
     # Per-requesting-user: when this user last chatted with the KB. Powers the
     # "Recently Used" sort. None = never used (or legacy pre-tracking usage).

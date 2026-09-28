@@ -22,7 +22,7 @@ vi.mock('../files/DocumentViewer', () => ({
   DocumentViewer: () => <div data-testid="doc-viewer" />,
 }))
 
-import { getKBSource, setKBSourceAmends } from '../../api/knowledge'
+import { getKBSource, setKBSourceAmends, setKBSourceReference } from '../../api/knowledge'
 
 const source = {
   uuid: 'src-1',
@@ -34,7 +34,7 @@ const source = {
 
 function renderModal() {
   return render(
-    <KBSourceInspectorModal kbUuid="kb-1" source={source} onClose={() => {}} />,
+    <KBSourceInspectorModal canManage kbUuid="kb-1" source={source} onClose={() => {}} />,
   )
 }
 
@@ -99,7 +99,7 @@ describe('KBSourceInspectorModal — Amends', () => {
     vi.mocked(setKBSourceAmends).mockResolvedValue({ amends_source_uuids: ['src-ch4'] } as never)
     const onUpdated = vi.fn()
     render(
-      <KBSourceInspectorModal
+      <KBSourceInspectorModal canManage
         kbUuid="kb-1" source={supplement} otherSources={[supplement, chapterIV, faq]}
         onClose={() => {}} onUpdated={onUpdated}
       />,
@@ -119,7 +119,7 @@ describe('KBSourceInspectorModal — Amends', () => {
     vi.mocked(setKBSourceAmends).mockResolvedValue({ amends_source_uuids: [] } as never)
     const linked = { ...supplement, amends_source_uuids: ['src-ch4'] } as KnowledgeBaseSource
     render(
-      <KBSourceInspectorModal kbUuid="kb-1" source={linked} otherSources={[linked, chapterIV]} onClose={() => {}} />,
+      <KBSourceInspectorModal canManage kbUuid="kb-1" source={linked} otherSources={[linked, chapterIV]} onClose={() => {}} />,
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Stop amending NSF_PAPPG_24-1_Chapter_IV.pdf' }))
@@ -130,7 +130,7 @@ describe('KBSourceInspectorModal — Amends', () => {
   it('puts the chip back when the save fails', async () => {
     vi.mocked(setKBSourceAmends).mockRejectedValue(new Error('Not a source of this knowledge base: src-ch4'))
     render(
-      <KBSourceInspectorModal kbUuid="kb-1" source={supplement} otherSources={[supplement, chapterIV]} onClose={() => {}} />,
+      <KBSourceInspectorModal canManage kbUuid="kb-1" source={supplement} otherSources={[supplement, chapterIV]} onClose={() => {}} />,
     )
 
     fireEvent.change(screen.getByLabelText('Amends'), { target: { value: 'src-ch4' } })
@@ -141,7 +141,41 @@ describe('KBSourceInspectorModal — Amends', () => {
   })
 
   it('is not shown when the KB has no other source to amend', () => {
-    render(<KBSourceInspectorModal kbUuid="kb-1" source={supplement} otherSources={[supplement]} onClose={() => {}} />)
+    render(<KBSourceInspectorModal canManage kbUuid="kb-1" source={supplement} otherSources={[supplement]} onClose={() => {}} />)
     expect(screen.queryByLabelText('Amends')).toBeNull()
+  })
+})
+
+
+describe('source inspector recovery and permissions', () => {
+  it('keeps indexed text and the edited draft visible after a provenance save fails', async () => {
+    vi.mocked(getKBSource).mockResolvedValue(detail({ document_file: 'available' }) as never)
+    vi.mocked(setKBSourceReference).mockRejectedValueOnce(new Error('Save unavailable'))
+    renderModal()
+    await screen.findByText('indexed text')
+    fireEvent.change(screen.getByLabelText('Source', { exact: true }), { target: { value: 'Reviewed source reference' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save source' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your source text is preserved')
+    expect(screen.getByText('indexed text')).toBeInTheDocument()
+    expect(screen.getByLabelText('Source', { exact: true })).toHaveValue('Reviewed source reference')
+  })
+
+  it('offers retry when the indexed source cannot load', async () => {
+    vi.mocked(getKBSource).mockRejectedValueOnce(new Error('Read unavailable')).mockResolvedValueOnce(detail({ document_file: 'available' }) as never)
+    renderModal()
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry source' }))
+    expect(await screen.findByText('indexed text')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows provenance without edit actions to a viewer', async () => {
+    vi.mocked(getKBSource).mockResolvedValue(detail({ source_reference: 'Saved reference', amends_source_uuids: ['other'] }) as never)
+    render(<KBSourceInspectorModal canManage={false} kbUuid="kb-1" source={{ ...source, amends_source_uuids: ['other'] }} otherSources={[{ ...source, uuid: 'other', document_title: 'Original policy' }]} onClose={() => {}} />)
+    const input = await screen.findByDisplayValue('Saved reference')
+    expect(input).toHaveAttribute('readonly')
+    expect(screen.queryByRole('button', { name: 'Save source' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Stop amending/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Amends' })).not.toBeInTheDocument()
+    expect(screen.getByText('Original policy')).toBeInTheDocument()
   })
 })

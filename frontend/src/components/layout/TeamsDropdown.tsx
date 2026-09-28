@@ -101,7 +101,7 @@ export function TeamsDropdown() {
         className="flex items-center gap-1.5 rounded-[30px] border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#555] hover:bg-gray-100 transition-all"
       >
         <User className="h-3.5 w-3.5" />
-        {currentTeam?.name || 'Account'}
+        <span className="header-action-label account-name">{currentTeam?.name || 'Account'}</span>
         <ChevronDown className="h-3 w-3" />
       </button>
 

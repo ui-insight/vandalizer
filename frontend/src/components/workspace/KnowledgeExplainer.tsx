@@ -39,6 +39,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
 
       <div
         className="kb-explainer-root"
+        tabIndex={0}
         style={{
           // As a modal (onClose set) it must sit above the panel header/search
           // chrome (zIndex 300), or that header bleeds through over the top.
@@ -202,7 +203,7 @@ function Section({
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 13, color: '#7a8499', margin: '0 0 14px' }}>{subtitle}</p>
+        <p style={{ fontSize: 13, color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: subtitle ? 0 : 14 }}>
         {children}

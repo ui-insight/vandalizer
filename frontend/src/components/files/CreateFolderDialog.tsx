@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 
 interface CreateFolderDialogProps {
-  onSubmit: (name: string) => void
+  onSubmit: (name: string) => void | Promise<void>
   onClose: () => void
   title?: string
 }
@@ -12,15 +12,23 @@ interface CreateFolderDialogProps {
 export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDialogProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  const submitting = useRef(false)
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    if (submitting.current) return
     const err = getNameError(name, 'Folder name')
     if (err) {
       setError(err)
       return
     }
-    onSubmit(normalizeName(name))
+    submitting.current = true
+    setPending(true)
+    setError(null)
+    try { await onSubmit(normalizeName(name)) }
+    catch (error) { setError(`${error instanceof Error ? error.message : 'Could not save the name'}. Your entry is preserved; try again.`) }
+    finally { submitting.current = false; setPending(false) }
   }
 
   return (
@@ -28,19 +36,20 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
       className="fixed inset-0 flex items-center justify-center bg-black/50"
       style={{ zIndex: 700 }}
       onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose()
+        if (e.key === 'Escape' && !submitting.current) onClose()
       }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+        style={{ maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflowY: 'auto' }}
         role="dialog"
         aria-modal="true"
         aria-labelledby="create-folder-dialog-title"
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 id="create-folder-dialog-title" className="text-lg font-medium text-gray-900">{title || 'New Folder'}</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
+          <button disabled={pending} onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -51,15 +60,17 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
             autoFocus
             type="text"
             placeholder="Folder name"
+            disabled={pending}
             value={name}
             maxLength={MAX_NAME_LENGTH}
             onChange={(e) => { setName(e.target.value); if (error) setError(null) }}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
           />
-          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
+              disabled={pending}
               onClick={onClose}
               className="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
@@ -67,9 +78,10 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
             </button>
             <button
               type="submit"
+              disabled={pending}
               className="rounded-md bg-highlight px-3 py-2 text-sm font-bold text-highlight-text hover:brightness-90"
             >
-              Create
+              {pending ? 'Creating…' : 'Create'}
             </button>
           </div>
         </form>

@@ -1,4 +1,5 @@
 import { TrendingUp, ShieldQuestion, Minus } from 'lucide-react'
+import type { KnowledgeBase } from '../../types/knowledge'
 
 interface Props {
   /** With-KB accuracy from the latest validation run (0–1). */
@@ -9,6 +10,8 @@ interface Props {
   lift?: number | null
   /** ISO timestamp of the latest validation run. */
   validatedAt?: string | null
+  metric?: KnowledgeBase['last_validation_metric']
+  configState?: KnowledgeBase['last_validation_config_state']
 }
 
 function formatRelativeTime(iso: string | null | undefined): string | null {
@@ -31,9 +34,11 @@ function formatRelativeTime(iso: string | null | undefined): string | null {
  * the banner prompts the owner to run validation so they (and their team)
  * can see whether the KB is pulling its weight.
  */
-export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
-  const hasRun = lift != null || (score != null && baseline != null)
-  const liftPts = lift != null ? Math.round(lift * 100) : null
+export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, configState }: Props) {
+  const hasRun = score != null || lift != null
+  const composite = metric === 'composite_quality'
+  const measuredLift = composite ? null : lift ?? (score != null && baseline != null ? score - baseline : null)
+  const liftPts = measuredLift != null ? Math.round(measuredLift * 100) : null
   const scorePct = score != null ? Math.round(score * 100) : null
   const baselinePct = baseline != null ? Math.round(baseline * 100) : null
   const relTime = formatRelativeTime(validatedAt)
@@ -76,21 +81,31 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 10, fontWeight: 700, color: '#9ca3af',
+          fontSize: 12, fontWeight: 700, color: '#9ca3af',
           textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2,
         }}>
-          AI Trust
+          {composite ? 'Retrieval quality' : 'Answer quality'}
         </div>
 
         {!hasRun ? (
           <>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', marginBottom: 4 }}>
-              AI accuracy not yet measured
+              Answer quality not yet measured
             </div>
             <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
-              Run validation below to see how much more accurate the AI is at answering
-              questions about this material when it can read the KB, compared to answering
-              from training data alone.
+              Test representative questions with and without this knowledge base. Scores describe this test set; they do not guarantee future answers.
+            </div>
+          </>
+        ) : composite ? (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', marginBottom: 4 }}>
+              Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : 'Proposed settings'}
+            </div>
+            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+              This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
+              {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
+              {configState === 'reverted' && ' This score describes the tested settings, not the restored settings.'}
+              {relTime && <span> · Last tested {relTime}</span>}
             </div>
           </>
         ) : (
@@ -102,7 +117,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
                 </span>
               )}
               <span style={{ fontSize: 13, color: '#cbd5e1' }}>
-                {positive
+                {liftPts == null ? 'Answer accuracy measured; no AI-only comparison yet' : positive
                   ? 'more accurate than asking the AI alone'
                   : 'no measured improvement over the AI alone'}
               </span>
@@ -110,14 +125,15 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt }: Props) {
             <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
               {scorePct != null && baselinePct != null ? (
                 <>
-                  The AI answered {scorePct}% of the test questions correctly with this KB,
+                  Average answer accuracy: {scorePct}% with this KB,
                   versus {baselinePct}% without it.
                 </>
               ) : scorePct != null ? (
-                <>The AI answered {scorePct}% of the test questions correctly with this KB.</>
+                <>Average answer accuracy: {scorePct}% with this KB.</>
               ) : null}
+              <span> These results describe the tested questions, not a guarantee of future answers.</span>
               {relTime && (
-                <span style={{ color: '#666' }}> · Last validated {relTime}</span>
+                <span style={{ color: '#aeb5bf' }}> · Last validated {relTime}</span>
               )}
             </div>
           </>

@@ -98,27 +98,28 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   }, [menuOpen])
 
   return (
-    <div
+    <div className="library-item-row" data-menu-open={menuOpen}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onOpen?.(item)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr 100px',
+        gridTemplateColumns: 'minmax(0, 1fr) 100px',
         padding: '12px 24px',
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
         cursor: 'pointer',
         transition: 'background-color 0.1s',
-        height: 72,
+        minHeight: 88,
         position: 'relative',
         backgroundColor: hovered ? '#f8f9fa' : 'transparent',
       }}
     >
       {/* Name column */}
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 16 }}>
-        <div
+        <button type="button" aria-label={`Open ${item.name}`}
           style={{
+            padding: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
             fontWeight: 500,
             fontSize: 14,
             color: '#202124',
@@ -145,7 +146,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           {item.pinned && !hovered && (
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
-        </div>
+        </button>
         {item.kind === 'workflow' && item.description && (
           <div
             title={item.description}
@@ -183,7 +184,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               <span
                 key={tag}
                 style={{
-                  fontSize: 11,
+                  fontSize: 12,
                   color: 'var(--library-highlight-ink, #78640c)',
                   background: 'color-mix(in srgb, var(--library-highlight, #eab308) 12%, #ffffff)',
                   padding: '2px 6px',
@@ -194,7 +195,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               </span>
             ))}
             {item.tags.length > 3 && (
-              <span style={{ fontSize: 10, color: '#888', alignSelf: 'center' }}>
+              <span style={{ fontSize: 12, color: '#5f6368', alignSelf: 'center' }}>
                 +{item.tags.length - 3}
               </span>
             )}
@@ -203,13 +204,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       </div>
 
       {/* Last used column — right-aligned */}
-      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap', textAlign: 'right' }}>
+      <div style={{ fontSize: 12, color: '#5f6368', whiteSpace: 'nowrap', textAlign: 'right' }}>
         {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
-      {/* Hover actions overlay — floats over last-used date */}
-      {(hovered || menuOpen) && (
-        <div
+      {/* Actions remain reachable by keyboard and touch. */}
+      <div className="library-item-actions"
           onClick={(e) => e.stopPropagation()}
           style={{
             position: 'absolute',
@@ -564,7 +564,6 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               )}
             </div>
         </div>
-      )}
       {showVerifyModal && (
         <VerificationSubmitModal
           itemKind={item.kind}

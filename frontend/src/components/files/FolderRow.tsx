@@ -26,7 +26,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       role="row"
       aria-label={`Folder: ${folder.title}`}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           onClick()
         }
@@ -91,13 +91,13 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
 
       {/* Name + icon */}
       <td style={{ padding: '12px 15px' }}>
-        <div className="flex items-center min-w-0">
+        <div className="folder-name-layout flex items-center min-w-0">
           {isTeam ? (
             <Users className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
           ) : (
             <FolderIcon className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
           )}
-          <span
+          <span className="file-name"
             style={{
               paddingRight: 10,
               paddingLeft: 5,
@@ -114,7 +114,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           </span>
           {isTeam && (
             <span className="shrink-0" style={{
-              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
               color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
               marginLeft: 6, whiteSpace: 'nowrap',
             }}>
@@ -123,8 +123,8 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           )}
           {isWatched && (
             <span className="shrink-0" style={{
-              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-              color: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              color: '#1e40af', backgroundColor: 'rgba(37, 99, 235, 0.1)',
               marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
             }}>
               <Eye style={{ width: 9, height: 9 }} />
@@ -138,10 +138,10 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       <td style={{ padding: '12px 15px', position: 'relative' }}>
         <div
           onClick={(e) => e.stopPropagation()}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          className="file-row-actions"
           style={{
             position: 'absolute',
-            right: 8,
+            right: 4,
             top: '50%',
             transform: 'translateY(-50%)',
             display: 'flex',

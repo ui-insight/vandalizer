@@ -38,9 +38,9 @@ export function BudgetTierPicker({
       {recommendedTierId && recommendationReason && (
         <div style={{
           marginBottom: 10, padding: '8px 10px',
-          backgroundColor: 'rgba(124, 58, 237, 0.08)',
-          border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
-          fontSize: 11, color: '#c4b5fd', lineHeight: 1.5,
+          backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
+          fontSize: 12, color: 'var(--highlight-color, #eab308)', lineHeight: 1.5,
         }}>
           {recommendationReason}
         </div>
@@ -57,8 +57,8 @@ export function BudgetTierPicker({
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', textAlign: 'left',
-                backgroundColor: active ? 'rgba(124, 58, 237, 0.12)' : '#262626',
-                border: '1px solid ' + (active ? '#7c3aed' : '#333'),
+                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
+                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : '#333'),
                 borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
               }}
             >
@@ -70,14 +70,14 @@ export function BudgetTierPicker({
                     <span style={{
                       fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
                       padding: '2px 6px', borderRadius: 10,
-                      color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.18)',
-                      border: '1px solid rgba(124, 58, 237, 0.45)',
+                      color: 'var(--highlight-color, #eab308)', backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent)',
+                      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 45%, transparent)',
                     }}>
                       Recommended for you
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 11, color: '#888' }}>
+                <div style={{ fontSize: 12, color: '#b8bec7' }}>
                   {rowTokens}
                   {rowCost && <> · {rowCost}</>}
                   {' · '}{t.trialsEstimate} · {t.timeEstimate}
@@ -91,8 +91,8 @@ export function BudgetTierPicker({
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 12px', textAlign: 'left',
-            backgroundColor: selected === 'custom' ? 'rgba(124, 58, 237, 0.12)' : '#262626',
-            border: '1px solid ' + (selected === 'custom' ? '#7c3aed' : '#333'),
+            backgroundColor: selected === 'custom' ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
+            border: '1px solid ' + (selected === 'custom' ? 'var(--highlight-color, #eab308)' : '#333'),
             borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
           }}
         >
@@ -122,7 +122,7 @@ export function BudgetTierPicker({
       }}>
         Selected: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
       </div>
-      <p style={{ margin: '8px 0 0 0', fontSize: 11, color: '#777', lineHeight: 1.5 }}>
+      <p style={{ margin: '8px 0 0 0', fontSize: 12, color: '#b8bec7', lineHeight: 1.5 }}>
         Time estimates are approximate. Actual runtime scales with your test-set
         size and current model speed, so larger test sets can take noticeably longer.
       </p>

@@ -83,6 +83,7 @@ describe('ChatMessage source citations', () => {
     expect(workspace.setWorkspaceMode).toHaveBeenCalledWith('files')
     expect(workspace.viewDocument).toHaveBeenCalledTimes(1)
     const [uuid, title, highlight] = workspace.viewDocument.mock.calls[0]
+    expect(workspace.viewDocument.mock.calls[0][3]).toEqual({ preserveChatScope: true })
     expect(uuid).toBe('doc-1')
     expect(title).toBe('Uniform Guidance')
     expect(highlight.page).toBe(12)
@@ -108,5 +109,21 @@ describe('ChatMessage source citations', () => {
 
     expect(screen.queryByRole('menuitem')).toBeNull()
     expect(screen.getByText(/Recipients must retain/)).toBeTruthy()
+  })
+})
+
+
+describe('citation menu keyboard navigation', () => {
+  it('focuses the menu, supports arrow keys, and returns Escape focus to the citation', () => {
+    workspace.openDocumentUuid = null
+    render(<ChatMessage message={messageWith({ document_uuid: 'document-1', page_approximate: true })} />)
+    const citation = screen.getByRole('button', { name: /Uniform Guidance · p. ~12/ })
+    fireEvent.click(citation)
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Preview' }))
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(screen.getByRole('menuitem', { name: 'Open at p. ~12' }))
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(document.activeElement).toBe(citation)
   })
 })

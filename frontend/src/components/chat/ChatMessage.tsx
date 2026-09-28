@@ -143,6 +143,7 @@ export function ChatMessage({
   // a row opens a menu that runs off the edge with no scrollbar to reach it.
   const [menuAlign, setMenuAlign] = useState<'left' | 'right'>('left')
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const citationButtons = useRef(new Map<number, HTMLButtonElement>())
   const contentRef = useRef<HTMLDivElement>(null)
   const citationsRef = useRef<HTMLDivElement>(null)
   const certPanel = useCertificationPanel()
@@ -222,7 +223,7 @@ export function ChatMessage({
   const handleCitationClick = (c: Citation) => {
     if (!c.document_id) return
     setWorkspaceMode('files')
-    viewDocument(c.document_id, c.document_title)
+    viewDocument(c.document_id, c.document_title, undefined, { preserveChatScope: true })
     if (c.content_preview) setHighlightTerms([pickHighlightPhrase(c.content_preview)])
   }
 
@@ -234,7 +235,7 @@ export function ChatMessage({
       if (!citationsRef.current?.contains(e.target as Node)) setCitationMenu(null)
     }
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setCitationMenu(null)
+      if (e.key === 'Escape') { setCitationMenu(null); citationButtons.current.get(citationMenu)?.focus() }
     }
     document.addEventListener('mousedown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
@@ -252,6 +253,7 @@ export function ChatMessage({
     const menu = menuRef.current
     const pill = menu?.parentElement
     if (!menu || !pill) return
+    menu.querySelector<HTMLElement>('[role=menuitem]')?.focus()
     const container = clippingAncestor(menu)
     const bounds = container?.getBoundingClientRect()
     const left = bounds?.left ?? 0
@@ -271,6 +273,7 @@ export function ChatMessage({
   // show the preview whether or not one is already open. Toggling belongs to
   // the pill itself, where a second click reads as "put it away".
   const showCitationPreview = (index: number) => {
+    citationButtons.current.get(index)?.focus()
     setCitationMenu(null)
     setOpenCitation(index)
   }
@@ -292,10 +295,10 @@ export function ChatMessage({
       // Same reason as the extraction path: the chip says "p. ~N" for an
       // interpolated page, so the viewer's fallback must not drop the hedge.
       pageApproximate: citation.page_approximate ?? false,
-    })
+    }, { preserveChatScope: true })
   }
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     // Build full message text including tool results
     const segs = segments || message.segments
     let text: string
@@ -320,9 +323,11 @@ export function ChatMessage({
       }
       text = parts.join('\n\n')
     }
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch { toast('Could not copy the response. Select the text to copy it, or try again.', 'error') }
   }
 
   // Build a result lookup from both streaming and persisted sources
@@ -530,7 +535,7 @@ export function ChatMessage({
             return (
               <div style={{ marginTop: 8 }} ref={citationsRef}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+                  <span style={{ fontSize: 12, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
                     Sources:
                   </span>
                   {message.citations.map((c, i) => {
@@ -543,8 +548,8 @@ export function ChatMessage({
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
                     const chipBase = {
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                      borderRadius: 999, transition: 'all 0.15s',
+                      padding: '6px 10px', fontSize: 12, fontWeight: 500,
+                      maxWidth: '100%', overflowWrap: 'anywhere', textAlign: 'left', borderRadius: 12, transition: 'all 0.15s',
                     } as const
                     // URL-backed KB source: link straight out to the origin.
                     if (c.url) {
@@ -576,11 +581,12 @@ export function ChatMessage({
                     return (
                       <span
                         key={`${c.chunk_id ?? c.document_id ?? i}`}
-                        style={{ position: 'relative', display: 'inline-flex' }}
+                        style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%' }}
                       >
                         <button
                           type="button"
                           title={preview}
+                          ref={node => { if (node) citationButtons.current.set(i, node); else citationButtons.current.delete(i) }}
                           aria-haspopup={offersOpen ? 'menu' : undefined}
                           aria-expanded={offersOpen ? menuOpen : isOpen}
                           onClick={() => offersOpen
@@ -588,11 +594,11 @@ export function ChatMessage({
                             : toggleCitationPreview(i)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                            padding: '6px 10px', fontSize: 12, fontWeight: 500,
                             backgroundColor: active ? '#e0e7ff' : '#f3f4f6',
                             color: active ? '#3730a3' : '#374151',
                             border: `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
-                            borderRadius: 999,
+                            borderRadius: 12, overflowWrap: 'anywhere', textAlign: 'left',
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
                         >
@@ -601,6 +607,15 @@ export function ChatMessage({
                         {menuOpen && (
                           <div
                             role="menu"
+                            onKeyDown={event => {
+                              const entries = [...event.currentTarget.querySelectorAll<HTMLElement>('[role=menuitem]')]
+                              const index = entries.indexOf(document.activeElement as HTMLElement)
+                              if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+                                event.preventDefault()
+                                const next = event.key === 'Home' ? 0 : event.key === 'End' ? entries.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + entries.length) % entries.length
+                                entries[next]?.focus()
+                              } else if (event.key === 'Tab') setCitationMenu(null)
+                            }}
                             ref={menuRef}
                             aria-label={`Source: ${label}`}
                             style={{
@@ -618,7 +633,7 @@ export function ChatMessage({
                             />
                             <CitationMenuItem
                               icon={<FileText size={12} />}
-                              label={typeof c.page === 'number' ? `Open at p. ${c.page}` : 'Open document'}
+                              label={typeof c.page === 'number' ? `Open at ${formatPageLocator(c.page, c.page_approximate, c.page_end)}` : 'Open document'}
                               onClick={() => openCitedDocument(c)}
                             />
                           </div>
@@ -634,16 +649,17 @@ export function ChatMessage({
                     border: '1px solid #e5e7eb', borderRadius: 8,
                     whiteSpace: 'pre-wrap' as const,
                   }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
                       {open.document_title}
                       {(() => {
                         const loc = formatPageLocator(open.page, open.page_approximate, open.page_end) ?? open.sheet
                         return loc ? ` · ${loc}` : ''
                       })()}
                     </div>
-                    {openPreview || 'No preview available for this source.'}
+                    {openPreview || 'No preview was saved for this source.'}
+                    {!open.document_uuid && !open.document_id && <p style={{ marginTop: 8 }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
                         Source: {open.source_reference}
                       </div>
                     )}
@@ -653,7 +669,7 @@ export function ChatMessage({
                         onClick={() => handleCitationClick(open)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
-                          marginTop: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                          marginTop: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600,
                           fontFamily: 'inherit', backgroundColor: '#fff', color: '#374151',
                           border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
                         }}
@@ -667,6 +683,9 @@ export function ChatMessage({
             )
           })()}
 
+          {message.interruption && <p role="status" style={{ marginTop: 10, padding: '10px 12px', background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 8, fontSize: 13, color: '#785411', lineHeight: 1.5 }}>
+            {message.interruption === 'stopped' ? 'Response stopped.' : 'Connection interrupted.'} Partial output is preserved. An action already started may still finish; check its result before retrying.
+          </p>}
           {/* Feedback bar - hidden during streaming */}
           {!isStreamingProp && message.content && <div style={{
             display: 'flex', alignItems: 'center', gap: 4, marginTop: 10,

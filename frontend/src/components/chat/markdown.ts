@@ -53,8 +53,24 @@ export function renderMarkdown(text: string): string {
     actionButton(type, '')
   )
   cleaned = cleaned.replace(ACTION_CLOSE_REMNANT_RE, '')
-  return DOMPurify.sanitize(marked.parse(cleaned) as string, {
+  const sanitized = DOMPurify.sanitize(marked.parse(cleaned) as string, {
     ADD_TAGS: ['button'],
     ADD_ATTR: ['data-action'],
   })
+  const content = document.createElement('div')
+  content.innerHTML = sanitized
+  for (const block of content.querySelectorAll('pre')) {
+    block.tabIndex = 0
+    block.setAttribute('aria-label', 'Code block')
+  }
+  for (const table of content.querySelectorAll('table')) {
+    const scroller = document.createElement('div')
+    scroller.className = 'chat-table-scroll'
+    scroller.tabIndex = 0
+    scroller.setAttribute('role', 'region')
+    scroller.setAttribute('aria-label', 'Response table')
+    table.before(scroller)
+    scroller.append(table)
+  }
+  return content.innerHTML
 }

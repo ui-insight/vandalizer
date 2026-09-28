@@ -82,6 +82,9 @@ class AutomationResponse(BaseModel):
     # the UI says "paused" beside it when it is not.
     next_run_at: Optional[str] = None
     last_run_at: Optional[str] = None
+    # Latest persisted event across workflow and extraction runs, for every trigger type.
+    last_event_status: Optional[str] = None
+    last_event_at: Optional[str] = None
 
 
 class SchedulePreviewRequest(BaseModel):

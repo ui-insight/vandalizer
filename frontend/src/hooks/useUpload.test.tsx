@@ -5,6 +5,7 @@ const mockUploadFile = vi.fn()
 
 vi.mock('../api/files', () => ({
   uploadFile: (...args: unknown[]) => mockUploadFile(...args),
+  getUploadPolicy: vi.fn().mockResolvedValue({ extensions: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt', 'md'], max_size_bytes: 10 }),
 }))
 
 import { useUpload } from './useUpload'
@@ -100,4 +101,12 @@ describe('useUpload', () => {
     expect(names).toContain('bad.pdf')
     expect(names).toContain('good.pdf')
   })
+})
+
+
+it('rejects a file over the server limit before reading or uploading it', async () => {
+  const { result } = renderHook(() => useUpload('folder-1', vi.fn()))
+  await act(async () => result.current.upload([new File(['01234567890'], 'large.txt')]))
+  expect(mockUploadFile).not.toHaveBeenCalled()
+  expect(result.current.uploads[0].error).toContain('per-file limit')
 })

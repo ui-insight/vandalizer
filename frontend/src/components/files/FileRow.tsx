@@ -31,7 +31,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       role="row"
       aria-label={`Document: ${doc.title}`}
       onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
           onClick?.()
         }
@@ -141,7 +141,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
-              <span
+              <span className="file-name"
                 style={{
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -189,7 +189,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       <td
         style={{
           padding: '12px 15px',
-          color: '#17181a6e',
+          color: '#59616b',
           fontSize: '0.8em',
           fontWeight: 300,
           whiteSpace: 'nowrap',
@@ -198,7 +198,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         }}
         title={doc.updated_at || doc.created_at || undefined}
       >
-        <span className="group-hover:opacity-0 transition-opacity">
+        <span className="file-modified-label">
           {stillProcessing ? (
             <span style={{ color: 'var(--highlight-on-light, #806600)' }}>{stageCopy(doc.task_status).short}</span>
           ) : (
@@ -207,10 +207,10 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         </span>
         <div
           onClick={(e) => e.stopPropagation()}
-          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          className="file-row-actions"
           style={{
             position: 'absolute',
-            right: 8,
+            right: 4,
             top: '50%',
             transform: 'translateY(-50%)',
             display: 'flex',

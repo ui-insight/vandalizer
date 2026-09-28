@@ -14,12 +14,15 @@ interface Props {
   otherSources?: KnowledgeBaseSource[]
   onClose: () => void
   onUpdated?: () => void  // called after the source's provenance is edited, so the list refreshes
+  canManage?: boolean
 }
 
-export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onClose, onUpdated }: Props) {
+export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onClose, onUpdated, canManage = false }: Props) {
   const [detail, setDetail] = useState<KnowledgeBaseSourceDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   // Editable provenance ("Source: …"). For url sources the origin URL is the
   // default when nothing was entered yet; the user can override either type.
   const [sourceDraft, setSourceDraft] = useState('')
@@ -44,7 +47,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load source') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
-  }, [kbUuid, source.uuid])
+  }, [kbUuid, source.uuid, attempt])
 
   // Close on Escape
   useEffect(() => {
@@ -59,31 +62,33 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
   const sourceDirty = sourceDraft.trim() !== (savedSource || '').trim()
 
   const saveSource = async () => {
-    if (savingSource || !sourceDirty) return
+    if (!canManage || savingSource || !sourceDirty) return
     setSavingSource(true)
+    setActionError(null)
     try {
       const updated = await setKBSourceReference(kbUuid, source.uuid, sourceDraft.trim())
       setDetail(prev => (prev ? { ...prev, source_reference: updated.source_reference } : prev))
       onUpdated?.()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save source')
+      setActionError(err instanceof Error ? err.message : 'Failed to save source')
     } finally {
       setSavingSource(false)
     }
   }
 
   const saveAmends = async (next: string[]) => {
-    if (savingAmends) return
+    if (!canManage || savingAmends) return
     const previous = amends
     setAmends(next)
     setSavingAmends(true)
+    setActionError(null)
     try {
       const updated = await setKBSourceAmends(kbUuid, source.uuid, next)
       setAmends(updated.amends_source_uuids ?? next)
       onUpdated?.()
     } catch (err) {
       setAmends(previous)
-      setError(err instanceof Error ? err.message : 'Failed to save what this source amends')
+      setActionError(err instanceof Error ? err.message : 'Failed to save what this source amends')
     } finally {
       setSavingAmends(false)
     }
@@ -132,7 +137,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
       style={{
         position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        zIndex: 1100, padding: 24,
+        zIndex: 1100, padding: 12,
       }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
@@ -142,16 +147,16 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         aria-label={`Source: ${displayTitle}`}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '90vw', maxWidth: 960, height: '85vh',
+          width: '100%', maxWidth: 960, height: '90dvh',
           display: 'flex', flexDirection: 'column',
           backgroundColor: '#1f1f1f',
           border: '1px solid #2e2e2e', borderRadius: 10,
-          overflow: 'hidden',
+          overflowY: 'auto', overflowX: 'hidden',
         }}
       >
         {/* Header */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10,
           padding: '14px 18px',
           borderBottom: '1px solid #2e2e2e',
           flexShrink: 0,
@@ -159,14 +164,14 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
           {isDoc
             ? <FileText size={18} style={{ color: '#a78bfa', flexShrink: 0 }} aria-hidden="true" />
             : <Globe size={18} style={{ color: '#60a5fa', flexShrink: 0 }} aria-hidden="true" />}
-          <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <div style={{
               fontSize: 14, fontWeight: 600, color: '#fff',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              overflowWrap: 'anywhere',
             }}>
               {displayTitle}
             </div>
-            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }}>
               {isDoc ? 'Document source' : 'URL source'}
               {source.chunk_count > 0 && <> · {source.chunk_count} chunks</>}
               {source.status !== 'ready' && <> · {source.status}</>}
@@ -231,10 +236,10 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         {/* Verifiable provenance — editable, shown for both URL and document sources.
             Lets a user confirm/record where the content came from (origin URL or citation). */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
           padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
         }}>
-          <span id="kb-source-ref-label" style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>Source</span>
+          <span id="kb-source-ref-label" style={{ fontSize: 12, color: '#b8bec7', flexShrink: 0 }}>Source</span>
           <input
             aria-labelledby="kb-source-ref-label"
             value={sourceDraft}
@@ -243,13 +248,14 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
             placeholder={isDoc ? 'e.g. APM Ch.45, uidaho.edu/apm/45' : 'Origin URL'}
             maxLength={2000}
             disabled={savingSource}
+            readOnly={!canManage}
             style={{
-              flex: 1, fontSize: 12, color: '#e5e5e5',
+              flex: '1 1 160px', minWidth: 0, maxWidth: '100%', fontSize: 12, color: '#e5e5e5',
               backgroundColor: '#161616', border: '1px solid #2e2e2e',
               borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit',
             }}
           />
-          {sourceDirty && (
+          {canManage && sourceDirty && (
             <button
               type="button"
               aria-label="Save source"
@@ -274,14 +280,14 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
         {/* Amends — which sources this one revises. Retrieval searches this
             source whenever one of those is retrieved, and tells the model
             this one governs where they conflict. */}
-        {amendable.length > 0 && (
+        {(amends.length > 0 || canManage && amendable.length > 0) && (
           <div style={{
             display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
             padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
           }}>
             <span
               id="kb-source-amends-label"
-              style={{ fontSize: 11, color: '#888', flexShrink: 0 }}
+              style={{ fontSize: 12, color: '#b8bec7', flexShrink: 0 }}
               title="Mark this source as a supplement, notice or revision of other sources. Questions that retrieve those sources will also search this one, and answers will treat it as the current rule."
             >
               Amends
@@ -296,7 +302,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                 }}
               >
                 {nameOf(uuid)}
-                <button
+                {canManage && <button
                   type="button"
                   aria-label={`Stop amending ${nameOf(uuid)}`}
                   onClick={() => saveAmends(amends.filter(u => u !== uuid))}
@@ -304,10 +310,10 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: '#888', display: 'inline-flex' }}
                 >
                   <X size={12} aria-hidden="true" />
-                </button>
+                </button>}
               </span>
             ))}
-            {amendable.some(s => !amends.includes(s.uuid)) && (
+            {canManage && amendable.some(s => !amends.includes(s.uuid)) && (
               <select
                 aria-labelledby="kb-source-amends-label"
                 value=""
@@ -316,7 +322,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                 style={{
                   fontSize: 12, color: '#e5e5e5', backgroundColor: '#161616',
                   border: '1px solid #2e2e2e', borderRadius: 5, padding: '3px 6px', fontFamily: 'inherit',
-                  maxWidth: 320,
+                  maxWidth: '100%', minWidth: 0,
                 }}
               >
                 <option value="">{amends.length ? 'Add another…' : 'Nothing — pick a source this one revises…'}</option>
@@ -329,8 +335,10 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
           </div>
         )}
 
+        {actionError && <div role="alert" style={{ color: '#fca5a5', padding: '8px 18px', fontSize: 13, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{actionError} Your source text is preserved; retry the change.</div>}
+
         {/* Body */}
-        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
+        <div style={{ flex: 1, minHeight: 180, overflow: 'auto', display: 'flex' }}>
           {isDoc && docView === 'file' && fileAvailable ? (
             source.document_uuid ? (
               <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
@@ -347,6 +355,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               fallbackUrl={source.url}
               isDoc={isDoc}
               partialText={partialText}
+              onRetry={() => setAttempt(n => n + 1)}
             />
           )}
         </div>
@@ -368,10 +377,11 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function SourceContentInspector({
-  loading, error, detail, fallbackUrl, isDoc = false, partialText = null,
+  loading, error, detail, fallbackUrl, isDoc = false, partialText = null, onRetry,
 }: {
   loading: boolean
   error: string | null
+  onRetry?: () => void
   detail: KnowledgeBaseSourceDetail | null
   fallbackUrl?: string
   isDoc?: boolean
@@ -393,10 +403,11 @@ function SourceContentInspector({
     return (
       <div role="alert" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 8, color: '#ef4444', fontSize: 13,
+        gap: 8, color: '#fca5a5', fontSize: 13, flexWrap: 'wrap', padding: 16, overflowWrap: 'anywhere',
       }}>
         <AlertCircle size={16} aria-hidden="true" />
         {error}
+        {onRetry && <button type="button" onClick={onRetry} style={{ padding: '8px 12px', color: '#fff', background: '#333', border: '1px solid #666', borderRadius: 5 }}>Retry source</button>}
       </div>
     )
   }
@@ -406,8 +417,8 @@ function SourceContentInspector({
   const hasContent = !!(detail.content && detail.content.trim())
 
   return (
-    <div style={{
-      flex: 1, display: 'flex', flexDirection: 'column',
+    <div role="region" aria-label="Indexed source details" tabIndex={0} style={{
+      flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column',
       padding: '14px 18px', overflowY: 'auto',
     }}>
       {/* Meta block */}
@@ -567,7 +578,7 @@ function SourceContentInspector({
         Extracted text
       </div>
       {hasContent ? (
-        <pre style={{
+        <pre tabIndex={0} aria-label="Extracted text" style={{
           margin: 0, padding: 12, flex: 1,
           fontSize: 12, lineHeight: 1.55,
           color: '#d1d5db',

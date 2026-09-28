@@ -22,19 +22,19 @@ export function ApplyBackButton({
   label = 'Apply optimized settings',
   applyAgainLabel = 'Apply again',
   applyingLabel = 'Applying…',
-  alreadyAppliedNote = '✓ Already applied automatically',
+  alreadyAppliedNote = 'These settings are applied',
 }: ApplyBackButtonProps) {
   return (
-    <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+    <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
       <button
         onClick={onApply}
         disabled={!canApply || applying}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-          color: !canApply ? '#555' : '#fff',
-          background: !canApply ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-          border: '1px solid ' + (!canApply ? '#333' : '#7c3aed'),
+          color: !canApply ? '#aaa' : 'var(--highlight-text-color, #000)',
+          background: !canApply ? '#222' : 'var(--highlight-color, #eab308)',
+          border: '1px solid ' + (!canApply ? '#555' : 'var(--highlight-color, #eab308)'),
           borderRadius: 6, cursor: !canApply || applying ? 'not-allowed' : 'pointer',
         }}
       >
@@ -42,7 +42,7 @@ export function ApplyBackButton({
         {applying ? applyingLabel : isAlreadyApplied ? applyAgainLabel : label}
       </button>
       {isAlreadyApplied && alreadyAppliedNote && (
-        <span style={{ fontSize: 11, color: '#22c55e' }}>
+        <span style={{ fontSize: 12, color: '#22c55e' }}>
           {alreadyAppliedNote}
         </span>
       )}

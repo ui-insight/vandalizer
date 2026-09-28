@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import type { VerificationSession } from '../api/verificationSessions'
 import { useTeams } from '../hooks/useTeams'
@@ -27,6 +27,7 @@ export interface ViewDocumentRequest {
   uuid: string
   title: string
   highlight?: { terms: string[]; page: number | null; pageApproximate?: boolean }
+  preserveChatScope?: boolean
 }
 
 export interface PendingExtractionResults {
@@ -154,13 +155,13 @@ const ChatStateContext = createContext<ChatStateContextValue | null>(null)
 
 interface UIStateContextValue {
   selectedDocUuids: string[]
-  setSelectedDocUuids: (uuids: string[]) => void
+  setSelectedDocUuids: React.Dispatch<React.SetStateAction<string[]>>
   selectedDocNames: Record<string, string>
-  setSelectedDocNames: (names: Record<string, string>) => void
+  setSelectedDocNames: Dispatch<SetStateAction<Record<string, string>>>
   selectedFolderUuids: string[]
   setSelectedFolderUuids: (uuids: string[]) => void
   selectedFolderNames: Record<string, string>
-  setSelectedFolderNames: (names: Record<string, string>) => void
+  setSelectedFolderNames: Dispatch<SetStateAction<Record<string, string>>>
   railDocked: boolean
   toggleRailDocked: () => void
   panelSplit: number
@@ -186,7 +187,7 @@ interface UIStateContextValue {
   activitySignal: number
   bumpActivitySignal: () => void
   viewDocumentRequest: ViewDocumentRequest | null
-  viewDocument: (uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => void
+  viewDocument: (uuid: string, title: string, highlight?: ViewDocumentRequest['highlight'], options?: { preserveChatScope?: boolean }) => void
   clearViewDocumentRequest: () => void
   verificationSession: VerificationSession | null
   setVerificationSession: (s: VerificationSession | null) => void
@@ -358,7 +359,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedDocNames, setSelectedDocNames] = useState<Record<string, string>>({})
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [selectedFolderNames, setSelectedFolderNames] = useState<Record<string, string>>({})
-  const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
+  const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', true))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [chatSplitOpen, _setChatSplitOpen] = useState(() => getStoredBool('workspace:chatSplit', false))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
@@ -493,6 +494,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setSelectedDocUuids([])
     setSelectedDocNames({})
     setSelectedFolderUuids([])
+    setSelectedFolderNames({})
   }, [])
 
   const resetToHome = useCallback(() => {
@@ -838,8 +840,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     try { localStorage.setItem('workspace:chatSplit', String(open)) } catch {}
   }, [])
 
-  const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight']) => {
-    setViewDocumentRequest({ uuid, title, highlight })
+  const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight'], options?: { preserveChatScope?: boolean }) => {
+    setViewDocumentRequest({ uuid, title, highlight, preserveChatScope: options?.preserveChatScope })
   }, [])
 
   const clearViewDocumentRequest = useCallback(() => {

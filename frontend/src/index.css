@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/workspace-polish.css";
 
 html {
   scroll-behavior: smooth;
@@ -215,6 +216,9 @@ html {
 }
 
 /* Chat markdown styles */
+.chat-markdown { min-width: 0; overflow-wrap: anywhere; }
+.chat-table-scroll { max-width: 100%; overflow-x: auto; }
+.chat-table-scroll table { min-width: 420px; }
 .chat-markdown p { margin: 0 0 0.5em; }
 .chat-markdown p:last-child { margin-bottom: 0; }
 .chat-markdown h1, .chat-markdown h2, .chat-markdown h3,
@@ -1392,3 +1396,7 @@ html {
   .print-slide { break-after: page; page-break-after: always; padding: 1.5rem 0; }
   .print-slide:last-child { break-after: auto; page-break-after: auto; }
 }
+
+/* Source actions stay below readable source identity on narrow KB panels. */
+.kb-source-actions { display: flex; flex: 1 0 100%; align-items: center; justify-content: flex-end; gap: 6px; }
+.kb-source-actions button { min-width: 32px; min-height: 32px; justify-content: center; align-items: center; }

@@ -60,7 +60,7 @@ export function QualityBadge({
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        fontSize: '11px',
+        fontSize: '12px',
         lineHeight: '16px',
         padding: '1px 6px',
         borderRadius: '4px',
@@ -68,7 +68,9 @@ export function QualityBadge({
         backgroundColor: colors.bg,
         color: colors.text,
         fontWeight: 500,
-        whiteSpace: 'nowrap',
+        whiteSpace: 'normal',
+        overflowWrap: 'anywhere',
+        textAlign: 'left',
       }}
     >
       {label}

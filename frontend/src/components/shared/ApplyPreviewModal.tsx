@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { AlertTriangle, CheckCircle2, MinusCircle, X } from 'lucide-react'
 
@@ -36,6 +36,7 @@ interface Props {
   onConfirm: () => void
   onCancel: () => void
   applying: boolean
+  error?: string | null
 }
 
 /**
@@ -47,7 +48,7 @@ interface Props {
  * before the confirm button enables.
  */
 export function ApplyPreviewModal({
-  open, preview, itemNoun, itemNounPlural, onConfirm, onCancel, applying,
+  open, preview, itemNoun, itemNounPlural, onConfirm, onCancel, applying, error,
 }: Props) {
   const [ack, setAck] = useState(false)
   const requiresAck = preview.significant_regressions > 0
@@ -63,10 +64,12 @@ export function ApplyPreviewModal({
 
   useEffect(() => {
     if (!open) return
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !applying) onCancel() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onCancel])
+  }, [open, onCancel, applying])
+
+  useLayoutEffect(() => { if (open) setAck(false) }, [open, preview])
 
   if (!open) return null
 
@@ -81,14 +84,14 @@ export function ApplyPreviewModal({
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 1000,
       }}
-      onClick={onCancel}
+      onClick={() => { if (!applying) onCancel() }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 'min(640px, 92vw)',
-          maxHeight: '88vh',
+          maxHeight: '88vh', overflowY: 'auto',
           background: '#1a1a1a',
           border: '1px solid #2e2e2e',
           borderRadius: 10,
@@ -111,7 +114,7 @@ export function ApplyPreviewModal({
             onClick={onCancel}
             disabled={applying}
             style={{
-              background: 'transparent', border: 'none', color: '#888',
+              background: 'transparent', border: 'none', color: '#aeb5bf',
               cursor: applying ? 'not-allowed' : 'pointer', padding: 4,
             }}
           >
@@ -138,29 +141,30 @@ export function ApplyPreviewModal({
           {preview.significant_regressions > 0 && (
             <SummaryChip
               icon={<AlertTriangle size={11} />}
-              color="#ef4444"
+              color="#fca5a5"
               label={`${preview.significant_regressions} > judge noise`}
             />
           )}
           <SummaryChip
-            color={preview.net_delta >= 0 ? '#22c55e' : '#ef4444'}
+            color={preview.net_delta >= 0 ? '#22c55e' : '#fca5a5'}
             label={`Net Δ ${preview.net_delta >= 0 ? '+' : ''}${(preview.net_delta * 100).toFixed(1)} pts`}
           />
         </div>
 
+        <p style={{ padding: '0 18px', margin: '4px 0 10px', fontSize: 12, color: '#b8bec7', lineHeight: 1.5 }}>These are recorded test scores for the current and proposed settings. Applying changes retrieval settings; it does not guarantee the same scores on future questions.</p>
         {/* Items table */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 18px 12px' }}>
+        <div style={{ flexShrink: 0, padding: '4px 18px 12px' }}>
           {sortedItems.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#888', fontSize: 12 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: '#aeb5bf', fontSize: 12 }}>
               No per-{itemNoun} detail available for this run.
             </div>
           ) : (
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ color: '#888', textAlign: 'left' }}>
+                <tr style={{ color: '#aeb5bf', textAlign: 'left' }}>
                   <th scope="col" style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
                   <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
-                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>After apply</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Proposed</th>
                   <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
                 </tr>
               </thead>
@@ -174,7 +178,7 @@ export function ApplyPreviewModal({
                       background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined,
                     }}
                   >
-                    <td style={{ padding: '6px 8px' }}>
+                    <td style={{ padding: '6px 8px', overflowWrap: 'anywhere' }}>
                       {item.label || item.item_id || `Item ${idx + 1}`}
                     </td>
                     <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
@@ -186,7 +190,7 @@ export function ApplyPreviewModal({
                     <td style={{
                       padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
                       color: item.within_noise ? '#888'
-                        : item.is_regression ? (item.significant ? '#ef4444' : '#f97316')
+                        : item.is_regression ? (item.significant ? '#fca5a5' : '#f97316')
                         : '#22c55e',
                     }}>
                       {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)}
@@ -224,6 +228,7 @@ export function ApplyPreviewModal({
               </span>
             </label>
           )}
+          {error && <p role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 13, lineHeight: 1.5, color: '#fecaca', background: '#3d1c1c', borderRadius: 6 }}>{error} Review the result and try again.</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
               onClick={onCancel}
@@ -242,11 +247,11 @@ export function ApplyPreviewModal({
               disabled={!canConfirm}
               style={{
                 padding: '6px 14px', fontSize: 12, fontWeight: 600,
-                color: canConfirm ? '#fff' : '#555',
+                color: canConfirm ? 'var(--highlight-text-color, #000)' : '#aaa',
                 background: canConfirm
-                  ? 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)'
+                  ? 'var(--highlight-color, #eab308)'
                   : '#222',
-                border: '1px solid ' + (canConfirm ? '#7c3aed' : '#333'),
+                border: '1px solid ' + (canConfirm ? 'var(--highlight-color, #eab308)' : '#555'),
                 borderRadius: 6,
                 cursor: canConfirm ? 'pointer' : 'not-allowed',
               }}
@@ -268,7 +273,7 @@ function SummaryChip({
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '3px 8px',
-      fontSize: 11, color,
+      fontSize: 12, color,
       background: 'rgba(255,255,255,0.03)',
       border: '1px solid ' + color + '40',
       borderRadius: 999,

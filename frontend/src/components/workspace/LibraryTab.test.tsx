@@ -273,7 +273,7 @@ describe('LibraryTab empty state', () => {
 
   it('does not show the nudge when a kind filter hides existing items', () => {
     render(<LibraryTab />)
-    fireEvent.click(screen.getByText(/^Workflows/))
+    fireEvent.click(screen.getByRole('button', { name: /^Workflows/ }))
     expect(screen.getByText('No items match these filters')).toBeTruthy()
     expect(screen.queryByText('Browse the catalog →')).toBeNull()
   })

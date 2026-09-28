@@ -56,7 +56,7 @@ export function FileProcessingCell({ docs }: Props) {
             ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--highlight-color, #eab308)' }} />
             : anyError
               ? <AlertCircle className="h-5 w-5" style={{ color: '#d97706' }} />
-              : <Check className="h-5 w-5" style={{ color: '#16a34a' }} />}
+              : <Check className="h-5 w-5" style={{ color: '#15803d' }} />}
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#191919' }}>{headline}</div>
@@ -75,10 +75,10 @@ export function FileProcessingCell({ docs }: Props) {
                   ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" style={{ color: 'var(--highlight-color, #eab308)' }} />
                   : d.phase === 'error'
                     ? <AlertCircle className="h-3.5 w-3.5 shrink-0" style={{ color: '#d97706' }} />
-                    : <Check className="h-3.5 w-3.5 shrink-0" style={{ color: '#16a34a' }} />}
+                    : <Check className="h-3.5 w-3.5 shrink-0" style={{ color: '#15803d' }} />}
                 <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
                 <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#374151' }} className="truncate">{d.name}</span>
-                <span style={{ fontSize: 11, color: d.phase === 'error' ? '#d97706' : d.phase === 'ready' ? '#16a34a' : '#6b7280' }}>
+                <span style={{ fontSize: 12, color: d.phase === 'error' ? '#d97706' : d.phase === 'ready' ? '#15803d' : '#6b7280' }}>
                   {d.phase === 'processing' ? copy.short : d.phase === 'error' ? 'Couldn’t process' : 'Ready'}
                 </span>
               </div>

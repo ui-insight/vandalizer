@@ -147,9 +147,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   const [docxText, setDocxText] = useState<string | null>(null)
   const [extractionError, setExtractionError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
+  const retryGeneration = useRef(0)
+  const retryPending = useRef(false)
+  const retryTimer = useRef<number | null>(null)
+  const cancelRetryPolling = useCallback(() => {
+    retryGeneration.current++
+    retryPending.current = false
+    if (retryTimer.current !== null) window.clearTimeout(retryTimer.current)
+    retryTimer.current = null
+  }, [])
   const [lowQuality, setLowQuality] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const [previewUnavailable, setPreviewUnavailable] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [loadAttempt, setLoadAttempt] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const renderingRef = useRef(false)
@@ -207,7 +218,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   useEffect(() => {
     let cancelled = false
     let createdBlobUrl: string | null = null
+    cancelRetryPolling()
+    setRetrying(false)
     setIsPdf(null)
+    setLoadError(null)
+    setExtractionError(null)
     setIsSpreadsheet(false)
     setIsDocx(false)
     setDocxText(null)
@@ -220,6 +235,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
+        if (!resp.ok) throw new Error(resp.status === 401 || resp.status === 403 ? 'This source is not accessible with your current account. Ask its owner for access, then retry.' : resp.status === 404 ? 'This source is no longer available. It may have been removed or access may have changed.' : 'The source could not be loaded. Check your connection and retry.')
         const ct = resp.headers.get('content-type') || ''
         if (ct.includes('csv') || ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) {
           setIsSpreadsheet(true)
@@ -246,13 +262,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               setDocxText(res.raw_text || '')
             }
           }).catch(() => {
-            if (!cancelled) setDocxText('')
+            if (!cancelled) setLoadError('The source text could not be loaded. Retry to reconnect.')
           })
         } else if (ct.startsWith('image/')) {
           // Fetch into a blob URL so the iframe inherits browser-side
           // caching and doesn't need a second auth round-trip.
           const fullResp = await fetch(inlineUrl, { credentials: 'include' })
           if (cancelled) return
+          if (!fullResp.ok) throw new Error('The source image could not be loaded. Retry to reconnect.')
           const blob = await fullResp.blob()
           if (cancelled) return
           createdBlobUrl = URL.createObjectURL(blob)
@@ -266,18 +283,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           setIsPdf(false)
         }
       })
-      .catch(() => {
+      .catch((error) => {
         if (!cancelled) {
-          setPreviewUnavailable(true)
+          setLoadError(error instanceof Error && !(error instanceof TypeError) ? error.message : 'The source could not be loaded. Check your connection and retry.')
           setIsPdf(false)
         }
       })
 
     return () => {
       cancelled = true
+      cancelRetryPolling()
       if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl)
     }
-  }, [inlineUrl, docUuid])
+  }, [inlineUrl, docUuid, loadAttempt, cancelRetryPolling])
 
   // Re-fetch docx text when processing completes
   useEffect(() => {
@@ -298,34 +316,39 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   }, [isDocx, processing, docUuid])
 
   const handleRetryExtraction = useCallback(async () => {
+    if (retryPending.current) return
+    retryPending.current = true
+    const generation = retryGeneration.current
     setRetrying(true)
     setExtractionError(null)
+    const finish = () => { retryPending.current = false; setRetrying(false) }
+    const poll = async () => {
+      try {
+        const res = await pollStatus(docUuid)
+        if (generation !== retryGeneration.current) return
+        if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
+          setLowQuality(Boolean(res.extraction_low_quality))
+          if (res.status === 'error' || (res.complete && !res.raw_text)) {
+            setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+            setDocxText('')
+          } else { setDocxText(res.raw_text || ''); setExtractionError(null) }
+          finish()
+        } else retryTimer.current = window.setTimeout(poll, 3000)
+      } catch {
+        if (generation !== retryGeneration.current) return
+        setLoadError('Processing status could not be loaded. Retry the source to reconnect; the extraction may still finish.')
+        finish()
+      }
+    }
     try {
       await retryExtraction(docUuid)
-      setDocxText(null) // back to loading state
-      // Poll for completion every 3s.
-      const interval = window.setInterval(async () => {
-        try {
-          const res = await pollStatus(docUuid)
-          if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
-            window.clearInterval(interval)
-            setLowQuality(Boolean(res.extraction_low_quality))
-            if (res.status === 'error' || (res.complete && !res.raw_text)) {
-              setExtractionError(res.error_message || "We couldn't extract any text from this document.")
-              setDocxText('')
-            } else {
-              setDocxText(res.raw_text || '')
-            }
-            setRetrying(false)
-          }
-        } catch {
-          window.clearInterval(interval)
-          setRetrying(false)
-        }
-      }, 3000)
+      if (generation !== retryGeneration.current) return
+      setDocxText(null)
+      retryTimer.current = window.setTimeout(poll, 3000)
     } catch (err) {
+      if (generation !== retryGeneration.current) return
       setExtractionError(err instanceof Error ? err.message : 'Retry failed.')
-      setRetrying(false)
+      finish()
     }
   }, [docUuid])
 
@@ -369,7 +392,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         renderAllPages(doc)
       })
       .catch(() => {
-        if (!cancelled) setIsPdf(false)
+        if (!cancelled) { setLoadError('The PDF preview could not be loaded. Retry the preview or open the original file.'); setIsPdf(false) }
       })
 
     return () => {
@@ -878,6 +901,18 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     return DOMPurify.sanitize(marked.parse(docxText) as string)
   }, [docxText])
 
+  if (loadError) {
+    return <div role="alert" style={{ padding: 24, color: '#374151', fontSize: 14, lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+      <h3 style={{ fontWeight: 600, marginBottom: 8 }}>Source unavailable</h3>
+      <p>{loadError}</p>
+      <p style={{ marginTop: 8 }}>The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+        <button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #9ca3af', background: '#fff', color: '#1f2937' }}>Retry source</button>
+        <a href={inlineUrl} target="_blank" rel="noreferrer" style={{ padding: '8px 0', color: '#1d4ed8' }}>Open original in new tab</a>
+      </div>
+    </div>
+  }
+
   // Spreadsheet viewer for CSV / Excel
   if (isSpreadsheet) {
     return <SpreadsheetViewer docUuid={docUuid} processing={processing} taskStatus={taskStatus} />
@@ -976,7 +1011,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '8px 14px', fontSize: 14, fontWeight: 500,
                   backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                  color: '#fff', border: 'none', borderRadius: 6,
+                  color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
                   cursor: retrying ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -1003,7 +1038,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                   was only reachable from that branch. */}
               {lowQuality && (
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
                   padding: '10px 12px', marginBottom: 16,
                   fontSize: 13, lineHeight: 1.4, color: '#92400e',
                   backgroundColor: '#fffbeb', border: '1px solid #fcd34d',
@@ -1021,7 +1056,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                       display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
                       padding: '5px 10px', fontSize: 13, fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                      color: '#fff', border: 'none', borderRadius: 6,
+                      color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
                       cursor: retrying ? 'not-allowed' : 'pointer',
                     }}
                   >

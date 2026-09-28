@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, useCallback, type DragEvent } from 'react'
 import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Sparkles, FolderKanban } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQueries } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -25,9 +25,9 @@ import { useToast } from '../../contexts/ToastContext'
 import { useBranding } from '../../contexts/BrandingContext'
 import { buildChatSetupUrl, useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
-import { uploadFile } from '../../api/files'
+import { useChatUploads } from '../../hooks/useChatUploads'
 import { pollStatus } from '../../api/documents'
-import { convertDocumentsToKB } from '../../api/knowledge'
+import { convertDocumentsToKB, getKnowledgeBase } from '../../api/knowledge'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
@@ -123,7 +123,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
+  const { workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId, bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, setSelectedFolderUuids, selectedFolderNames, setSelectedFolderNames, activeKBs, activeKBUuid, activeKBTitle, activateKB, attachKBs, detachKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -132,6 +132,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const projectIndexed = scopedProject?.capabilities?.knowledge.documents ?? 0
   const projectEmpty = !!activeProjectUuid && projectFileCount === 0
   const projectIndexing = !!activeProjectUuid && projectFileCount > 0 && projectIndexed < projectFileCount
+  const kbHealth = useQueries({ queries: activeKBs.map(kb => ({
+    queryKey: ['knowledge-base-health', kb.uuid], queryFn: () => getKnowledgeBase(kb.uuid),
+    staleTime: 30_000, refetchInterval: 30_000, retry: false,
+  })) })
+  const knowledgeHealth = Object.fromEntries(activeKBs.map((kb, index) => {
+    const query = kbHealth[index]
+    const data = query.data
+    return [kb.uuid, data ? `${data.sources_ready}/${data.total_sources} sources ready${data.sources_failed ? ` · ${data.sources_failed} need attention` : ''}` : query.isError ? 'Source status unavailable' : 'Checking sources…']
+  }))
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -147,7 +156,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const demoTriggered = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
-  const [attachLoading, setAttachLoading] = useState(false)
+  const [linkLoading, setLinkLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [showAttachKB, setShowAttachKB] = useState(false)
   const [modelsList, setModelsList] = useState<ModelInfo[]>([])
@@ -155,12 +164,25 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [showContextNudge, setShowContextNudge] = useState(false)
   const contextNudgeShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const readingPosition = useRef(0)
+  const restoringReadingPosition = useRef(false)
   // Docs dropped this session — shown as "processing…" until the docs poll
   // confirms readiness, so a freshly dropped file's chip reflects state at once.
   const [justDroppedUuids, setJustDroppedUuids] = useState<Set<string>>(new Set())
   // Latest poll'd task_status per dropped uuid, so the in-chat processing cell
   // can show the live stage ("Reading text…", "Indexing…") and progress.
   const [dropStatusByUuid, setDropStatusByUuid] = useState<Record<string, string | null>>({})
+  const [documentErrors, setDocumentErrors] = useState<Record<string, string>>({})
+  useEffect(() => {
+    // A retry started in Files supersedes the previous processing failure.
+    const resumed = selectedDocsProcessing.filter(doc => doc.status && !/error|fail/i.test(doc.status))
+    setDocumentErrors(prev => {
+      if (!resumed.some(doc => doc.uuid in prev)) return prev
+      const next = { ...prev }
+      resumed.forEach(doc => { delete next[doc.uuid] })
+      return next
+    })
+  }, [selectedDocsProcessing])
   // Dropped uuids that just finished, kept briefly so the cell shows a clear
   // "Ready" / "Couldn't process" confirmation before fading out.
   const [recentlyReady, setRecentlyReady] = useState<Record<string, 'ready' | 'error'>>({})
@@ -284,10 +306,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
-    if (!el) return
+    if (!el || el.offsetParent === null || restoringReadingPosition.current) return
+    readingPosition.current = el.scrollTop
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
     setShowScrollDown(distFromBottom > 80)
   }, [])
+
+  // Hiding a panel can clamp its scroll position as its dimensions collapse.
+  // Restore the last visible reading position when returning from a source or editor.
+  useLayoutEffect(() => {
+    const el = scrollContainerRef.current
+    if (!el || el.offsetParent === null) return
+    const top = readingPosition.current
+    restoringReadingPosition.current = true
+    el.scrollTo({ top, behavior: 'instant' })
+    const frame = requestAnimationFrame(() => {
+      el.scrollTo({ top, behavior: 'instant' })
+      restoringReadingPosition.current = false
+    })
+    return () => { cancelAnimationFrame(frame); restoringReadingPosition.current = false }
+  }, [workspaceMode, activeRightTab, openWorkflowId, openExtractionId, openAutomationId])
 
   // Incoming content never auto-scrolls the view — it accumulates below the
   // fold and the scroll-down arrow appears, so reading isn't interrupted.
@@ -331,7 +369,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const scrollToBottom = useCallback(() => {
     setShowScrollDown(false)
     const el = scrollContainerRef.current
-    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+    if (el) requestAnimationFrame(() => el.scrollTo({ top: el.scrollHeight, left: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }))
   }, [])
 
   useEffect(() => {
@@ -435,6 +473,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       })
       const done = ok.filter(({ r }) => r.complete || !!r.raw_text || !!r.error_message)
       if (done.length) {
+        setDocumentErrors(prev => {
+          const next = { ...prev }
+          for (const { u, r } of done) {
+            if (r.error_message) next[u] = r.error_message
+            else delete next[u]
+          }
+          return next
+        })
         // Flag each finished doc as ready/errored for a brief grace window, then
         // clear it so the cell can collapse once the user has seen the result.
         setRecentlyReady(prev => {
@@ -463,6 +509,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [justDroppedUuids])
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+    if (chatUploads.uploading || linkLoading) {
+      toast('Wait for the attachment transfer to finish before sending.', 'info')
+      return
+    }
     // Auto-hold: if the user attached document(s) that aren't readable yet,
     // don't fire a question at a file the model can't see. Queue it and let the
     // readiness effect below auto-send once text extraction finishes.
@@ -490,16 +540,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // without re-subscribing on every render (handleSend isn't memoized).
   const handleSendRef = useRef(handleSend)
   handleSendRef.current = handleSend
-
-  // Auto-fire a held message once all attached docs are readable. A doc that
-  // errored out counts as "ready" (isDocReady), so the turn fires and the
-  // backend explains the failure rather than the message hanging forever.
-  useEffect(() => {
-    if (!heldMessage || anySelectedProcessing || isStreaming) return
-    const { message, includeOnboardingContext } = heldMessage
-    setHeldMessage(null)
-    handleSendRef.current(message, includeOnboardingContext)
-  }, [heldMessage, anySelectedProcessing, isStreaming])
 
   // When the user attaches content right after the assistant asked for it, keep
   // the conversation moving instead of leaving the assistant idle. We queue a
@@ -533,61 +573,38 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const queryClient = useQueryClient()
 
-  const handleAttachFile = async (files: File[]) => {
-    // Dedup by filename against what's already attached so a second drop of the
-    // same file doesn't silently create a duplicate document (and OCR job).
+  const chatUploads = useChatUploads((uuid, file) => {
+    setSelectedDocUuids(prev => prev.includes(uuid) ? prev : [...prev, uuid])
+    setSelectedDocNames(prev => ({ ...prev, [uuid]: file.name }))
+    setJustDroppedUuids(prev => new Set([...prev, uuid]))
+    void queryClient.invalidateQueries({ queryKey: ['documents'] })
+    maybeContinueAfterAttach(`"${file.name}"`)
+  })
+  // Auto-fire a held message once all attached docs are readable. A doc that
+  // errored out counts as "ready" (isDocReady), so the turn fires and the
+  // backend explains the failure rather than the message hanging forever.
+  useEffect(() => {
+    if (!heldMessage || anySelectedProcessing || chatUploads.uploading || linkLoading || isStreaming) return
+    const { message, includeOnboardingContext } = heldMessage
+    setHeldMessage(null)
+    handleSendRef.current(message, includeOnboardingContext)
+  }, [heldMessage, anySelectedProcessing, chatUploads.uploading, linkLoading, isStreaming])
+
+  const attachLoading = chatUploads.uploading || linkLoading
+  const handleAttachFile = (files: File[]) => {
     const { toUpload: uploadNames, dupes } = partitionNewFiles(
-      files.map(f => f.name),
-      Object.values(selectedDocNames),
+      files.map(file => file.name),
+      [...selectedDocUuids.map(uuid => selectedDocNames[uuid]).filter(Boolean), ...chatUploads.uploads.map(item => item.file.name)],
     )
     const uploadSet = new Set(uploadNames)
     const seen = new Set<string>()
-    const toUpload = files.filter(f => {
-      if (!uploadSet.has(f.name) || seen.has(f.name)) return false
-      seen.add(f.name)
+    const toUpload = files.filter(file => {
+      if (!uploadSet.has(file.name) || seen.has(file.name)) return false
+      seen.add(file.name)
       return true
     })
-    if (dupes.length > 0) {
-      toast(`${dupes[0]}${dupes.length > 1 ? ` and ${dupes.length - 1} more` : ''} already attached`, 'info')
-    }
-    if (toUpload.length === 0) return
-
-    setAttachLoading(true)
-    try {
-      // Upload to the file browser (single source of truth) and auto-select
-      const newNames: Record<string, string> = {}
-      const newUuids: string[] = []
-      for (const file of toUpload) {
-        const ext = file.name.split('.').pop() || ''
-        const base64 = await fileToBase64(file)
-        const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
-        if (result.uuid) {
-          newUuids.push(result.uuid)
-          newNames[result.uuid] = file.name
-        }
-      }
-      if (newUuids.length > 0) {
-        setSelectedDocUuids([...selectedDocUuids, ...newUuids])
-        setSelectedDocNames({ ...selectedDocNames, ...newNames })
-        // Mark as just-dropped so the chip shows "processing…" immediately,
-        // before the documents poll has a chance to report status.
-        setJustDroppedUuids(prev => {
-          const next = new Set(prev)
-          newUuids.forEach(u => next.add(u))
-          return next
-        })
-        queryClient.invalidateQueries({ queryKey: ['documents'] })
-        const label = newUuids.length === 1 ? newNames[newUuids[0]] : `${newUuids.length} files`
-        toast(`Added ${label}, processing…`, 'success')
-        maybeContinueAfterAttach(
-          newUuids.length === 1 ? `"${newNames[newUuids[0]]}"` : `${newUuids.length} documents`,
-        )
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
-    } finally {
-      setAttachLoading(false)
-    }
+    if (dupes.length) toast(`${dupes[0]}${dupes.length > 1 ? ` and ${dupes.length - 1} more` : ''} already added. Retry failed uploads below.`, 'info')
+    chatUploads.add(toUpload)
   }
 
   // Share what this chat is looking at, so a co-worker doesn't rebuild it
@@ -616,7 +633,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleAttachLink = async (url: string) => {
-    setAttachLoading(true)
+    setLinkLoading(true)
     try {
       const result = await addLink(url, activityId)
       setUrlAttachments((prev) => [
@@ -635,7 +652,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to add website', 'error')
     } finally {
-      setAttachLoading(false)
+      setLinkLoading(false)
     }
   }
 
@@ -784,7 +801,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const homeActionsDisabled = attachLoading || !!processingDoc
-  const showFirstSessionHome = effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading
+  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && messages.length === 0 && !isStreaming && !onboardingLoading
   const showReturningHome = !effectiveFirstSession
     && messages.length === 0
     && !isStreaming
@@ -793,7 +810,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     && !activeProjectUuid
     && !activeKBUuid
     && !hasDocContext
-  const showContextualEmptyState = !effectiveFirstSession
+  const showContextualEmptyState = (!effectiveFirstSession || hasDocContext)
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
@@ -843,9 +860,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         selectedDocUuids={selectedDocUuids}
         selectedDocNames={selectedDocNames}
         processingByUuid={processingByUuid}
+        documentErrors={documentErrors}
         selectedFolderUuids={selectedFolderUuids}
         selectedFolderNames={selectedFolderNames}
         knowledgeBases={activeKBs}
+        knowledgeHealth={knowledgeHealth}
         onDetachKB={detachKB}
         onShareKB={(kb) => shareLink('kb', kb.uuid, kb.title || undefined)}
         onShareSetup={
@@ -869,16 +888,34 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         }}
       />
 
-      {attachLoading && (
-        <div className="flex items-center gap-2 border-b border-gray-200 bg-[color-mix(in_srgb,var(--highlight-color),white_90%)] px-4 py-2 text-xs text-highlight-on-light">
-          <div className="chat-loader" style={{ width: 30 }} />
-          Processing document... This may take a moment for PDFs and scanned files.
+      {chatUploads.uploads.length > 0 && (
+        <div className="chat-upload-list" aria-label="File uploads">
+          {chatUploads.uploads.map(upload => (
+            <div key={upload.id} className="chat-upload-item">
+              <div role="status"><strong>{upload.file.name}</strong><span>
+                {upload.status === 'uploading' ? 'Uploading…' : upload.status === 'canceled' ? 'Upload canceled. Check Files before retrying if the transfer had already reached the server.' : `Upload failed: ${upload.error}`}
+              </span></div>
+              {upload.status === 'uploading'
+                ? <button type="button" onClick={() => chatUploads.cancel(upload.id)} aria-label={`Cancel upload: ${upload.file.name}`}>Cancel upload</button>
+                : <><button type="button" onClick={() => chatUploads.retry(upload)} aria-label={`Retry upload: ${upload.file.name}`}>Retry</button><button type="button" onClick={() => chatUploads.dismiss(upload.id)} aria-label={`Dismiss upload: ${upload.file.name}`}>Dismiss</button></>}
+            </div>
+          ))}
         </div>
       )}
 
+      {linkLoading && <div role="status" className="px-4 py-2 text-sm text-gray-600">Adding website…</div>}
+      {effectiveFirstSession && (hasDocContext || messages.length > 0) && (
+        <div className="first-task-progress" role="status">
+          <strong>{messages.some(message => message.role === 'assistant') ? '3. Check the evidence' : '2. Ask a question'}</strong>
+          <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
+        </div>
+      )}
       {/* Messages area */}
       <div
         ref={scrollContainerRef}
+        role="region"
+        aria-label="Conversation"
+        tabIndex={0}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
@@ -922,24 +959,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {showContextualEmptyState && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
-              className="relative overflow-hidden text-white"
+              className="relative overflow-hidden"
               style={{
-                padding: '28px 24px',
+                padding: '18px 20px',
                 borderRadius: 'var(--ui-radius, 12px)',
-                background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
+                background: '#f6f8fa', color: '#30363d', border: '1px solid #dfe3e6',
                 transition: 'filter 0.3s ease',
               }}
             >
-              <div
-                style={{
-                  position: 'absolute', top: '-50%', left: '-50%',
-                  width: '200%', height: '200%',
-                  background: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%)',
-                  animation: 'rotateBG 32s linear infinite',
-                }}
-              />
               <div className="relative z-[1] flex items-center gap-4">
-                <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                <div className="shrink-0">
                   {bannerProcessingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
                   ) : activeProjectUuid ? (
@@ -990,11 +1019,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </div>
               </div>
               {bannerProcessingDoc && (
-                <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+                <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: '#dfe3e6', overflow: 'hidden' }}>
                   <div
                     className="animate-pulse"
                     style={{
-                      height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.7)',
+                      height: '100%', borderRadius: 2, backgroundColor: '#806600',
                       width: `${Math.round(stageCopy(bannerProcessingDoc.status).progress * 100)}%`,
                       transition: 'width 0.5s ease',
                     }}
@@ -1138,7 +1167,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             )}
 
             {/* Getting-started stepper for returning users who haven't finished basics */}
-            {onboardingStatus && (
+            {onboardingStatus && !effectiveFirstSession && (
               <div style={{ marginTop: 12 }}>
                 <OnboardingStepper
                   status={onboardingStatus}
@@ -1358,7 +1387,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {/* Live task checklist for multi-step agent work (Phase 8). */}
-        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} />}
+        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} isStreaming={isStreaming} />}
 
         {/* Auto-compaction can take a while — show progress instead of dead
             air; the context_notice that follows reports the outcome. */}
@@ -1539,6 +1568,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         />
       )}
 
+      {(attachLoading || anySelectedProcessing) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
       {/* Input. Typing stays enabled while a turn streams (Phase 10):
           submits mid-run queue into the current turn instead of sending. */}
       <ChatInput
@@ -1547,6 +1577,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onAttachLink={handleAttachLink}
         onAddKnowledge={() => setShowAttachKB(true)}
         disabled={false}
+        sendDisabled={attachLoading}
         isStreaming={isStreaming}
         onStop={stop}
         selectedModel={selectedModel}
@@ -1597,16 +1628,4 @@ function downloadBlob(blob: Blob, filename: string) {
   a.download = filename
   a.click()
   URL.revokeObjectURL(url)
-}
-
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      resolve(result.split(',')[1])
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
 }

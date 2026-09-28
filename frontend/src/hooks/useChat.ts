@@ -104,6 +104,7 @@ export function useChat() {
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
       lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuids, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
+      setPlanTasks(null) // The previous turn's plan must not label this new action.
       setErrorDetails(null)
       setIsStreaming(true)
       setStreamingContent('')
@@ -129,10 +130,10 @@ export function useChat() {
       // Build and append an assistant message from whatever has accumulated so
       // far. Shared by the normal-completion, user-stop, and network-failure
       // paths so a partial response is never silently discarded.
-      const commitAssistantMessage = () => {
+      const commitAssistantMessage = (interruption?: 'stopped' | 'connection') => {
         const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
-        if (!finalContent && toolResultsRef.current.length === 0) return
-        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent }
+        if (!finalContent && toolResultsRef.current.length === 0 && toolCallsRef.current.length === 0) return
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent, ...(interruption ? { interruption } : {}) }
         if (thinkingRef.current) {
           assistantMsg.thinking = thinkingRef.current
           if (thinkingDurationRef.current != null) {
@@ -312,15 +313,14 @@ export function useChat() {
           (e instanceof DOMException && e.name === 'AbortError') ||
           (e instanceof Error && e.name === 'AbortError')
         if (wasAborted) {
-          // User hit Stop. Keep whatever partial content streamed — the backend
-          // persisted it on its side; mirror that in the local message list so
-          // the UI doesn't lose the response.
-          commitAssistantMessage()
+          // Keep partial output locally. Stopping the stream does not establish
+          // whether an already-started server action completed or was canceled.
+          commitAssistantMessage('stopped')
         } else {
           // Network drop or stalled stream. Preserve the partial response (same
           // as the Stop path) so the user doesn't lose a half-written answer,
           // then surface a recoverable, plain-language error.
-          commitAssistantMessage()
+          commitAssistantMessage('connection')
           const friendly = toFriendlyError(e)
           setError(friendly)
           setErrorDetails({ message: friendly })
@@ -385,15 +385,15 @@ export function useChat() {
     setErrorDetails(null)
   }, [])
 
-  /** Re-send the last message, dropping the failed exchange so it isn't duplicated. */
+  /** Re-send without discarding a partial reply or its completed artifacts. */
   const retry = useCallback(() => {
     const args = lastSendArgsRef.current
     if (!args) return
     setMessages((prev) => {
       const next = [...prev]
-      // Drop a committed partial assistant reply, then the user message —
-      // send() re-appends the user message itself.
-      if (next.length && next[next.length - 1].role === 'assistant') next.pop()
+      // With no assistant output, replace the unanswered user message. If
+      // partial output exists, retain that exchange as the record of work
+      // already attempted; send() appends the explicitly requested retry.
       if (next.length && next[next.length - 1].role === 'user') next.pop()
       return next
     })

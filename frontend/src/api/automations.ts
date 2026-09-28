@@ -9,7 +9,7 @@ export function getAutomation(id: string) {
   return apiFetch<Automation>(`/api/automations/${id}`)
 }
 
-export function createAutomation(data: { name: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean }) {
+export function createAutomation(data: { name: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean; output_config?: Record<string, unknown> }) {
   return apiFetch<Automation>('/api/automations', { method: 'POST', body: JSON.stringify(data) })
 }
 

@@ -3,14 +3,11 @@ import {
   AlertTriangle,
   ArrowRight,
   Award,
-  BookOpen,
   CheckCircle2,
   Clock3,
   FileSearch,
   FileUp,
   MessageSquare,
-  Shield,
-  Sparkles,
   Workflow,
   Zap,
   type LucideIcon,
@@ -18,6 +15,7 @@ import {
 import type { OnboardingStatus, RecentActivityItem } from '../../api/config'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { ConceptStrip } from './ConceptTip'
+import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 import { OnboardingStepper } from './WelcomeExperience'
 
 /**
@@ -64,12 +62,6 @@ const FIRST_RUN_PROMPTS = [
   },
 ] as const
 
-const FIRST_RUN_TRUST_SIGNALS = [
-  'Every answer links back to source passages you can review.',
-  'Validated templates carry measured quality signals, not vague confidence language.',
-  'Documents, workflows, and knowledge stay scoped to your workspace.',
-]
-
 const DEFAULT_RETURNING_PROMPTS = [
   'Summarize my latest document in 5 bullets.',
   'Extract deadlines, owners, and deliverables from my latest documents.',
@@ -89,6 +81,7 @@ function UploadPrimaryButton({
   onAttachFiles,
 }: UploadPrimaryButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { accept } = useUploadPolicy()
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
@@ -126,6 +119,7 @@ function UploadPrimaryButton({
       <input
         ref={inputRef}
         type="file"
+        accept={accept}
         multiple
         className="hidden"
         aria-label={label}
@@ -147,6 +141,7 @@ function UploadPillButton({
   onAttachFiles: (files: File[]) => void
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
+  const { accept } = useUploadPolicy()
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
@@ -182,6 +177,7 @@ function UploadPillButton({
       <input
         ref={inputRef}
         type="file"
+        accept={accept}
         multiple
         className="hidden"
         aria-label={label}
@@ -427,49 +423,6 @@ function SurfaceCard({
   )
 }
 
-function MetricChip({
-  icon: Icon,
-  label,
-  value,
-  tone = 'neutral',
-}: {
-  icon: LucideIcon
-  label: string
-  value: string
-  tone?: 'neutral' | 'warning'
-}) {
-  const palette = tone === 'warning'
-    ? {
-        background: 'rgba(234,179,8,0.10)',
-        border: 'rgba(234,179,8,0.26)',
-        text: '#854d0e',
-      }
-    : {
-        background: 'rgba(255,255,255,0.14)',
-        border: 'rgba(255,255,255,0.22)',
-        text: '#ffffff',
-      }
-
-  return (
-    <div
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '8px 10px',
-        borderRadius: 999,
-        border: `1px solid ${palette.border}`,
-        background: palette.background,
-        color: palette.text,
-      }}
-    >
-      <Icon size={14} />
-      <span style={{ fontSize: 12, fontWeight: 600 }}>{label}</span>
-      <span style={{ fontSize: 12, opacity: 0.88 }}>{value}</span>
-    </div>
-  )
-}
-
 function PromptButton({
   label,
   onClick,
@@ -552,18 +505,6 @@ function returningHeroTitle(status: OnboardingStatus | null): string {
   if ((status?.unprocessed_doc_count ?? 0) > 0) return 'Your latest documents are ready'
   if (status?.has_documents) return 'Jump back into active work'
   return 'Start with one real document'
-}
-
-function returningHeroSubtitle(status: OnboardingStatus | null): string {
-  if (status?.daily_guidance) return status.daily_guidance
-  if (status?.since_last_visit) return status.since_last_visit
-  if (status?.has_only_onboarding_docs) {
-    return 'You have seen the sample flow. Upload one of your own documents so the home screen can reflect your real files, tasks, and follow-up work.'
-  }
-  if (status?.has_documents) {
-    return 'Use this home to continue recent runs, review anything that drifted, or start the next grounded task without rebuilding context.'
-  }
-  return 'The product becomes meaningfully better once it has one of your files, policies, or proposals to work from.'
 }
 
 function starterSuggestions(status: OnboardingStatus | null, suggestionPills: string[]): string[] {
@@ -710,15 +651,6 @@ function deriveReturningPrimaryAction(
   }
 }
 
-function returningReadyState(status: OnboardingStatus | null): string {
-  if (!status) return 'Waiting for files'
-  if (status.has_ready_knowledge_base && status.has_workflows) return 'Knowledge base + workflows ready'
-  if (status.has_ready_knowledge_base) return 'Knowledge base ready'
-  if (status.has_workflows) return 'Workflow ready'
-  if (status.has_documents) return 'Documents loaded'
-  return 'Waiting for your files'
-}
-
 function FocusNowCard({
   action,
   disabled,
@@ -755,10 +687,10 @@ function FocusNowCard({
       style={{
         padding: 16,
         borderRadius: 16,
-        border: '1px solid rgba(255,255,255,0.18)',
-        background: 'rgba(255,255,255,0.10)',
+        border: '1px solid #dce1e5',
+        background: '#f7f8f9',
         backdropFilter: 'blur(8px)',
-        boxShadow: '0 18px 36px rgba(0,0,0,0.10)',
+        boxShadow: 'none',
       }}
     >
       <div
@@ -768,12 +700,12 @@ function FocusNowCard({
           gap: 7,
           padding: '5px 9px',
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.12)',
+          background: '#edf0f2',
           fontSize: 11,
-          fontWeight: 800,
+          fontWeight: 650,
           letterSpacing: '0.05em',
           textTransform: 'uppercase',
-          color: 'rgba(255,255,255,0.78)',
+          color: '#59616b',
         }}
       >
         {action.eyebrow}
@@ -788,17 +720,17 @@ function FocusNowCard({
             width: 38,
             height: 38,
             borderRadius: 12,
-            background: 'rgba(255,255,255,0.12)',
+            background: '#edf0f2',
             flexShrink: 0,
           }}
         >
           <Icon size={18} />
         </div>
         <div>
-          <div style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 800, color: '#ffffff' }}>
+          <div style={{ fontSize: 18, lineHeight: 1.15, fontWeight: 650, color: '#242b32' }}>
             {action.title}
           </div>
-          <div style={{ marginTop: 7, fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.84)' }}>
+          <div style={{ marginTop: 7, fontSize: 13, lineHeight: 1.55, color: '#59616b' }}>
             {action.description}
           </div>
         </div>
@@ -824,11 +756,11 @@ function FocusNowCard({
               padding: '11px 16px',
               borderRadius: 12,
               border: 'none',
-              background: '#ffffff',
+              background: 'var(--highlight-color, #eab308)',
               color: '#111827',
               fontFamily: 'inherit',
               fontSize: 14,
-              fontWeight: 800,
+              fontWeight: 650,
               cursor: disabled ? 'default' : 'pointer',
               opacity: disabled ? 0.55 : 1,
             }}
@@ -953,7 +885,7 @@ function ResumeQueue({
   return (
     <SurfaceCard
       title="Continue where you left off"
-      subtitle="Use actual workspace state, not a generic blank chat, to decide the fastest next move."
+      subtitle="Recent runs and items that need your attention."
     >
       {status.since_last_visit && (
         <div
@@ -1082,462 +1014,55 @@ interface SharedHomeProps {
   onSendMessage: (message: string) => void
 }
 
-export function FirstSessionHome({
-  orgName,
-  brandIcon,
-  disabled,
-  onRunDemo,
-  onAttachFiles,
-  onSendMessage,
-}: SharedHomeProps) {
+export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onSendMessage }: SharedHomeProps) {
   const certCta = useCertificationCta()
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div
-        className="relative overflow-hidden text-white"
-        style={{
-          padding: '20px 22px',
-          borderRadius: 'var(--ui-radius, 12px)',
-          background: 'linear-gradient(135deg, #7c2d12, color-mix(in srgb, var(--highlight-color, #eab308) 74%, #ffffff 26%))',
-          boxShadow: '0 22px 40px rgba(124,45,18,0.16)',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            top: '-40%',
-            right: '-15%',
-            width: '58%',
-            height: '180%',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0))',
-            transform: 'rotate(28deg)',
-          }}
-        />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div
-            style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '5px 10px',
-            borderRadius: 999,
-            background: 'rgba(255,255,255,0.14)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
-        >
-          Start here
-        </div>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: 16,
-              alignItems: 'start',
-              marginTop: 14,
-            }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 40,
-                    height: 40,
-                    borderRadius: 13,
-                    background: 'rgba(255,255,255,0.14)',
-                    flexShrink: 0,
-                  }}
-                >
-                  {brandIcon ? (
-                    <img
-                      src={brandIcon}
-                      alt={orgName}
-                      style={{ width: 22, height: 22, objectFit: 'contain' }}
-                    />
-                  ) : (
-                    <Sparkles size={18} />
-                  )}
-                </div>
-                <div>
-                  <div style={{ fontSize: 24, lineHeight: 1.08, fontWeight: 800, maxWidth: 420 }}>
-                    Turn complex documents into answers you can verify.
-                  </div>
-                  <div style={{ marginTop: 9, fontSize: 14, lineHeight: 1.55, maxWidth: 440, opacity: 0.92 }}>
-                    Upload one of your own files or run the sample demo. {orgName} extracts deadlines,
-                    budget details, and compliance risks with source-linked evidence you can audit.
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 8,
-                  alignItems: 'center',
-                  marginTop: 16,
-                }}
-              >
-                <UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} />
-                <ActionPillButton label="Run sample demo" icon={Zap} inverse disabled={disabled} onClick={onRunDemo} />
-                {certCta && (
-                  <ActionPillButton
-                    label={certCta.label}
-                    icon={Award}
-                    inverse
-                    disabled={disabled}
-                    onClick={() => onSendMessage(certCta.message)}
-                  />
-                )}
-              </div>
-
-              <div
-                style={{
-                  marginTop: 14,
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: 'rgba(255,255,255,0.84)',
-                  maxWidth: 470,
-                }}
-              >
-                Source-linked answers, measured quality signals, and workflows built for research administration.
-              </div>
-            </div>
-
-            <SampleAnswerPreview inverse />
-          </div>
-        </div>
+    <div className="chat-home first-session-home">
+      <div className="chat-home-heading">
+        {brandIcon && <img src={brandIcon} alt="" />}
+        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>Start with a document. Find an answer.</h2><p>Upload a file or try the sample, then ask a question and inspect its supporting sources.</p></div>
       </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <SurfaceCard
-          title="Start with a real task"
-          subtitle="These prompts get you to a useful result fast instead of teaching product vocabulary first."
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {FIRST_RUN_PROMPTS.map((prompt) => (
-              <PromptButton
-                key={prompt.label}
-                label={prompt.label}
-                onClick={() => onSendMessage(prompt.prompt)}
-              />
-            ))}
-          </div>
+      <ol className="first-task-steps" aria-label="Your first task"><li aria-current="step"><strong>1</strong> Choose a document</li><li><strong>2</strong> Ask a question</li><li><strong>3</strong> Check the evidence</li></ol>
+      <div className="home-primary-actions"><UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} /><ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} /></div>
+      <div className="home-two-columns">
+        <SurfaceCard title="Questions to try" subtitle="Once your file is attached, start with a specific question.">
+          {FIRST_RUN_PROMPTS.map(prompt => <PromptButton key={prompt.label} label={prompt.label} onClick={() => onSendMessage(prompt.prompt)} />)}
         </SurfaceCard>
-
-        <SurfaceCard
-          title="Why the first answer feels trustworthy"
-          subtitle="You should see the answer, source passage, and a reusable structure in one pass."
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
-            {FIRST_RUN_TRUST_SIGNALS.map((item) => (
-              <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                <CheckCircle2
-                  size={16}
-                  style={{ marginTop: 2, flexShrink: 0, color: 'var(--highlight-on-light, #806600)' }}
-                />
-                <div style={{ fontSize: 13, lineHeight: 1.55, color: '#374151' }}>{item}</div>
-              </div>
-            ))}
-          </div>
-
-          <div
-            style={{
-              marginTop: 14,
-              padding: 12,
-              borderRadius: 12,
-              background: 'color-mix(in srgb, var(--highlight-color, #eab308) 7%, white)',
-              border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, #e5e7eb)',
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              What you should notice
-            </div>
-            <div style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                  Exact field extracted
-                </div>
-                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                  Source passage attached
-                </div>
-                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
-                  Reusable in a template
-                </div>
-              </div>
-              <div style={{ fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
-                The demo should immediately show that Vandalizer is not just answering; it is pulling a specific fact, showing where it came from, and leaving you with a pattern you can reuse on your own files.
-              </div>
-            </div>
-          </div>
-        </SurfaceCard>
+        <SampleAnswerPreview />
       </div>
-
+      <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
       <GlossaryDisclosure />
+      {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     </div>
   )
 }
 
-export function ReturningHome({
-  orgName,
-  brandIcon,
-  disabled,
-  onRunDemo,
-  onAttachFiles,
-  onFocusComposer,
-  onSendMessage,
-  status,
-  suggestionPills,
-}: SharedHomeProps & {
-  status: OnboardingStatus | null
-  suggestionPills: string[]
-}) {
+export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onSendMessage, status, suggestionPills }: SharedHomeProps & { status: OnboardingStatus | null; suggestionPills: string[] }) {
   const certCta = useCertificationCta()
   const primaryAction = deriveReturningPrimaryAction(status, orgName)
-  const alerts = status?.active_alerts.length ?? 0
-  const suggestions = starterSuggestions(status, suggestionPills)
-  const emphasizeUpload = !status?.has_documents || !!status?.has_only_onboarding_docs
-  const showBasicsStepper = !!status
-    && ['newcomer', 'explorer'].includes(status.maturity_stage)
-    && (!status.has_documents || status.has_only_onboarding_docs)
-  const showGlossary = !!status && !status.has_documents && ['newcomer', 'explorer'].includes(status.maturity_stage)
-  const readyBadges = [
-    status?.top_extraction_set_name ? `Extraction: ${status.top_extraction_set_name}` : null,
-    status?.top_workflow_name ? `Workflow: ${status.top_workflow_name}` : null,
-    status?.has_ready_knowledge_base ? 'Knowledge base ready' : null,
-  ].filter((value): value is string => !!value)
-
+  const suggestions = starterSuggestions(status, suggestionPills).slice(0, 3)
+  const hasQueue = !!status && (status.recent_activity.length > 0 || status.active_alerts.length > 0 || status.unprocessed_doc_count > 0 || status.has_only_onboarding_docs)
+  const readyBadges = [status?.top_extraction_set_name ? `Extraction: ${status.top_extraction_set_name}` : null, status?.top_workflow_name ? `Workflow: ${status.top_workflow_name}` : null, status?.has_ready_knowledge_base ? 'Knowledge base ready' : null].filter((value): value is string => !!value)
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div
-        className="relative overflow-hidden text-white"
-        style={{
-          padding: '22px 24px',
-          borderRadius: 'var(--ui-radius, 12px)',
-          background: 'linear-gradient(135deg, #1f2937, color-mix(in srgb, var(--highlight-color, #eab308) 58%, #ffffff 18%))',
-          boxShadow: '0 22px 40px rgba(17,24,39,0.14)',
-        }}
-      >
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 45%)',
-          }}
-        />
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 1,
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-            gap: 16,
-            alignItems: 'start',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 42,
-                  height: 42,
-                  borderRadius: 14,
-                  background: 'rgba(255,255,255,0.14)',
-                  flexShrink: 0,
-                }}
-              >
-                {brandIcon ? (
-                  <img
-                    src={brandIcon}
-                    alt={orgName}
-                    style={{ width: 22, height: 22, objectFit: 'contain' }}
-                  />
-                ) : (
-                  <Clock3 size={18} />
-                )}
-              </div>
-              <div>
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 7,
-                    padding: '5px 10px',
-                    borderRadius: 999,
-                    background: 'rgba(255,255,255,0.12)',
-                    fontSize: 11,
-                    fontWeight: 800,
-                    letterSpacing: '0.05em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Workspace home
-                </div>
-                <div style={{ marginTop: 10, fontSize: 30, lineHeight: 1.08, fontWeight: 800, maxWidth: 520 }}>
-                  {returningHeroTitle(status)}
-                </div>
-                <div style={{ marginTop: 10, fontSize: 15, lineHeight: 1.6, maxWidth: 560, opacity: 0.92 }}>
-                  {returningHeroSubtitle(status)}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-              <MetricChip
-                icon={Clock3}
-                label="Recent"
-                value={
-                  status?.recent_activity[0]?.relative_time
-                    ? status.recent_activity[0].relative_time
-                    : status?.has_documents
-                      ? 'Ready for next task'
-                      : 'No runs yet'
-                }
-              />
-              <MetricChip
-                icon={AlertTriangle}
-                label="Needs review"
-                value={alerts > 0 ? `${alerts} item${alerts === 1 ? '' : 's'}` : 'Clear'}
-                tone={alerts > 0 ? 'warning' : 'neutral'}
-              />
-              <MetricChip
-                icon={status?.has_ready_knowledge_base ? BookOpen : status?.has_workflows ? Workflow : FileSearch}
-                label="Ready"
-                value={returningReadyState(status)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-              {!emphasizeUpload ? (
-                <>
-                  <ActionPillButton
-                    label="Ask about current work"
-                    icon={MessageSquare}
-                    inverse
-                    disabled={disabled}
-                    onClick={onFocusComposer}
-                  />
-                  <UploadPillButton
-                    label="Upload another document"
-                    inverse
-                    disabled={disabled}
-                    onAttachFiles={onAttachFiles}
-                  />
-                </>
-              ) : (
-                <>
-                  <UploadPillButton
-                    label="Upload a document"
-                    inverse
-                    disabled={disabled}
-                    onAttachFiles={onAttachFiles}
-                  />
-                  <ActionPillButton
-                    label="Run sample demo"
-                    icon={Zap}
-                    inverse
-                    disabled={disabled}
-                    onClick={onRunDemo}
-                  />
-                </>
-              )}
-              {certCta && (
-                <ActionPillButton
-                  label={certCta.label}
-                  icon={Award}
-                  inverse
-                  disabled={disabled}
-                  onClick={() => onSendMessage(certCta.message)}
-                />
-              )}
-            </div>
-          </div>
-
-          <FocusNowCard
-            action={primaryAction}
-            disabled={disabled}
-            onRunDemo={onRunDemo}
-            onAttachFiles={onAttachFiles}
-            onFocusComposer={onFocusComposer}
-            onSendMessage={onSendMessage}
-          />
-        </div>
+    <div className="chat-home">
+      <div className="chat-home-heading">
+        {brandIcon && <img src={brandIcon} alt="" />}
+        <div><span className="home-eyebrow">Your workspace</span><h2>{returningHeroTitle(status)}</h2>{status?.daily_guidance && <p>{status.daily_guidance}</p>}</div>
       </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-          gap: 12,
-          alignItems: 'start',
-        }}
-      >
-        <ResumeQueue status={status} onSendMessage={onSendMessage} />
-
-        <SurfaceCard
-          title="Fastest next steps"
-          subtitle="These are prompt-shaped shortcuts back into real work, based on what exists in the workspace today."
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {suggestions.map((suggestion) => (
-              <PromptButton
-                key={suggestion}
-                label={suggestion}
-                onClick={() => onSendMessage(suggestion)}
-              />
-            ))}
-          </div>
-
-          <div
-            style={{
-              marginTop: 16,
-              padding: 12,
-              borderRadius: 12,
-              background: 'color-mix(in srgb, var(--highlight-color, #eab308) 7%, white)',
-              border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, #e5e7eb)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <Shield size={14} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Ready in this workspace
-              </span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {readyBadges.length > 0 ? (
-                readyBadges.map((badge) => <ReadyAssetBadge key={badge} label={badge} />)
-              ) : (
-                <div style={{ fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
-                  Upload a real document and the home screen will start surfacing reusable assets instead of generic prompts.
-                </div>
-              )}
-            </div>
-          </div>
+      <FocusNowCard action={primaryAction} disabled={disabled} onRunDemo={onRunDemo} onAttachFiles={onAttachFiles} onFocusComposer={onFocusComposer} onSendMessage={onSendMessage} />
+      <div className="home-primary-actions">
+        {primaryAction.kind !== 'upload' && <UploadPillButton label="Upload another document" disabled={disabled} onAttachFiles={onAttachFiles} />}
+        {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}
+      </div>
+      <div className="home-two-columns">
+        {hasQueue && <ResumeQueue status={status} onSendMessage={onSendMessage} />}
+        <SurfaceCard title="Suggested questions" subtitle="Start from your existing documents and tools.">
+          {suggestions.map(suggestion => <PromptButton key={suggestion} label={suggestion} onClick={() => onSendMessage(suggestion)} />)}
         </SurfaceCard>
       </div>
-
-      {showBasicsStepper && status && (
-        <OnboardingStepper
-          status={status}
-          hasChatAboutDocs={status.has_chatted_with_docs}
-        />
-      )}
-
-      {showGlossary && <GlossaryDisclosure />}
+      {readyBadges.length > 0 && <div className="home-ready-assets"><span>Ready in this workspace</span>{readyBadges.map(badge => <ReadyAssetBadge key={badge} label={badge} />)}</div>}
+      {status && !status.has_documents && <OnboardingStepper status={status} hasChatAboutDocs={status.has_chatted_with_docs} />}
+      {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     </div>
   )
 }

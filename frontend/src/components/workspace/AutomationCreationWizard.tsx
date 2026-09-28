@@ -8,8 +8,9 @@ import { apiFetch } from '../../api/client'
 import { getFeatureFlags } from '../../api/config'
 import { ItemPickerModal } from './ItemPickerModal'
 import { ScheduleConfigFields } from './ScheduleConfigFields'
+import { ConfirmDialog } from '../shared/ConfirmDialog'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
-import { defaultScheduleConfig, isScheduleComplete, scheduleConfigPayload } from '../../utils/schedule'
+import { defaultScheduleConfig, describeSchedule, isScheduleComplete, scheduleConfigPayload } from '../../utils/schedule'
 import type { ActionType, TriggerType } from '../../types/automation'
 import { SUPPORTED_EXTENSIONS } from '../../utils/fileTypes'
 interface Props {
@@ -76,11 +77,19 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [docPickerOpen, setDocPickerOpen] = useState(false)
 
   // Final step: output, enable, share
-  const [enabled, setEnabled] = useState(true)
+  const [discardOpen, setDiscardOpen] = useState(false)
+  const savedAutomationId = useRef<string | null>(null)
+  const submitting = useRef(false)
+  const requestClose = useCallback(() => {
+    if (submitting.current) return
+    if (savedAutomationId.current) { onCreate(savedAutomationId.current); return }
+    if (name.trim() || description.trim() || step > 1) setDiscardOpen(true)
+    else onClose()
+  }, [name, description, step, onClose, onCreate])
   const [sharedWithTeam, setSharedWithTeam] = useState(false)
   const [saveToFolder, setSaveToFolder] = useState(false)
   const [outputFolder, setOutputFolder] = useState('')
-  const [outputFormat, setOutputFormat] = useState('csv')
+  const [outputFormat, setOutputFormat] = useState('text')
   const [emailNotify, setEmailNotify] = useState(false)
   const [emailRecipients, setEmailRecipients] = useState('')
 
@@ -94,9 +103,12 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const actionStep = hasConfigStep ? 4 : 3
   const finalStep = totalSteps
   const configStep = 3 // only used when hasConfigStep
+  const stepLabels = ['Name', 'Trigger', ...(hasConfigStep ? ['Inputs'] : []), 'Action', 'Review & create']
+  const stepHeadingRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (step === 1) nameRef.current?.focus()
+    else stepHeadingRef.current?.focus()
   }, [step])
 
   // Load folders when entering the folder config step or the final step (for output folder)
@@ -118,29 +130,27 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
       return triggerType === 'schedule' ? isScheduleComplete(scheduleConfig) : watchFolderId.length > 0
     }
     if (step === actionStep) return actionId.length > 0
-    if (step === finalStep) return true
+    if (step === finalStep) return (!saveToFolder || !!outputFolder) && (!emailNotify || /^[^\s@,]+@[^\s@,]+\.[^\s@,]+(?:\s*,\s*[^\s@,]+@[^\s@,]+\.[^\s@,]+)*$/.test(emailRecipients.trim()))
     return false
-  }, [step, name, hasConfigStep, configStep, actionStep, finalStep, triggerType, scheduleConfig, watchFolderId, actionId])
+  }, [step, name, hasConfigStep, configStep, actionStep, finalStep, triggerType, scheduleConfig, watchFolderId, actionId, saveToFolder, outputFolder, emailNotify, emailRecipients])
 
   const handleActionTypeChange = (type: ActionType) => {
+    if (type === actionType) return
     setActionType(type)
+    if (type !== 'extraction' && outputFormat === 'csv') setOutputFormat('text')
     setActionId('')
     setActionName('')
   }
 
-  // When trigger type changes away from folder_watch, reset folder config and
-  // clamp step if we're on the folder step that no longer exists
+  // Keep each branch's draft when switching; only the active branch is submitted.
   const handleTriggerTypeChange = (type: TriggerType) => {
     setTriggerType(type)
-    if (type !== 'folder_watch') {
-      setWatchFolderId('')
-      setFileTypes(DEFAULT_FILE_TYPES)
-      setExcludePatterns('')
-      setBatchMode(false)
-    }
+    setCreatingFolder(false)
   }
 
-  const handleCreate = useCallback(async () => {
+  const handleCreate = useCallback(async (activate: boolean) => {
+    if (submitting.current || !canAdvance()) return
+    submitting.current = true
     setCreating(true)
     setError(null)
     try {
@@ -172,7 +182,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         }]
       }
 
-      const auto = await createAutomation({
+      const draft = {
         name: normalizeName(name),
         description: description.trim() || undefined,
         trigger_type: triggerType,
@@ -180,35 +190,38 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         action_type: actionType,
         action_id: actionId || undefined,
         shared_with_team: sharedWithTeam,
-      })
-
-      if (enabled || Object.keys(outputConfig).length > 0) {
-        await updateAutomation(auto.id, {
-          enabled,
-          ...(Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {}),
-        })
+        output_config: outputConfig,
       }
-
-      onCreate(auto.id)
+      // Keep the created ID if activation fails. A retry updates this draft
+      // rather than creating a second automation.
+      if (!savedAutomationId.current) savedAutomationId.current = (await createAutomation(draft)).id
+      await updateAutomation(savedAutomationId.current, { ...draft, enabled: activate })
+      onCreate(savedAutomationId.current)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create automation')
+      const message = err instanceof Error ? err.message : 'Failed to create automation'
+      setError(savedAutomationId.current ? `Your automation was saved, but the final update failed: ${message}. Retry to update the same automation.` : message)
+    } finally {
+      submitting.current = false
       setCreating(false)
     }
-  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, scheduleConfig, actionType, actionId, enabled, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate])
+  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, scheduleConfig, actionType, actionId, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate, canAdvance])
 
-  // Keyboard: Escape closes, Enter advances/submits
+  // Keyboard: Escape requests close; Enter in a text field advances a step.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (docPickerOpen) return
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'Enter' && !creating && !creatingFolder) {
+      if (discardOpen || docPickerOpen || showPicker || e.defaultPrevented || e.isComposing) return
+      if (e.key === 'Escape' && !creating) { e.preventDefault(); requestClose() }
+      // Native buttons/selects own Enter. Only text fields advance a step;
+      // prevent the default before focus moves so it cannot activate Close.
+      const target = e.target
+      if (e.key === 'Enter' && target instanceof HTMLInputElement && ['text', 'email'].includes(target.type) && !creating && !creatingFolder) {
+        e.preventDefault()
         if (step < totalSteps && canAdvance()) setStep(s => s + 1)
-        else if (step === totalSteps && canAdvance()) handleCreate()
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, step, totalSteps, creating, creatingFolder, docPickerOpen, canAdvance, handleCreate])
+  }, [requestClose, step, totalSteps, creating, creatingFolder, docPickerOpen, showPicker, discardOpen, canAdvance])
 
   const handleFileTypeToggle = (type: string) => {
     setFileTypes(prev =>
@@ -250,13 +263,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         backgroundColor: 'rgba(0,0,0,0.35)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === e.currentTarget) requestClose() }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap active={!discardOpen && !showPicker && !docPickerOpen} focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="New Automation"
+        className="automation-wizard"
         style={{
         backgroundColor: '#fff', borderRadius: 14, width: 540, maxWidth: '92vw',
         boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
@@ -273,15 +287,15 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
             <div style={{ fontSize: 17, fontWeight: 700, color: '#111', letterSpacing: '-0.01em' }}>
               New Automation
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-              Step {step} of {totalSteps}
+            <div ref={stepHeadingRef} tabIndex={-1} style={{ fontSize: 12, color: '#59616b', marginTop: 2 }}>
+              Step {step} of {totalSteps} · {stepLabels[step - 1]}
             </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             aria-label="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#6b7280', display: 'flex' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#555e68', display: 'flex' }}
           >
             <X style={{ width: 18, height: 18 }} />
           </button>
@@ -292,14 +306,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           <div style={{
             height: '100%',
             width: `${(step / totalSteps) * 100}%`,
-            backgroundColor: '#3b82f6',
+            backgroundColor: 'var(--highlight-on-light, #806600)',
             borderRadius: '0 2px 2px 0',
             transition: 'width 0.25s ease',
           }} />
         </div>
 
         {/* Body */}
-        <div style={{ padding: '28px 28px 20px', flex: 1, overflowY: 'auto' }}>
+        <div className="automation-wizard-body" style={{ padding: '28px 28px 20px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
           {/* Step 1: Name */}
           {step === 1 && (
@@ -308,7 +322,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 What would you like to call this automation?
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label htmlFor="wizard-name" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <label htmlFor="wizard-name" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Name <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
@@ -319,16 +333,17 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   maxLength={MAX_NAME_LENGTH}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Process grant applications"
-                  aria-invalid={!!error}
-                  aria-describedby={error ? 'wizard-error' : undefined}
+                  required
+                  aria-describedby="wizard-name-help"
                   style={inputStyle}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--highlight-on-light, #806600)')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                 />
+                <p id="wizard-name-help" className="wizard-field-help">Required. Give this automation a name you can recognize later.</p>
               </div>
               <div>
-                <label htmlFor="wizard-description" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Description <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
+                <label htmlFor="wizard-description" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Description <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   id="wizard-description"
@@ -337,7 +352,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   onChange={e => setDescription(e.target.value)}
                   placeholder="What does this automation do?"
                   style={inputStyle}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--highlight-on-light, #806600)')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                 />
               </div>
@@ -364,28 +379,28 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 14,
                         padding: '14px 16px',
-                        backgroundColor: selected ? '#eff6ff' : '#fff',
-                        border: selected ? '2px solid #3b82f6' : '1.5px solid #e5e7eb',
+                        backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#fff',
+                        border: selected ? '2px solid var(--highlight-on-light, #806600)' : '1.5px solid #e5e7eb',
                         borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
                         textAlign: 'left', width: '100%', transition: 'border-color 0.1s, background-color 0.1s',
                       }}
                     >
                       <div style={{
                         width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-                        backgroundColor: selected ? '#dbeafe' : '#f3f4f6',
+                        backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#f3f4f6',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'background-color 0.1s',
                       }}>
-                        <Icon style={{ width: 18, height: 18, color: selected ? '#2563eb' : '#6b7280' }} />
+                        <Icon style={{ width: 18, height: 18, color: selected ? 'var(--highlight-on-light, #806600)' : '#555e68' }} />
                       </div>
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{opt.label}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{opt.description}</div>
+                        <div style={{ fontSize: 12, color: '#555e68', marginTop: 2 }}>{opt.description}</div>
                       </div>
-                      <div style={{ marginLeft: 'auto' }}>
+                      <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
                         <div style={{
                           width: 18, height: 18, borderRadius: '50%',
-                          border: selected ? '5px solid #3b82f6' : '2px solid #d1d5db',
+                          border: selected ? '5px solid var(--highlight-on-light, #806600)' : '2px solid #d1d5db',
                           backgroundColor: '#fff', flexShrink: 0, transition: 'border 0.1s',
                         }} />
                       </div>
@@ -393,6 +408,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   )
                 })}
               </div>
+              <p className="wizard-field-help">Each trigger keeps its settings while you edit. Only the selected trigger is used when you create.</p>
+              {triggerType === 'api' && <p className="wizard-field-help">The endpoint and request examples are available in the automation editor after creation. Requests require an API key, which you can generate from My Account. Keep your key private.</p>}
             </div>
           )}
 
@@ -427,14 +444,16 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 testId="folder-watch-folder"
               >
               <div style={{ paddingTop: 8 }}>
-                <label htmlFor="wizard-watch-folder" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <label htmlFor="wizard-watch-folder" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Watch Folder <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 {foldersLoading ? (
-                  <div style={{ padding: '10px 14px', fontSize: 13, color: '#6b7280' }}>Loading folders...</div>
+                  <div style={{ padding: '10px 14px', fontSize: 13, color: '#555e68' }}>Loading folders...</div>
                 ) : (
                   <select
                     id="wizard-watch-folder"
+                    required
+                    aria-describedby="wizard-folder-help"
                     value={watchFolderId}
                     onChange={e => {
                       if (e.target.value === '__create__') {
@@ -453,6 +472,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     <option value="__create__">+ Create new folder...</option>
                   </select>
                 )}
+                <p id="wizard-folder-help" className="wizard-field-help">Required. Choose the folder to monitor for new documents.</p>
                 {creatingFolder && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                     <input
@@ -473,7 +493,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       }}
                       placeholder="Folder name..."
                       style={{ ...inputStyle, flex: 1 }}
-                      onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'var(--highlight-on-light, #806600)')}
                       onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                     />
                     <button
@@ -486,7 +506,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       }}
                       style={{
                         padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                        borderRadius: 6, border: 'none', backgroundColor: '#3b82f6', color: '#fff',
+                        borderRadius: 6, border: 'none', backgroundColor: 'var(--highlight-on-light, #806600)', color: '#fff',
                         cursor: newFolderName.trim() ? 'pointer' : 'not-allowed',
                         opacity: newFolderName.trim() ? 1 : 0.5,
                         display: 'flex', alignItems: 'center', gap: 4,
@@ -502,11 +522,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
 
               <CollapsibleSection
                 title="Filters"
-                summary={`${fileTypes.length ? fileTypes.map(t => `.${t}`).join(' ') : 'No file types'}${excludePatterns ? ' · with exclusions' : ''}${batchMode ? ' · batch' : ''}`}
+                summary={`${fileTypes.length ? fileTypes.map(t => `.${t}`).join(' ') : 'All supported file types'}${excludePatterns ? ' · with exclusions' : ''}${batchMode ? ' · batch' : ''}`}
                 testId="folder-watch-filters"
               >
               <div style={{ marginBottom: 16, paddingTop: 8 }}>
-                <div id="wizard-filetypes-label" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div id="wizard-filetypes-label" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   File Types
                 </div>
                 <div role="group" aria-labelledby="wizard-filetypes-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -519,9 +539,9 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       style={{
                         padding: '4px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
                         borderRadius: 14, cursor: 'pointer',
-                        backgroundColor: fileTypes.includes(type) ? '#dbeafe' : '#f3f4f6',
-                        color: fileTypes.includes(type) ? '#1d4ed8' : '#6b7280',
-                        border: fileTypes.includes(type) ? '1px solid #93c5fd' : '1px solid #e5e7eb',
+                        backgroundColor: fileTypes.includes(type) ? 'var(--wizard-selected-bg, #f7f4e8)' : '#f3f4f6',
+                        color: fileTypes.includes(type) ? '#554400' : '#555e68',
+                        border: fileTypes.includes(type) ? '1px solid var(--highlight-on-light, #806600)' : '1px solid #e5e7eb',
                       }}
                     >
                       .{type}
@@ -531,8 +551,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               </div>
 
               <div style={{ marginBottom: 16 }}>
-                <label htmlFor="wizard-exclude" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Exclude Patterns <span style={{ color: '#6b7280', fontWeight: 400 }}>(optional)</span>
+                <label htmlFor="wizard-exclude" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Exclude Patterns <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   id="wizard-exclude"
@@ -541,7 +561,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   onChange={e => setExcludePatterns(e.target.value)}
                   placeholder="e.g. draft*, temp_*"
                   style={inputStyle}
-                  onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--highlight-on-light, #806600)')}
                   onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                 />
               </div>
@@ -551,10 +571,10 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   type="checkbox"
                   checked={batchMode}
                   onChange={e => setBatchMode(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                  style={{ width: 16, height: 16, flexShrink: 0, accentColor: 'var(--highlight-on-light, #806600)' }}
                 />
                 <span style={{ fontWeight: 500 }}>Batch mode</span>
-                <span style={{ color: '#6b7280', fontSize: 12 }}>wait and process files together</span>
+                <span style={{ color: '#555e68', fontSize: 12 }}>wait and process files together</span>
               </label>
               </CollapsibleSection>
               </div>
@@ -580,20 +600,20 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 12,
                         padding: '12px 16px',
-                        backgroundColor: selected ? '#eff6ff' : '#fff',
-                        border: selected ? '2px solid #3b82f6' : '1.5px solid #e5e7eb',
+                        backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#fff',
+                        border: selected ? '2px solid var(--highlight-on-light, #806600)' : '1.5px solid #e5e7eb',
                         borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
                         textAlign: 'left', width: '100%', transition: 'border-color 0.1s',
                       }}
                     >
                       <div style={{
                         width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-                        border: selected ? '5px solid #3b82f6' : '2px solid #d1d5db',
+                        border: selected ? '5px solid var(--highlight-on-light, #806600)' : '2px solid #d1d5db',
                         backgroundColor: '#fff', transition: 'border 0.1s',
                       }} />
                       <div>
                         <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{opt.label}</div>
-                        <div style={{ fontSize: 12, color: '#6b7280' }}>{opt.description}</div>
+                        <div style={{ fontSize: 12, color: '#555e68' }}>{opt.description}</div>
                       </div>
                     </button>
                   )
@@ -603,28 +623,30 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               {/* Action selector */}
               {(actionType === 'workflow' || actionType === 'extraction' || actionType === 'task') && (
                 <div>
-                  <label id="wizard-action-label" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <label id="wizard-action-label" style={{ fontSize: 12, fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Select {actionType === 'extraction' ? 'Extraction' : actionType === 'task' ? 'Workflow Task' : 'Workflow'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <button
                     type="button"
                     aria-labelledby="wizard-action-label"
+                    aria-describedby="wizard-action-help"
                     aria-haspopup="dialog"
                     aria-expanded={showPicker}
                     onClick={() => setShowPicker(true)}
                     style={{
                       width: '100%', padding: '10px 14px', fontSize: 14,
                       border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
-                      backgroundColor: '#fff', color: actionId ? '#111827' : '#6b7280',
+                      backgroundColor: '#fff', color: actionId ? '#111827' : '#555e68',
                       cursor: 'pointer', textAlign: 'left',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     }}
                   >
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
                       {actionName || `Browse ${actionType === 'extraction' ? 'extractions' : 'workflows'}...`}
                     </span>
                     <ChevronRight size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
                   </button>
+                  <p id="wizard-action-help" className="wizard-field-help">{actionId ? 'Selected. Open the picker to review or change your selection.' : 'Required. Choose an action from your library, your team, or Explore.'}</p>
                   {showPicker && (
                     <ItemPickerModal
                       kind={actionType === 'extraction' ? 'extraction' : 'workflow'}
@@ -646,29 +668,25 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {step === finalStep && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
-                Output &amp; Activation
+                Review your automation
               </div>
 
+              <dl className="automation-review-summary">
+                <div><dt>Name</dt><dd>{name}</dd></div>
+                <div><dt>Trigger</dt><dd>{triggerOptions.find(option => option.value === triggerType)?.label}{triggerType === 'schedule' && ` · ${describeSchedule(scheduleConfig)} (${scheduleConfig.timezone})`}</dd></div>
+                <div><dt>Input</dt><dd>{triggerType === 'folder_watch' ? folders.find(folder => folder.uuid === watchFolderId)?.path || watchFolderId : triggerType === 'schedule' ? scheduleConfig.source === 'folder' ? folders.find(folder => folder.uuid === scheduleConfig.folder_id)?.path || scheduleConfig.folder_id : `${scheduleConfig.document_uuids?.length ?? 0} selected documents` : 'Documents supplied by the trigger'}</dd></div>
+                {triggerType === 'folder_watch' && <div><dt>Filters</dt><dd>{fileTypes.length ? fileTypes.map(type => `.${type}`).join(', ') : 'All supported file types'}{excludePatterns && ` · Exclude: ${excludePatterns}`} · {batchMode ? 'Run as a batch' : 'Run per document'}</dd></div>}
+                <div><dt>Action</dt><dd>{actionName || actionId}</dd></div>
+                <div><dt>Output</dt><dd>{saveToFolder ? `${folders.find(folder => folder.uuid === outputFolder)?.path || 'Choose a folder'} · ${outputFormat.toUpperCase()}` : 'Results available in the run'}{emailNotify && ` · Email: ${emailRecipients || 'Add recipients'}`}</dd></div>
+              </dl>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               <CollapsibleSection
                 title="Activation"
-                summary={`${enabled ? 'Enabled' : 'Off'}${sharedWithTeam ? ' · shared with team' : ''}`}
+                summary={sharedWithTeam ? 'Shared with team' : 'Private · choose activation below'}
                 testId="wizard-activation"
               >
               <div style={{ paddingTop: 8 }}>
-              {/* Enable toggle */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 16, fontSize: 13, color: '#374151' }}>
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  onChange={e => setEnabled(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
-                />
-                <span style={{ fontWeight: 500 }}>Enable immediately</span>
-                <span style={{ color: '#6b7280', fontSize: 12 }}>
-                  {triggerType === 'schedule' ? 'start running on the schedule once created' : 'start watching as soon as created'}
-                </span>
-              </label>
+              <p style={{ marginBottom: 16, lineHeight: 1.5 }}>Choose <strong>Save disabled</strong> to finish setup without running, or <strong>Create &amp; enable</strong> to activate this automation.</p>
 
               {/* Share with team */}
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
@@ -676,10 +694,10 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   type="checkbox"
                   checked={sharedWithTeam}
                   onChange={e => setSharedWithTeam(e.target.checked)}
-                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                  style={{ width: 16, height: 16, flexShrink: 0, accentColor: 'var(--highlight-on-light, #806600)' }}
                 />
                 <span style={{ fontWeight: 500 }}>Share with team</span>
-                <span style={{ color: '#6b7280', fontSize: 12 }}>team members can view and manage</span>
+                <span style={{ color: '#555e68', fontSize: 12 }}>team members can view and manage</span>
               </label>
               </div>
               </CollapsibleSection>
@@ -697,7 +715,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     type="checkbox"
                     checked={saveToFolder}
                     onChange={e => setSaveToFolder(e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                    style={{ width: 16, height: 16, flexShrink: 0, accentColor: 'var(--highlight-on-light, #806600)' }}
                   />
                   <span style={{ fontWeight: 500 }}>Save results to a folder</span>
                 </label>
@@ -707,6 +725,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       value={outputFolder}
                       onChange={e => setOutputFolder(e.target.value)}
                       aria-label="Destination folder"
+                      aria-describedby="wizard-output-help"
+                      required
                       style={selectStyle}
                     >
                       <option value="">Select destination folder</option>
@@ -714,6 +734,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                         <option key={f.uuid} value={f.uuid}>{f.path}</option>
                       ))}
                     </select>
+                    <p id="wizard-output-help" className="wizard-field-help">Required when saving results to a folder. Choose a destination.</p>
                     <select
                       value={outputFormat}
                       onChange={e => setOutputFormat(e.target.value)}
@@ -746,7 +767,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     type="checkbox"
                     checked={emailNotify}
                     onChange={e => setEmailNotify(e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                    style={{ width: 16, height: 16, flexShrink: 0, accentColor: 'var(--highlight-on-light, #806600)' }}
                   />
                   <span style={{ fontWeight: 500 }}>Email results when complete</span>
                 </label>
@@ -757,11 +778,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       value={emailRecipients}
                       onChange={e => setEmailRecipients(e.target.value)}
                       aria-label="Email recipients"
+                      aria-describedby="wizard-email-help"
+                      required
                       placeholder="email@example.com, another@example.com"
                       style={inputStyle}
-                      onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'var(--highlight-on-light, #806600)')}
                       onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
                     />
+                    <p id="wizard-email-help" className="wizard-field-help">Required when emailing results. Enter valid email addresses separated by commas.</p>
                   </div>
                 )}
               </div>
@@ -782,32 +806,19 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         </div>
 
         {/* Footer */}
-        <div style={{
+        <div className="automation-wizard-footer" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '16px 28px 20px',
           borderTop: '1px solid #f3f4f6',
         }}>
-          {/* Step dots */}
-          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
-              <div key={s} style={{
-                height: 8,
-                width: s === step ? 22 : 8,
-                borderRadius: 4,
-                backgroundColor: s < step ? '#93c5fd' : s === step ? '#3b82f6' : '#e5e7eb',
-                transition: 'all 0.2s ease',
-              }} />
-            ))}
-          </div>
-
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
             {step > 1 ? (
               <button onClick={() => setStep(s => s - 1)} disabled={creating} style={btnSecondary}>
                 Back
               </button>
             ) : (
-              <button onClick={onClose} style={btnSecondary}>Cancel</button>
+              <button onClick={requestClose} style={btnSecondary}>Cancel</button>
             )}
 
             {step < totalSteps ? (
@@ -815,15 +826,19 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 Next
               </button>
             ) : (
-              <button onClick={handleCreate} disabled={!canAdvance() || creating} style={btnPrimary(canAdvance() && !creating)}>
-                {creating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
-                Create Automation
-              </button>
+              <>
+                <button type="button" onClick={() => handleCreate(false)} disabled={!canAdvance() || creating} style={btnSecondary}>Save disabled</button>
+                <button type="button" onClick={() => handleCreate(true)} disabled={!canAdvance() || creating} style={btnPrimary(canAdvance() && !creating)}>
+                  {creating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+                  Create &amp; enable
+                </button>
+              </>
             )}
           </div>
         </div>
       </div>
       </FocusTrap>
+      <ConfirmDialog open={discardOpen} title="Discard this automation draft?" message="Your unsaved changes will be lost." confirmLabel="Discard draft" cancelLabel="Keep editing" destructive onCancel={() => setDiscardOpen(false)} onConfirm={onClose} />
     </div>
   )
 }

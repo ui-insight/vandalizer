@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, FileText, Link2, Search, X } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
 import type { ContentMatch } from '../files/FileBrowser'
@@ -18,7 +18,7 @@ import type { Folder } from '../../types/document'
 
 export function LeftPanel() {
   const {
-    setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames,
+    selectedDocUuids, selectedDocNames, selectedFolderUuids, setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, setSelectedFolderNames,
     highlightTerms, highlightPage, highlightPageApproximate, setHighlightTerms,
     setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
@@ -35,13 +35,19 @@ export function LeftPanel() {
     title: string
     processing?: boolean
     taskStatus?: string | null
+    preserveChatScope?: boolean
+    previousSelection?: { uuids: string[]; names: Record<string, string> }
   } | null>(null)
   const [showRawText, setShowRawText] = useState(false)
   const [showUsage, setShowUsage] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [contentSearchState, setContentSearchState] = useState<'loading' | 'error' | null>(null)
+  const [searchAttempt, setSearchAttempt] = useState(0)
   const [contentMatches, setContentMatches] = useState<ContentMatch[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null)
+  const listScroller = useRef<HTMLDivElement>(null)
+  const listPosition = useRef(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -63,7 +69,7 @@ export function LeftPanel() {
   }, [setSelectedDocUuids])
 
   const handleDocNamesChange = useCallback((names: Record<string, string>) => {
-    if (!viewingDocRef.current) setSelectedDocNames(names)
+    if (!viewingDocRef.current) setSelectedDocNames(previous => ({ ...previous, ...names }))
   }, [setSelectedDocNames])
 
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
@@ -71,7 +77,7 @@ export function LeftPanel() {
   }, [setSelectedFolderUuids])
 
   const handleFolderNamesChange = useCallback((names: Record<string, string>) => {
-    if (!viewingDocRef.current) setSelectedFolderNames(names)
+    if (!viewingDocRef.current) setSelectedFolderNames(previous => ({ ...previous, ...names }))
   }, [setSelectedFolderNames])
 
   // "Ask about folder": scope the chat to just this folder, drop any
@@ -128,9 +134,11 @@ export function LeftPanel() {
   // apply it instead of the default clear, so the terms survive the open.
   useEffect(() => {
     if (viewDocumentRequest) {
-      setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
-      setSelectedDocUuids([viewDocumentRequest.uuid])
-      setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
+      setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title, preserveChatScope: viewDocumentRequest.preserveChatScope })
+      if (!viewDocumentRequest.preserveChatScope) {
+        setSelectedDocUuids([viewDocumentRequest.uuid])
+        setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
+      }
       if (viewDocumentRequest.highlight) {
         setHighlightTerms(
           viewDocumentRequest.highlight.terms,
@@ -222,17 +230,16 @@ export function LeftPanel() {
     if (searchOpen) searchInputRef.current?.focus()
   }, [searchOpen])
 
-  // Close search when navigating to a doc
-  useEffect(() => {
-    if (viewingDoc) {
-      setSearchOpen(false)
-      setSearchQuery('')
-      setContentMatches([])
-    }
+  // Keep list controls mounted and restore the visible list position on return.
+  useLayoutEffect(() => {
+    if (!viewingDoc) listScroller.current?.scrollTo({ top: listPosition.current, behavior: 'instant' })
   }, [viewingDoc])
 
   // Debounced content search
   useEffect(() => {
+    let cancelled = false
+    setContentSearchState(searchQuery.trim() ? 'loading' : null)
+    setContentMatches([])
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (!searchQuery.trim()) {
       setContentMatches([])
@@ -241,6 +248,8 @@ export function LeftPanel() {
     debounceRef.current = setTimeout(async () => {
       try {
         const data = await searchDocuments(searchQuery.trim())
+        if (cancelled) return
+        setContentSearchState(null)
         setContentMatches(
           data.items.map(item => ({
             uuid: item.uuid,
@@ -258,13 +267,16 @@ export function LeftPanel() {
           }))
         )
       } catch {
+        if (cancelled) return
+        setContentSearchState('error')
         setContentMatches([])
       }
     }, 300)
     return () => {
+      cancelled = true
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [searchQuery])
+  }, [searchQuery, searchAttempt])
 
   const handleCloseSearch = () => {
     setSearchOpen(false)
@@ -290,7 +302,7 @@ export function LeftPanel() {
             <button
               type="button"
               aria-label="Close document"
-              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}); setHighlightTerms([]) }}
+              onClick={() => { setViewingDoc(null); if (!viewingDoc.preserveChatScope) { setSelectedDocUuids(viewingDoc.previousSelection?.uuids ?? []); setSelectedDocNames(viewingDoc.previousSelection?.names ?? {}) } setHighlightTerms([]) }}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
               <ArrowLeft className="h-6 w-6 text-white" />
@@ -324,7 +336,7 @@ export function LeftPanel() {
               </button>
             </div>
           ) : (
-            <p
+            <h1
               className="m-0 truncate text-white"
               title={viewingDoc ? viewingDoc.title : undefined}
               style={{
@@ -335,8 +347,8 @@ export function LeftPanel() {
                 paddingRight: 8,
               }}
             >
-              {viewingDoc ? viewingDoc.title : 'Select or Upload PDFs'}
-            </p>
+              {viewingDoc ? viewingDoc.title : 'Files'}
+            </h1>
           )}
         </div>
 
@@ -377,7 +389,7 @@ export function LeftPanel() {
       </div>
 
       {/* Content area */}
-      {viewingDoc ? (
+      {viewingDoc && (
         <div style={{ height: 'calc(100% - 50px)', position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
@@ -430,11 +442,15 @@ export function LeftPanel() {
             </div>
           )}
         </div>
-      ) : (
-        <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
+      )}
+        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
           <FileBrowser
+            selectedDocumentUuids={selectedDocUuids}
+            selectedFolderUuids={selectedFolderUuids}
             searchQuery={searchQuery}
             contentMatches={contentMatches}
+            contentSearchState={contentSearchState}
+            onRetryContentSearch={() => setSearchAttempt(value => value + 1)}
             currentFolder={currentFolder}
             onFolderNavigate={setCurrentFolder}
             rootFolder={activeProjectRootFolder}
@@ -446,6 +462,7 @@ export function LeftPanel() {
                 title: doc.title,
                 processing: doc.processing,
                 taskStatus: doc.task_status,
+                previousSelection: { uuids: selectedDocUuids, names: selectedDocNames },
               }
               // Sync-update the ref so handleSelectionChange's guard sees
               // "viewing" immediately. When the auto-open-after-upload effect
@@ -467,7 +484,6 @@ export function LeftPanel() {
             onAddFolderToKB={setKbPickerFolder}
           />
         </div>
-      )}
 
       {showUsage && viewingDoc && (
         <DocumentUsageDialog

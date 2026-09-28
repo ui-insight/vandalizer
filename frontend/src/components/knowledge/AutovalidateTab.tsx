@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Sparkles, Loader2 } from 'lucide-react'
 import {
   startKBOptimization,
@@ -38,15 +38,17 @@ interface Props {
    * can't manage (e.g. a bookmarked verified catalog KB) so the panel can
    * navigate to their own, manageable copy. */
   onCloned?: (newUuid: string) => void
+  onChanged?: () => void
 }
 
 const POLL_INTERVAL_MS = 3000
 
-export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries, onCloned }: Props) {
+export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries, onCloned, onChanged }: Props) {
   const [run, setRun] = useState<KBOptimizationRun | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [actionPending, setActionPending] = useState<'cancel' | 'apply' | 'revert' | null>(null)
+  const actionRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
   // When set, we're viewing a *historical* run (not the active/latest). The
   // results view renders read-only so users can't accidentally apply or
@@ -139,7 +141,9 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   }
 
   const handleCancel = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('cancel')
     try {
       await cancelKBOptimization(kbUuid, run.uuid)
@@ -148,6 +152,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
@@ -167,31 +172,39 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   }
 
   const doApply = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('apply')
     try {
       await applyKBOptimization(kbUuid, run.uuid)
       // Refresh so the UI flips to "applied" state with the revert button.
       const fresh = await getKBOptimization(kbUuid, run.uuid)
       setRun(fresh)
+      onChanged?.()
       setShowApplyPreview(false)
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
 
   const handleRevert = async () => {
-    if (!run) return
+    if (!run || actionRef.current) return
+    actionRef.current = true
+    setError(null)
     setActionPending('revert')
     try {
       await revertKBOptimization(kbUuid, run.uuid)
       const fresh = await getKBOptimization(kbUuid, run.uuid)
       setRun(fresh)
+      onChanged?.()
     } catch (e) {
       setError((e as Error).message)
     } finally {
+      actionRef.current = false
       setActionPending(null)
     }
   }
@@ -219,7 +232,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#b8bec7' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -248,7 +261,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (viewingPastLoading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#b8bec7' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -301,6 +314,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
             onConfirm={() => void doApply()}
             onCancel={() => setShowApplyPreview(false)}
             applying={actionPending === 'apply'}
+            error={error}
           />
         )}
       </div>
@@ -355,7 +369,7 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
         fontSize: 12, color: '#bbf7d0',
       }}>
         Since you tuned this KB, <b>{(after * 100).toFixed(0)}%</b> of chats grounded in it
-        got a thumbs-up <span style={{ color: '#888' }}>(n={impact.n_after} ratings)</span>.
+        got a thumbs-up <span style={{ color: '#b8bec7' }}>(n={impact.n_after} ratings)</span>.
       </div>
     )
   }
@@ -371,7 +385,7 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
       Since you tuned this KB, chat thumbs-up rate is{' '}
       <b>{positive ? '+' : ''}{deltaPts.toFixed(0)}pts</b>
       {' '}({(before * 100).toFixed(0)}% → {(after * 100).toFixed(0)}%,{' '}
-      <span style={{ color: '#888' }}>n={impact.n_before}→{impact.n_after} ratings</span>).
+      <span style={{ color: '#b8bec7' }}>n={impact.n_before}→{impact.n_after} ratings</span>).
     </div>
   )
 }
@@ -418,27 +432,26 @@ function IdleHero({
   return (
     <div style={{
       padding: 18, background: 'linear-gradient(135deg, #1f1f2e 0%, #1a1a1a 100%)',
-      border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
+      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, transparent)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Sparkles size={18} style={{ color: '#a78bfa' }} aria-hidden="true" />
-        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get a quality score for this KB — and a one-click recipe to improve it</h3>
+        <Sparkles size={18} style={{ color: 'var(--highlight-color, #eab308)' }} aria-hidden="true" />
+        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Compare retrieval settings against your test questions</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
       <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
-        Typically <b>10–20 minutes</b>, using roughly <b>$1–$5</b> worth of LLM
-        tokens — an estimate of AI usage, not a charge to you. We test your KB against
-        expected answers, try dozens of retrieval setups, and recommend the
-        best. Nothing changes until you click Apply.
+        Review the test questions, measure a baseline, and choose a token budget.
+        This experiment uses model tokens; cost and duration depend on your model and test set.
+        Review the results before applying changes. Automatic application is optional in the wizard.
       </p>
       {coldStart && (
         <div style={{
           padding: '10px 12px', marginBottom: 12,
-          backgroundColor: 'rgba(124, 58, 237, 0.06)',
-          border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: 6,
+          backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, transparent)', borderRadius: 6,
         }}>
           <div style={{
-            fontSize: 10, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5,
+            fontSize: 12, color: 'var(--highlight-color, #eab308)', textTransform: 'uppercase', letterSpacing: 0.5,
             marginBottom: 6, fontWeight: 600,
           }}>
             What happens next
@@ -452,7 +465,7 @@ function IdleHero({
           </ol>
         </div>
       )}
-      <ul style={{ fontSize: 12, color: '#999', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
+      <ul style={{ fontSize: 12, color: '#b8bec7', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li>See how much your knowledge base actually helps vs. asking the model directly</li>
         <li>Get a recommended setup with one-click apply</li>
         <li>Find out which documents are pulling weight and which aren't</li>
@@ -477,8 +490,8 @@ function IdleHero({
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               color: cloning ? '#888' : '#fff',
-              background: cloning ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-              border: '1px solid ' + (cloning ? '#333' : '#7c3aed'),
+              background: cloning ? '#222' : 'linear-gradient(135deg, var(--highlight-color, #eab308) 0%, var(--highlight-color, #eab308) 100%)',
+              border: '1px solid ' + (cloning ? '#333' : 'var(--highlight-color, #eab308)'),
               borderRadius: 6, cursor: cloning ? 'not-allowed' : 'pointer',
             }}
           >
@@ -498,8 +511,8 @@ function IdleHero({
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
             color: disabled ? '#555' : '#fff',
-            background: disabled ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-            border: '1px solid ' + (disabled ? '#333' : '#7c3aed'),
+            background: disabled ? '#222' : 'linear-gradient(135deg, var(--highlight-color, #eab308) 0%, var(--highlight-color, #eab308) 100%)',
+            border: '1px solid ' + (disabled ? '#333' : 'var(--highlight-color, #eab308)'),
             borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >

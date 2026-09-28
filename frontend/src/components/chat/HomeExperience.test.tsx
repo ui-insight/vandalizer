@@ -100,13 +100,13 @@ describe('FirstSessionHome', () => {
       />,
     )
 
-    expect(screen.getByText('Turn complex documents into answers you can verify.')).toBeInTheDocument()
+    expect(screen.getByText('Start with a document. Find an answer.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Upload a document/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Run sample demo/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Ask a question/i })).not.toBeInTheDocument()
     expect(screen.getByText('Preview of the demo result')).toBeInTheDocument()
     expect(screen.getByText(/Question:/i)).toBeInTheDocument()
-    expect(screen.getByText('Why the first answer feels trustworthy')).toBeInTheDocument()
+    expect(screen.getByRole('list', { name: 'Your first task' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Extract deadlines/i }))
     expect(onSendMessage).toHaveBeenCalledWith(
@@ -155,7 +155,7 @@ describe('ReturningHome', () => {
 
     expect(screen.getByText('Review what changed since your last visit')).toBeInTheDocument()
     expect(screen.getByText('Continue where you left off')).toBeInTheDocument()
-    expect(screen.getByText('Fastest next steps')).toBeInTheDocument()
+    expect(screen.getByText('Suggested questions')).toBeInTheDocument()
     expect(screen.getByText('Ready in this workspace')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Review alert/i }))
@@ -209,7 +209,7 @@ describe('ReturningHome', () => {
     ))
 
     // Wait for the provider's progress fetch to settle, then assert absence.
-    await screen.findByText('Fastest next steps')
+    await screen.findByText('Suggested questions')
     await Promise.resolve()
     expect(screen.queryByRole('button', { name: /certification/i })).not.toBeInTheDocument()
   })

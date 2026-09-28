@@ -250,7 +250,9 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
       <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
         <div className="flex flex-col gap-1">
           {/* New chat button - matches Flask _app_rail.html first item */}
-          <div
+          <button
+            type="button"
+            aria-label="New chat"
             onClick={triggerNewChat}
             className={cn(
               'flex items-center gap-2 rounded-lg cursor-pointer p-2',
@@ -265,7 +267,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
             {!visualDocked && (
               <div className="text-[11px] leading-[1.4] text-[#111]">New chat</div>
             )}
-          </div>
+          </button>
 
           {/* Pending reviews — only when something is actually waiting, so the
               rail stays quiet for the many users who never review anything.

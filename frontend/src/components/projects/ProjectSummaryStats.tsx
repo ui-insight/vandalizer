@@ -40,11 +40,11 @@ export function ProjectSummaryStats({
   const shown = stats.filter(s => s.always || s.value > 0)
 
   return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-600 ${className}`}>
       {shown.map(({ icon: Icon, value, label }) => (
         <span key={label} className="inline-flex items-center gap-1" title={`${value} ${label}`}>
           <Icon size={12} className="text-gray-400" />
-          {value}
+          {value} {value === 1 && label.endsWith('s') ? label.slice(0, -1) : label}
         </span>
       ))}
     </div>

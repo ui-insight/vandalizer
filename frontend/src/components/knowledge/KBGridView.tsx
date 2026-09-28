@@ -23,7 +23,7 @@ const SORT_LABEL: Record<SortOption, string> = {
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
   empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
   building: { label: 'Building', color: '#d97706', bg: '#fef3c7' },
-  ready: { label: 'Ready', color: '#15803d', bg: '#dcfce7' },
+  ready: { label: 'Available', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
   // Broken bookmark: the referenced KB was deleted, retired from the catalog,
   // or is no longer shared with this user. The card offers only Remove.
@@ -37,8 +37,8 @@ const C = {
   border: '#3a3a3a',
   text: '#e5e5e5',
   textMuted: '#aaa',
-  textDim: '#888',
-  textFaint: '#666',
+  textDim: '#b8bec7',
+  textFaint: '#aeb5bf',
 }
 
 export function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
@@ -95,8 +95,7 @@ function KBGridCard({
   const canonicalUuid = isReference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid
 
   return (
-    <button
-      onClick={() => { if (!isUnavailable) onSelect(kb.uuid) }}
+    <article
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
         padding: 14, borderRadius: 12,
@@ -116,14 +115,15 @@ function KBGridCard({
         ) : (
           <BookOpen size={14} style={{ color: '#7dd3fc', flexShrink: 0, marginTop: 2 }} />
         )}
-        <span style={{
-          fontSize: 13, fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
+        <button type="button" onClick={() => onSelect(kb.uuid)} disabled={isUnavailable} style={{
+          background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
+          fontSize: 15, fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
           lineHeight: 1.3,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
         }}>
           {kb.title}
-        </span>
+        </button>
         {onTogglePin && (
           <button
             onClick={(e) => { e.stopPropagation(); onTogglePin(canonicalUuid) }}
@@ -139,26 +139,29 @@ function KBGridCard({
         )}
       </div>
 
+      <p style={{ fontSize: 12, lineHeight: 1.5, color: kb.sources_failed > 0 ? '#fcd34d' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
       <div style={{ marginBottom: 8 }}>
         <AITrustChip
           score={kb.last_validation_score}
           baseline={kb.last_validation_baseline_score}
           lift={kb.last_validation_lift}
+          metric={kb.last_validation_metric}
+          configState={kb.last_validation_config_state}
         />
       </div>
 
       {/* Badges row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{
-          fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+          fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
           color: badge.color, backgroundColor: badge.bg,
         }}>
           {badge.label}
         </span>
         {kb.shared_with_team && (
           <span style={{
-            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+            fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
             color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
           }}>
             Team
@@ -179,7 +182,7 @@ function KBGridCard({
         </p>
       ) : (
         <p style={{
-          fontSize: 11, color: C.textFaint, margin: '0 0 8px', fontStyle: 'italic',
+          fontSize: 12, color: C.textFaint, margin: '0 0 8px', fontStyle: 'italic',
         }}>
           No description yet
         </p>
@@ -187,7 +190,7 @@ function KBGridCard({
 
       {/* Stats (meaningless for a broken bookmark — the source KB is gone) */}
       {!isUnavailable && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textFaint, marginBottom: 8 }}>
           <span>{kb.total_sources} source{kb.total_sources !== 1 ? 's' : ''}</span>
           <span>{kb.total_chunks.toLocaleString()} chunk{kb.total_chunks !== 1 ? 's' : ''}</span>
         </div>
@@ -201,7 +204,7 @@ function KBGridCard({
             return (
               <span key={gid} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
-                fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
                 color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.12)',
               }}>
                 <Tag size={9} />
@@ -217,7 +220,7 @@ function KBGridCard({
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {kb.tags.map(t => (
             <span key={t} style={{
-              fontSize: 10, padding: '1px 6px', borderRadius: 999,
+              fontSize: 12, padding: '1px 6px', borderRadius: 999,
               backgroundColor: 'rgba(255,255,255,0.06)', color: '#c5c5c5',
             }}>
               {t}
@@ -233,7 +236,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)',
               backgroundColor: 'var(--highlight-color, #eab308)',
               border: 'none', borderRadius: 4, cursor: 'pointer',
@@ -248,7 +251,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onEdit(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: '#ccc', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
             }}
@@ -262,7 +265,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onAdopt(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.1)',
               border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 4, cursor: 'pointer',
             }}
@@ -280,7 +283,7 @@ function KBGridCard({
               : 'This knowledge base has no sources to copy yet'}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: canClone ? '#ccc' : '#777', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4,
               cursor: canClone ? 'pointer' : 'default',
@@ -296,7 +299,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onRemoveRef(kb.reference_uuid!) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 11, fontFamily: 'inherit',
+              padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
             }}
@@ -312,7 +315,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onDelete(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 11, fontFamily: 'inherit',
+              padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
               marginLeft: 'auto',
@@ -322,7 +325,7 @@ function KBGridCard({
           </button>
         )}
       </div>
-    </button>
+    </article>
   )
 }
 
@@ -397,6 +400,7 @@ export function KBGridView({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
         <ArrowUpDown size={13} style={{ color: C.textFaint }} />
         <select
+          aria-label="Sort knowledge bases"
           value={sort}
           onChange={(e) => setSort(e.target.value as SortOption)}
           style={{

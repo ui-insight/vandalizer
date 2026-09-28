@@ -77,20 +77,20 @@ export function AutovalidateWizard<TOptions>({
         aria-modal="true"
         aria-labelledby="autovalidate-wizard-title"
         style={{
-          width: 520, maxHeight: '90vh', overflowY: 'auto',
-          padding: 22, backgroundColor: '#1f1f1f',
+          width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          padding: 16, backgroundColor: '#1f1f1f',
           border: '1px solid #2e2e2e', borderRadius: 10,
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sparkles size={18} aria-hidden="true" style={{ color: '#a78bfa' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexShrink: 0 }}>
+          <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--highlight-color, #eab308)' }} />
           <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: '#fff' }}>{title}</h3>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -100,21 +100,21 @@ export function AutovalidateWizard<TOptions>({
         <WizardSteps steps={stepIds} current={currentStep.id} labels={stepLabels} />
 
         {/* Body */}
-        <div style={{ minHeight: 240, marginTop: 14 }}>
+        <div key={currentStep.id} role="region" aria-label={currentStep.label} tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', marginTop: 14, padding: 3 }}>
           {currentStep.render(options, setOptions)}
         </div>
 
         {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginTop: 16, flexShrink: 0 }}>
           <button onClick={isFirst ? onClose : prev} style={btn()}>
             {isFirst ? 'Cancel' : (<><ChevronLeft size={12} />Back</>)}
           </button>
           {!isLast ? (
-            <button onClick={next} disabled={!canAdvance} style={btn(canAdvance, '#7c3aed')}>
+            <button onClick={next} disabled={!canAdvance} style={btn(canAdvance, 'var(--highlight-color, #eab308)')}>
               Next<ChevronRight size={12} />
             </button>
           ) : (
-            <button onClick={confirm} disabled={!canAdvance} style={btn(canAdvance, '#7c3aed')}>
+            <button onClick={confirm} disabled={!canAdvance} style={btn(canAdvance, 'var(--highlight-color, #eab308)')}>
               <Sparkles size={12} />
               {typeof confirmLabel === 'function' ? confirmLabel(options) : confirmLabel}
             </button>
@@ -130,7 +130,7 @@ function btn(enabled: boolean = true, color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? '#e5e5e5' : '#555',
+    color: enabled ? color ? 'var(--highlight-text-color, #000)' : '#e5e5e5' : '#aaa',
     backgroundColor: color ? color : '#2a2a2a',
     border: `1px solid ${color || '#3a3a3a'}`,
     borderRadius: 5,

@@ -109,11 +109,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
+    <div className="automations-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
       {/* Header */}
       <div
         style={{
-          height: 50,
+          minHeight: 54,
+          gap: 8,
+          flexWrap: 'wrap',
           backgroundColor: 'var(--color-panel-dark)',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
           padding: '0 20px',
@@ -162,7 +164,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           flexShrink: 0,
         }}>
           <FolderKanban size={13} style={{ color: 'var(--highlight-color, #eab308)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
             {projectScoped
               ? <>Pinned to <strong style={{ color: '#ddd' }}>{activeProjectTitle}</strong></>
               : <>All automations</>}
@@ -171,7 +173,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             onClick={() => setProjectScoped(s => !s)}
             style={{
               marginLeft: 'auto', flexShrink: 0,
-              padding: '3px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
               color: '#ccc', backgroundColor: 'transparent',
               border: '1px solid #3a3a3a', borderRadius: 12, cursor: 'pointer',
             }}
@@ -184,7 +186,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {/* Filter bar */}
       {base.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
           padding: '8px 12px',
           backgroundColor: '#1e1e1e',
           borderBottom: '1px solid #2f2f2f',
@@ -209,7 +211,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               placeholder="Filter..."
               aria-label="Filter automations"
               style={{
-                flex: 1, width: 60, padding: 0, fontSize: 11, fontFamily: 'inherit',
+                flex: 1, width: 60, padding: 0, fontSize: 12, fontFamily: 'inherit',
                 color: '#ccc', backgroundColor: 'transparent',
                 border: 'none', outline: 'none',
               }}
@@ -231,11 +233,11 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
         {loading ? (
-          <div role="status" aria-live="polite" aria-label="Loading automations" style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+          <div role="status" aria-live="polite" aria-label="Loading automations" style={{ textAlign: 'center', padding: 40, color: '#b5bbc3' }}>
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : base.length === 0 && isProjectScoped && automations.length > 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: '#b5bbc3', fontSize: 13 }}>
             <FolderKanban size={28} style={{ color: '#444', margin: '0 auto 12px' }} />
             <div style={{ color: '#bbb', fontWeight: 600, marginBottom: 4 }}>No automations pinned to this project</div>
             <div style={{ marginBottom: 14 }}>Pin an automation to it from the list, or browse them all.</div>
@@ -253,7 +255,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         ) : automations.length === 0 ? (
           <AutomationsExplainer />
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#666', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: '#adb4bc', fontSize: 13 }}>
             No matching automations
           </div>
         ) : (
@@ -269,7 +271,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   aria-label={`Open automation: ${auto.name}`}
                   onClick={() => openAutomation(auto.id)}
                   onKeyDown={e => {
-                    if (e.key === 'Enter' || e.key === ' ') {
+                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                       e.preventDefault()
                       openAutomation(auto.id)
                     }
@@ -301,7 +303,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                         animation: isRunning ? 'automationPulseDot 1.5s ease-in-out infinite' : undefined,
                       }}
                     />
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
                       {auto.name}
                     </span>
                     {canPin && (() => {
@@ -328,7 +330,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <span
                       style={{
-                        fontSize: 11,
+                        fontSize: 12,
                         fontWeight: 600,
                         padding: '2px 8px',
                         borderRadius: 10,
@@ -338,22 +340,26 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                     >
                       {badge.label}
                     </span>
+                    <span style={{ fontSize: 12, color: '#d0d5dc' }}>{isRunning ? 'Running' : auto.enabled ? 'Enabled' : 'Disabled'}</span>
                     {auto.shared_with_team && (
                       <span style={{
-                        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                        fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
                         color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
                       }}>
                         Team
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#b5bbc3', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
                     {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
-                  {auto.trigger_type === 'schedule' && auto.next_run_at && !isRunning && (
-                    <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+                  <div style={{ marginTop: 8, fontSize: 12, color: auto.last_event_status === 'failed' ? '#fca5a5' : '#b5bbc3' }}>
+                    {auto.last_event_status ? `Last run: ${{ completed: 'Succeeded', failed: 'Failed', pending: 'Pending', queued: 'Queued', running: 'Running', skipped: 'Skipped' }[auto.last_event_status] || auto.last_event_status}${auto.last_event_at ? ` · ${formatRunTime(auto.last_event_at, String(auto.trigger_config?.timezone || 'UTC'))}` : ''}` : auto.last_event_status === null ? 'No runs yet' : 'Run history not reported'}
+                  </div>
+                  {auto.trigger_type === 'schedule'  && (auto.next_run_at || !auto.enabled) && !isRunning && (
+                    <div style={{ fontSize: 12, color: '#b5bbc3', marginTop: 2 }}>
                       {auto.enabled
-                        ? `Next run ${formatRunTime(auto.next_run_at, String(auto.trigger_config?.timezone || 'UTC'))}`
+                        ? `Next run ${formatRunTime(auto.next_run_at!, String(auto.trigger_config?.timezone || 'UTC'))}`
                         : 'Paused'}
                     </div>
                   )}
@@ -409,13 +415,13 @@ export function ExplainerPill({ label, onClick }: { label: string; onClick: () =
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-        color: '#999', backgroundColor: 'transparent',
+        padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        color: '#b5bbc3', backgroundColor: 'transparent',
         border: '1px solid #3a3a3a', borderRadius: 999, cursor: 'pointer',
-        transition: 'all 0.15s', whiteSpace: 'nowrap',
+        transition: 'all 0.15s', whiteSpace: 'normal',
       }}
       onMouseEnter={e => { e.currentTarget.style.color = '#ddd'; e.currentTarget.style.borderColor = '#555' }}
-      onMouseLeave={e => { e.currentTarget.style.color = '#999'; e.currentTarget.style.borderColor = '#3a3a3a' }}
+      onMouseLeave={e => { e.currentTarget.style.color = '#b5bbc3'; e.currentTarget.style.borderColor = '#3a3a3a' }}
     >
       <HelpCircle size={12} />
       {label}
@@ -435,9 +441,9 @@ function FilterPill({ label, count, active, onClick, icon }: {
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '3px 10px', fontSize: 11, fontWeight: 600,
+        padding: '3px 10px', fontSize: 12, fontWeight: 600,
         fontFamily: 'inherit', borderRadius: 12,
-        color: active ? '#fff' : '#888',
+        color: active ? '#fff' : '#b8bec7',
         backgroundColor: active ? '#3a3a3a' : 'transparent',
         border: active ? '1px solid #555' : '1px solid transparent',
         cursor: 'pointer', transition: 'all 0.12s',
@@ -447,8 +453,8 @@ function FilterPill({ label, count, active, onClick, icon }: {
       {icon}
       {label}
       <span style={{
-        fontSize: 10, fontWeight: 600,
-        color: active ? '#ccc' : '#555',
+        fontSize: 12, fontWeight: 600,
+        color: active ? '#ccc' : '#b8bec7',
         marginLeft: 1,
       }}>
         {count}

@@ -84,7 +84,7 @@ async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
 class _TrustSummary:
     """Most recent AI-trust signal for a KB, unified across run sources."""
 
-    __slots__ = ("score", "baseline", "lift", "at")
+    __slots__ = ("score", "baseline", "lift", "at", "metric", "config_state")
 
     def __init__(
         self,
@@ -93,11 +93,15 @@ class _TrustSummary:
         baseline: float | None,
         lift: float | None,
         at,
+        metric: str = "answer_accuracy",
+        config_state: str | None = None,
     ) -> None:
         self.score = score
         self.baseline = baseline
         self.lift = lift
         self.at = at
+        self.metric = metric
+        self.config_state = config_state
 
 
 def _kb_response(
@@ -150,6 +154,8 @@ def _kb_response(
         last_validation_score=last_score,
         last_validation_baseline_score=last_baseline,
         last_validation_lift=last_lift,
+        last_validation_metric=trust.metric if trust else None,
+        last_validation_config_state=trust.config_state if trust else None,
         last_validated_at=last_validated_at_str,
         last_used_at=(
             last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
@@ -260,14 +266,19 @@ async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
         existing = out.get(r.kb_uuid)
         if existing is not None and existing.at is not None and ts is not None and existing.at >= ts:
             continue
-        # The user-facing question is "does the AI do better with the KB?".
-        # Use the *applied* KB score (optimized_score when present, else the
-        # default-config baseline) against the no-KB baseline so the lift
-        # always reflects what the user actually gets at chat time.
+        # Optimization stores composite quality; the no-KB score is raw answer
+        # accuracy. Subtracting them would invent a comparison between unlike
+        # metrics. Also distinguish tested proposals from settings actually applied.
         score = r.optimized_score if r.optimized_score is not None else r.baseline_default_score
-        baseline = r.baseline_no_kb_score
-        lift = (score - baseline) if (score is not None and baseline is not None) else None
-        out[r.kb_uuid] = _TrustSummary(score=score, baseline=baseline, lift=lift, at=ts)
+        config_state = (
+            "default" if r.optimized_score is None else
+            "reverted" if getattr(r, "reverted_at", None) else
+            "applied" if getattr(r, "applied_at", None) else "proposed"
+        )
+        out[r.kb_uuid] = _TrustSummary(
+            score=score, baseline=None, lift=None, at=ts,
+            metric="composite_quality", config_state=config_state,
+        )
 
     return out
 
@@ -1094,6 +1105,7 @@ async def validate_knowledge_base(
       - mode: "judge" (default) or "judge+baseline" (analysis mode with lift).
       - skip_judge: bool — skip the LLM judge entirely (cheap re-run).
       - async: bool — enqueue a Celery task and return {task_id} instead of running inline.
+      - request_id: UUID — reuse this ID and options to recover a lost start response.
       - query_uuids: list[str] — run only these test queries (a smoke test).
         The run lands in history and exports like any other but is tagged
         so it never becomes the KB's quality score. 400 when empty, when more
@@ -1132,6 +1144,14 @@ async def validate_knowledge_base(
                     f"({len(query_uuids)} requested) — narrow the selection or run a full validation"
                 ),
             )
+    options = {"mode": mode, "skip_judge": skip_judge, "query_uuids": query_uuids}
+    if async_run:
+        from app.services.kb_validation_lifecycle import existing_validation
+        existing = await existing_validation(kb.uuid, user.user_id, options, body.get("request_id"))
+        if existing:
+            return existing
+
+    if query_uuids is not None:
         from app.models.kb_test_query import KBTestQuery
         owned = await KBTestQuery.find(
             {"knowledge_base_uuid": kb.uuid, "uuid": {"$in": query_uuids}},
@@ -1153,15 +1173,34 @@ async def validate_knowledge_base(
             )
 
     if async_run:
-        from app.tasks.kb_validation_tasks import validate_kb_task
-        task = validate_kb_task.delay(kb.uuid, user.user_id, mode, skip_judge, query_uuids)
-        return {"task_id": task.id, "status": "queued"}
+        from app.services.kb_validation_lifecycle import start_validation
+        return await start_validation(kb.uuid, user.user_id, options, body.get("request_id"))
 
     from app.services import kb_validation_service
     result = await kb_validation_service.run_kb_validation(
         kb.uuid, user.user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids,
     )
     return result
+
+
+@router.get("/{uuid}/validation-tasks/active")
+async def get_active_validation_task(uuid: str, user: User = Depends(get_current_user)):
+    ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(uuid, user, user_org_ancestry=ancestry, allow_admin=True)
+    if not kb:
+        raise HTTPException(404, "Knowledge base not found")
+    from app.services.kb_validation_lifecycle import active_validation
+    return await active_validation(kb.uuid, user.user_id)
+
+
+@router.get("/{uuid}/validation-tasks/{task_id}")
+async def get_validation_task(uuid: str, task_id: str, user: User = Depends(get_current_user)):
+    ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(uuid, user, user_org_ancestry=ancestry, allow_admin=True)
+    if not kb:
+        raise HTTPException(404, "Knowledge base not found")
+    from app.services.kb_validation_lifecycle import validation_status
+    return await validation_status(kb.uuid, user.user_id, task_id)
 
 
 @router.get("/{uuid}/validation-grader")

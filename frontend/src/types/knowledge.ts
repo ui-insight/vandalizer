@@ -65,6 +65,8 @@ export interface KnowledgeBase {
   last_validation_score?: number | null
   last_validation_baseline_score?: number | null
   last_validation_lift?: number | null
+  last_validation_metric?: 'answer_accuracy' | 'composite_quality' | null
+  last_validation_config_state?: 'proposed' | 'applied' | 'reverted' | 'default' | null
   last_validated_at?: string | null
   // Per-requesting-user: when this user last chatted with the KB (ISO string).
   last_used_at?: string | null

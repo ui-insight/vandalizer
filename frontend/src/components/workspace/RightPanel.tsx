@@ -19,7 +19,7 @@ export function RightPanel() {
   // built in the workflow editor) must come back to the same chat — and the
   // Library's filters, search, folder selection, and scroll likewise survive
   // opening and closing an editor.
-  const editor = openAutomationId ? <AutomationEditorPanel />
+  const editor = openAutomationId ? <AutomationEditorPanel key={openAutomationId} />
     : openExtractionId ? <ExtractionEditorPanel />
     : openWorkflowId ? <WorkflowEditorPanel />
     : null

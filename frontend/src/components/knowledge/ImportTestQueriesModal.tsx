@@ -5,7 +5,7 @@ import { importKBTestQueries, type KBTestQueryImportResult } from '../../api/kno
 
 interface Props {
   kbUuid: string
-  onImported: () => void
+  onImported: () => void | Promise<void>
   onClose: () => void
 }
 
@@ -34,10 +34,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
   const [result, setResult] = useState<KBTestQueryImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const inFlight = useRef(false)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !inFlight.current) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -45,23 +46,28 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
   const pickFile = (f: File | undefined | null) => {
     if (!f) return
+    if (inFlight.current) return
     setError(null)
     setResult(null)
+    if (!/\.(csv|xlsx)$/i.test(f.name)) { setFile(null); setError('Choose a CSV or Excel (.xlsx) file.'); return }
+    if (f.size > 5 * 1024 * 1024) { setFile(null); setError('This file exceeds the 5 MB limit.'); return }
     setFile(f)
   }
 
   const handleImport = async () => {
-    if (!file) return
+    if (!file || inFlight.current || result) return
+    inFlight.current = true
     setImporting(true)
     setError(null)
     try {
       const res = await importKBTestQueries(kbUuid, file)
       setResult(res)
-      if (res.created > 0 || res.updated > 0) onImported()
+      if (res.created > 0 || res.updated > 0) await onImported()
     } catch (e) {
       setError((e as Error).message)
     } finally {
       setImporting(false)
+      inFlight.current = false
     }
   }
 
@@ -76,7 +82,7 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         aria-modal="true"
         aria-label="Import test queries"
         style={{
-          width: 480, padding: 20, backgroundColor: '#1f1f1f',
+          width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflowY: 'auto', padding: 16, backgroundColor: '#1f1f1f', overflowWrap: 'anywhere',
           border: '1px solid #2e2e2e', borderRadius: 10,
         }}
       >
@@ -87,13 +93,14 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
             type="button"
             aria-label="Close"
             onClick={onClose}
+            disabled={importing}
             style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
           >
             <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 12 }}>
-          Upload a CSV or Excel (.xlsx) file with a <strong>Question</strong> column;
+          Upload a CSV or Excel (.xlsx) file, up to 5 MB, with a <strong>Question</strong> column;
           Expected Answer, Category, Source or Section, Notes, and ID columns are
           optional. Rows whose ID matches a previously imported question update it
           instead of creating a duplicate — re-import the same sheet as your KB evolves.
@@ -120,10 +127,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         {/* Drop zone / picker */}
         <div
           role="button"
-          tabIndex={0}
+          tabIndex={importing ? -1 : 0}
+          aria-disabled={importing}
           aria-label="Choose a file to import"
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click() }}
+          onClick={() => { if (!importing) inputRef.current?.click() }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!importing) inputRef.current?.click() } }}
           onDragOver={e => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={e => {
@@ -139,7 +147,7 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           }}
         >
           <FileSpreadsheet size={20} style={{ color: file ? '#22c55e' : '#666' }} aria-hidden="true" />
-          <div style={{ fontSize: 12, color: file ? '#e5e5e5' : '#888', textAlign: 'center' }}>
+          <div style={{ fontSize: 12, color: file ? '#e5e5e5' : '#b8bec7', textAlign: 'center' }}>
             {file ? file.name : 'Drop a .csv or .xlsx file here, or click to browse'}
           </div>
           <input
@@ -210,7 +218,7 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" onClick={onClose} style={{
+          <button type="button" onClick={onClose} disabled={importing} style={{
             padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
             color: '#aaa', background: 'transparent', border: '1px solid #333',
             borderRadius: 6, cursor: 'pointer',
@@ -220,18 +228,18 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           <button
             type="button"
             onClick={handleImport}
-            disabled={!file || importing}
+            disabled={!file || importing || !!result}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#fff', backgroundColor: !file || importing ? '#134e6b' : '#0ea5e9',
+              color: '#fff', backgroundColor: !file || importing || result ? '#134e6b' : '#0369a1',
               border: '1px solid #0ea5e9', borderRadius: 6,
               cursor: !file || importing ? 'not-allowed' : 'pointer',
               opacity: !file || importing ? 0.7 : 1,
             }}
           >
             {importing && <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />}
-            {importing ? 'Importing…' : 'Import'}
+            {importing ? 'Importing…' : result ? 'Import complete' : 'Import'}
           </button>
         </div>
       </div>

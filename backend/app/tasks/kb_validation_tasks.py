@@ -24,6 +24,7 @@ def _run_async(coro):
 @celery.task(
     bind=True,
     name="tasks.kb.validate_kb",
+    track_started=True,
     autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,
     max_retries=2,
@@ -41,21 +42,30 @@ def validate_kb_task(
 
     ``query_uuids`` restricts the run to those test queries (a smoke test).
     """
-    return _run_async(_validate_kb_async(kb_uuid, user_id, mode, skip_judge, query_uuids))
+    return _run_async(_validate_kb_async(kb_uuid, user_id, mode, skip_judge, query_uuids, self.request.id))
 
 
 async def _validate_kb_async(
     kb_uuid: str, user_id: str, mode: str, skip_judge: bool,
     query_uuids: list[str] | None = None,
+    task_id: str | None = None,
 ):
     from app.config import Settings
     from app.database import init_db
 
     await init_db(Settings())
 
+    from app.models.validation_run import ValidationRun
+    if task_id:
+        saved = await ValidationRun.find_one({
+            "item_kind": "knowledge_base", "item_id": kb_uuid, "user_id": user_id,
+            "result_snapshot.validation_task_id": task_id,
+        })
+        if saved:
+            return {"kb_uuid": kb_uuid, "already_completed": True}
     from app.services.kb_validation_service import run_kb_validation
     result = await run_kb_validation(
-        kb_uuid, user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids,
+        kb_uuid, user_id, mode=mode, skip_judge=skip_judge, query_uuids=query_uuids, validation_task_id=task_id,
     )
     # Compact return value — the full result is in the persisted ValidationRun.
     return {

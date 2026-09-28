@@ -268,6 +268,8 @@ export type KBJudgeVerdict = {
 }
 
 export type KBValidationDetail = {
+  /** Expected answer saved with the run; never substitute today’s edited test question. */
+  expected_answer?: string | null
   query_uuid?: string
   query: string
   category?: string | null
@@ -386,12 +388,29 @@ export function runKBValidation(
 
 export function runKBValidationAsync(
   uuid: string,
-  options?: KBValidationRunOptions,
+  options?: KBValidationRunOptions & { request_id?: string },
 ) {
-  return apiFetch<{ task_id: string; status: 'queued' }>(`/api/knowledge/${uuid}/validate`, {
+  return apiFetch<{ task_id: string; status: 'queued'; resumed?: boolean; options?: KBValidationRunOptions }>(`/api/knowledge/${uuid}/validate`, {
     method: 'POST',
     body: JSON.stringify({ ...(options ?? {}), async: true }),
   })
+}
+
+export type KBValidationTaskStatus = {
+  task_id: string
+  status: 'queued' | 'running' | 'retrying' | 'unknown' | 'failed' | 'completed'
+  delayed?: boolean
+  message?: string
+  run_uuid?: string
+  result?: KBValidationResult
+}
+
+export function getActiveKBValidationTask(uuid: string) {
+  return apiFetch<{ task: (KBValidationTaskStatus & { options: KBValidationRunOptions }) | null }>(`/api/knowledge/${uuid}/validation-tasks/active`)
+}
+
+export function getKBValidationTask(uuid: string, taskId: string) {
+  return apiFetch<KBValidationTaskStatus>(`/api/knowledge/${uuid}/validation-tasks/${taskId}`)
 }
 
 export function getKBSourceHealth(uuid: string) {

@@ -4,6 +4,7 @@ import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
 import { useBranding } from '../../contexts/BrandingContext'
+import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface Props {
   onSend: (message: string) => void
@@ -12,6 +13,7 @@ interface Props {
   // Opens the knowledge base screen so the user can pick a KB to chat with.
   onAddKnowledge?: () => void
   disabled?: boolean
+  sendDisabled?: boolean
   isStreaming?: boolean
   onStop?: () => void
   selectedModel?: string
@@ -29,12 +31,13 @@ interface Props {
 const MIN_COMPOSER_TEXT_HEIGHT = 24
 
 export function ChatInput({
-  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled,
+  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
   contextMeter, memoryControl, focusSignal,
 }: Props) {
   const branding = useBranding()
+  const uploadPolicy = useUploadPolicy()
   const [message, setMessage] = useState('')
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -87,13 +90,13 @@ export function ChatInput({
 
   const handleSend = () => {
     const trimmed = message.trim()
-    if (!trimmed || disabled) return
+    if (!trimmed || disabled || sendDisabled) return
     onSend(trimmed)
     setMessage('')
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSend()
     }
@@ -170,20 +173,20 @@ export function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder={
               hasDocuments
-                ? 'Ask about these documents, extract key fields, or compare versions...'
-                : `Ask ${branding.appName} about a document, workflow, or compliance question...`
+                ? 'Ask about these documents…'
+                : `Ask ${branding.appName}…`
             }
             aria-label="Message input"
             rows={1}
             wrap="soft"
-            className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none"
+            className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#626a75] placeholder:font-medium focus:outline-none focus-visible:outline-none"
             style={{ fontSize: 16, lineHeight: 1.5, minHeight: `${MIN_COMPOSER_TEXT_HEIGHT}px`, maxHeight: '25vh' }}
             disabled={disabled}
           />
         </div>
 
         {/* Controls toolbar — min-w-0 lets children shrink instead of overflowing on narrow screens */}
-        <div className="flex min-w-0 items-center gap-2.5 pt-1 px-1">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5 pt-1 px-1">
           {/* + Add button */}
           <div ref={addMenuRef} className="relative">
             <button
@@ -213,7 +216,7 @@ export function ChatInput({
                   style={{ minHeight: 40 }}
                 >
                   <FileUp className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                  <span>Add Document</span>
+                  <span>Add Document<span style={{ display: 'block', fontSize: 12, color: '#58616d', lineHeight: 1.5 }}>{uploadPolicy.description}</span></span>
                 </button>
                 <button
                   role="menuitem"
@@ -244,6 +247,7 @@ export function ChatInput({
             type="file"
             multiple
             aria-label="Attach files"
+            accept={uploadPolicy.accept}
             className="hidden"
             onChange={handleFileChange}
           />
@@ -342,7 +346,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={handleSend}
-              disabled={!message.trim() || disabled}
+              disabled={!message.trim() || disabled || sendDisabled}
               aria-label="Send message"
               className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >

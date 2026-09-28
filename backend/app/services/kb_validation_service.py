@@ -1937,6 +1937,7 @@ async def run_kb_validation(
     skip_judge: bool = False,
     model: Optional[str] = None,
     query_uuids: Optional[list[str]] = None,
+    validation_task_id: str | None = None,
 ) -> dict:
     """Run full validation on a knowledge base.
 
@@ -2187,6 +2188,9 @@ async def run_kb_validation(
         "answer_model": effective_answer_model if judge_payload else None,
         "answer_model_fallback": answer_model_fallback if judge_payload else None,
     }
+
+    if validation_task_id:
+        result["validation_task_id"] = validation_task_id
 
     # Persist the validation run
     from app.models.validation_run import SMOKE_TEST_SOURCE

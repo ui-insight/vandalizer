@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { KBTestQueriesTab, chunkForBulkDelete, BULK_DELETE_BATCH, matchesSearch } from './KBTestQueriesTab'
+import { createKBTestQuery, updateKBTestQuery, deleteKBTestQuery } from '../../api/knowledge'
 import type { KBTestQuery } from '../../api/knowledge'
 
 const bulkDeleteKBTestQueries = vi.fn().mockResolvedValue({ deleted: 2 })
@@ -253,4 +254,58 @@ describe('KBTestQueriesTab search', () => {
     fireEvent.change(screen.getByLabelText(/Search test queries/), { target: { value: 'nothing-like-this' } })
     expect(screen.getByText(/No all test queries match/)).toBeInTheDocument()
   })
+})
+
+
+describe('question mutation recovery', () => {
+  it('keeps a failed add draft, then reveals the saved question outside old search', async () => {
+    vi.mocked(createKBTestQuery).mockRejectedValueOnce(new Error('Service unavailable')).mockResolvedValueOnce(q('new', 'New question?', false))
+    const { onChange } = renderTab()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'old search' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add manually' }))
+    fireEvent.change(screen.getByLabelText('Query', { exact: true }), { target: { value: 'New question?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your draft is preserved')
+    expect(screen.getByLabelText('Query', { exact: true })).toHaveValue('New question?')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => expect(onChange).toHaveBeenCalled())
+    expect(screen.getByRole('searchbox')).toHaveValue('')
+  })
+
+  it('keeps edits after failure and prevents cancelling a pending save', async () => {
+    let rejectSave!: (error: Error) => void
+    vi.mocked(updateKBTestQuery).mockImplementationOnce(() => new Promise((_, reject) => { rejectSave = reject }))
+    renderTab()
+    fireEvent.click(screen.getAllByRole('button', { name: 'Edit test query' })[0])
+    fireEvent.change(screen.getByLabelText('Expected answer'), { target: { value: 'Reviewed answer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled()
+    expect(screen.getByLabelText('Expected answer')).toBeDisabled()
+    rejectSave(new Error('Try again'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your edits are preserved')
+    expect(screen.getByLabelText('Expected answer')).toHaveValue('Reviewed answer')
+  })
+
+  it('preserves the selected target on a failed row deletion', async () => {
+    vi.mocked(deleteKBTestQuery).mockRejectedValueOnce(new Error('Try again'))
+    renderTab()
+    fireEvent.click(screen.getByLabelText('Select test query: Hand-written question?'))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete test query' })[0])
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not delete “Hand-written question?”')
+    expect(screen.getByLabelText('Select test query: Hand-written question?')).toBeChecked()
+  })
+
+  it('retains only the remaining selection after a partial batch failure', async () => {
+    const many = Array.from({ length: 2001 }, (_, i) => q(`bulk-${i}`, `Question ${i}`, false))
+    bulkDeleteKBTestQueries.mockResolvedValueOnce({ deleted: 2000 }).mockRejectedValueOnce(new Error('Temporary failure'))
+    renderTab({ queries: many })
+    fireEvent.click(document.querySelector('input[aria-label="Select all all test queries"]')!)
+    fireEvent.click(screen.getByText('Delete selected (2001)'))
+    expect(await screen.findByText(/Deleted 2000 questions before deletion stopped/)).toBeInTheDocument()
+    expect(screen.getByText('Delete selected (1)')).toBeEnabled()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Question 2000' } })
+    expect(screen.getByLabelText('Select test query: Question 2000')).toBeChecked()
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Question 0' } })
+    expect(screen.getByLabelText('Select test query: Question 0')).not.toBeChecked()
+  }, 20000)
 })

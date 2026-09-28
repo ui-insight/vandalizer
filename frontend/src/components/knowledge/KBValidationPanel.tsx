@@ -4,18 +4,17 @@ import {
   listKBTestQueries,
   getKBQuality,
   getKBValidationGrader,
-  runKBValidationAsync,
   downloadKBValidationRunExport,
   type KBTestQuery,
   type KBValidationExportFormat,
   type KBValidationGrader,
-  type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
 import { describeKBScoreWithValues, explainKBScore } from './kbScoreFormula'
 import { AutovalidateTab } from './AutovalidateTab'
 import { KBTestQueriesTab } from './KBTestQueriesTab'
 import { KBValidationRunTab } from './KBValidationRunTab'
+import { useKBValidationRun } from '../../hooks/useKBValidationRun'
 import { KBQualityHistoryTab } from './KBQualityHistoryTab'
 
 type Tab = 'autovalidate' | 'queries' | 'run' | 'history'
@@ -31,6 +30,7 @@ interface Props {
   /** Called with the new KB's uuid after the user clones a KB they can't
    * manage, so the parent can navigate to their own copy. */
   onCloned?: (newUuid: string) => void
+  onRunCompleted?: (kbUuid: string) => void
   /** Collapse state is owned by the parent so it can trade screen space
    * between this panel and sibling sections (e.g. the Sources list). The
    * header stays visible when collapsed, keeping the latest score chip in
@@ -38,13 +38,6 @@ interface Props {
   collapsed?: boolean
   onToggleCollapsed?: () => void
 }
-
-// Validation runs off the request/response path (a background Celery task), so
-// the UI polls the quality history until the new run lands instead of blocking
-// on a single long HTTP call that would trip the 60s client fetch timeout.
-const POLL_INTERVAL_MS = 4000
-const MAX_POLL_MS = 10 * 60 * 1000 // give up after 10 min; the run still lands in History
-const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
 
 // One row of GET /knowledge/{uuid}/quality history. ``result_snapshot`` carries
 // the full KBValidationResult the Run-now tab renders, so we can hydrate the
@@ -66,9 +59,9 @@ type KBHistoryItem = {
 const isSmokeTest = (h: KBHistoryItem) => h.source === 'smoke_test'
 
 const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
-  { id: 'autovalidate', label: 'Validate', icon: Sparkles },
-  { id: 'queries', label: 'Test Queries' },
-  { id: 'run', label: 'Run now' },
+  { id: 'autovalidate', label: 'Improve retrieval', icon: Sparkles },
+  { id: 'queries', label: 'Test questions' },
+  { id: 'run', label: 'Check answer quality' },
   { id: 'history', label: 'History' },
 ]
 
@@ -91,20 +84,20 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, collapsed = false, onToggleCollapsed }: Props) {
-  const [tab, setTab] = useState<Tab>('autovalidate')
+export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = true, onCloned, onRunCompleted, collapsed = false, onToggleCollapsed }: Props) {
+  const [tab, setTab] = useState<Tab>('run')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
   // Persisted uuid of the run shown in the Run-now tab, so its results can be
   // exported. null until a run lands (or is hydrated from history).
   const [latestRunUuid, setLatestRunUuid] = useState<string | null>(null)
+  const [displayedRunDate, setDisplayedRunDate] = useState<string | null>(null)
   const [latestQuality, setLatestQuality] = useState<LatestQualitySummary | null>(null)
   const [loading, setLoading] = useState(false)
   // Run state lives here (not in KBValidationRunTab) so an in-flight validation
   // survives tab switches — the Run now tab is conditionally rendered and would
   // otherwise unmount mid-run, dropping its `running`/`error` local state and
   // showing the idle "Run Validation" button as if nothing were happening.
-  const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
   // Questions ticked on Test Queries and handed to Run now by "Run selected",
   // where the count and category mix are shown before the run starts.
@@ -125,7 +118,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   // mid-run). The polling loop awaits across many seconds, so it can resolve
   // long after React has torn the component down.
   const mountedRef = useRef(true)
-  useEffect(() => () => { mountedRef.current = false }, [])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
 
   // Roving focus for the tab strip (keyboard arrow navigation).
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -179,73 +175,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
     }
   }, [fetchHistory, applyLatestQuality])
 
-  // Run validation as a background task and poll for the result. The synchronous
-  // endpoint can take minutes for a large eval set and would blow past the
-  // client's 60s fetch timeout — the request aborted with "Request timed out"
-  // even though the server finished and persisted the run (it only surfaced
-  // later in History). Instead we enqueue the Celery task and poll the quality
-  // history until the new ValidationRun lands, then render its full snapshot.
-  const runValidation = useCallback(async (mode: KBValidationMode, queryUuids?: string[]) => {
-    setRunning(true)
+  const { start: runValidation, retry: retryValidation, running, progress, activeOptions } = useKBValidationRun(kbUuid, (uuid, result) => {
+    setLatestRun(result)
+    setLatestRunUuid(uuid)
+    setDisplayedRunDate(null)
     setRunError(null)
-    try {
-      // Remember the runs that already exist so we can spot the new one.
-      let priorUuids = new Set<string>()
-      try {
-        priorUuids = new Set(
-          (await fetchHistory()).map(h => h.uuid).filter((u): u is string => !!u),
-        )
-      } catch {
-        // Non-fatal — worst case we match the first completed run we see.
-      }
-
-      await runKBValidationAsync(
-        kbUuid,
-        queryUuids ? { mode, query_uuids: queryUuids } : { mode },
-      )
-
-      const deadline = Date.now() + MAX_POLL_MS
-      let result: KBValidationResult | null = null
-      let resultUuid: string | null = null
-      while (Date.now() < deadline) {
-        await sleep(POLL_INTERVAL_MS)
-        if (!mountedRef.current) return
-        let history: KBHistoryItem[]
-        try {
-          history = await fetchHistory()
-        } catch {
-          continue // transient fetch error — keep polling
-        }
-        // The freshest run we haven't seen before that carries a full validation
-        // payload (skips lightweight optimizer-apply / passive rows).
-        const fresh = history.find(
-          h => h.uuid && !priorUuids.has(h.uuid) && h.result_snapshot?.retrieval_precision,
-        )
-        if (fresh?.result_snapshot) {
-          result = fresh.result_snapshot
-          resultUuid = fresh.uuid ?? null
-          applyLatestQuality(history)
-          break
-        }
-      }
-      if (!mountedRef.current) return
-      if (result) {
-        setLatestRun(result)
-        setLatestRunUuid(resultUuid)
-        // Surface the new run in History without waiting for a reload.
-        setHistoryRefreshKey(k => k + 1)
-      } else {
-        setRunError(
-          'Validation is still running. Large evaluation sets can take several ' +
-          'minutes. It will appear in the History tab when it finishes.',
-        )
-      }
-    } catch (e) {
-      if (mountedRef.current) setRunError((e as Error).message)
-    } finally {
-      if (mountedRef.current) setRunning(false)
-    }
-  }, [kbUuid, fetchHistory, applyLatestQuality])
+    setHistoryRefreshKey(k => k + 1)
+    void refreshHistory()
+    onRunCompleted?.(kbUuid)
+  })
 
   // Export the run currently shown in the Run-now tab. Failures surface in
   // the tab's existing error slot rather than dying silently.
@@ -284,7 +222,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
 
   const latestScore = latestQuality?.score ?? null
   const scoreColor =
-    latestScore == null ? '#666'
+    latestScore == null ? '#b8bec7'
     : latestScore >= 90 ? '#22c55e'
     : latestScore >= 70 ? '#3b82f6'
     : latestScore >= 50 ? '#f59e0b'
@@ -330,7 +268,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   return (
     <div
       style={{
-        marginTop: 16,
+        marginTop: 12,
         padding: 12,
         backgroundColor: '#1f1f1f',
         border: '1px solid #2e2e2e',
@@ -352,8 +290,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       >
         {onToggleCollapsed && (
           collapsed
-            ? <ChevronRight size={14} style={{ color: '#888', flexShrink: 0 }} />
-            : <ChevronDown size={14} style={{ color: '#888', flexShrink: 0 }} />
+            ? <ChevronRight size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
+            : <ChevronDown size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
         )}
         <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
         <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
@@ -364,7 +302,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             title={tooltip}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+              fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
               color: scoreColor, backgroundColor: 'rgba(255,255,255,0.05)',
               border: `1px solid ${scoreColor}33`,
             }}
@@ -379,7 +317,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={tooltip}
             style={{
-              fontSize: 10, color: '#666',
+              fontSize: 12, color: '#b8bec7',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -390,7 +328,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={`The applied optimization pins ${latestQuality.answerModelFallback.configured}, which is no longer in System Config. This score was answered by ${latestQuality.answerModelFallback.used}. Re-run Autovalidate or revert the optimization to clear this.`}
             style={{
-              fontSize: 10, color: '#f59e0b',
+              fontSize: 12, color: '#f59e0b',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -398,9 +336,9 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           </span>
         )}
         {collapsed && running && (
-          <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
+          <Loader2 size={12} style={{ color: '#b8bec7', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#888' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 13, color: '#b8bec7' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
       </button>
@@ -410,15 +348,14 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           know what each tab is for without clicking through. */}
       <div
         style={{
-          fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5,
+          fontSize: 13, color: '#b8bec7', marginBottom: 6, lineHeight: 1.5,
         }}
       >
-        <b style={{ color: '#bbb' }}>Validate</b> to score &amp; improve. <b style={{ color: '#bbb' }}>Run now</b> to spot-check.{' '}
-        <b style={{ color: '#bbb' }}>Test Queries</b> are the rubric.
+        Add test questions, check answer quality, then compare retrieval settings if needed.
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
+      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
         {TAB_LABELS.map((t, idx) => {
           const active = tab === t.id
           const Icon = t.icon
@@ -439,7 +376,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
                 fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 background: 'transparent',
-                color: active ? '#fff' : '#888',
+                color: active ? '#fff' : '#b8bec7',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 12,
@@ -451,17 +388,24 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
                 marginBottom: -1,
               }}
             >
-              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#888' }} aria-hidden="true" />}
+              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#b8bec7' }} aria-hidden="true" />}
               {t.label}
             </button>
           )
         })}
       </div>
 
+      {tab !== 'run' && progress && (
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 13, color: progress.phase === 'failed' ? '#fca5a5' : '#c5c9d0', lineHeight: 1.6 }}>
+          <div>{progress.message}</div>
+          {progress.delayed && <div>This check is taking longer than usual; it remains active.</div>}
+          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 8, padding: '7px 12px', color: '#fff', background: '#333', border: '1px solid #666', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}
+        </div>
+      )}
       {/* Tab content */}
       <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
       {loading ? (
-        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#b8bec7' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
           <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
         </div>
@@ -473,6 +417,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           queriesCount={queries.length}
           onSwitchToQueries={() => setTab('queries')}
           onCloned={onCloned}
+          onChanged={() => { void refreshHistory(); onRunCompleted?.(kbUuid); setHistoryRefreshKey(key => key + 1) }}
         />
       ) : tab === 'queries' ? (
         <KBTestQueriesTab
@@ -497,10 +442,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           queries={queries}
           selectedUuids={handedSelection}
           latestRun={latestRun}
+          displayedRunLabel={latestRunUuid ? `Saved run ${displayedRunDate ? new Date(displayedRunDate).toLocaleString() + ' · ' : ''}${latestRunUuid}` : undefined}
           running={running}
+          progress={progress}
+          activeOptions={activeOptions}
+          onRetryStatus={retryValidation}
           error={runError}
-          onRun={runValidation}
+          onRun={(mode, queryUuids) => { setRunError(null); runValidation(mode, queryUuids) }}
           onExport={latestRunUuid ? exportLatestRun : undefined}
+          onChooseQuestions={() => setTab('queries')}
           grader={grader}
         />
       ) : (
@@ -510,6 +460,14 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           refreshKey={historyRefreshKey}
           polling={running}
           kbHasSources={kbHasSources}
+          onOpenRun={(uuid, result, createdAt) => {
+            setLatestRun(result)
+            setLatestRunUuid(uuid)
+            setDisplayedRunDate(createdAt ?? null)
+            setHandedSelection(null)
+            setTab('run')
+            tabRefs.current[2]?.focus()
+          }}
         />
       )}
       </div>

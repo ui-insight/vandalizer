@@ -33,7 +33,7 @@ export function ProjectChatBadge({
         padding: '6px 16px',
         fontSize: 12,
         fontWeight: 600,
-        color: 'var(--highlight-color, #eab308)',
+        color: '#424a55',
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
         borderTop: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)',
       }}
@@ -44,7 +44,7 @@ export function ProjectChatBadge({
       {kbReady && (
         <span
           title="Answers are grounded in this project's knowledge base"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 0.75, fontWeight: 500 }}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 1, fontWeight: 500 }}
         >
           <Sparkles size={12} /> grounded in project KB
         </span>
@@ -60,7 +60,7 @@ export function ProjectChatBadge({
           padding: 2,
           display: 'flex',
           color: 'inherit',
-          opacity: 0.7,
+          opacity: 1,
         }}
       >
         <X size={14} />

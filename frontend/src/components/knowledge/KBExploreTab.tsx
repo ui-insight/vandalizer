@@ -28,8 +28,8 @@ const C = {
   borderHover: '#4a4a4a',
   text: '#e5e5e5',
   textMuted: '#aaa',
-  textDim: '#888',
-  textFaint: '#666',
+  textDim: '#b8bec7',
+  textFaint: '#b8bec7',
 }
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
           {collection.description}
         </p>
       )}
-      <span style={{ marginTop: 'auto', fontSize: 11, fontWeight: 500, color: C.textFaint }}>
+      <span style={{ marginTop: 'auto', fontSize: 12, fontWeight: 500, color: C.textFaint }}>
         {(collection.visible_count ?? collection.item_ids.length)} item{(collection.visible_count ?? collection.item_ids.length) !== 1 ? 's' : ''}
       </span>
     </button>
@@ -154,8 +154,7 @@ function KBCatalogCard({
   const tierIconColor = (measuredTier && TIER_ICON[measuredTier]) || C.textFaint
 
   return (
-    <button
-      onClick={onClick}
+    <article
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
         padding: 14, borderRadius: 12,
@@ -171,15 +170,15 @@ function KBCatalogCard({
     >
       <div style={{ display: 'flex', alignItems: 'start', gap: 6, marginBottom: 6 }}>
         <ShieldCheck size={14} style={{ color: tierIconColor, flexShrink: 0, marginTop: 2 }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3 }}>
+        <button type="button" onClick={onClick} style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
           {item.display_name || item.name}
-        </span>
+        </button>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 11, padding: '1px 6px', borderRadius: 4,
+          fontSize: 12, padding: '1px 6px', borderRadius: 4,
           backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc',
           border: '1px solid rgba(56, 189, 248, 0.25)',
         }}>
@@ -194,7 +193,7 @@ function KBCatalogCard({
           regressionPending={item.regression_pending_review}
           variant="catalog"
         />
-        <CatalogSignals item={item} style={{ fontSize: 10, color: C.textFaint }} />
+        <CatalogSignals item={item} style={{ fontSize: 12, color: C.textFaint }} />
       </div>
 
       {item.description && (
@@ -210,7 +209,7 @@ function KBCatalogCard({
       )}
 
       {(item.total_sources != null || item.total_chunks != null) && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 11, color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textFaint, marginBottom: 8 }}>
           {item.total_sources != null && (
             <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
           )}
@@ -223,24 +222,24 @@ function KBCatalogCard({
       {item.tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 'auto', paddingTop: 6 }}>
           {item.tags.slice(0, 4).map((tag, i) => (
-            <span
+            <button type="button"
               key={i}
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
               style={{
-                fontSize: 10, padding: '1px 6px', borderRadius: 999,
+                fontSize: 12, padding: '1px 6px', borderRadius: 999,
                 backgroundColor: 'rgba(255,255,255,0.06)', color: '#c5c5c5',
                 cursor: 'pointer', transition: 'background-color 0.15s',
               }}
             >
               {tag}
-            </span>
+            </button>
           ))}
           {item.tags.length > 4 && (
-            <span style={{ fontSize: 10, color: C.textFaint }}>+{item.tags.length - 4}</span>
+            <span style={{ fontSize: 12, color: C.textFaint }}>+{item.tags.length - 4}</span>
           )}
         </div>
       )}
-    </button>
+    </article>
   )
 }
 
@@ -257,6 +256,7 @@ function CollectionLink({
 }) {
   return (
     <button
+      aria-pressed={active}
       onClick={onClick}
       style={{
         width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
@@ -275,7 +275,7 @@ function CollectionLink({
       {collection.featured && (
         <Star size={11} fill="currentColor" style={{ color: active ? '#fde047' : '#facc15', flexShrink: 0, marginTop: 3 }} />
       )}
-      <span style={{ fontSize: 11, color: active ? '#cbd5e1' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
+      <span style={{ fontSize: 12, color: active ? '#cbd5e1' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
         {collection.visible_count ?? collection.item_ids.length}
       </span>
     </button>
@@ -297,7 +297,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
   const {
     items, total, allTotal, featuredCollections, regularCollections,
-    loading, loadingMore, error,
+    loading, loadingMore, error, collectionsError, retryCollections,
     searchQuery, setSearchQuery, qualityFilter, setQualityFilter,
     tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
     refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
@@ -321,7 +321,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
       const message = err instanceof ApiError && err.message
         ? err.message
         : 'Could not add this knowledge base — please try again.'
-      toast(message, 'error')
+      throw new Error(message)
     }
   }
 
@@ -339,7 +339,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
         backgroundColor: C.bg, color: C.text,
       }}>
         {/* Sidebar: Collections */}
-        <div style={{
+        {featuredCollections.length + regularCollections.length > 0 && <div style={{
           width: 224, flexShrink: 0,
           borderRight: `1px solid ${C.border}`,
           backgroundColor: C.panel,
@@ -348,6 +348,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           className="hidden md:block"
         >
           <button
+            aria-pressed={!selectedCollectionId}
             onClick={() => setSelectedCollectionId(null)}
             style={{
               width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
@@ -359,14 +360,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             }}
           >
             <span>All Knowledge Bases</span>
-            <span style={{ fontSize: 11, color: !selectedCollectionId ? '#cbd5e1' : C.textFaint }}>{allTotal ?? total}</span>
+            <span style={{ fontSize: 12, color: !selectedCollectionId ? '#cbd5e1' : C.textFaint }}>{allTotal ?? total}</span>
           </button>
 
           {featuredCollections.length > 0 && (
             <div style={{ marginTop: 16, marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px', marginBottom: 6 }}>
                 <Star size={10} fill="currentColor" style={{ color: '#facc15' }} />
-                <span style={{ fontSize: 10, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Featured
                 </span>
               </div>
@@ -384,7 +385,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           {regularCollections.length > 0 && (
             <div style={{ marginTop: 16, marginBottom: 8 }}>
               <span style={{
-                fontSize: 10, fontWeight: 700, color: C.textFaint,
+                fontSize: 12, fontWeight: 700, color: C.textFaint,
                 textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 10px',
               }}>
                 Collections
@@ -401,11 +402,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Main content */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: 24, maxWidth: 1024, margin: '0 auto' }}>
+        <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
+          <div className="catalog-content" style={{ padding: 24, maxWidth: 1024, margin: '0 auto' }}>
             {/* Hero header */}
             {showHero && !activeCollection && (
               <div style={{ marginBottom: 24 }}>
@@ -420,10 +421,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   </div>
                   <div>
                     <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
-                      Shared with everyone here
+                      Explore knowledge bases
                     </h2>
                     <p style={{ fontSize: 13, color: C.textDim, margin: '2px 0 0' }}>
-                      Knowledge bases ready to chat with — checked, scored, and free to copy
+                      Browse shared knowledge bases. Review their sources and measured quality before adding one.
                     </p>
                     <p style={{ fontSize: 12, color: C.textFaint, margin: '4px 0 0' }}>
                       Built one that works for you? Share it from My KBs — it doesn't need to be finished.
@@ -440,7 +441,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   onClick={() => setSelectedCollectionId(null)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: 11, color: C.textDim, background: 'transparent',
+                    fontSize: 12, color: C.textDim, background: 'transparent',
                     border: 'none', cursor: 'pointer', marginBottom: 6, fontFamily: 'inherit',
                   }}
                 >
@@ -526,7 +527,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {tagFilter && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 11,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 12,
                     backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}>
@@ -544,7 +545,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {selectedCollectionId && activeCollection && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 11,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 12,
                     backgroundColor: 'rgba(255,255,255,0.06)', color: C.text,
                   }}>
                     <FolderOpen size={10} aria-hidden="true" /> {activeCollection.title}
@@ -561,18 +562,19 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 <button
                   onClick={clearFilters}
                   style={{
-                    fontSize: 11, color: C.textDim, background: 'transparent',
+                    fontSize: 12, color: C.textDim, background: 'transparent',
                     border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit',
                   }}
                 >
                   Clear all
                 </button>
-                <span role="status" aria-live="polite" style={{ fontSize: 11, color: C.textFaint, marginLeft: 'auto' }}>
-                  {total} result{total !== 1 ? 's' : ''}
+                <span role="status" aria-live="polite" style={{ fontSize: 12, color: C.textFaint, marginLeft: 'auto' }}>
+                  {loading ? 'Loading…' : error ? 'Results unavailable' : `${total} result${total !== 1 ? 's' : ''}`}
                 </span>
               </div>
             )}
 
+            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12, borderRadius: 8, marginBottom: 12 }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
             {/* Error state */}
             {error && (
               <div role="alert" style={{
@@ -603,7 +605,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} aria-hidden="true" />
                 <p style={{ fontSize: 13, margin: 0 }}>Loading knowledge bases...</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : error ? null : items.length === 0 ? (
               <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '80px 16px' }}>
                 <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} aria-hidden="true" />
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 4 }}>
@@ -636,7 +638,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>
                       Featured Collections
                     </h3>
-                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {featuredCollections.map(col => (
                         <FeaturedCollectionCard
                           key={col.id}
@@ -659,11 +661,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>
                         Top Rated
                       </h3>
-                      <span style={{ fontSize: 11, color: C.textFaint }}>
+                      <span style={{ fontSize: 12, color: C.textFaint }}>
                         {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {topItems.slice(0, 6).map(item => (
                         <KBCatalogCard
                           key={item.id}
@@ -682,13 +684,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
                   )}
                   {!showHero && !loading && (
-                    <div role="status" aria-live="polite" style={{ fontSize: 11, color: C.textFaint, marginBottom: 10 }}>
+                    <div role="status" aria-live="polite" style={{ fontSize: 12, color: C.textFaint, marginBottom: 10 }}>
                       {total} item{total !== 1 ? 's' : ''}
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))' }}>
+                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                   {(showHero && !activeCollection ? otherItems : items).map(item => (
                     <KBCatalogCard
                       key={item.id}
@@ -734,10 +736,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           item={detailItem}
           onClose={() => setDetailItem(null)}
           onAddToLibrary={() => {}}
-          onAdoptKB={async (uuid) => {
-            await handleAdoptKB(uuid)
-            setDetailItem(null)
-          }}
+          onAdoptKB={handleAdoptKB}
           onTryIt={handleTryIt}
         />
       )}

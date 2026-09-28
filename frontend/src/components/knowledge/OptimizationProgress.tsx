@@ -1,6 +1,5 @@
 import type { KBOptimizationRun, OptimizationTrial } from '../../api/knowledge'
 import { OptimizationProgressCard } from '../shared/OptimizationProgressCard'
-import { DOMAIN_LABELS } from '../shared/labels'
 import { summariseConfigVerbose } from './OptimizationResults'
 
 interface Props {
@@ -10,17 +9,16 @@ interface Props {
 }
 
 export function OptimizationProgress({ run, onCancel, cancelling }: Props) {
-  const labels = DOMAIN_LABELS.kb
   return (
     <OptimizationProgressCard<OptimizationTrial['config']>
       run={run}
-      scoreFloor={run.baseline_no_kb_score}
+      scoreFloor={run.baseline_default_score}
       summariseConfig={summariseConfigVerbose}
       onCancel={onCancel}
       cancelling={cancelling}
-      scoreFloorLabel={labels.scoreFloorLabel}
-      scoreFloorDescription={labels.scoreFloorDescription}
-      liftLabel={labels.liftLabel}
+      scoreFloorLabel="Default settings: composite quality"
+      scoreFloorDescription="Retrieval and answer quality on the same test questions used for the trials."
+      liftLabel="vs default settings"
     />
   )
 }

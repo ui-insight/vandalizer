@@ -139,7 +139,7 @@ export function ConceptStrip({ heading = 'New here? Tap a term to see what it me
   return (
     <div>
       {heading && (
-        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8, fontWeight: 500 }}>
+        <div style={{ fontSize: 12, color: '#626a75', marginBottom: 8, fontWeight: 500 }}>
           {heading}
         </div>
       )}

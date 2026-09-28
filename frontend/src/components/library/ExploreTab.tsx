@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -12,7 +12,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
-import { CatalogSignals } from './CatalogSignals'
+import { CatalogSignals, CatalogEvidence } from './CatalogSignals'
 import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type KindFilter, type QualityFilter, type SortOption } from './useCatalogBrowser'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import { AuthorChip } from '../shared/AuthorChip'
@@ -123,7 +123,7 @@ export function ItemDetailModal({
   item: VerifiedCatalogItem
   onClose: () => void
   onAddToLibrary: (item: VerifiedCatalogItem) => void
-  onAdoptKB?: (kbUuid: string, teamId?: string | null) => void
+  onAdoptKB?: (kbUuid: string, teamId?: string | null) => void | Promise<void>
   onTryIt?: (item: VerifiedCatalogItem) => void
   currentTeamId?: string | null
   currentTeamName?: string | null
@@ -132,6 +132,21 @@ export function ItemDetailModal({
   isPinnedToProject?: boolean
   onTogglePinToProject?: (item: VerifiedCatalogItem) => void
 }) {
+  const [adopting, setAdopting] = useState<string | null>(null)
+  const adoptingRef = useRef(false)
+  const [adopted, setAdopted] = useState<Set<string>>(new Set())
+  const [adoptError, setAdoptError] = useState<string | null>(null)
+  const adopt = async (teamId: string | null) => {
+    const destination = teamId || 'personal'
+    if (!onAdoptKB || !item.source_uuid || adoptingRef.current || adopted.has(destination)) return
+    adoptingRef.current = true; setAdopting(destination); setAdoptError(null)
+    try {
+      await onAdoptKB(item.source_uuid, teamId)
+      setAdopted(previous => new Set([...previous, destination]))
+    } catch (error) {
+      setAdoptError(error instanceof Error ? error.message : 'Could not add this knowledge base. Try again.')
+    } finally { adoptingRef.current = false; setAdopting(null) }
+  }
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
   const shareLink = useShareLink()
@@ -142,19 +157,19 @@ export function ItemDetailModal({
     : null
 
   useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !adoptingRef.current) onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [onClose])
 
   return createPortal(
-    <div className="fixed inset-0 z-[9990] flex items-start justify-center pt-[5vh] bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[9990] flex items-start justify-center pt-[5vh] bg-black/40" onClick={() => { if (!adoptingRef.current) onClose() }}>
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={item.display_name || item.name}
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
+        className="w-[calc(100%-24px)] max-w-2xl max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header bar */}
@@ -164,7 +179,7 @@ export function ItemDetailModal({
               <div className="flex items-center gap-2 mb-2">
                 <ShieldCheck className="h-5 w-5 text-white/80" />
                 <span className="text-xs font-medium text-white/70 uppercase tracking-wide">
-                  Verified {kindConf?.label || item.kind}
+                  Shared {kindConf?.label || item.kind}
                 </span>
               </div>
               <h2 className="text-xl font-bold">{item.display_name || item.name}</h2>
@@ -172,13 +187,13 @@ export function ItemDetailModal({
                 <p className="mt-1.5 text-sm text-white/80">{item.description}</p>
               )}
             </div>
-            <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
+            <button type="button" disabled={!!adopting} onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>
           </div>
 
           {/* Stats row */}
-          <div className="flex items-center gap-4 mt-4 text-sm">
+          <div className="flex flex-wrap items-center gap-3 mt-4 text-sm">
             <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
@@ -216,6 +231,8 @@ export function ItemDetailModal({
             </div>
           )}
 
+          <CatalogEvidence item={item} />
+
           {/* Markdown documentation */}
           {item.markdown && (
             <div className={`rounded-xl p-5 mb-5 ${tierStyle?.bg || 'bg-gray-50'} border border-gray-100`}>
@@ -223,25 +240,29 @@ export function ItemDetailModal({
             </div>
           )}
 
+          {adoptError && <p role="alert" className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{adoptError} Try adding it again.</p>}
+          {adopted.size > 0 && <p role="status" className="mb-3 rounded-lg bg-green-50 p-3 text-sm text-green-800">Available in {adopted.has('personal') ? 'My Knowledge Bases' : `${currentTeamName || 'Team'} Knowledge Bases`}. You can open it in Chat below.</p>}
           {/* Actions */}
-          <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100">
             {item.kind === 'knowledge_base' && onAdoptKB && item.source_uuid && (
               <button
-                onClick={() => onAdoptKB(item.source_uuid!, null)}
+                disabled={!!adopting || adopted.has('personal')}
+                onClick={() => { void adopt(null) }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
               >
                 <Bookmark className="h-4 w-4" />
-                Add to My Knowledge Bases
+                {adopting === 'personal' ? 'Adding…' : adopted.has('personal') ? 'Added to My Knowledge Bases' : 'Add to My Knowledge Bases'}
               </button>
             )}
             {item.kind === 'knowledge_base' && onAdoptKB && item.source_uuid && currentTeamId && (
               <button
-                onClick={() => onAdoptKB(item.source_uuid!, currentTeamId)}
+                disabled={!!adopting || adopted.has(currentTeamId)}
+                onClick={() => { void adopt(currentTeamId) }}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
                 title={`Share with ${currentTeamName || 'your team'}`}
               >
                 <Users className="h-4 w-4" />
-                Add to {currentTeamName || 'Team'} Knowledge Bases
+                {adopting === currentTeamId ? 'Adding…' : `${adopted.has(currentTeamId) ? 'Added' : 'Add'} to ${currentTeamName || 'Team'} Knowledge Bases`}
               </button>
             )}
             {item.kind === 'knowledge_base' && item.source_uuid && onTryIt && (
@@ -342,7 +363,7 @@ function FeaturedCollectionCard({
         <p className="text-xs text-gray-500 mb-3">{collection.description}</p>
       )}
       <span className="mt-auto text-xs font-medium text-gray-500">
-        {collection.item_ids.length} item{collection.item_ids.length !== 1 ? 's' : ''}
+        {collection.visible_count ?? collection.item_ids.length} item{(collection.visible_count ?? collection.item_ids.length) !== 1 ? 's' : ''}
       </span>
     </button>
   )
@@ -390,7 +411,7 @@ function CatalogCard({
               regressionPending={item.regression_pending_review}
               variant="catalog"
             />
-            <CatalogSignals item={item} className="text-[10px] text-gray-500" />
+            <CatalogSignals item={item} className="text-xs text-gray-500" />
           </div>
         </div>
       </div>
@@ -406,7 +427,7 @@ function CatalogCard({
       )}
 
       {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (
-        <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-2">
+        <div className="flex items-center gap-3 text-xs text-gray-500 mb-2">
           {item.total_sources != null && <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>}
           {item.total_chunks != null && <span>{item.total_chunks.toLocaleString()} chunks</span>}
         </div>
@@ -418,13 +439,13 @@ function CatalogCard({
             <span
               key={i}
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
-              className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700 cursor-pointer transition-colors"
+              className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-700 cursor-pointer transition-colors"
             >
               {tag}
             </span>
           ))}
           {item.tags.length > 4 && (
-            <span className="text-[10px] text-gray-500">+{item.tags.length - 4}</span>
+            <span className="text-xs text-gray-500">+{item.tags.length - 4}</span>
           )}
         </div>
       )}
@@ -447,6 +468,7 @@ function CollectionLink({
 }) {
   return (
     <button
+      aria-pressed={active}
       onClick={onClick}
       className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-start gap-2 ${
         active
@@ -504,7 +526,7 @@ export function ExploreTab() {
   })
   const {
     items, total, allTotal, collections, featuredCollections,
-    loading, loadingMore, error,
+    loading, loadingMore, error, collectionsError, retryCollections,
     searchQuery, setSearchQuery, kindFilter, setKindFilter, qualityFilter, setQualityFilter,
     tagFilter, setTagFilter, sortOption, setSortOption, selectedCollectionId, setSelectedCollectionId,
     refresh, handleLoadMore, hasMore, activeCollection, clearFilters, hasActiveFilters, showHero,
@@ -562,7 +584,7 @@ export function ExploreTab() {
       const message = err instanceof ApiError && err.message
         ? err.message
         : 'Could not add this knowledge base — please try again.'
-      toast(message, 'error')
+      throw new Error(message)
     }
   }
 
@@ -602,6 +624,7 @@ export function ExploreTab() {
         {/* Sidebar: Collections */}
         <div className="w-56 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-3 hidden md:block">
           <button
+            aria-pressed={!selectedCollectionId}
             onClick={() => setSelectedCollectionId(null)}
             className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-1 ${
               !selectedCollectionId
@@ -619,7 +642,7 @@ export function ExploreTab() {
             <div className="mt-4 mb-2">
               <div className="flex items-center gap-1 px-3 mb-1.5">
                 <Star className="h-3 w-3 text-yellow-400 fill-current" />
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Featured</span>
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Featured</span>
               </div>
               {featuredCollections.map(col => (
                 <CollectionLink
@@ -634,7 +657,7 @@ export function ExploreTab() {
 
           {collections.filter(c => !featuredCollections.some(f => f.id === c.id)).length > 0 && (
             <div className="mt-4 mb-2">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3">Collections</span>
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider px-3">Collections</span>
               <div className="mt-1.5 space-y-0.5">
                 {collections
                   .filter(c => !featuredCollections.some(f => f.id === c.id))
@@ -662,8 +685,8 @@ export function ExploreTab() {
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900">Shared with everyone here</h2>
-                    <p className="text-sm text-gray-500">Workflows, extractions, and knowledge bases — checked, scored, and free to copy</p>
+                    <h2 className="text-xl font-bold text-gray-900">Explore shared tools</h2>
+                    <p className="text-sm text-gray-500">Browse workflows, extractions, and knowledge bases. Review details and measured quality before adding one.</p>
                     <p className="text-xs text-gray-500 mt-1">Have something that works for you? Share it from its ⋯ menu in Mine — it doesn't need to be finished.</p>
                   </div>
                 </div>
@@ -708,6 +731,7 @@ export function ExploreTab() {
                 {kindFilters.map(([val, label]) => (
                   <button
                     key={val}
+                    aria-pressed={kindFilter === val}
                     onClick={() => setKindFilter(val)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                       kindFilter === val
@@ -764,10 +788,11 @@ export function ExploreTab() {
                 <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">
                   Clear all
                 </button>
-                <span role="status" aria-live="polite" className="text-xs text-gray-500 ml-auto">{total} result{total !== 1 ? 's' : ''}</span>
+                <span role="status" aria-live="polite" className="text-xs text-gray-500 ml-auto">{loading ? 'Loading…' : error ? 'Results unavailable' : `${total} result${total !== 1 ? 's' : ''}`}</span>
               </div>
             )}
 
+            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12, borderRadius: 8, marginBottom: 12 }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
             {/* Error state */}
             {error && (
               <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
@@ -782,7 +807,7 @@ export function ExploreTab() {
                 <Loader2 className="h-8 w-8 animate-spin mb-3" aria-hidden="true" />
                 <p className="text-sm">Loading catalog...</p>
               </div>
-            ) : items.length === 0 ? (
+            ) : error ? null : items.length === 0 ? (
               /* Empty state */
               <div className="text-center py-20">
                 <ShieldCheck className="h-14 w-14 text-gray-200 mx-auto mb-4" />
@@ -809,7 +834,7 @@ export function ExploreTab() {
                 {showHero && !activeCollection && featuredCollections.length > 0 && (
                   <div className="mb-8">
                     <h3 className="text-sm font-bold text-gray-900 mb-3">Featured Collections</h3>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {featuredCollections.map(col => (
                         <FeaturedCollectionCard
                           key={col.id}
@@ -829,7 +854,7 @@ export function ExploreTab() {
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
                       <span className="text-xs text-gray-500">{topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {topItems.slice(0, 6).map(item => (
                         <CatalogCard
                           key={item.id}
@@ -852,7 +877,7 @@ export function ExploreTab() {
                   )}
                 </div>
 
-                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
+                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                   {(showHero && !activeCollection ? otherItems : items).map(item => (
                     <CatalogCard
                       key={item.id}
@@ -897,16 +922,15 @@ export function ExploreTab() {
       )}
 
       {/* Add to library dialog */}
-      {addToLibraryItem && libraries.some(l => l.scope !== 'verified') && (
+      {addToLibraryItem && (
         <AddToLibraryDialog
           libraries={libraries.filter(l => l.scope !== 'verified')}
           itemId={addToLibraryItem.item_id}
+          itemName={addToLibraryItem.display_name || addToLibraryItem.name}
+          onOpen={addToLibraryItem.source_uuid ? () => { const item = addToLibraryItem; setAddToLibraryItem(null); handleTryIt(item) } : undefined}
           kind={addToLibraryItem.kind as LibraryItemKind}
-          onClose={() => setAddToLibraryItem(null)}
-          onAdded={() => {
-            setAddToLibraryItem(null)
-            toast('Saved to library', 'success')
-          }}
+          onClose={() => { setDetailItem(addToLibraryItem); setAddToLibraryItem(null) }}
+          onAdded={library => { toast(`Saved to ${library.title}`, 'success') }}
         />
       )}
     </>

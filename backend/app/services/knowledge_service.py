@@ -840,7 +840,10 @@ async def register_documents(
     """
     team_access = await access_control.get_team_access_context(user)
     source_uuids: list[str] = []
-    for doc_uuid in document_uuids:
+    documents = []
+    # Check the whole selection before writing. A missing/inaccessible later
+    # document must not strand earlier inserts that were never dispatched.
+    for doc_uuid in dict.fromkeys(document_uuids):
         doc = await access_control.get_authorized_document(
             doc_uuid,
             user,
@@ -849,9 +852,11 @@ async def register_documents(
         )
         if not doc:
             raise ValueError(f"Document not found: {doc_uuid}")
+        documents.append(doc)
+    for doc in documents:
         existing = await KnowledgeBaseSource.find_one(
             KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
-            KnowledgeBaseSource.document_uuid == doc_uuid,
+            KnowledgeBaseSource.document_uuid == doc.uuid,
         )
         if existing:
             continue

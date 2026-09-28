@@ -30,6 +30,7 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
   const [scope, setScope] = useState<KBScope>('mine')
   const [kbs, setKbs] = useState<KnowledgeBase[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
   const [search, setSearch] = useState('')
   const [picked, setPicked] = useState<Record<string, string>>({})
 
@@ -45,7 +46,7 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
       })
       .catch(() => { if (!cancelled) setError('Could not load knowledge bases.') })
     return () => { cancelled = true }
-  }, [scope])
+  }, [scope, attempt])
 
   const pickedCount = Object.keys(picked).length
   const remaining = maxAttached - attachedUuids.length - pickedCount
@@ -85,7 +86,7 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
           aria-modal="true"
           aria-labelledby="attach-kb-title"
           className="flex w-full max-w-md flex-col rounded-lg bg-white shadow-xl"
-          style={{ maxHeight: '70vh' }}
+          style={{ maxHeight: '90dvh' }}
         >
           <div className="flex items-center justify-between border-b border-gray-200 px-5 py-3">
             <h3 id="attach-kb-title" className="text-base font-medium text-gray-900">
@@ -131,9 +132,10 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
 
           <div className="flex-1 overflow-y-auto px-5 py-3" style={{ minHeight: 120 }}>
             {error ? (
-              <p className="text-sm text-red-700">{error}</p>
+              <div role="alert" className="text-sm text-red-700">{error} <button type="button" onClick={() => setAttempt(value => value + 1)} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry knowledge bases</button></div>
             ) : kbs === null ? (
-              <div className="flex justify-center py-6 text-gray-400">
+              <div role="status" className="flex justify-center gap-2 py-6 text-gray-600">
+                <span className="text-sm">Loading knowledge bases…</span>
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             ) : visible.length === 0 ? (
@@ -156,7 +158,7 @@ export function AttachKBModal({ attachedUuids, maxAttached, onAttach, onClose }:
                         className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left text-sm hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <BookOpen className="h-4 w-4 shrink-0 text-gray-400" />
-                        <span className="flex-1 truncate text-gray-900">{kb.title}</span>
+                        <span className="min-w-0 flex-1 break-words text-gray-900">{kb.title}</span>
                         {already ? (
                           <span className="shrink-0 text-xs text-gray-500">attached</span>
                         ) : selected ? (

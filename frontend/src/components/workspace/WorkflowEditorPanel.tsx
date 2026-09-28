@@ -945,7 +945,7 @@ export function WorkflowEditorPanel() {
                   ? '3px solid var(--highlight-color, #eab308)'
                   : '3px solid transparent',
                 color: activeTab === tab.key
-                  ? 'var(--highlight-color, #eab308)'
+                  ? '#111827'
                   : '#6b7280',
                 cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,

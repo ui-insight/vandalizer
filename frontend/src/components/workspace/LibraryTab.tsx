@@ -56,6 +56,14 @@ function matchesKindFilter(item: { kind: string; set_type: string | null }, filt
   if (item.kind !== 'search_set') return false
   return (item.set_type || 'extraction') === filter
 }
+const KIND_FILTERS = [
+  { value: 'all', label: 'All types' },
+  { value: 'workflow', label: 'Workflows' },
+  { value: 'extraction', label: 'Extractions' },
+  { value: 'prompt', label: 'Prompts' },
+  { value: 'formatter', label: 'Formatters' },
+] as const
+
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
@@ -69,6 +77,7 @@ export function LibraryTab() {
 
   const [scope, setScope] = useState('mine' as ScopeTab)
   const [search, setSearch] = useState('')
+  const [mobileViewsOpen, setMobileViewsOpen] = useState(false)
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [sortOption, setSortOption] = useState<SortOption>('recent')
@@ -636,18 +645,18 @@ export function LibraryTab() {
 
   return (
     <div
-      className="flex flex-col h-full"
+      className="library-workspace flex flex-col h-full"
       style={{
         position: 'relative',
         backgroundColor: '#fff',
         ['--library-highlight' as string]: 'var(--highlight-color, #eab308)',
-        ['--library-highlight-ink' as string]: 'color-mix(in srgb, var(--library-highlight) 65%, #1f2937)',
+        ['--library-highlight-ink' as string]: 'color-mix(in srgb, var(--library-highlight) 30%, #1f2937)',
         ['--library-highlight-soft' as string]: 'color-mix(in srgb, var(--library-highlight) 18%, #ffffff)',
         ['--library-highlight-muted' as string]: 'color-mix(in srgb, var(--library-highlight) 10%, #f8f9fa)',
       }}
     >
       {/* ── Header ── */}
-      <div
+      <div className="library-header"
         style={{
           flexShrink: 0,
           borderBottom: '1px solid #e0e0e0',
@@ -665,7 +674,7 @@ export function LibraryTab() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
             {/* Search */}
-            <div style={{ position: 'relative', flex: 1, maxWidth: 400, minWidth: 0 }}>
+            {scope !== 'explore' && <div style={{ position: 'relative', flex: 1, maxWidth: 400, minWidth: 0 }}>
               <Search
                 style={{
                   position: 'absolute',
@@ -682,7 +691,8 @@ export function LibraryTab() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search..."
+                aria-label="Search library"
+                placeholder="Search library…"
                 style={{
                   width: '100%',
                   background: '#f1f3f4',
@@ -705,7 +715,7 @@ export function LibraryTab() {
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               />
-            </div>
+            </div>}
 
             {/* + New button with dropdown */}
             <div ref={newMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
@@ -757,11 +767,11 @@ export function LibraryTab() {
         </div>
 
         {/* Row 2: Scope tabs */}
-        <div style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
+        <div className="library-scope-tabs" style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
-            { key: 'explore' as const, label: 'Everyone' },
+            { key: 'explore' as const, label: 'Explore' },
             { key: 'quality' as const, label: 'Quality Inbox' },
           ]).map(({ key, label }) => {
             const active = scope === key
@@ -786,7 +796,7 @@ export function LibraryTab() {
                   background: 'none',
                   border: 'none',
                   borderBottom: active ? '2px solid var(--library-highlight, #eab308)' : '2px solid transparent',
-                  color: active ? 'var(--library-highlight, #eab308)' : '#5f6368',
+                  color: active ? 'var(--library-highlight-ink, #665000)' : '#5f6368',
                   cursor: 'pointer',
                   transition: 'color 0.15s',
                   whiteSpace: 'nowrap',
@@ -799,15 +809,12 @@ export function LibraryTab() {
         </div>
 
         {/* Row 3: Filter chips + sort (hidden for Explore — it has its own — and Quality Inbox) */}
-        <div style={{ display: scope === 'explore' || scope === 'quality' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {([
-              { value: 'all' as const, label: 'All' },
-              { value: 'workflow' as const, label: 'Workflows' },
-              { value: 'extraction' as const, label: 'Extractions' },
-              { value: 'prompt' as const, label: 'Prompts' },
-              { value: 'formatter' as const, label: 'Formatters' },
-            ]).map(({ value, label }) => {
+        <div className="library-filters" style={{ display: scope === 'explore' || scope === 'quality' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
+          <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
+            {KIND_FILTERS.map(({ value, label }) => <option key={value} value={value}>{label} ({kindCounts[value]})</option>)}
+          </select>
+          <div className="library-kind-chips" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            {KIND_FILTERS.map(({ value, label }) => {
               const active = kindFilter === value
               const count = kindCounts[value]
               return (
@@ -887,10 +894,14 @@ export function LibraryTab() {
           </div>
         </div>
       ) : (
-      <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="library-body" style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        <button type="button" className="library-views-toggle" aria-expanded={mobileViewsOpen} aria-controls="library-saved-views" onClick={() => setMobileViewsOpen(open => !open)}>{mobileViewsOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : 'Folder'} · Change`}</button>
         {/* Sidebar */}
         <div
           ref={sidebarRef}
+          id="library-saved-views"
+          className="library-sidebar"
+          data-open={mobileViewsOpen}
           style={{
             width: sidebarWidth,
             flexShrink: 0,
@@ -929,13 +940,16 @@ export function LibraryTab() {
                   ? items.filter((i) => i.pinned).length
                   : 0
             return (
-              <div
+              <button
+                type="button"
                 key={view}
-                onClick={() => setViewFilter(view)}
+                aria-pressed={isActive}
+                onClick={() => { setViewFilter(view); setMobileViewsOpen(false) }}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '7px 10px 7px 12px',
+                  width: '100%', border: 0, textAlign: 'left', fontFamily: 'inherit',
+                  padding: '10px 10px 10px 12px',
                   cursor: 'pointer',
                   fontSize: 12,
                   fontWeight: isActive ? 600 : 500,
@@ -950,10 +964,15 @@ export function LibraryTab() {
                 {count > 0 && (
                   <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{count}</span>
                 )}
-              </div>
+              </button>
             )
           })}
 
+          <details style={{ margin: '12px', fontSize: 12, color: '#555e68', lineHeight: 1.5 }}>
+            <summary style={{ cursor: 'pointer' }}>How organization works</summary>
+            <p>Favorites mark useful items. Pins appear first when sorting by recent use, followed by favorites. Folders group items in this library.</p>
+            <p>These choices do not add items to a project. Manage project pins from the project.</p>
+          </details>
           {/* Folders section — personal and team scopes */}
           {(
             <div style={{ marginTop: 16 }}>
@@ -1246,7 +1265,7 @@ export function LibraryTab() {
         </div>
 
         {/* Drag handle — resize the sidebar */}
-        <div
+        <div className="library-sidebar-resizer"
           onMouseDown={(e) => {
             sidebarLeftRef.current = sidebarRef.current?.getBoundingClientRect().left ?? 0
             setResizing(true)
@@ -1267,7 +1286,7 @@ export function LibraryTab() {
         />
 
         {/* Results pane */}
-        <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
+        <div className="library-results" style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0, minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
           {/* Collection filter banner */}
           {selectedCollection && (
             <div style={{ padding: '12px 24px', background: '#f8f9fa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
@@ -1300,7 +1319,7 @@ export function LibraryTab() {
           )}
 
           {/* List header */}
-          <div
+          <div className="library-list-header"
             style={{
               display: 'grid',
               gridTemplateColumns: '1fr 100px',
@@ -1349,7 +1368,7 @@ export function LibraryTab() {
                     <button
                       type="button"
                       onClick={() => openCreateModal('workflow')}
-                      style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--library-highlight-ink, #1f1b00)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
                     >
                       Create a workflow
                     </button>

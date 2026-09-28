@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type DragEvent } from 'react'
 import { CloudUpload } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import { SUPPORTED_ACCEPT_ATTR } from '../../utils/fileTypes'
+import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface UploadZoneProps {
   onFilesSelected: (files: FileList) => void
@@ -9,6 +9,7 @@ interface UploadZoneProps {
 }
 
 export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
+  const { accept, description } = useUploadPolicy()
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const active = dragOver || highlighted
@@ -49,7 +50,7 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
           : 'border-[#17181a30] hover:border-[#17181a60] hover:bg-[#17181a06]',
       )}
       style={{
-        height: 100, margin: '30px 0', justifyContent: 'center',
+        minHeight: 88, padding: 12, margin: '12px 0', justifyContent: 'center',
         transition: 'border-color 0.2s, background-color 0.2s, transform 0.2s',
       }}
     >
@@ -62,17 +63,17 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         color: active ? 'var(--highlight-color, #eab308)' : '#17181abb',
         transition: 'color 0.2s',
       }}>
-        {active ? 'Drop files here' : 'Drag & Drop to Upload Files'}
+        {active ? 'Drop files here' : 'Upload files or drop them here'}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 300, color: '#5d5d5d78' }}>
-        <i>pdf, doc, docx, xls, xlsx, csv, txt, md</i>
+      <div style={{ fontSize: 12, fontWeight: 400, color: '#58616d', textAlign: 'center', lineHeight: 1.6 }}>
+        {description}
       </div>
       <input
         ref={inputRef}
         type="file"
         multiple
         aria-label="Upload files"
-        accept={SUPPORTED_ACCEPT_ATTR}
+        accept={accept}
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onFilesSelected(e.target.files)

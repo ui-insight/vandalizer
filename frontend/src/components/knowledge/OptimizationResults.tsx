@@ -91,7 +91,6 @@ export function OptimizationResults({
 
   const kbLabels = DOMAIN_LABELS.kb.baselineTile
   const baselines: BaselinePoint[] = [
-    { id: 'no-kb', label: kbLabels.noBaseline, score: run.baseline_no_kb_score, color: '#888' },
     {
       id: 'default',
       label: kbLabels.yourSettings,
@@ -114,17 +113,15 @@ export function OptimizationResults({
         baselines={baselines}
         variance={run.judge_variance ?? 0}
         liftCI={run.lift_ci ?? null}
-        secondaryBaselineId="no-kb"
         scoreFormulaHint={
           'Quality score = 40% LLM judge + 25% retrieval precision + 20% source health + 15% chunk coverage. '
-          + 'Matches the score the validation header reports.'
+          + 'Answer accuracy and AI-only results use a different metric.'
         }
         measurementNote={
           holdoutHeadline
             ? `${kbLabels.yourSettings} and ${kbLabels.tuned} are measured on the `
               + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'} the optimizer `
-              + `never tuned against; ${kbLabels.noBaseline} uses the `
-              + `${trainCount ?? ''} training queries.`
+              + 'never tuned against.'
             : undefined
         }
         topSlot={
@@ -146,7 +143,7 @@ export function OptimizationResults({
                     above uses the holdout slice — without this caption the two
                     read as contradictory counts over the same queries. */}
                 {holdoutHeadline && (
-                  <div style={{ fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: '#aeb5bf', marginBottom: 6, lineHeight: 1.5 }}>
                     Per-query outcomes below are from the {trainCount ?? ''} training
                     quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
                     the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
@@ -159,12 +156,19 @@ export function OptimizationResults({
         }
       />
 
+      {run.baseline_no_kb_score != null && (
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#b8bec7' }}>
+          AI-only answer accuracy: {Math.round(run.baseline_no_kb_score * 100)}% on the training questions.
+          {' '}This is a separate metric from composite quality above; the two scores cannot be subtracted to measure improvement.
+        </p>
+      )}
+
       {/* Cross-judge sanity check — only shown when a second judge actually
           ran (gated by token budget in the backend). */}
       {run.cross_judge && (
         <CrossJudgeNote
           crossJudge={run.cross_judge}
-          primaryScore={run.optimized_score ?? 0}
+          primaryScore={run.cross_judge.score - run.cross_judge.delta}
           primaryJudge={run.judge_model ?? null}
         />
       )}
@@ -198,15 +202,13 @@ export function OptimizationResults({
 
       {/* Best config + Apply / Revert. ``isAlreadyApplied`` is true if this
           run is the one currently live on the KB. We trust applied_at /
-          reverted_at when present (post-Phase-1) and fall back to the legacy
-          ``apply_on_finish`` flag for runs that pre-date the snapshot. */}
+          reverted_at. An apply-on-finish preference alone does not prove it applied. */}
       {run.best_config && (
         <BestConfigCard
           config={run.best_config}
           defaultConfig={run.default_config ?? null}
           isAlreadyApplied={
             !!(run.applied_at && !run.reverted_at)
-            || (!run.applied_at && !!run.options?.apply_on_finish)
           }
           canRevert={!!(run.applied_at && !run.reverted_at && onRevert)}
           canManage={canManage && !run.tied_with_baseline}
@@ -343,10 +345,10 @@ function BestConfigCard({
         <Sparkles size={14} style={{ color: '#a78bfa' }} />
         <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Best configuration</span>
         {hasDefault && (
-          <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: '#aeb5bf', marginLeft: 8 }}>
             {changed.length === 0
-              ? 'identical to default, no knobs changed'
-              : `${changed.length} knob${changed.length === 1 ? '' : 's'} changed vs default`}
+              ? 'identical to default, no settings changed'
+              : `${changed.length} setting${changed.length === 1 ? '' : 's'} changed vs default`}
           </span>
         )}
       </div>
@@ -359,7 +361,7 @@ function BestConfigCard({
             <div key={r.key} title={r.hint} style={{
               padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
             }}>
-              <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
               <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2 }}>{r.winner}</div>
             </div>
           ))}
@@ -382,10 +384,10 @@ function BestConfigCard({
               alignItems: 'center', gap: 8,
             }}>
               <div>
-                <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
               </div>
-              <div style={{ fontSize: 12, color: '#888', textDecoration: 'line-through' }}>{r.def}</div>
-              <div style={{ fontSize: 12, color: '#666', textAlign: 'center' }}>→</div>
+              <div style={{ fontSize: 12, color: '#aeb5bf', textDecoration: 'line-through' }}>{r.def}</div>
+              <div style={{ fontSize: 12, color: '#aeb5bf', textAlign: 'center' }}>→</div>
               <div style={{ fontSize: 13, color: '#86efac', fontWeight: 600 }}>{r.winner}</div>
               <div />
             </div>
@@ -395,12 +397,12 @@ function BestConfigCard({
               onClick={() => setShowUnchanged(v => !v)}
               style={{
                 marginTop: 4, padding: '4px 8px',
-                fontSize: 11, fontFamily: 'inherit', color: '#888',
+                fontSize: 12, fontFamily: 'inherit', color: '#aeb5bf',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 textAlign: 'left',
               }}
             >
-              {showUnchanged ? '▾' : '▸'} {unchanged.length} unchanged knob{unchanged.length === 1 ? '' : 's'}
+              {showUnchanged ? '▾' : '▸'} {unchanged.length} unchanged setting{unchanged.length === 1 ? '' : 's'}
             </button>
           )}
           {showUnchanged && unchanged.length > 0 && (
@@ -409,7 +411,7 @@ function BestConfigCard({
                 <div key={r.key} title={r.hint} style={{
                   padding: '6px 10px', backgroundColor: '#202020', borderRadius: 4, cursor: 'help',
                 }}>
-                  <div style={{ fontSize: 10, color: '#666', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                  <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
                   <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{r.winner}</div>
                 </div>
               ))}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { KnowledgePanel } from './KnowledgePanel'
 import type { KnowledgeBaseDetail } from '../../types/knowledge'
 
@@ -71,6 +71,7 @@ vi.mock('../../hooks/useProjectPins', () => ({
 const refreshKBSource = vi.fn().mockResolvedValue({ ok: true, status: 'queued', source_uuid: 'src-1' })
 const reprocessKBSource = vi.fn().mockResolvedValue({ ok: true, status: 'queued', mode: 'reindex', source_uuid: 'src-2' })
 const cloneKnowledgeBase = vi.fn().mockResolvedValue({ uuid: 'kb-copy', title: 'Export Control Regulations (copy)' })
+const renameKBSource = vi.fn()
 
 vi.mock('../../api/knowledge', () => ({
   getKnowledgeBase: (uuid: string) => getKnowledgeBase(uuid),
@@ -79,6 +80,7 @@ vi.mock('../../api/knowledge', () => ({
   refreshKBSource: (uuid: string, sourceUuid: string) => refreshKBSource(uuid, sourceUuid),
   reprocessKBSource: (uuid: string, sourceUuid: string) => reprocessKBSource(uuid, sourceUuid),
   cloneKnowledgeBase: (uuid: string) => cloneKnowledgeBase(uuid),
+  renameKBSource: (...args: unknown[]) => renameKBSource(...args),
 }))
 
 vi.mock('../../api/organizations', () => ({
@@ -89,17 +91,16 @@ vi.mock('../../api/organizations', () => ({
 // detail pane for a fixed KB uuid.
 vi.mock('../knowledge/KBGridView', () => ({
   KBGridView: ({ onSelect }: { onSelect: (uuid: string) => void }) => (
-    <button onClick={() => onSelect('kb-1')}>open-kb</button>
+    <><button onClick={() => onSelect('kb-1')}>open-kb</button><button onClick={() => onSelect('kb-2')}>open-other-kb</button></>
   ),
 }))
 
-vi.mock('../knowledge/KBValidationPanel', () => ({ KBValidationPanel: () => null }))
+vi.mock('../knowledge/KBValidationPanel', () => ({ KBValidationPanel: ({ kbUuid, onRunCompleted }: { kbUuid: string; onRunCompleted: (uuid: string) => void }) => <button onClick={() => onRunCompleted(kbUuid)}>Complete validation fixture</button> }))
 vi.mock('../knowledge/KBExploreTab', () => ({ KBExploreTab: () => null }))
 vi.mock('../knowledge/KBSourceInspectorModal', () => ({ KBSourceInspectorModal: () => null }))
 vi.mock('../knowledge/CreateKBModal', () => ({ CreateKBModal: () => null }))
 vi.mock('../knowledge/DocumentPickerModal', () => ({ DocumentPickerModal: () => null }))
 vi.mock('../knowledge/AddUrlsModal', () => ({ AddUrlsModal: () => null }))
-vi.mock('../knowledge/KBTrustBanner', () => ({ KBTrustBanner: () => null }))
 vi.mock('./KnowledgeExplainer', () => ({ KnowledgeExplainer: () => null }))
 vi.mock('./AutomationsPanel', () => ({ ExplainerPill: () => null }))
 vi.mock('../library/ShareWithTeamDialog', () => ({ ShareWithTeamDialog: () => null }))
@@ -517,4 +518,69 @@ describe('KnowledgePanel export on an empty KB', () => {
     // The visible line carries the pipeline's own clause, not only a hover.
     expect(screen.getByText(/Only part of this document is indexed — only part of this document could be converted/)).toBeInTheDocument()
   }, 30000)
+})
+
+
+describe('KnowledgePanel validation summary', () => {
+  it('refreshes the persisted summary after a run and stays on Validation', async () => {
+    detail.current = makeDetail({ can_manage: true })
+    await openDetail()
+    fireEvent.click(screen.getByRole('tab', { name: 'Validation' }))
+    expect(screen.getByText('Answer quality not yet measured')).toBeVisible()
+    detail.current = makeDetail({ can_manage: true, last_validation_score: 0.9, last_validation_baseline_score: 0.4, last_validation_lift: 0.5 })
+    fireEvent.click(screen.getByRole('button', { name: 'Complete validation fixture' }))
+    await waitFor(() => expect(screen.getByText('+50 pts')).toBeVisible())
+    expect(screen.getByRole('tab', { name: 'Validation' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.queryByText('Answer quality not yet measured')).not.toBeInTheDocument()
+  }, 30000)
+})
+
+describe('source action recovery and navigation', () => {
+  const source = { uuid: 'src-1', source_type: 'url' as const, url: 'https://example.org/policy', url_title: 'Policy source', status: 'ready' as const, chunk_count: 4, created_at: '2026-01-01T00:00:00Z' }
+  it('disables duplicate source submissions and ignores a late completion after changing KB', async () => {
+    let finish!: (value: Awaited<ReturnType<typeof refreshKBSource>>) => void
+    refreshKBSource.mockClear()
+    refreshKBSource.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    detail.current = makeDetail({ can_manage: true, sources: [source] })
+    await openDetail()
+    const button = screen.getByLabelText('Refresh source')
+    fireEvent.click(button)
+    fireEvent.click(button)
+    expect(button).toBeDisabled()
+    expect(refreshKBSource).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByLabelText('Back to knowledge bases'))
+    detail.current = makeDetail({ uuid: 'kb-2', title: 'Other knowledge base', can_manage: true })
+    fireEvent.click(screen.getByText('open-other-kb'))
+    await screen.findByText('Other knowledge base')
+    const reads = getKnowledgeBase.mock.calls.length
+    await act(async () => finish({ ok: true, status: 'queued', source_uuid: 'src-1' }))
+    expect(getKnowledgeBase.mock.calls.length).toBe(reads)
+    expect(screen.getByText('Other knowledge base')).toBeInTheDocument()
+    expect(screen.queryByText('Policy source')).not.toBeInTheDocument()
+  })
+
+  it('retains a failed rename draft and saves the exact source on retry', async () => {
+    renameKBSource.mockRejectedValueOnce(new Error('Temporary failure')).mockResolvedValueOnce({ custom_name: 'Reviewed policy' })
+    detail.current = makeDetail({ can_manage: true, sources: [source] })
+    await openDetail()
+    fireEvent.click(screen.getByLabelText('Rename source'))
+    fireEvent.change(screen.getByLabelText('Source name'), { target: { value: 'Reviewed policy' } })
+    fireEvent.click(screen.getByLabelText('Save name'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your draft is preserved')
+    expect(screen.getByLabelText('Source name')).toHaveValue('Reviewed policy')
+    fireEvent.click(screen.getByLabelText('Save name'))
+    await waitFor(() => expect(screen.queryByLabelText('Source name')).not.toBeInTheDocument())
+    expect(renameKBSource).toHaveBeenLastCalledWith('kb-1', 'src-1', 'Reviewed policy')
+    expect(screen.getByRole('button', { name: 'Inspect source: Reviewed policy' })).toBeInTheDocument()
+  })
+
+  it('keeps a refresh failure visible beside the source and permits retry', async () => {
+    refreshKBSource.mockRejectedValueOnce(new Error('Temporary failure'))
+    detail.current = makeDetail({ can_manage: true, sources: [source] })
+    await openDetail()
+    fireEvent.click(screen.getByLabelText('Refresh source'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not refresh “Policy source”')
+    expect(screen.getByLabelText('Refresh source')).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Inspect source: Policy source' })).toBeInTheDocument()
+  })
 })

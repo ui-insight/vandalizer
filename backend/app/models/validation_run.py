@@ -6,6 +6,7 @@ from uuid import uuid4
 
 from beanie import Document
 from pydantic import Field
+from pymongo import IndexModel
 
 
 # A KB validation over a user-selected subset of test queries. It is a
@@ -66,6 +67,9 @@ class ValidationRun(Document):
     class Settings:
         name = "validation_runs"
         indexes = [
+            # One saved outcome per asynchronous KB request; older/sync runs
+            # have no task ID and are excluded by this sparse index.
+            IndexModel("result_snapshot.validation_task_id", unique=True, sparse=True),
             # Per-item history (get_quality_history, get_latest_validation).
             [("item_kind", 1), ("item_id", 1), ("created_at", -1)],
             # By-model rollups and the mgmt API's model filter — previously a

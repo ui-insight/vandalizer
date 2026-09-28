@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { type ReactNode } from 'react'
 
@@ -91,4 +91,17 @@ describe('useDocuments', () => {
     expect(result.current.documents).toBe(docs1)
     expect(result.current.folders).toBe(folders1)
   })
+})
+
+
+it('exposes a failed refresh while preserving the previously loaded folder contents', async () => {
+  const data = { documents: [{ uuid: 'doc-1', title: 'Saved document' }], folders: [] }
+  mockListContents.mockResolvedValueOnce(data).mockRejectedValueOnce(new Error('Offline')).mockResolvedValue(data)
+  const { result } = renderHook(() => useDocuments('folder-1'), { wrapper: createWrapper() })
+  await waitFor(() => expect(result.current.documents).toEqual(data.documents))
+  await act(async () => result.current.refresh())
+  await waitFor(() => expect(result.current.error).toBeTruthy())
+  expect(result.current.documents).toEqual(data.documents)
+  await act(async () => result.current.refresh())
+  await waitFor(() => expect(result.current.error).toBeNull())
 })

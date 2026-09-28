@@ -59,7 +59,7 @@ export function FileList({
     textAlign: 'left',
     fontSize: '0.8em',
     fontWeight: 500,
-    color: '#6b7280',
+    color: '#555e68',
     cursor: onSort ? 'pointer' : undefined,
     userSelect: 'none',
     whiteSpace: 'nowrap',
@@ -79,7 +79,7 @@ export function FileList({
   }
 
   return (
-    <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+    <table className="file-table w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         <col style={{ width: 32 }} />
         <col />

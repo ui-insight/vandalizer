@@ -211,8 +211,29 @@ async def _resolve_action_names_bulk(automations: list) -> dict[str, str]:
 _UNRESOLVED = object()
 
 
+async def _latest_run_summaries(automations) -> dict:
+    """Resolve the latest event per authorized automation in two bounded queries."""
+    ids = [str(auto.id) for auto in automations]
+    if not ids:
+        return {}
+    summaries = {}
+    for model, key in ((WorkflowTriggerEvent, "trigger_context.automation_id"),
+                       (ExtractionTriggerEvent, "automation_id")):
+        pipeline = [
+            {"$match": {key: {"$in": ids}}},
+            {"$sort": {"created_at": -1, "_id": -1}},
+            {"$group": {"_id": "$" + key, "status": {"$first": "$status"},
+                        "created_at": {"$first": "$created_at"}}},
+        ]
+        for row in await model.aggregate(pipeline).to_list():
+            previous = summaries.get(row["_id"])
+            if previous is None or row["created_at"] > previous["created_at"]:
+                summaries[row["_id"]] = row
+    return summaries
+
+
 async def _to_response(
-    auto, *, can_manage: bool = True, action_name=_UNRESOLVED
+    auto, *, can_manage: bool = True, action_name=_UNRESOLVED, last_event=None
 ) -> AutomationResponse:
     # When action_name is left unresolved, look it up individually. Callers that
     # have already batch-resolved names (e.g. list_automations) pass the value
@@ -239,6 +260,8 @@ async def _to_response(
         can_manage=can_manage,
         next_run_at=next_run_at,
         last_run_at=last_run_at,
+        last_event_status=last_event["status"] if last_event else None,
+        last_event_at=last_event["created_at"].isoformat() if last_event else None,
     )
 
 
@@ -316,11 +339,13 @@ async def list_automations(user: User = Depends(get_current_user)):
     )
     team_access = await access_control.get_team_access_context(user)
     action_names = await _resolve_action_names_bulk(automations)
+    last_events = await _latest_run_summaries(automations)
     return [
         await _to_response(
             a,
             can_manage=access_control.can_manage_automation(a, user, team_access),
             action_name=action_names.get(a.action_id) if a.action_id else None,
+            last_event=last_events.get(str(a.id)),
         )  # action_name is always supplied here, so no per-row fallback fires
         for a in automations
     ]

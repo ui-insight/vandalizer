@@ -96,16 +96,16 @@ export function ReproducibilityPanel({ run }: Props) {
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
           fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#888' }} /> : <ChevronRight size={14} style={{ color: '#888' }} />}
-        <ShieldCheck size={14} style={{ color: '#888' }} />
+        {open ? <ChevronDown size={14} style={{ color: '#aeb5bf' }} /> : <ChevronRight size={14} style={{ color: '#aeb5bf' }} />}
+        <ShieldCheck size={14} style={{ color: '#aeb5bf' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Reproducibility</span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#666' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aeb5bf' }}>
           {run.judge_model || 'unknown judge'}{run.rng_seed != null ? ` · seed ${run.rng_seed}` : ''}
         </span>
       </button>
@@ -113,7 +113,7 @@ export function ReproducibilityPanel({ run }: Props) {
       {open && (
         <div style={{
           padding: '4px 14px 14px 14px',
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
           gap: 8,
         }}>
           {rows.map(r => (
@@ -124,8 +124,8 @@ export function ReproducibilityPanel({ run }: Props) {
                 padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4,
               }}
             >
-              <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 11, color: '#e5e5e5', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
+              <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
             </div>
           ))}
         </div>

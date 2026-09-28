@@ -39,6 +39,7 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.extraction_optimization_run import ExtractionOptimizationRun
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.models.validation_run import ValidationRun
+from app.models.kb_validation_task import KBValidationTask
 from app.models.quality_alert import QualityAlert
 from app.models.verification_session import VerificationSession
 from app.models.regression_suite_run import RegressionSuiteRun
@@ -105,6 +106,7 @@ ALL_MODELS = [
     ExtractionOptimizationRun,
     WorkflowOptimizationRun,
     ValidationRun,
+    KBValidationTask,
     QualityAlert,
     VerificationSession,
     RegressionSuiteRun,

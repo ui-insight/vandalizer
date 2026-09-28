@@ -1187,19 +1187,30 @@ export function ToolStatusLine({
   isActive?: boolean
   onConfirm?: (message: string) => void
 }) {
-  const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession } = useWorkspace()
+  const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
   const meta = getMeta(name)
   const accent = CATEGORY_ACCENT[meta.category]
   const args = call?.args || {}
   const obj = result?.content as Record<string, unknown> | undefined
   const isError = Boolean(obj?.error)
+  const unconfirmed = !isActive && !!call && !result
 
   // Keep the Certification panel / rail badge in sync with chat-driven
   // certification writes (XP, lab provisioning, assessments).
   useCertificationSync(name, Boolean(result))
 
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
+  const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
+  const actionLabel = ({ create_workflow: 'Create workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation' } as Record<string, string>)[name] ?? `Approve ${name.replaceAll('_', ' ')}`
+  const target = args.name ?? args.title ?? obj?.default_title
+  const artifact = !isActive && !needsConfirmation && !isError && obj
+    ? name === 'create_workflow' && typeof obj.workflow_id === 'string' ? { label: 'Open workflow', open: () => openWorkflow(obj.workflow_id as string) }
+      : name === 'create_extraction_from_document' && typeof obj.extraction_set_uuid === 'string' ? { label: 'Open extraction', open: () => openExtraction(obj.extraction_set_uuid as string) }
+      : name === 'create_automation' && typeof obj.id === 'string' ? { label: 'Open automation', open: () => openAutomation(obj.id as string) }
+      : null
+    : null
+
 
   const activeHint = isActive ? getActiveHint(name, args) : ''
   const { text: summaryText, qualityHint } = result
@@ -1272,6 +1283,8 @@ export function ToolStatusLine({
               </span>
             )}
           </>
+        ) : unconfirmed ? (
+          <span style={{ color: '#92400e', fontWeight: 500 }}>{meta.label} · completion not confirmed</span>
         ) : isError ? (
           <>
             <span style={{ color: '#dc2626', fontWeight: 500 }}>
@@ -1351,28 +1364,16 @@ export function ToolStatusLine({
         <CertCompletionCard content={obj} />
       )}
 
-      {/* Confirmation buttons for write tools awaiting user approval */}
+      {artifact && <button type="button" className="chat-action-btn" style={{ margin: '8px 0 8px 20px' }} onClick={artifact.open}>{artifact.label}</button>}
       {needsConfirmation && onConfirm && (
-        <div style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 20 }}>
-          <button
-            onClick={() => onConfirm('Yes, go ahead')}
-            className="chat-action-btn"
-            style={{ fontSize: 12, padding: '5px 14px' }}
-          >
-            Confirm
-          </button>
-          <button
-            onClick={() => onConfirm('No, cancel that')}
-            style={{
-              padding: '5px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 8, border: '1px solid #d1d5db',
-              background: '#fff', color: '#374151', cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-          >
-            Cancel
-          </button>
-        </div>
+        <section className="agent-approval" aria-label="Review proposed action">
+          <strong>{decision === 'approved' ? 'Approval sent' : decision === 'canceled' ? 'Cancellation sent' : 'Your approval is needed'}</strong>
+          <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>
+          {!decision && <div className="agent-approval-actions">
+            <button type="button" onClick={() => { setDecision('approved'); onConfirm('Yes, go ahead') }}>{actionLabel}</button>
+            <button type="button" onClick={() => { setDecision('canceled'); onConfirm('No, cancel that') }}>Cancel action</button>
+          </div>}
+        </section>
       )}
     </div>
   )
