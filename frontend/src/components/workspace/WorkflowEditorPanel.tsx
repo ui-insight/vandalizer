@@ -1793,7 +1793,7 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
         {draggable && (
           <div
             draggable
-            aria-label="Drag to reorder step"
+            aria-hidden="true"
             title="Drag to reorder"
             onClick={e => e.stopPropagation()}
             onDragStart={(e) => {
@@ -5686,7 +5686,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               Save buttons that offer it as a finished deliverable. */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8,
-            fontSize: 13, color: stepWarnings.length > 0 ? '#b45309' : '#16a34a', fontWeight: 500,
+            fontSize: 13, color: stepWarnings.length > 0 ? '#b45309' : '#15803d', fontWeight: 500,
           }}>
             {stepWarnings.length > 0
               ? <AlertTriangle style={{ width: 16, height: 16 }} />

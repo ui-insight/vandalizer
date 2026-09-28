@@ -2,8 +2,8 @@
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
   "completed_items": 120,
   "total_items": 169,
-  "unique_states": 492,
-  "capture_executions": 584,
+  "unique_states": 522,
+  "capture_executions": 614,
   "mobile_grade": 8,
   "areas": [
     {
@@ -7035,6 +7035,353 @@
           },
           "pageWidth": 1440,
           "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-file-library-evidence",
+      "capturedAt": "2026-09-28T21:30:55.706Z",
+      "sourceFingerprint": "7a42314934b1b90e86fb59a116253f54e851ec074509436c370b165d0c41368b",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M CHANGELOG.md\n M backend/app/routers/chat.py\n M backend/app/routers/config.py\n M backend/app/schemas/config.py\n M backend/app/services/chat_service.py\n M backend/app/services/llm_service.py\n M backend/tests/test_chat_routes.py\n M backend/tests/test_llm_service.py\n M frontend/src/api/config.ts\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/HomeExperience.test.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/UtilityBar.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkspaceLayout.tsx\n M frontend/src/contexts/TeamContext.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/hooks/useProjects.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/file-library-workflow.mjs\n?? frontend/scripts/visual-review/projects-recovery.mjs\n?? frontend/scripts/visual-review/welcome-paths.mjs\n?? frontend/src/components/chat/ChatPanel.demo.test.tsx\n?? frontend/src/components/workspace/ProjectManageModal.test.tsx\n?? frontend/src/components/workspace/ProjectsPanel.test.tsx\n?? frontend/src/components/workspace/UtilityBar.test.tsx\n?? frontend/src/components/workspace/WorkspaceLayout.test.tsx\n?? frontend/src/contexts/TeamContext.test.tsx\n?? frontend/src/contexts/WorkspaceContext.projects.test.tsx\n?? frontend/src/hooks/useOpenActivity.ts",
+      "commit": "1a20147e1253c860515261dd5a0afed485ecc635",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
         }
       ],
       "unmatched": [],

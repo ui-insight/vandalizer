@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MessageSquare, X } from 'lucide-react'
+import { X } from 'lucide-react'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
@@ -18,7 +18,7 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, setActiveRightTab } = useWorkspace()
+  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid, openAutomationId, openWorkflowId, openExtractionId, focusChatSignal, activeRightTab, setActiveRightTab } = useWorkspace()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -81,9 +81,18 @@ export function WorkspaceLayout() {
   // remains the full-width right panel; every other workspace mode uses its
   // purpose-built left panel as the full mobile view.
   const hasEditor = !!(openAutomationId || openWorkflowId || openExtractionId)
+  const editorKey = openAutomationId ? `automation:${openAutomationId}` : openWorkflowId ? `workflow:${openWorkflowId}` : openExtractionId ? `extraction:${openExtractionId}` : null
+  const previousEditor = useRef<string | null>(null)
+  useEffect(() => {
+    if (previousEditor.current === editorKey) return
+    previousEditor.current = editorKey
+    if (editorKey) setAssistantMode(workspaceMode)
+  }, [editorKey, workspaceMode])
   const assistantOpen = assistantMode === workspaceMode
-  const showLeftOnly = !isChat && !hasEditor && !assistantOpen
-  const collapseLeft = !!openAutomationId || (isChat && (!chatSplitOpen || isCompact)) || (isCompact && (hasEditor || assistantOpen))
+  // Desktop keeps files/section content alongside the Library and its tools.
+  // Compact screens switch panes without discarding the open file or editor.
+  const showLeftOnly = isCompact && !isChat && !assistantOpen
+  const collapseLeft = (isChat && (!chatSplitOpen || isCompact)) || (isCompact && assistantOpen)
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
   const railWidth = isCompact ? 0 : railDocked ? 64 : 220
@@ -108,18 +117,30 @@ export function WorkspaceLayout() {
       </a>
       <Header onOpenActivity={isCompact ? () => setActivityOpen(true) : undefined} />
       <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
-      <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
+      <ProjectManageModal key={activeProjectUuid ?? 'no-project'} open={manageOpen} onClose={() => setManageOpen(false)} />
       <h1 className="sr-only">{workspaceHeading}</h1>
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <main id="main-content"
           ref={containerRef}
-          className="flex min-w-0 flex-1 overflow-hidden relative"
+          className="flex min-w-0 flex-1 flex-col overflow-hidden relative"
           style={{
             marginRight: `${railWidth}px`,
             transition: 'margin-right 0.3s ease',
           }}
         >
+          {isCompact && !isChat && (
+            <div role="group" aria-label="Workspace panels" className="flex shrink-0 flex-wrap gap-1 border-b border-gray-200 bg-white p-2">
+              <button type="button" aria-pressed={showLeftOnly} onClick={() => setAssistantMode(null)} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
+                {isProjects ? 'Projects panel' : isAutomations ? 'Automations panel' : isKnowledge ? 'Knowledge panel' : 'Files panel'}
+              </button>
+              <button type="button" aria-label={hasEditor ? 'Open tool panel' : 'Open Library panel'} aria-pressed={!showLeftOnly && (hasEditor || activeRightTab === 'library')} onClick={() => { setAssistantMode(workspaceMode); if (!hasEditor) setActiveRightTab('library') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
+                {hasEditor ? 'Tool' : 'Library'}
+              </button>
+              {!hasEditor && <button type="button" aria-label="Open Assistant panel" aria-pressed={!showLeftOnly && activeRightTab === 'assistant'} onClick={() => { setAssistantMode(workspaceMode); setActiveRightTab('assistant') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">Assistant</button>}
+            </div>
+          )}
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {/* Left panel area — hidden in chat mode (unless split view is open),
               drawer in automations/knowledge */}
           <div
@@ -131,7 +152,8 @@ export function WorkspaceLayout() {
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
-            {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
+            <div className={isProjects || isAutomations || isKnowledge ? 'hidden' : 'h-full'}><LeftPanel /></div>
+            {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : null}
           </div>
 
           {/* Resizer — hidden when the left panel is collapsed */}
@@ -143,11 +165,10 @@ export function WorkspaceLayout() {
             />
           )}
 
-          <div className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
-            {!isChat && !hasEditor && <button type="button" className="context-assistant-close" onClick={() => setAssistantMode(null)}>Close assistant</button>}
+          <div role="region" aria-label="Tools and assistant" className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
             <div style={{ flex: 1, minHeight: 0 }}><RightPanel /></div>
           </div>
-          {!isChat && !hasEditor && !assistantOpen && <button type="button" className="context-assistant-launcher" onClick={() => { setAssistantMode(workspaceMode); setActiveRightTab('assistant') }}><MessageSquare size={17} /> Ask assistant</button>}
+          </div>
         </main>
         {isCompact && activityOpen && (
           <button

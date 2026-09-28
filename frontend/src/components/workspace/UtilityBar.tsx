@@ -9,7 +9,7 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole, activeProjectUuid, deactivateProject, chatSplitOpen, setChatSplitOpen } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject, chatSplitOpen, setChatSplitOpen } = useWorkspace()
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
   const projectsActive = workspaceMode === 'projects' && !activeProjectUuid
@@ -64,13 +64,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         return (
           <button
             key={mode}
-            onClick={() => {
-              if (mode === 'chat' && active) {
-                resetToHome()
-              } else {
-                setWorkspaceMode(mode)
-              }
-            }}
+            onClick={() => setWorkspaceMode(mode)}
             title={label}
             aria-label={label}
             aria-current={active ? 'page' : undefined}

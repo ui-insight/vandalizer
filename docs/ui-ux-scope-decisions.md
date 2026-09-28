@@ -35,3 +35,12 @@ A12–A14 expose existing information. A1–A11 include new controls, informatio
 - Test existing flows; a verification task is not blanket authorization to build other missing features.
 - No unrelated backend rewrite, permission redesign, new integrations, model tuning or production deployment is included.
 - Keep the issue self-contained. Local, uncommitted review files are not publicly accessible evidence links.
+
+## September 28 navigation correction
+
+The user's correction requires preserving existing cross-pane workflows: open a
+file, browse Library alongside it, and run a Library item on that file. A primary
+workspace canvas must not make sections exclusive. Desktop keeps the existing
+Assistant/Library pane available; compact screens provide explicit pane controls
+without discarding the open document or tool. This supersedes the implemented
+floating assistant launcher/full-width section interpretation of SYS-01/02 and A10.

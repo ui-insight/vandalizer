@@ -9,6 +9,14 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
 
+## Navigation correction — September 28
+
+The user reported that the full-width section layout broke opening a file and running a Library item on it. This was a regression in the earlier visual refresh. Desktop sections now retain the document/section pane beside Assistant and Library, including while a workflow or extraction is open. Compact screens expose explicit pane controls and preserve both the file and tool while switching. Clicking the active Chat navigation item no longer resets the conversation or attachments.
+
+Verification: 22 tests across four layout/navigation/Library files, TypeScript and the production build pass. The production browser journey covers open file → Library → workflow → failed run → retry → output → return at 320, 390, 768, 1024 and 1440px. Both run attempts must submit exactly the opened document UUID. All 30 captured states have zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly. The workflow editor's drag handle now uses its existing keyboard move controls as the accessible alternative, and completion text has readable contrast.
+
+Evidence: `2026-09-28-file-library-evidence`; recipe: `frontend/scripts/visual-review/file-library-workflow.mjs`. API execution and results are synthetic; this establishes the frontend journey and request targeting, not live workflow/model execution. Earlier section grades do not establish cross-pane task coverage. The broader acceptance checklist remains open, with no new items marked complete in this correction.
+
 ## Local checkpoint — September 28
 
 The first checkpoint records the implementation, regression tests, browser review scripts and progress documentation accumulated for #964. Earlier entries below describe the uncommitted state at the time of those reviews. This is a partial implementation checkpoint, not completion of the issue or a deployment.
