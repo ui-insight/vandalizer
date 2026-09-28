@@ -94,3 +94,9 @@ scripts/ui_endpoint_map.*
 # Backups left by patch(1) and merge tools.
 *.orig
 *.rej
+
+# Visual-review captures and diagnostic archives are local generated evidence.
+# Keep the report builder, selected-evidence records and report in version control.
+/artifacts/visual-review/*/
+!/artifacts/visual-review/upgrade-review/
+/artifacts/visual-review/upgrade-review/*.png

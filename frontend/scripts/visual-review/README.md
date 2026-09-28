@@ -103,3 +103,31 @@ Run both against a fresh production build with the same environment variables ab
 `wizard-continuation.mjs` covers name/field guidance, folder filter retention across trigger changes, folder/API/schedule review, long action names, selected picker state, no-results recovery, picker load failure/retry, nested picker Escape, schedule preview failure/retry, and the API editor endpoint/key guidance with Python/cURL examples. It captures at 320×568, 768×600, 1440×900 and targeted 390×844 recovery states. Every capture rejects page overflow and axe findings; final controls must fit after scrolling. Use `REVIEW_BUILD=production`, a fresh `REVIEW_OUTPUT`, `REVIEW_BASE_URL`, and optional `REVIEW_CHROMIUM` as above.
 
 This script adds local route fixtures for action search and schedule previews; it never creates a real automation. Component tests separately assert that only the active trigger configuration is submitted, invalid output requirements prevent creation, the default workflow output format is supported, and old schedule previews disappear immediately when timing changes. Full API credential use, actual scheduled execution, M365 setup, and complete assistive-technology journeys remain outside this pass.
+
+## Evidence retention and cleanup
+
+Generated capture directories, report-preview PNGs and diagnostic archives are
+local artifacts ignored by Git. Keep the harness, scorecard, report builder and
+selected-evidence records under version control. A fresh checkout needs captures
+regenerated or restored before its gallery links can resolve.
+
+Keep the baseline runs, every run listed in `upgrade-review/build.py`, any other
+run linked by the gallery, and pending review evidence expanded in place. Before
+removing superseded run directories, archive their complete contents and verify
+every archived file against its original. Failed runs remain available as
+diagnostics inside the archive; they are not selected passing evidence.
+
+The September 28 cleanup is recorded in
+`artifacts/visual-review/upgrade-review/retention.json`. Its compressed archive is
+local only at `artifacts/visual-review/.archive/superseded-2026-09-28.tar.gz`. To
+restore an archived run from the repository root, first confirm that the target
+run directory does not already exist, then use its name from `retention.json`:
+
+```bash
+tar -xzf artifacts/visual-review/.archive/superseded-2026-09-28.tar.gz \
+  -C artifacts/visual-review RUN_NAME
+```
+
+After cleanup or restoration, rebuild the selected report with
+`python3 artifacts/visual-review/upgrade-review/build.py` and verify its local
+links. Never prune evidence by directory-name suffix alone.
