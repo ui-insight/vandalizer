@@ -2,8 +2,8 @@
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
   "completed_items": 131,
   "total_items": 169,
-  "unique_states": 693,
-  "capture_executions": 812,
+  "unique_states": 711,
+  "capture_executions": 830,
   "mobile_grade": 8,
   "areas": [
     {
@@ -34,7 +34,7 @@
       "ui": 8,
       "ux": 8,
       "evidence": "../2026-09-28-automation-summary-review/automation-summary-editor-1440.png",
-      "note": "List and editor share neutral surfaces and a readable trigger/input/action/output summary. The editor has explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Persisted history, pagination, failed details and reconnecting to a run after leaving the editor pass frontend fixtures and backend authorization tests; live execution and ambiguous launch failures remain unverified."
+      "note": "List and editor share neutral surfaces and a readable trigger/input/action/output summary. The editor has explicit autosave state. Serialized saves preserve quick edits and failed drafts across panel navigation in tab memory; exact retries, description clearing and rename submission pass. Unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Persisted history, pagination, failed details and reconnecting to a run after leaving the editor pass frontend fixtures and backend authorization tests; live execution and ambiguous launch failures remain unverified."
     },
     {
       "id": "automation-wizard",
@@ -9673,6 +9673,221 @@
           "id": "automation-list-empty-1440",
           "note": "",
           "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-automation-save-review",
+      "capturedAt": "2026-09-28T22:37:11.763Z",
+      "sourceFingerprint": "f5bb53d9dc8f8f1c44df0a4d9afee6372ec2a9c184070f88dc82719208545558",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/hooks/useAutomationSave.test.ts\n M frontend/src/hooks/useAutomationSave.ts\n?? frontend/scripts/visual-review/automation-save-recovery.mjs",
+      "commit": "8c045eb39ffedfc371c35bf8f71064ff01743d85",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "automation-save-name-pending-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-draft-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-reopened-draft-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-cleared-description-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-pause-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-enabled-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-save-name-pending-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-draft-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-reopened-draft-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-cleared-description-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-pause-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-enabled-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-name-pending-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-draft-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-reopened-draft-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-cleared-description-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-pause-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-save-enabled-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
           "viewport": {
             "width": 1440,
             "height": 900

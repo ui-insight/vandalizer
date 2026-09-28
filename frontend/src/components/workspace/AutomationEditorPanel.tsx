@@ -4,6 +4,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
 import { useAutomationSave } from '../../hooks/useAutomationSave'
+import { useAuth } from '../../hooks/useAuth'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useConfirm } from '../shared/useConfirm'
@@ -34,6 +35,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string; e
 
 export function AutomationEditorPanel() {
   const { openAutomationId, closeAutomation } = useWorkspace()
+  const { user } = useAuth()
   const { workflows } = useWorkflows()
   const folderNames = useAutomationFolderNames()
   const { searchSets } = useSearchSets()
@@ -46,8 +48,10 @@ export function AutomationEditorPanel() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const titleSaving = useRef(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const autosave = useAutomationSave(openAutomationId, setAutomation)
+  const autosave = useAutomationSave(openAutomationId, setAutomation, user?.user_id)
+  const { revision, applyLoaded } = autosave
   const busySaving = autosave.state === 'pending' || autosave.state === 'saving'
   const closeAfterSave = async () => {
     if (await autosave.flush()) closeAutomation()
@@ -57,15 +61,16 @@ export function AutomationEditorPanel() {
     if (!openAutomationId) return
     setLoading(true)
     setLoadError(null)
+    const startedAt = revision()
     try {
       const auto = await getAutomation(openAutomationId)
-      setAutomation(auto)
+      setAutomation(applyLoaded(auto, startedAt))
     } catch (error) {
       setLoadError(error instanceof Error ? error.message : 'Could not load automation.')
     } finally {
       setLoading(false)
     }
-  }, [openAutomationId])
+  }, [openAutomationId, revision, applyLoaded])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -97,11 +102,11 @@ export function AutomationEditorPanel() {
   }
 
   const handleTitleSave = async () => {
-    if (!titleValue.trim()) {
-      setEditingTitle(false)
-      return
-    }
-    if (await save({ name: titleValue.trim() })) setEditingTitle(false)
+    if (!titleValue.trim() || titleSaving.current) return
+    titleSaving.current = true
+    try {
+      if (titleValue.trim() === automation?.name || await save({ name: titleValue.trim() })) setEditingTitle(false)
+    } finally { titleSaving.current = false }
   }
 
   const handleDelete = async () => {
@@ -180,22 +185,27 @@ export function AutomationEditorPanel() {
       <div style={{ padding: '16px 24px', width: '100%', maxWidth: 1040, margin: '0 auto', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           {editingTitle ? (
+            <div style={{ display: 'flex', flex: '1 1 240px', minWidth: 0, gap: 8, flexWrap: 'wrap' }}>
             <input
               ref={titleInputRef}
               aria-label="Automation name"
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
-              onBlur={handleTitleSave}
+              disabled={busySaving}
               onKeyDown={e => {
-                if (e.key === 'Enter') handleTitleSave()
-                if (e.key === 'Escape') setEditingTitle(false)
+                if (e.nativeEvent.isComposing) return
+                if (e.key === 'Enter') { e.preventDefault(); void handleTitleSave() }
+                if (e.key === 'Escape' && !busySaving) setEditingTitle(false)
               }}
               style={{
                 fontSize: 18, fontWeight: 600, color: '#202124', border: '1px solid #d1d5db',
                 borderRadius: 4, padding: '2px 8px', fontFamily: 'inherit',
-                flex: 1, marginRight: 8,
+                flex: '1 1 160px', minWidth: 0,
               }}
             />
+            <button type="button" disabled={busySaving || !titleValue.trim()} onClick={() => { void handleTitleSave() }}>Save name</button>
+            <button type="button" disabled={busySaving} onClick={() => setEditingTitle(false)}>Cancel rename</button>
+            </div>
           ) : (
             <button type="button" aria-label="Rename automation" disabled={!canManage}
               style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1, background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit' }}
@@ -296,7 +306,7 @@ export function AutomationEditorPanel() {
 
       <div role={autosave.state === 'error' ? 'alert' : 'status'} aria-live="polite" style={{ padding: '10px 24px', maxWidth: 1040, width: '100%', margin: '0 auto', fontSize: 12, color: autosave.state === 'error' ? '#b91c1c' : '#555e68', borderBottom: '1px solid #e5e7eb' }}>
         {autosave.state === 'saved' ? 'All changes saved automatically' : autosave.state === 'pending' ? 'Unsaved changes · saving shortly…' : autosave.state === 'saving' ? 'Saving changes…' : `Changes not saved. ${autosave.error}`}
-        {autosave.state === 'error' && <button type="button" onClick={() => { void autosave.flush() }} style={{ marginLeft: 12, padding: '4px 10px', border: '1px solid #b91c1c', borderRadius: 6, background: 'white', color: '#b91c1c', cursor: 'pointer' }}>Retry save</button>}
+        {autosave.state === 'error' && <><span> Your edits are kept in this tab until you reload.</span><button type="button" disabled={!canManage} onClick={() => { void autosave.flush() }} style={{ marginLeft: 12, padding: '4px 10px', border: '1px solid #b91c1c', borderRadius: 6, background: 'white', color: '#b91c1c', cursor: 'pointer' }}>Retry save</button></>}
       </div>
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px', minHeight: 0, width: '100%', maxWidth: 1040, margin: '0 auto' }}>
@@ -314,12 +324,9 @@ export function AutomationEditorPanel() {
         <input
           type="text"
           aria-label="Automation description"
-          defaultValue={automation.description || ''}
-          disabled={!canManage || busySaving}
-          onBlur={e => {
-            const v = e.target.value.trim()
-            if (v !== (automation.description || '')) debouncedSave({ description: v || undefined })
-          }}
+          value={automation.description || ''}
+          disabled={!canManage}
+          onChange={e => debouncedSave({ description: e.target.value })}
           placeholder="Add a description..."
           style={{
             width: '100%', padding: '6px 0', fontSize: 13, color: '#555e68',

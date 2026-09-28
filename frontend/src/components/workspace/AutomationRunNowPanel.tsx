@@ -36,7 +36,7 @@ export function describeRunNowSource(automation: Pick<Automation, 'trigger_type'
 
 export function describeRunNowResult(run: AutomationRunStatus): { tone: 'ok' | 'bad' | 'warn'; text: string } {
   if (run.status === 'completed') {
-    return { tone: 'ok', text: 'Run completed. Outputs were delivered per this automation’s settings — check the destination folder, your notifications, and any webhook receiver.' }
+    return { tone: 'ok', text: 'Run completed. Check the recorded output below and any configured destinations. This status does not confirm delivery to folders, notifications, or webhook receivers.' }
   }
   if (run.status === 'skipped') {
     return { tone: 'warn', text: `Run skipped${run.error ? `: ${run.error}` : ''}.` }

@@ -9,6 +9,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
 
+
+## Automation edit recovery — September 28
+
+**131/169 checklist items implemented locally.** AUTO-08 remains open for ambiguous manual-run launch recovery.
+
+- Save queues now survive editor navigation in tab memory, scoped by user and automation. Failed writes retain their exact patches and require explicit retry; reopened editors overlay the draft and cannot race an earlier write or stale initial read. Read-only loads retain their current permissions. Drafts are not written to browser storage because output settings may include credentials; reloading the tab discards unsaved edits, as the error message explains.
+- Description edits debounce as they are typed, including an empty string that actually clears the server field. Rename has explicit Save/Cancel controls, ignores IME Enter, and prevents duplicate submission. Completed run wording no longer claims all output deliveries succeeded.
+- Verification: 21 frontend tests across two files, TypeScript, production build and touched-file ESLint pass. All 18 production browser states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Checks cover canceled/IME rename, pending submission, failed drafts across editor switches, exact retry, description clearing, failed pause, retry and re-enable. Mobile screenshots were inspected directly.
+- Evidence: `2026-09-28-automation-save-review`; recipe: `frontend/scripts/visual-review/automation-save-recovery.mjs`. API writes are fixtures; live server/worker behavior remains unverified. Work continues on preventing duplicate runs after a lost launch response.
+
 ## Automation summaries and shared surfaces — September 28
 
 **131/169 checklist items implemented locally.** AUTO-02 and AUTO-05 are complete; changes are not deployed.
@@ -143,4 +153,4 @@ Latest history tests: **19 passed across 5 files**; production build/TypeScript 
 
 Latest wizard tests: **12 passed across 3 files**; touched-file ESLint, TypeScript, and the production build pass. September 26 results remain recorded separately: **55 frontend tests passed across 11 files; 131 knowledge/optimization backend tests passed**. TypeScript/production build pass. Changed-file lint has no errors and eight existing hook-dependency warnings in the expanded set; final touched-file lint is clean. `git diff --check` passes. Earlier 56/32-test frontend and 58-test automation-backend runs remain recorded separately, without adding overlapping counts. The earlier full frontend run had 961 passes and three signup failures reproduced on unchanged baseline HEAD.
 
-Remaining acceptance work includes live worker integration, catalog filter/role/scope variants, source repair and full document navigation, other upload paths, large lists, alternate themes/roles, and 200% zoom. Failed automation saves after navigating away still need persistent recovery. All browser interaction results use synthetic API responses; no live model, ingestion, optimizer or automation execution was verified.
+Remaining acceptance work includes live worker integration, catalog filter/role/scope variants, source repair and full document navigation, other upload paths, large lists, alternate themes/roles, and 200% zoom. Failed automation saves now survive panel navigation in tab memory; reload persistence is intentionally excluded for credential-bearing drafts. All browser interaction results use synthetic API responses; no live model, ingestion, optimizer or automation execution was verified.
