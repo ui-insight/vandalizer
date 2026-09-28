@@ -4,6 +4,27 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Automation filtering and recovery — September 28
+
+**128/169 checklist items implemented locally.** AUTO-07 is complete; broader automation acceptance remains open. These changes are not deployed.
+
+- Search trims whitespace and combines with trigger filters. Clearing resets search and type while retaining the current project scope. Counts reflect that scope, filters expose their selected state, and existing M365 items remain filterable even when new M365 creation is disabled.
+- Unavailable lists and project pins have an explicit retry rather than a false empty state. Refresh failures preserve loaded rows and filters; the error banner scrolls with the list so retained rows remain reachable on short screens. Earlier list/pin requests and late pin mutations cannot overwrite a newer response or another project's pins.
+- Automation cards expose separate open and pin controls, avoiding nested interactive controls.
+- Verification: 14 focused list/pin tests across four files, TypeScript, Vite production build and touched-file ESLint pass. The 27 production browser states at 320/768/1440px cover combined filters, empty results, clearing, M365 filtering, list and pin failures/retry, retained rows, project counts and a truly empty list. All have zero axe findings, page overflow, page errors or unmatched fixture requests; representative screenshots were inspected directly.
+- Evidence: `2026-09-28-automation-filters-final`; recipe: `frontend/scripts/visual-review/automation-filters.mjs`. The preceding manual-run recovery commit is `fd7ba849`, with 18 focused tests and 21 browser states. AUTO-08/09 stay open for broader lifecycle/history work. All browser APIs and execution are synthetic; live permissions and worker delivery remain unverified.
+
+
+## Automation manual-run recovery — September 28
+
+Progress toward AUTO-08/09; the broader automation acceptance items remain open. The completed checklist count stays at 127/169.
+
+Document search now distinguishes loading, failure/retry and no results, retains its query on failure, ignores stale responses and supports keyboard selection. Pending/accepted runs lock their document selection and block duplicate starts. Status requests run sequentially; a failed status read explicitly explains that the accepted run may still finish and offers a retry of that same event. Late responses cannot update another automation. Collapsing and reopening Run now preserves its accepted run; previous output remains clearly labeled if a new launch fails.
+
+Verification: 18 focused manual-run/autosave tests, TypeScript, Vite production build and touched-file ESLint pass. The production browser journey covers keyboard document choice, search failure/empty state, start failure, status retry without relaunch, panel close/reopen, failed/completed outcomes and retained output at 320/768/1440px. All 21 captured states have zero axe findings, page overflow, uncaught page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+
+Evidence: `2026-09-28-automation-run-evidence`; recipe: `frontend/scripts/visual-review/automation-run-recovery.mjs`. API responses and execution are synthetic. Accepted-run recovery after leaving the editor/reloading, ambiguous launch failures, full history and live worker/output delivery remain unverified; this pass does not close AUTO-08/09.
+
 ## Files and Projects recovery — September 28
 
 **127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
@@ -283,7 +304,7 @@ Acceptance: users can create, find, open and work within the correct project wit
 - [x] **AUTO-04 · P2 · Fix:** Give the editor sufficient width so normal titles and configuration fields do not wrap unnecessarily.
 - [ ] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
 - [x] **AUTO-06 · P2 · Improve:** Keep enabled state, ownership/sharing, Save and Run now easy to distinguish; communicate unsaved edits.
-- [ ] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
+- [x] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
 - [ ] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.
 - [ ] **AUTO-09 · P2 · Verify:** Available execution history, failed-run details and recovery actions are reachable from the relevant automation.
 

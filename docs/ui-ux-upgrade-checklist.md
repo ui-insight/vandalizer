@@ -100,7 +100,7 @@ Acceptance: users can create, find, open and work within the correct project wit
 - [x] **AUTO-04 · P2 · Fix:** Give the editor sufficient width so normal titles and configuration fields do not wrap unnecessarily.
 - [ ] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
 - [x] **AUTO-06 · P2 · Improve:** Keep enabled state, ownership/sharing, Save and Run now easy to distinguish; communicate unsaved edits.
-- [ ] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
+- [x] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
 - [ ] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.
 - [ ] **AUTO-09 · P2 · Verify:** Available execution history, failed-run details and recovery actions are reachable from the relevant automation.
 

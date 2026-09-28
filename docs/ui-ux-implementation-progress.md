@@ -2,12 +2,23 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**127/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**128/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
+
+## Automation filtering and recovery — September 28
+
+**128/169 checklist items implemented locally.** AUTO-07 is complete; broader automation acceptance remains open. These changes are not deployed.
+
+- Search trims whitespace and combines with trigger filters. Clearing resets search and type while retaining the current project scope. Counts reflect that scope, filters expose their selected state, and existing M365 items remain filterable even when new M365 creation is disabled.
+- Unavailable lists and project pins have an explicit retry rather than a false empty state. Refresh failures preserve loaded rows and filters; the error banner scrolls with the list so retained rows remain reachable on short screens. Earlier list/pin requests and late pin mutations cannot overwrite a newer response or another project's pins.
+- Automation cards expose separate open and pin controls, avoiding nested interactive controls.
+- Verification: 14 focused list/pin tests across four files, TypeScript, Vite production build and touched-file ESLint pass. The 27 production browser states at 320/768/1440px cover combined filters, empty results, clearing, M365 filtering, list and pin failures/retry, retained rows, project counts and a truly empty list. All have zero axe findings, page overflow, page errors or unmatched fixture requests; representative screenshots were inspected directly.
+- Evidence: `2026-09-28-automation-filters-final`; recipe: `frontend/scripts/visual-review/automation-filters.mjs`. The preceding manual-run recovery commit is `fd7ba849`, with 18 focused tests and 21 browser states. AUTO-08/09 stay open for broader lifecycle/history work. All browser APIs and execution are synthetic; live permissions and worker delivery remain unverified.
+
 
 ## Automation manual-run recovery — September 28
 

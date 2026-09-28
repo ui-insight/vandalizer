@@ -2,7 +2,7 @@
 
 September 28, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 127/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 128/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,17 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Automation filtering and recovery — September 28
+
+**128/169 checklist items implemented locally.** AUTO-07 is complete; broader automation acceptance remains open. These changes are not deployed.
+
+- Search trims whitespace and combines with trigger filters. Clearing resets search and type while retaining the current project scope. Counts reflect that scope, filters expose their selected state, and existing M365 items remain filterable even when new M365 creation is disabled.
+- Unavailable lists and project pins have an explicit retry rather than a false empty state. Refresh failures preserve loaded rows and filters; the error banner scrolls with the list so retained rows remain reachable on short screens. Earlier list/pin requests and late pin mutations cannot overwrite a newer response or another project's pins.
+- Automation cards expose separate open and pin controls, avoiding nested interactive controls.
+- Verification: 14 focused list/pin tests across four files, TypeScript, Vite production build and touched-file ESLint pass. The 27 production browser states at 320/768/1440px cover combined filters, empty results, clearing, M365 filtering, list and pin failures/retry, retained rows, project counts and a truly empty list. All have zero axe findings, page overflow, page errors or unmatched fixture requests; representative screenshots were inspected directly.
+- Evidence: `2026-09-28-automation-filters-final`; recipe: `frontend/scripts/visual-review/automation-filters.mjs`. The preceding manual-run recovery commit is `fd7ba849`, with 18 focused tests and 21 browser states. AUTO-08/09 stay open for broader lifecycle/history work. All browser APIs and execution are synthetic; live permissions and worker delivery remain unverified.
+
 
 ## Automation manual-run recovery — September 28
 
@@ -92,7 +103,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 615 distinct states / 707 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 642 distinct states / 734 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -182,6 +193,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-28-projects-restored-layout](../2026-09-28-projects-restored-layout/manifest.json): 39 states; source `dbfff5c474499b27dd914e221843a04bfb912042947b4511c356b97e4387ed92`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-files-restored-layout](../2026-09-28-files-restored-layout/manifest.json): 33 states; source `449342649e3042a4729bded577766c57e4f4a6e01a6384e91bd6517e0655e7cd`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-automation-run-evidence](../2026-09-28-automation-run-evidence/manifest.json): 21 states; source `23a01df2593e624f9ae9f8090d4774ed49d1df4a57c2a7ff0e56ae726e980f09`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-28-automation-filters-final](../2026-09-28-automation-filters-final/manifest.json): 27 states; source `6a74bcfc7d73502fb4a87f5ea0d58d2adb635911a72590d9d899cbe6ea106ee0`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -189,7 +201,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Projects:** Large lists, long titles, roles and counts remain readable. Creation, detail loading and edits recover without losing drafts. Empty/read-only details explain the next action. Scope transitions and stale-response guards pass fixture and component checks; live permissions remain unverified.
 
-**Automations screen and editor:** The editor has its own canvas and explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Broader execution/history recovery remains open.
+**Automations screen and editor:** The editor has its own canvas and explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Recovery after leaving the editor and broader history remain open.
 
 **Automation creation wizard:** The reviewed folder/API/schedule wizard checklist is complete: required-field guidance, retained trigger drafts, readable picker selections and retry, current schedule previews, nested Escape isolation, consistent controls and short-screen review. API examples are keyboard-scrollable. M365, real credentials and actual execution remain unverified.
 

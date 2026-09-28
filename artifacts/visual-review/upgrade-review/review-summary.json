@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 127,
+  "completed_items": 128,
   "total_items": 169,
-  "unique_states": 615,
-  "capture_executions": 707,
+  "unique_states": 642,
+  "capture_executions": 734,
   "mobile_grade": 8,
   "areas": [
     {
@@ -34,7 +34,7 @@
       "ui": 8,
       "ux": 8,
       "evidence": "../upgrade-polish-final-journeys/automation-save-failed.png",
-      "note": "The editor has its own canvas and explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Broader execution/history recovery remains open."
+      "note": "The editor has its own canvas and explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Recovery after leaving the editor and broader history remain open."
     },
     {
       "id": "automation-wizard",
@@ -8456,6 +8456,320 @@
           },
           "pageWidth": 1440,
           "smallText": 4
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-automation-filters-final",
+      "capturedAt": "2026-09-28T22:05:40.802Z",
+      "sourceFingerprint": "6a74bcfc7d73502fb4a87f5ea0d58d2adb635911a72590d9d899cbe6ea106ee0",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/hooks/useAutomations.ts\n M frontend/src/hooks/useProjectPins.ts\n?? frontend/scripts/visual-review/automation-filters.mjs\n?? frontend/src/components/workspace/AutomationsPanel.test.tsx\n?? frontend/src/hooks/useAutomations.test.ts\n?? frontend/src/hooks/useProjectPins.test.ts",
+      "commit": "1379f292bc9446415ca5dc0b8b8b6e092237c023",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "automation-list-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-filter-combined-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-filter-empty-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-filter-m365-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-list-refresh-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-list-retained-row-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-project-pins-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-project-filtered-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-list-empty-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-list-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-combined-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-empty-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-m365-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-refresh-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-retained-row-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-project-pins-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-project-filtered-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-empty-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-combined-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-empty-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-filter-m365-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-refresh-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-retained-row-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-project-pins-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-project-filtered-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-list-empty-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
         }
       ],
       "unmatched": [],

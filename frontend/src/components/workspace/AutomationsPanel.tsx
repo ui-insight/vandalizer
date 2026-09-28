@@ -22,7 +22,7 @@ type FilterMode = 'all' | 'folder_watch' | 'api' | 'schedule' | 'm365_intake'
 
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
-  const { automations, loading, refresh } = useAutomations()
+  const { automations, loading, error, refresh } = useAutomations()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
   const projectPins = useProjectPins(activeProjectUuid)
@@ -45,11 +45,11 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
   // Refresh list when editor saves or closes
   useEffect(() => {
-    if (openAutomationId === null) refresh()
+    if (openAutomationId === null) void refresh()
     const handler = () => refresh()
     window.addEventListener('automations-updated', handler)
     return () => window.removeEventListener('automations-updated', handler)
-  }, [openAutomationId])
+  }, [openAutomationId, refresh])
 
   // The base list reflects the project scope: when scoped, only automations
   // pinned to the active project. Everything below (counts, type filter, search)
@@ -65,7 +65,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     let list = base
     if (filter !== 'all') list = list.filter(a => a.trigger_type === filter)
     if (search.trim()) {
-      const q = search.toLowerCase()
+      const q = search.trim().toLowerCase()
       list = list.filter(a =>
         a.name.toLowerCase().includes(q) ||
         (a.description || '').toLowerCase().includes(q),
@@ -81,6 +81,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     schedule: base.filter(a => a.trigger_type === 'schedule').length,
     m365_intake: base.filter(a => a.trigger_type === 'm365_intake').length,
   }), [base])
+
+  const scopeLoading = isProjectScoped && projectPins.loading
+  const listError = error || (isProjectScoped ? projectPins.error : null)
+  const clearFilters = () => { setSearch(''); setFilter('all') }
 
   const togglePin = async (e: React.MouseEvent, autoId: string) => {
     e.stopPropagation()
@@ -184,7 +188,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       )}
 
       {/* Filter bar */}
-      {base.length > 0 && (
+      {(base.length > 0 || search || filter !== 'all') && (
         <div style={{
           display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
           padding: '8px 12px',
@@ -195,8 +199,8 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <FilterPill label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
           <FilterPill label="Folder Watch" count={counts.folder_watch} active={filter === 'folder_watch'} onClick={() => setFilter('folder_watch')} icon={<FolderSearch size={10} />} />
           <FilterPill label="API" count={counts.api} active={filter === 'api'} onClick={() => setFilter('api')} icon={<Globe size={10} />} />
-          {counts.schedule > 0 && <FilterPill label="Schedule" count={counts.schedule} active={filter === 'schedule'} onClick={() => setFilter('schedule')} icon={<CalendarClock size={10} />} />}
-          {m365Enabled && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
+          {(counts.schedule > 0 || filter === 'schedule') && <FilterPill label="Schedule" count={counts.schedule} active={filter === 'schedule'} onClick={() => setFilter('schedule')} icon={<CalendarClock size={10} />} />}
+          {(m365Enabled || counts.m365_intake > 0 || filter === 'm365_intake') && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
           <div style={{ flex: 1 }} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,
@@ -230,13 +234,27 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         </div>
       )}
 
+      {(search || filter !== 'all') && (
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 12px', fontSize: 12, color: '#d0d5dc' }}>
+          {!loading && !scopeLoading && !listError && <span role="status">{filtered.length} of {base.length} automations</span>}
+          <button type="button" onClick={clearFilters} style={{ color: '#fff', border: '1px solid #6b7280', borderRadius: 6, padding: '5px 10px' }}>Clear filters</button>
+        </div>
+      )}
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
-        {loading ? (
+      {listError && (
+        <div role="alert" style={{ margin: 12, padding: 12, border: '1px solid #fca5a5', borderRadius: 8, color: '#fecaca', fontSize: 13 }}>
+          <p>{listError}</p>
+          <p>{base.length ? 'Showing the previously loaded list. Your filters are preserved.' : 'The list is unavailable. Your filters are preserved.'}</p>
+          <button type="button" onClick={() => { void refresh(); if (isProjectScoped) void projectPins.refresh() }} style={{ marginTop: 8, color: '#fff', border: '1px solid #9ca3af', borderRadius: 6, padding: '6px 10px' }}>Retry automations</button>
+        </div>
+      )}
+
+        {(loading || scopeLoading) && base.length === 0 ? (
           <div role="status" aria-live="polite" aria-label="Loading automations" style={{ textAlign: 'center', padding: 40, color: '#b5bbc3' }}>
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
-        ) : base.length === 0 && isProjectScoped && automations.length > 0 ? (
+        ) : listError && base.length === 0 ? null : base.length === 0 && isProjectScoped && automations.length > 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#b5bbc3', fontSize: 13 }}>
             <FolderKanban size={28} style={{ color: '#444', margin: '0 auto 12px' }} />
             <div style={{ color: '#bbb', fontWeight: 600, marginBottom: 4 }}>No automations pinned to this project</div>
@@ -266,16 +284,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               return (
                 <div
                   key={auto.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Open automation: ${auto.name}`}
                   onClick={() => openAutomation(auto.id)}
-                  onKeyDown={e => {
-                    if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
-                      e.preventDefault()
-                      openAutomation(auto.id)
-                    }
-                  }}
                   style={{
                     display: 'block',
                     width: '100%',
@@ -303,9 +312,9 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                         animation: isRunning ? 'automationPulseDot 1.5s ease-in-out infinite' : undefined,
                       }}
                     />
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
+                    <button type="button" aria-label={`Open automation: ${auto.name}`} onClick={e => { e.stopPropagation(); openAutomation(auto.id) }} style={{ fontFamily: 'inherit', textAlign: 'left', background: 'transparent', border: 0, padding: 0, fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal', cursor: 'pointer' }}>
                       {auto.name}
-                    </span>
+                    </button>
                     {canPin && (() => {
                       const pinned = projectPins.isPinned('automation', auto.id)
                       return (
@@ -439,6 +448,8 @@ function FilterPill({ label, count, active, onClick, icon }: {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
+      aria-label={`${label}: ${count} automations`}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '3px 10px', fontSize: 12, fontWeight: 600,
