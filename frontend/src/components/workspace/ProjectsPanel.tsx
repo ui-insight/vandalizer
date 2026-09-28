@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
@@ -16,9 +16,21 @@ import { ProjectsExplainer } from '../projects/ProjectsExplainer'
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
-  const { projects, loading, create, duplicate } = useProjects()
+  const { projects, loading, error, refresh, create, duplicate } = useProjects()
   const { toast } = useToast()
   const [newName, setNewName] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const createPending = useRef(false)
+  const duplicatePending = useRef(false)
+  const [visibleLimit, setVisibleLimit] = useState(40)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState('updated')
+  const visibleProjects = useMemo(() => projects.filter(p => `${p.title} ${p.description ?? ''}`.toLowerCase().includes(search.trim().toLowerCase())).sort((a, b) => sort === 'name' ? a.title.localeCompare(b.title) : new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()), [projects, search, sort])
   const [creating, setCreating] = useState(false)
   const [showExplainer, setShowExplainer] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
@@ -46,18 +58,27 @@ export function ProjectsPanel() {
   }
 
   const handleCreate = async () => {
-    if (!newName.trim()) return
+    if (!newName.trim() || createPending.current) return
+    createPending.current = true
+    setCreateError(null)
     setCreating(true)
     try {
       const project = await create(newName.trim())
-      setNewName('')
-      openProject(project.uuid)
+      if (mounted.current) {
+        setNewName('')
+        openProject(project.uuid)
+      }
+    } catch (error) {
+      setCreateError(`${error instanceof Error ? error.message : 'Could not create project'}. Your name is preserved; retry Create.`)
     } finally {
+      createPending.current = false
       setCreating(false)
     }
   }
 
   const handleDuplicate = async (p: Project) => {
+    if (duplicatePending.current) return
+    duplicatePending.current = true
     setMenuOpenId(null)
     setDuplicatingId(p.uuid)
     try {
@@ -66,13 +87,14 @@ export function ProjectsPanel() {
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to duplicate project', 'error')
     } finally {
+      duplicatePending.current = false
       setDuplicatingId(null)
     }
   }
 
   return (
     <div className="relative h-full overflow-auto bg-white">
-      <div className="flex items-center gap-2 border-b border-gray-200 px-5 py-4">
+      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-5 py-4">
         <FolderKanban className="h-5 w-5 text-gray-400" />
         <h2 className="text-base font-semibold text-gray-900">Projects</h2>
         <button
@@ -82,37 +104,45 @@ export function ProjectsPanel() {
           <HelpCircle size={12} />
           What are Projects?
         </button>
-        <span className="ml-auto text-xs text-gray-400">{projects.length}</span>
+        <span className="ml-auto text-xs text-gray-600">{loading ? 'Loading…' : error ? 'Unavailable' : `${projects.length} projects`}</span>
       </div>
 
       {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
 
-      <div className="p-5">
+      <div className="p-5 pb-24">
         <div className="flex gap-2">
           <input
             type="text"
             value={newName}
+            disabled={creating}
             onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
+            onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleCreate()}
             placeholder="New project name..."
-            className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
+            aria-label="New project name"
+            className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
           />
           <button
             onClick={handleCreate}
+            aria-label="Create project"
             disabled={creating || !newName.trim()}
             className="flex items-center gap-1 rounded-lg bg-highlight px-3 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50"
           >
-            <Plus size={16} />
+            <Plus size={16} /> <span>{creating ? 'Creating…' : 'Create'}</span>
           </button>
         </div>
 
+        {createError && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{createError}</p>}
+        {projects.length > 0 && <div className="project-list-tools">
+          <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
+          <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value); setVisibleLimit(40) }}><option value="updated">Recently updated</option><option value="name">Name A–Z</option></select>
+        </div>}
         <div className="mt-4 space-y-2">
           {loading ? (
-            <div className="text-sm text-gray-500">Loading...</div>
-          ) : projects.length === 0 ? (
-            <ProjectsExplainer />
+            <div role="status" className="text-sm text-gray-600">Loading projects…</div>
+          ) : error ? (<div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Projects could not be loaded. <button onClick={() => refresh()} className="ml-2 rounded border border-red-300 px-2 py-1 underline">Retry projects</button></div>) : projects.length === 0 ? (
+            <div className="project-empty"><h3>Bring your work together</h3><p>A project keeps related files, knowledge and reusable tools in one place. Name your first project above to get started.</p></div>
           ) : (
-            projects.map(p => (
+            visibleProjects.length === 0 ? <p role="status" className="py-6 text-sm text-gray-600">No projects match “{search}”. <button type="button" onClick={() => setSearch('')}>Clear search</button></p> : visibleProjects.slice(0, visibleLimit).map(p => (
               <div
                 key={p.uuid}
                 className="group relative rounded-lg border border-gray-200 bg-white transition-colors hover:border-highlight"
@@ -121,14 +151,16 @@ export function ProjectsPanel() {
                   onClick={() => openProject(p.uuid)}
                   className="flex w-full flex-col items-start p-3 text-left"
                 >
-                  <div className="flex w-full items-center justify-between gap-2 pr-7">
-                    <span className="truncate font-medium text-gray-900">{p.title}</span>
+                  <div className="flex w-full flex-col items-start gap-2 pr-7">
+                    <span className="w-full min-w-0 break-words font-medium text-gray-900">{p.title}</span>
                     <ProjectStateBadge state={p.state} />
                   </div>
                   {p.description && (
-                    <span className="mt-1 line-clamp-1 text-xs text-gray-500">{p.description}</span>
+                    <span className="mt-1 break-words text-sm text-gray-600">{p.description}</span>
                   )}
                   <ProjectSummaryStats capabilities={p.capabilities} className="mt-2" />
+                  <span className="mt-2 text-xs text-gray-600">{p.role ? `${p.role === 'viewer' ? 'Read-only' : p.role === 'owner' ? 'Owner' : 'Editor'} · ` : ''}Updated {Number.isNaN(new Date(p.updated_at).getTime()) ? 'date unavailable' : new Date(p.updated_at).toLocaleDateString()}</span>
+                  {duplicatingId === p.uuid && <span role="status" className="mt-2 text-sm text-gray-600">Requesting a copy…</span>}
                 </button>
 
                 {/* Per-project actions. Kept outside the card <button> above —
@@ -136,9 +168,9 @@ export function ProjectsPanel() {
                 <div className="absolute right-1.5 top-1.5">
                   <button
                     onClick={() => setMenuOpenId(menuOpenId === p.uuid ? null : p.uuid)}
-                    disabled={duplicatingId === p.uuid}
-                    aria-label="Project actions"
-                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-wait aria-expanded:opacity-100"
+                    disabled={!!duplicatingId}
+                    aria-label={`Actions for project: ${p.title}`}
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition-opacity hover:bg-gray-100 hover:text-gray-600 focus:opacity-100 group-hover:opacity-100 disabled:opacity-50 disabled:cursor-wait aria-expanded:opacity-100"
                     aria-expanded={menuOpenId === p.uuid}
                   >
                     <MoreHorizontal size={16} />
@@ -167,6 +199,7 @@ export function ProjectsPanel() {
             ))
           )}
         </div>
+        {!loading && !error && visibleProjects.length > visibleLimit && <button onClick={() => setVisibleLimit(limit => limit + 40)} className="mt-4 rounded-lg border border-gray-300 px-4 py-2 text-sm">Show more projects ({visibleProjects.length - visibleLimit} remaining)</button>}
       </div>
     </div>
   )

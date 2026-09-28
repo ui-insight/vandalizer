@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Team } from '../types/user'
 import * as teamsApi from '../api/teams'
 import { useAuth } from '../hooks/useAuth'
@@ -18,20 +18,28 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const { user, refreshUser } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null)
+  const requestVersion = useRef(0)
 
   const refreshTeams = useCallback(async () => {
+    const version = ++requestVersion.current
     if (!user) {
       setTeams([])
+      setLoadedUserId(null)
       setLoading(false)
       return
     }
+    setLoading(true)
     try {
       const data = await teamsApi.listTeams()
-      setTeams(data)
+      if (version === requestVersion.current) setTeams(data)
     } catch {
-      setTeams([])
+      if (version === requestVersion.current) setTeams([])
     } finally {
-      setLoading(false)
+      if (version === requestVersion.current) {
+        setLoadedUserId(user.user_id)
+        setLoading(false)
+      }
     }
   }, [user])
 
@@ -60,7 +68,7 @@ export function TeamProvider({ children }: { children: ReactNode }) {
 
   return (
     <TeamContext.Provider
-      value={{ teams, currentTeam, loading, switchTeam, createTeam, refreshTeams }}
+      value={{ teams, currentTeam, loading: loading || loadedUserId !== (user?.user_id ?? null), switchTeam, createTeam, refreshTeams }}
     >
       {children}
     </TeamContext.Provider>

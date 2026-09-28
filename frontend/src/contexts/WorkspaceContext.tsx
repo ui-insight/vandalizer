@@ -341,7 +341,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate({ from: '/' })
   const { toast } = useToast()
   const search = useSearch({ from: '/' })
-  const { currentTeam } = useTeams()
+  const { currentTeam, loading: teamsLoading } = useTeams()
 
   // ── URL-derived state ───────────────────────────────────────────────────
   const workspaceMode: WorkspaceMode =
@@ -402,7 +402,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const kbsHydratedRef = useRef(false)
   const activeKBUuid = activeKBs[0]?.uuid ?? null
   const activeKBTitle = activeKBs[0]?.title ?? null
+  // Invalidates asynchronous scope reads after another navigation or team change.
+  const projectScopeVersion = useRef(0)
   const [activeProjectUuid, setActiveProjectUuid] = useState<string | null>(null)
+  const activeProjectUuidRef = useRef(activeProjectUuid)
+  activeProjectUuidRef.current = activeProjectUuid
   const [activeProjectTitle, setActiveProjectTitle] = useState<string | null>(null)
   const [activeProjectRootFolder, setActiveProjectRootFolder] = useState<string | null>(null)
   const [activeProjectTeamId, setActiveProjectTeamId] = useState<string | null>(null)
@@ -495,15 +499,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setSelectedDocNames({})
     setSelectedFolderUuids([])
     setSelectedFolderNames({})
-  }, [])
+    setProcessingDoc(null)
+    setSelectedDocsProcessing([])
+  }, [setSelectedDocsProcessing])
 
   const resetToHome = useCallback(() => {
+    projectScopeVersion.current += 1
     updateSearch(() => emptyWorkspaceSearch())
     localStorage.setItem('workspace:mode', 'chat')
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
     setPendingChatMessage(null)
+    setViewDocumentRequest(null)
+    setVerificationSession(null)
+    setVerificationCompletion(null)
+    setProcessingDoc(null)
+    setSelectedDocsProcessing([])
     setHighlightTerms([])
     setStoredRaw(KB_STORAGE_KEY, null)
     setActiveKBs([])
@@ -513,7 +525,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveProjectRootFolder(null)
     setActiveProjectTeamId(null)
     setActiveProjectRole(null)
-  }, [updateSearch, clearChatAttachments, setHighlightTerms])
+  }, [updateSearch, clearChatAttachments, setHighlightTerms, setSelectedDocsProcessing])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
 
@@ -569,6 +581,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const activateProject = useCallback((uuid: string, title: string) => {
+    projectScopeVersion.current += 1
+    setActiveProjectRootFolder(null)
+    setActiveProjectTeamId(null)
+    setActiveProjectRole(null)
     // Persist the scope so a reload re-enters the project (see rehydrate effect).
     // We store only the uuid — title/role/root are re-fetched on rehydrate so a
     // renamed or re-shared project never shows stale chrome.
@@ -585,19 +601,17 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [updateSearch, clearChatAttachments])
 
   const deactivateProject = useCallback(() => {
-    setStoredRaw(PROJECT_STORAGE_KEY, null)
-    setActiveProjectUuid(null)
-    setActiveProjectTitle(null)
-    setActiveProjectRootFolder(null)
-    setActiveProjectTeamId(null)
-    setActiveProjectRole(null)
-  }, [])
+    if (activeProjectUuid || search.project || getStoredRaw(PROJECT_STORAGE_KEY)) resetToHome()
+    else projectScopeVersion.current += 1
+  }, [activeProjectUuid, search.project, resetToHome])
 
   const refreshActiveProject = useCallback(() => {
-    if (!activeProjectUuid) return
+    if (!activeProjectUuid || activeProjectUuidRef.current !== activeProjectUuid) return
+    const version = projectScopeVersion.current
     import('../api/projects').then(({ getProject }) => {
       getProject(activeProjectUuid)
         .then((project) => {
+          if (projectScopeVersion.current !== version) return
           setActiveProjectTitle(project.title)
           setActiveProjectRootFolder(project.root_folder_uuid)
           setActiveProjectTeamId(project.team_id ?? null)
@@ -670,9 +684,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const projectParam = search.project
     if (!projectParam) return
+    const version = ++projectScopeVersion.current
+    let cancelled = false
+    const isCurrent = () => !cancelled && projectScopeVersion.current === version
+    const failed = () => {
+      if (!isCurrent()) return
+      resetToHome()
+      toast('Could not open this project. It may be unavailable or no longer shared with you. Open Projects to retry.', 'error')
+    }
     import('../api/projects').then(({ getProject }) => {
       getProject(projectParam)
         .then((project) => {
+          if (!isCurrent()) return
           setStoredRaw(PROJECT_STORAGE_KEY, projectParam)
           setActiveProjectUuid(projectParam)
           setActiveProjectTitle(project.title)
@@ -682,6 +705,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setStoredRaw(KB_STORAGE_KEY, null)
           setActiveKBs([])
           clearChatAttachments()
+          setLoadConversationId(null)
+          setPendingChatMessage(null)
+          setViewDocumentRequest(null)
+          setVerificationSession(null)
+          setVerificationCompletion(null)
+          setHighlightTerms([])
           setNewChatSignal(prev => prev + 1)
           // Land in whatever mode was requested (e.g. ?project=X&mode=files),
           // defaulting to chat. Viewers (shared-in PIs) are chat-only.
@@ -701,19 +730,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             replace: true,
           })
         })
-        .catch(() => {
-          navigate({
-            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
-            replace: true,
-          })
-        })
-    }).catch(() => {
-      navigate({
-        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
-        replace: true,
-      })
-    })
-  }, [search.project, search.mode, navigate, clearChatAttachments])
+        .catch(failed)
+    }).catch(failed)
+    return () => { cancelled = true }
+  }, [search.project, search.mode, search.workflow, search.extraction, search.automation, navigate, clearChatAttachments, resetToHome, setHighlightTerms, toast])
 
   // Rehydrate the active project/KB scope on a fresh load (e.g. browser reload).
   // Scope lives in ephemeral React state, so without this a refresh would drop
@@ -740,17 +760,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
     if (deepLink) return
 
+    const version = projectScopeVersion.current
     if (storedProject) {
       import('../api/projects').then(({ getProject }) => {
         getProject(storedProject)
           .then((project) => {
+            if (projectScopeVersion.current !== version) return
             setActiveProjectUuid(storedProject)
             setActiveProjectTitle(project.title)
             setActiveProjectRootFolder(project.root_folder_uuid)
             setActiveProjectTeamId(project.team_id ?? null)
             setActiveProjectRole(project.role)
           })
-          .catch(() => { setStoredRaw(PROJECT_STORAGE_KEY, null) })
+          .catch(() => { if (projectScopeVersion.current === version) setStoredRaw(PROJECT_STORAGE_KEY, null) })
       }).catch(() => {})
       return
     }
@@ -762,6 +784,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         // rest of the attachment survives.
         Promise.allSettled(storedKBUuids.map(uuid => getKnowledgeBase(uuid)))
           .then(results => {
+            if (projectScopeVersion.current !== version) return
             const restored: AttachedKB[] = []
             results.forEach((res, i) => {
               if (res.status === 'fulfilled') {
@@ -794,6 +817,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // never leave the user pointed at a project they can no longer access.
   const prevTeamUuidRef = useRef<string | null | undefined>(undefined)
   useEffect(() => {
+    if (teamsLoading) return
     const teamUuid = currentTeam?.uuid ?? null
     if (prevTeamUuidRef.current === undefined) {
       // First resolution of the current team — establish the baseline, don't
@@ -803,15 +827,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
     if (prevTeamUuidRef.current === teamUuid) return
     prevTeamUuidRef.current = teamUuid
-    setStoredRaw(PROJECT_STORAGE_KEY, null)
-    setActiveProjectUuid(null)
-    setActiveProjectTitle(null)
-    setActiveProjectRootFolder(null)
-    setActiveProjectTeamId(null)
-    setActiveProjectRole(null)
-    setStoredRaw(KB_STORAGE_KEY, null)
-    setActiveKBs([])
-  }, [currentTeam?.uuid])
+    resetToHome()
+  }, [currentTeam?.uuid, teamsLoading, resetToHome])
 
   // ── UI callbacks ────────────────────────────────────────────────────────
 

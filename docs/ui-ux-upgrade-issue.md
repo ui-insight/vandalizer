@@ -4,6 +4,27 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Files and Projects recovery — September 28
+
+**127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
+
+- Files retain folder location, search, sorting and selection when returning from a document. Failed loads/searches retry; rename/create/move failures preserve their target and draft. Partial moves retry only failed files and refresh the destination. Prior upload and deletion evidence covers processing and partial-delete recovery.
+- Projects show readable titles, descriptions, state, role and counts, with search across large lists and incremental display. Creation and detail loading have retry; failed title, description and status edits retain changes. Empty projects explain what belongs there and offer files/chat actions; viewers see read-only details.
+- Project entry and exit update file, chat and KB scope together. Late lookups or refreshes cannot restore an old project. Initial team loading no longer clears a newly opened project, and opening Projects outside a project preserves general-work attachments.
+- Verification: 50 focused Projects/navigation tests pass. The earlier Files suite passed 37 tests across six files. TypeScript and production build pass; touched Projects files have no lint errors and one existing hook-dependency warning. The restored layout passes 39 Projects and 33 Files browser states at 320/768/1440px, with zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+- Evidence: `2026-09-28-projects-restored-layout` and `2026-09-28-files-restored-layout`. The separate file → Library → workflow navigation journey remains selected.
+- Limits: browser APIs, execution and permissions are fixtures; live backend/model behavior is not certified. The remaining acceptance checklist stays open.
+
+## Navigation correction — September 28
+
+Committed locally as `c107773b` (not pushed or deployed).
+
+The user reported that the full-width section layout broke opening a file and running a Library item on it. This was a regression in the earlier visual refresh. Desktop sections now retain the document/section pane beside Assistant and Library, including while a workflow or extraction is open. Compact screens expose explicit pane controls and preserve both the file and tool while switching. Clicking the active Chat navigation item no longer resets the conversation or attachments.
+
+Verification: 22 tests across four layout/navigation/Library files, TypeScript and the production build pass. The production browser journey covers open file → Library → workflow → failed run → retry → output → return at 320, 390, 768, 1024 and 1440px. Both run attempts must submit exactly the opened document UUID. All 30 captured states have zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly. The workflow editor's drag handle now uses its existing keyboard move controls as the accessible alternative, and completion text has readable contrast.
+
+Evidence: `2026-09-28-file-library-evidence`; recipe: `frontend/scripts/visual-review/file-library-workflow.mjs`. API execution and results are synthetic; this establishes the frontend journey and request targeting, not live workflow/model execution. Earlier section grades do not establish cross-pane task coverage. The broader acceptance checklist remains open, with no new items marked complete in this correction.
+
 ## Implementation progress — September 28, chat reading and source navigation
 
 **120/169 checklist items implemented locally (CHAT-06/07/09 and CKB-04/05/06 completed in this pass).** Changes are uncommitted and not deployed.
@@ -235,9 +256,9 @@ Acceptance: the six main mobile screens and their critical flows independently e
 - [x] **FILE-05 · P2 · Fix:** Increase timestamp and file-type contrast and normalize metadata styling.
 - [x] **FILE-06 · P2 · Fix:** Make the row action menu persistently discoverable and accessible with touch and keyboard.
 - [x] **FILE-07 · P2 · Improve:** Show selected count, clear selection and applicable bulk actions together, with a clear distinction between selection and opening a file.
-- [ ] **FILE-08 · P2 · Verify:** Folder navigation, breadcrumbs, search, sorting and returning from a document preserve the correct location and selection.
-- [ ] **FILE-09 · P2 · Verify:** Empty folder, no search results, loading, processing, failed processing and retry states are distinct and actionable.
-- [ ] **FILE-10 · P2 · Verify:** Existing move, rename, delete and other bulk/context actions explain their target and recover from failure without losing selection.
+- [x] **FILE-08 · P2 · Verify:** Folder navigation, breadcrumbs, search, sorting and returning from a document preserve the correct location and selection.
+- [x] **FILE-09 · P2 · Verify:** Empty folder, no search results, loading, processing, failed processing and retry states are distinct and actionable.
+- [x] **FILE-10 · P2 · Verify:** Existing move, rename, delete and other bulk/context actions explain their target and recover from failure without losing selection.
 
 Acceptance: upload → locate → select → inspect/use a file is understandable and reliable on desktop and mobile, including error recovery.
 
@@ -246,11 +267,11 @@ Acceptance: upload → locate → select → inspect/use a file is understandabl
 - [x] **PROJ-01 · P2 · Fix:** Replace the unlabeled plus with a named, prominent New project action.
 - [x] **PROJ-02 · P2 · Fix:** Replace or supplement cryptic icon/count pairs with readable labels for the most useful project contents.
 - [x] **PROJ-03 · P2 · Improve:** Add a project search and useful sorting without overloading a short list.
-- [ ] **PROJ-04 · P2 · Improve:** Make project title, description, state and relevant activity readable within a consistent card/list hierarchy.
+- [x] **PROJ-04 · P2 · Improve:** Make project title, description, state and relevant activity readable within a consistent card/list hierarchy.
 - [x] **PROJ-05 · P2 · Fix:** Shorten the empty-state explanation and place a direct create action beside it.
-- [ ] **PROJ-06 · P2 · Improve:** Make the project detail page clearly answer what belongs here and what the user should do next.
-- [ ] **PROJ-07 · P2 · Verify:** Entering and leaving a project updates the visible chat/file/KB context consistently; no stale project scope leaks into unrelated work.
-- [ ] **PROJ-08 · P2 · Verify:** Creation errors, empty contents, long titles, many projects and restricted access have usable states.
+- [x] **PROJ-06 · P2 · Improve:** Make the project detail page clearly answer what belongs here and what the user should do next.
+- [x] **PROJ-07 · P2 · Verify:** Entering and leaving a project updates the visible chat/file/KB context consistently; no stale project scope leaks into unrelated work.
+- [x] **PROJ-08 · P2 · Verify:** Creation errors, empty contents, long titles, many projects and restricted access have usable states.
 
 Acceptance: users can create, find, open and work within the correct project without interpreting unlabeled icons or losing context.
 

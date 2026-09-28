@@ -32,11 +32,11 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
     >
       <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)' }} />
       <span style={{ color: '#6b7280', fontWeight: 500 }}>Project</span>
-      <span style={{ color: '#111', fontWeight: 600 }}>{activeProjectTitle}</span>
+      <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{activeProjectTitle}</span>
       {activeProjectRole === 'viewer' && (
-        <span style={{ color: '#6b7280', fontSize: 12 }}>· viewing</span>
+        <span style={{ color: '#6b7280', fontSize: 12 }}>· read-only</span>
       )}
-      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         {onOpenManage && (
           <button
             type="button"

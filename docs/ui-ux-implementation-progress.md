@@ -2,12 +2,23 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**120/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**127/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
+
+## Files and Projects recovery — September 28
+
+**127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
+
+- Files retain folder location, search, sorting and selection when returning from a document. Failed loads/searches retry; rename/create/move failures preserve their target and draft. Partial moves retry only failed files and refresh the destination. Prior upload and deletion evidence covers processing and partial-delete recovery.
+- Projects show readable titles, descriptions, state, role and counts, with search across large lists and incremental display. Creation and detail loading have retry; failed title, description and status edits retain changes. Empty projects explain what belongs there and offer files/chat actions; viewers see read-only details.
+- Project entry and exit update file, chat and KB scope together. Late lookups or refreshes cannot restore an old project. Initial team loading no longer clears a newly opened project, and opening Projects outside a project preserves general-work attachments.
+- Verification: 50 focused Projects/navigation tests pass. The earlier Files suite passed 37 tests across six files. TypeScript and production build pass; touched Projects files have no lint errors and one existing hook-dependency warning. The restored layout passes 39 Projects and 33 Files browser states at 320/768/1440px, with zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+- Evidence: `2026-09-28-projects-restored-layout` and `2026-09-28-files-restored-layout`. The separate file → Library → workflow navigation journey remains selected.
+- Limits: browser APIs, execution and permissions are fixtures; live backend/model behavior is not certified. The remaining acceptance checklist stays open.
 
 ## Navigation correction — September 28
 
@@ -21,7 +32,7 @@ Evidence: `2026-09-28-file-library-evidence`; recipe: `frontend/scripts/visual-r
 
 The first checkpoint records the implementation, regression tests, browser review scripts and progress documentation accumulated for #964. Earlier entries below describe the uncommitted state at the time of those reviews. This is a partial implementation checkpoint, not completion of the issue or a deployment.
 
-The latest Files recovery changes are included: failed folder loads and content searches retry; rename/create/move errors preserve drafts and targets; partial moves retry only failed files; revisiting moved-to folders refreshes their cached contents; returning from a document preserves list search, sort and selection. The focused run passed 37 tests across six files, and the production build passed. The 33-state Files browser run completed, but its final visual review and checklist update remain pending.
+The latest Files recovery changes are included: failed folder loads and content searches retry; rename/create/move errors preserve drafts and targets; partial moves retry only failed files; revisiting moved-to folders refreshes their cached contents; returning from a document preserves list search, sort and selection. The focused run passed 37 tests across six files, and the production build passed. The Files browser review and checklist closure were subsequently completed against the restored navigation; see the Files and Projects entry above.
 
 Checkpoint verification: 190 frontend tests across 32 changed test files and 216 backend tests across seven selected regression files pass. TypeScript and the production build pass. Backend deprecation warnings and existing Vite chunk/dynamic-import warnings remain. These checks do not certify live infrastructure.
 

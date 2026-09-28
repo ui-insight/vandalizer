@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 120,
+  "completed_items": 127,
   "total_items": 169,
-  "unique_states": 522,
-  "capture_executions": 614,
+  "unique_states": 594,
+  "capture_executions": 686,
   "mobile_grade": 8,
   "areas": [
     {
@@ -13,8 +13,8 @@
       "baseline_ux": 6,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-folder-recheck/files-390.png",
-      "note": "Mobile names and bulk controls are readable. Partial deletion keeps failed items selected and retries only those files. Move/rename recovery, larger libraries and broader selection scope still need verification."
+      "evidence": "../2026-09-28-files-restored-layout/files-return-from-document-1440.png",
+      "note": "Returning from a document preserves folder, search, sorting and selection. Load/search, rename/create/move and partial-delete failures have actionable retry; partial moves retry only failed files and refresh destination contents. Verified with the restored desktop source and Library panes."
     },
     {
       "id": "projects",
@@ -23,8 +23,8 @@
       "baseline_ux": 6.5,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-final/projects.png",
-      "note": "Search, sorting, named creation and labeled counts clarify the main list. Restricted roles and project-scope transitions need broader verification."
+      "evidence": "../2026-09-28-projects-restored-layout/projects-empty-detail-768.png",
+      "note": "Large lists, long titles, roles and counts remain readable. Creation, detail loading and edits recover without losing drafts. Empty/read-only details explain the next action. Scope transitions and stale-response guards pass fixture and component checks; live permissions remain unverified."
     },
     {
       "id": "automations",
@@ -7382,6 +7382,832 @@
           },
           "pageWidth": 320,
           "smallText": 1
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-projects-restored-layout",
+      "capturedAt": "2026-09-28T21:34:46.683Z",
+      "sourceFingerprint": "dbfff5c474499b27dd914e221843a04bfb912042947b4511c356b97e4387ed92",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M CHANGELOG.md\n M backend/app/routers/chat.py\n M backend/app/routers/config.py\n M backend/app/schemas/config.py\n M backend/app/services/chat_service.py\n M backend/app/services/llm_service.py\n M backend/tests/test_chat_routes.py\n M backend/tests/test_llm_service.py\n M docs/ui-ux-upgrade-issue.md\n M frontend/src/api/config.ts\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/HomeExperience.test.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/projects/ProjectPinsSection.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/contexts/TeamContext.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/hooks/useProjects.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/projects-recovery.mjs\n?? frontend/scripts/visual-review/welcome-paths.mjs\n?? frontend/src/components/chat/ChatPanel.demo.test.tsx\n?? frontend/src/components/workspace/ProjectManageModal.test.tsx\n?? frontend/src/components/workspace/ProjectsPanel.test.tsx\n?? frontend/src/contexts/TeamContext.test.tsx\n?? frontend/src/contexts/WorkspaceContext.projects.test.tsx\n?? frontend/src/hooks/useOpenActivity.ts",
+      "commit": "c107773b7c3997dff3e1e0443e11802147ae9ac6",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "projects-load-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "projects-many-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "projects-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "projects-create-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "projects-empty-detail-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-members-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-title-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-description-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-status-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-scoped-chat-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-exited-chat-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-viewer-detail-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-access-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-load-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-many-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-create-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-empty-detail-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-members-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-title-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-description-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-status-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-scoped-chat-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-exited-chat-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-viewer-detail-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-access-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-load-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-many-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-create-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-empty-detail-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-members-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-title-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-description-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-status-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-scoped-chat-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-exited-chat-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-viewer-detail-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-access-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-files-restored-layout",
+      "capturedAt": "2026-09-28T21:36:13.423Z",
+      "sourceFingerprint": "449342649e3042a4729bded577766c57e4f4a6e01a6384e91bd6517e0655e7cd",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M CHANGELOG.md\n M backend/app/routers/config.py\n M backend/app/schemas/config.py\n M docs/ui-ux-upgrade-issue.md\n M frontend/scripts/visual-review/files-recovery.mjs\n M frontend/src/api/config.ts\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/HomeExperience.test.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/projects/ProjectPinsSection.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/contexts/TeamContext.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/hooks/useProjects.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/projects-recovery.mjs\n?? frontend/src/components/workspace/ProjectManageModal.test.tsx\n?? frontend/src/components/workspace/ProjectsPanel.test.tsx\n?? frontend/src/contexts/TeamContext.test.tsx\n?? frontend/src/contexts/WorkspaceContext.projects.test.tsx\n?? frontend/src/hooks/useOpenActivity.ts",
+      "commit": "e4ae47d0031bc272b62a1a721c81df63bab0e4d9",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "files-load-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "files-rename-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-move-destinations-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-partial-move-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-moved-destination-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-return-from-document-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-content-search-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "files-no-search-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "files-create-folder-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-folder-move-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "files-empty-folder-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "files-load-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "files-rename-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-move-destinations-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-partial-move-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-moved-destination-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-return-from-document-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-content-search-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "files-no-search-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "files-create-folder-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-folder-move-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "files-empty-folder-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "files-load-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-rename-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-move-destinations-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-partial-move-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-moved-destination-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-return-from-document-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-content-search-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-no-search-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-create-folder-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-folder-move-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-empty-folder-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
         }
       ],
       "unmatched": [],

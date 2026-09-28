@@ -18,7 +18,7 @@ export function useProjects() {
   const qc = useQueryClient()
   const queryKey = ['projects'] as const
 
-  const { data: projects = [], isLoading: loading } = useQuery<Project[]>({
+  const { data: projects = [], isLoading: loading, error, refetch } = useQuery<Project[]>({
     queryKey,
     queryFn: () => api.listProjects(),
   })
@@ -58,14 +58,14 @@ export function useProjects() {
   const update = (uuid: string, data: ProjectUpdate) =>
     updateMutation.mutateAsync({ uuid, data })
 
-  return { projects, loading, create, remove, duplicate, update }
+  return { projects, loading, error, refresh: refetch, create, remove, duplicate, update }
 }
 
 export function useProject(uuid: string) {
   const qc = useQueryClient()
   const queryKey = ['project', uuid] as const
 
-  const { data: project, isLoading: loading } = useQuery<ProjectOverview>({
+  const { data: project, isLoading: loading, error, refetch } = useQuery<ProjectOverview>({
     queryKey,
     queryFn: () => api.getProject(uuid),
     enabled: !!uuid,
@@ -83,5 +83,5 @@ export function useProject(uuid: string) {
   const update = (data: { title?: string; description?: string; state?: ProjectState }) =>
     updateMutation.mutateAsync(data)
 
-  return { project, loading, update }
+  return { project, loading, error, refresh: refetch, update }
 }

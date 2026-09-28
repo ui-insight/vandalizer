@@ -51,7 +51,7 @@ try{
   fail='';await page.getByRole('button',{name:'Retry search',exact:true}).click()
   await page.getByText(/No files or folders match/).waitFor();await shot(`files-no-search-results-${width}`)
   await page.getByRole('button',{name:'Close search',exact:true}).click();assert.equal(await page.getByRole('checkbox',{name:'Select Budget justification.docx',exact:true}).isChecked(),true)
-  await page.getByRole('button',{name:'Add',exact:true}).click();await page.getByRole('menuitem',{name:'New Folder',exact:true}).click()
+  await page.getByRole('complementary',{name:'Documents',exact:true}).getByRole('button',{name:'Add',exact:true}).click();await page.getByRole('menuitem',{name:'New Folder',exact:true}).click()
   const create=page.getByRole('dialog',{name:'New Folder',exact:true});await create.getByRole('textbox').fill('Empty review folder');fail='create';await create.getByRole('button',{name:'Create',exact:true}).click();await create.getByRole('alert').waitFor();await shot(`files-create-folder-error-${width}`)
   fail='';await create.getByRole('button',{name:'Create',exact:true}).click();await create.waitFor({state:'hidden'});assert.deepEqual(writes.filter(w=>w.type==='create').map(w=>w.parent_id),['folder-1','folder-1'])
   await page.getByRole('row',{name:'Folder: Empty review folder',exact:true}).getByRole('button',{name:'More options',exact:true}).click();await page.getByRole('menuitem',{name:'Move to…',exact:true}).click()

@@ -73,9 +73,9 @@ Acceptance: the six main mobile screens and their critical flows independently e
 - [x] **FILE-05 · P2 · Fix:** Increase timestamp and file-type contrast and normalize metadata styling.
 - [x] **FILE-06 · P2 · Fix:** Make the row action menu persistently discoverable and accessible with touch and keyboard.
 - [x] **FILE-07 · P2 · Improve:** Show selected count, clear selection and applicable bulk actions together, with a clear distinction between selection and opening a file.
-- [ ] **FILE-08 · P2 · Verify:** Folder navigation, breadcrumbs, search, sorting and returning from a document preserve the correct location and selection.
-- [ ] **FILE-09 · P2 · Verify:** Empty folder, no search results, loading, processing, failed processing and retry states are distinct and actionable.
-- [ ] **FILE-10 · P2 · Verify:** Existing move, rename, delete and other bulk/context actions explain their target and recover from failure without losing selection.
+- [x] **FILE-08 · P2 · Verify:** Folder navigation, breadcrumbs, search, sorting and returning from a document preserve the correct location and selection.
+- [x] **FILE-09 · P2 · Verify:** Empty folder, no search results, loading, processing, failed processing and retry states are distinct and actionable.
+- [x] **FILE-10 · P2 · Verify:** Existing move, rename, delete and other bulk/context actions explain their target and recover from failure without losing selection.
 
 Acceptance: upload → locate → select → inspect/use a file is understandable and reliable on desktop and mobile, including error recovery.
 
@@ -84,11 +84,11 @@ Acceptance: upload → locate → select → inspect/use a file is understandabl
 - [x] **PROJ-01 · P2 · Fix:** Replace the unlabeled plus with a named, prominent New project action.
 - [x] **PROJ-02 · P2 · Fix:** Replace or supplement cryptic icon/count pairs with readable labels for the most useful project contents.
 - [x] **PROJ-03 · P2 · Improve:** Add a project search and useful sorting without overloading a short list.
-- [ ] **PROJ-04 · P2 · Improve:** Make project title, description, state and relevant activity readable within a consistent card/list hierarchy.
+- [x] **PROJ-04 · P2 · Improve:** Make project title, description, state and relevant activity readable within a consistent card/list hierarchy.
 - [x] **PROJ-05 · P2 · Fix:** Shorten the empty-state explanation and place a direct create action beside it.
-- [ ] **PROJ-06 · P2 · Improve:** Make the project detail page clearly answer what belongs here and what the user should do next.
-- [ ] **PROJ-07 · P2 · Verify:** Entering and leaving a project updates the visible chat/file/KB context consistently; no stale project scope leaks into unrelated work.
-- [ ] **PROJ-08 · P2 · Verify:** Creation errors, empty contents, long titles, many projects and restricted access have usable states.
+- [x] **PROJ-06 · P2 · Improve:** Make the project detail page clearly answer what belongs here and what the user should do next.
+- [x] **PROJ-07 · P2 · Verify:** Entering and leaving a project updates the visible chat/file/KB context consistently; no stale project scope leaks into unrelated work.
+- [x] **PROJ-08 · P2 · Verify:** Creation errors, empty contents, long titles, many projects and restricted access have usable states.
 
 Acceptance: users can create, find, open and work within the correct project without interpreting unlabeled icons or losing context.
 

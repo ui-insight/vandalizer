@@ -3,7 +3,7 @@ import json, html, re
 root=Path(__file__).resolve().parents[3]
 out=Path(__file__).resolve().parent
 base=root/'artifacts/visual-review'
-runs=['upgrade-final','upgrade-final-responsive','upgrade-final-recheck','upgrade-final-detail-recheck','upgrade-followup-detail','upgrade-followup-responsive','upgrade-polish-final-journeys','upgrade-polish-final-context','upgrade-folder-recheck','2026-09-26-recovery-verified','2026-09-26-recovery-layout-verified','2026-09-28-wizard-flow-verified','2026-09-28-wizard-api-verified','2026-09-28-wizard-mobile-final','2026-09-28-history-verified','2026-09-28-lifecycle-evidence','2026-09-28-resumption-final','2026-09-28-questions-final','2026-09-28-sources-release','2026-09-28-uploads-evidence','2026-09-28-validation-scope','2026-09-28-source-intake-final','2026-09-28-catalog-filters-evidence','2026-09-28-catalog-evidence-review','2026-09-28-chat-navigation-evidence','2026-09-28-chat-scope-final','2026-09-28-file-library-evidence']
+runs=['upgrade-final','upgrade-final-responsive','upgrade-final-recheck','upgrade-final-detail-recheck','upgrade-followup-detail','upgrade-followup-responsive','upgrade-polish-final-journeys','upgrade-polish-final-context','upgrade-folder-recheck','2026-09-26-recovery-verified','2026-09-26-recovery-layout-verified','2026-09-28-wizard-flow-verified','2026-09-28-wizard-api-verified','2026-09-28-wizard-mobile-final','2026-09-28-history-verified','2026-09-28-lifecycle-evidence','2026-09-28-resumption-final','2026-09-28-questions-final','2026-09-28-sources-release','2026-09-28-uploads-evidence','2026-09-28-validation-scope','2026-09-28-source-intake-final','2026-09-28-catalog-filters-evidence','2026-09-28-catalog-evidence-review','2026-09-28-chat-navigation-evidence','2026-09-28-chat-scope-final','2026-09-28-file-library-evidence','2026-09-28-projects-restored-layout','2026-09-28-files-restored-layout']
 captures={}; manifests=[]
 for name in runs:
  p=base/name;m=json.loads((p/'manifest.json').read_text())
@@ -20,8 +20,8 @@ for c in captures.values():
 assert not violations,violations
 score=json.loads((root/'frontend/scripts/visual-review/scorecard.json').read_text())
 updates={
- 'files':(8,8,'files-390','Mobile names and bulk controls are readable. Partial deletion keeps failed items selected and retries only those files. Move/rename recovery, larger libraries and broader selection scope still need verification.'),
- 'projects':(8,8,'projects','Search, sorting, named creation and labeled counts clarify the main list. Restricted roles and project-scope transitions need broader verification.'),
+ 'files':(8,8,'files-return-from-document-1440','Returning from a document preserves folder, search, sorting and selection. Load/search, rename/create/move and partial-delete failures have actionable retry; partial moves retry only failed files and refresh destination contents. Verified with the restored desktop source and Library panes.'),
+ 'projects':(8,8,'projects-empty-detail-768','Large lists, long titles, roles and counts remain readable. Creation, detail loading and edits recover without losing drafts. Empty/read-only details explain the next action. Scope transitions and stale-response guards pass fixture and component checks; live permissions remain unverified.'),
  'automations':(8,8,'automation-save-failed','The editor has its own canvas and explicit autosave state. Serialized saves preserve quick edits, failures keep edits for retry, and unsaved configuration cannot run. Broader execution/history recovery remains open.'),
  'automation-wizard':(8,8,'wizard-schedule-review-320','The reviewed folder/API/schedule wizard checklist is complete: required-field guidance, retained trigger drafts, readable picker selections and retry, current schedule previews, nested Escape isolation, consistent controls and short-screen review. API examples are keyboard-scrollable. M365, real credentials and actual execution remain unverified.'),
  'knowledge':(8,8,'knowledge-sources-mobile','Sources/Validation precede source controls. Tags and technical metadata are behind Manage; web refresh settings collapse. Source health and measured quality remain distinct.'),
@@ -72,6 +72,17 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Files and Projects recovery — September 28
+
+**127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
+
+- Files retain folder location, search, sorting and selection when returning from a document. Failed loads/searches retry; rename/create/move failures preserve their target and draft. Partial moves retry only failed files and refresh the destination. Prior upload and deletion evidence covers processing and partial-delete recovery.
+- Projects show readable titles, descriptions, state, role and counts, with search across large lists and incremental display. Creation and detail loading have retry; failed title, description and status edits retain changes. Empty projects explain what belongs there and offer files/chat actions; viewers see read-only details.
+- Project entry and exit update file, chat and KB scope together. Late lookups or refreshes cannot restore an old project. Initial team loading no longer clears a newly opened project, and opening Projects outside a project preserves general-work attachments.
+- Verification: 50 focused Projects/navigation tests pass. The earlier Files suite passed 37 tests across six files. TypeScript and production build pass; touched Projects files have no lint errors and one existing hook-dependency warning. The restored layout passes 39 Projects and 33 Files browser states at 320/768/1440px, with zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+- Evidence: `2026-09-28-projects-restored-layout` and `2026-09-28-files-restored-layout`. The separate file → Library → workflow navigation journey remains selected.
+- Limits: browser APIs, execution and permissions are fixtures; live backend/model behavior is not certified. The remaining acceptance checklist stays open.
 
 ## Navigation correction — September 28
 

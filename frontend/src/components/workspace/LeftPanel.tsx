@@ -9,6 +9,7 @@ import { VerificationNavBar } from '../files/VerificationNavBar'
 import { ItemPickerModal } from './ItemPickerModal'
 import { KBPickerModal } from '../files/KBPickerModal'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useTeams } from '../../hooks/useTeams'
 import { useToast } from '../../contexts/ToastContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 import { getVerificationSession } from '../../api/verificationSessions'
@@ -27,6 +28,7 @@ export function LeftPanel() {
     workspaceMode, setOpenDocumentUuid,
   } = useWorkspace()
   const { toast } = useToast()
+  const { currentTeam } = useTeams()
   // Folder targeted by the workflow / KB picker modals (null = closed).
   const [workflowPickerFolder, setWorkflowPickerFolder] = useState<Folder | null>(null)
   const [kbPickerFolder, setKbPickerFolder] = useState<Folder | null>(null)
@@ -59,7 +61,16 @@ export function LeftPanel() {
   // whole browser — upload, subfolders, drag-to-move, rename — scoped in.
   useEffect(() => {
     setCurrentFolder(activeProjectRootFolder ?? null)
-  }, [activeProjectRootFolder])
+    setViewingDoc(null)
+    setShowRawText(false)
+    setShowUsage(false)
+    setSearchQuery('')
+    setSearchOpen(false)
+    setContentMatches([])
+    setWorkflowPickerFolder(null)
+    setKbPickerFolder(null)
+    listPosition.current = 0
+  }, [activeProjectRootFolder, currentTeam?.uuid])
 
   // When a document is being viewed, ignore checkbox selection changes from FileBrowser
   // (the documents list refresh triggers onSelectionChange with empty selection, which

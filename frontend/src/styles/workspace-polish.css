@@ -21,7 +21,7 @@
 .file-table col:last-child { width: 140px !important; }
 .project-list-tools { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 24px; }
 .project-list-tools input, .project-list-tools select { padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font: inherit; font-size: 13px; min-width: 0; background: white; color: #374151; }
-.project-list-tools input { flex: 1; }
+.project-list-tools input { flex: 1 1 180px; }
 .project-empty { max-width: 440px; padding: 24px 0; color: #59616b; font-size: 14px; line-height: 1.6; }
 .project-empty h3 { color: #242b32; font-size: 18px; font-weight: 650; margin-bottom: 8px; }
 .automation-review-summary { display: grid; gap: 12px; margin-bottom: 20px; padding: 16px; border: 1px solid #dce1e5; border-radius: 10px; background: #f7f8f9; font-size: 13px; }

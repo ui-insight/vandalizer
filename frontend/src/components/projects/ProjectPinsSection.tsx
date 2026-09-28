@@ -89,7 +89,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
     <div className="mt-8">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Pinned tools</h2>
-        <button type="button" onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-highlight hover:underline">
+        <button type="button" onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-gray-700 hover:underline">
           <Plus size={14} /> Pin a tool
         </button>
       </div>
