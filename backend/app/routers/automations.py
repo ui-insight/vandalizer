@@ -33,7 +33,7 @@ from app.schemas.automations import (
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
-from app.services import automation_history, automation_run_now
+from app.services import automation_history, automation_run_now, automation_launch
 from app.services import automation_schedule
 
 logger = logging.getLogger(__name__)
@@ -626,10 +626,15 @@ async def run_automation_now(
     it can be tested before it is switched on. Manage rights required.
     """
     auto, _team_access = await _load_authorized_automation(automation_id, user, manage=True)
+    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
+    request_id = body.request_id if body else None
+    if request_id:
+        recovered = await automation_launch.recover(automation_id, user.user_id, request_id, chosen)
+        if recovered:
+            return recovered
     if not auto.action_id:
         raise HTTPException(status_code=400, detail="This automation has no action target selected yet.")
 
-    chosen = [u.strip() for u in (body.document_uuids if body else None) or [] if u and u.strip()]
     if chosen:
         chosen = await _authorize_existing_documents(chosen, user)
     selection = await automation_run_now.select_run_now_documents(auto, chosen_uuids=chosen)
@@ -637,13 +642,31 @@ async def run_automation_now(
         raise HTTPException(status_code=400, detail=selection["reason"] or "No documents to run with.")
 
     doc_uuids = [d["uuid"] for d in selection["documents"]]
-    result = await _dispatch_action(
-        auto, user, doc_uuids, None, False, 30, None,
-        trigger_type="manual",
-        extra_context={"manual_run": True, "run_by_user_id": user.user_id},
-    )
+    receipt = None
+    if request_id:
+        receipt, recovered = await automation_launch.reserve(
+            automation_id, user.user_id, request_id, chosen, selection, auto.action_type,
+        )
+        if recovered:
+            return recovered
+    try:
+        result = await _dispatch_action(
+            auto, user, doc_uuids, None, False, 30, None,
+            trigger_type="manual",
+            extra_context={"manual_run": True, "run_by_user_id": user.user_id,
+                           **({"launch_request_id": request_id} if request_id else {})},
+        )
+    except Exception:
+        if receipt is None:
+            raise
+        logger.exception("Manual automation launch outcome uncertain: %s", request_id)
+        raise HTTPException(status_code=503, detail="Launch outcome is not confirmed. Reconnect using the same request; do not start another run.")
     if isinstance(result, JSONResponse):  # pragma: no cover - wait=False never returns one
         raise HTTPException(status_code=500, detail="Unexpected dispatch response")
+
+    if receipt:
+        receipt.response = automation_launch.response_for(receipt, result["trigger_event_id"]).model_dump()
+        await receipt.save()
 
     await audit_service.log_event(
         action="automation.run_now",

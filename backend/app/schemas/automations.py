@@ -2,7 +2,7 @@
 
 from typing import Any, Literal, Optional
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.services.automation_schedule import normalize_schedule_config
 from app.utils.naming import EntityName, OptionalEntityName
@@ -114,6 +114,7 @@ class RunNowRequest(BaseModel):
     selection is used) and required for API / M365 ones."""
 
     document_uuids: Optional[list[str]] = None
+    request_id: Optional[str] = Field(default=None, pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 
 
 class RunNowDocument(BaseModel):

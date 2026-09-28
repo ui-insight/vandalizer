@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Automation edit and launch recovery — September 28
+
+**132/169 checklist items implemented locally.** AUTO-08 is complete for the reviewed editor and manual-run flows; changes are not deployed.
+
+- Failed edits survive panel navigation in a user/automation-scoped save queue. Exact retries, pause/re-enable, description clearing, rename cancellation, IME Enter and duplicate-submit prevention pass. Unsaved configuration cannot launch. Drafts remain in tab memory and are discarded on reload, as the error message explains.
+- Manual launches carry a stable request ID, reserved in a durable server receipt before dispatch. Reconnect repeats the same identity and document selection; a competing reservation returns the existing run. Lost responses can recover the owned event, while uncertain dispatch is never automatically queued again. Manage permission is checked before receipt access. Confirmed validation rejection permits corrected input; an uncertain outcome keeps the original intent locked.
+- The browser retains launch IDs across editor switches and tab reloads. Accepted status failures retry only that event, and a deliberate run after completion receives a new ID. Completion no longer claims that every output destination received delivery.
+- Verification: 24 frontend tests across two files and 93 backend tests across five files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. The 18 edit states plus 18 launch states and 21 repeated manual-run states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- Evidence: `2026-09-28-automation-save-review`, `2026-09-28-automation-launch-evidence`, and `2026-09-28-automation-run-reconnect`. Browser APIs use fixtures and backend persistence is mocked. The frontend/API update and new unique Mongo receipt index need coordinated release; live broker delivery, model execution and output destinations are unverified. A reservation without a recoverable event remains locked for investigation rather than risking duplicate effects. Earlier clients without request IDs retain their existing behavior.
+
 ## Automation summaries and shared surfaces — September 28
 
 **131/169 checklist items implemented locally.** AUTO-02 and AUTO-05 are complete; changes are not deployed.
@@ -324,7 +334,7 @@ Acceptance: users can create, find, open and work within the correct project wit
 - [x] **AUTO-05 · P2 · Fix:** Unify list and editor visual styles using the shared theme and control patterns.
 - [x] **AUTO-06 · P2 · Improve:** Keep enabled state, ownership/sharing, Save and Run now easy to distinguish; communicate unsaved edits.
 - [x] **AUTO-07 · P2 · Verify:** Search/filter combinations, empty results and clearing filters work predictably.
-- [ ] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.
+- [x] **AUTO-08 · P2 · Verify:** Enable, pause, edit and manual-run actions provide accurate pending, success and failure feedback and prevent accidental duplicate submission.
 - [x] **AUTO-09 · P2 · Verify:** Available execution history, failed-run details and recovery actions are reachable from the relevant automation.
 
 Acceptance: the list explains what will run and its operational state; configuration changes and manual execution have clear consequences and feedback.

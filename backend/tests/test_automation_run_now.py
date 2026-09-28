@@ -247,3 +247,82 @@ class TestRunStatusRoute:
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.get("/api/automations/auto-1/runs/507f1f77bcf86cd799439011", cookies=cookies, headers=headers)
         assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_idempotent_replay_authorizes_before_recovering_and_never_dispatches(client):
+    from app.schemas.automations import RunNowResponse
+    user, auto = _user(), _auto(folder_id="F1")
+    cookies, headers = _auth()
+    p_tok, p_user, p_load = _authed(user, auto)
+    response = RunNowResponse(status="queued", trigger_event_id="original", action_type="workflow",
+                              documents=[{"uuid": "doc", "title": "Original"}], document_source="folder", documents_matched=1)
+    request_id = "00000000-0000-4000-8000-000000000001"
+    with p_tok, p_user as MockUser, p_load as load, \
+         patch("app.routers.automations.automation_launch.recover", new=AsyncMock(return_value=response)) as recover, \
+         patch("app.routers.automations._dispatch_action", new=AsyncMock()) as dispatch, \
+         patch("app.routers.automations.automation_run_now.select_run_now_documents", new=AsyncMock()) as select:
+        MockUser.find_one = AsyncMock(return_value=user)
+        result = await client.post("/api/automations/auto-1/run-now", json={"request_id": request_id}, cookies=cookies, headers=headers)
+    assert result.status_code == 200 and result.json()["trigger_event_id"] == "original"
+    assert load.await_args.kwargs == {"manage": True}
+    recover.assert_awaited_once_with("auto-1", "testuser", request_id, [])
+    dispatch.assert_not_awaited()
+    select.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("dispatch_error", [False, True])
+async def test_launch_reserves_before_dispatch_and_persists_response(client, dispatch_error):
+    from fastapi import HTTPException
+    user, auto = _user(), _auto(folder_id="F1")
+    cookies, headers = _auth()
+    p_tok, p_user, p_load = _authed(user, auto)
+    selection = {"documents": [{"uuid": "doc", "title": "Original"}], "source": "folder", "matched": 1}
+    receipt = SimpleNamespace(selection=selection, action_type="workflow", response=None, save=AsyncMock())
+    request_id = "00000000-0000-4000-8000-000000000002"
+    reserved = False
+
+    async def reserve(*args):
+        nonlocal reserved
+        reserved = True
+        return receipt, None
+
+    async def dispatch(*args, **kwargs):
+        assert reserved
+        assert kwargs["extra_context"]["launch_request_id"] == request_id
+        if dispatch_error:
+            raise HTTPException(status_code=400, detail="Failure after reservation")
+        return {"trigger_event_id": "original"}
+
+    with p_tok, p_user as MockUser, p_load, \
+         patch("app.routers.automations.automation_launch.recover", new=AsyncMock(return_value=None)), \
+         patch("app.routers.automations.automation_launch.reserve", new=AsyncMock(side_effect=reserve)), \
+         patch("app.routers.automations.automation_run_now.select_run_now_documents", new=AsyncMock(return_value=selection)), \
+         patch("app.routers.automations._dispatch_action", new=AsyncMock(side_effect=dispatch)), \
+         patch("app.routers.automations.audit_service.log_event", new=AsyncMock()):
+        MockUser.find_one = AsyncMock(return_value=user)
+        result = await client.post("/api/automations/auto-1/run-now", json={"request_id": request_id}, cookies=cookies, headers=headers)
+    if dispatch_error:
+        assert result.status_code == 503
+        assert "not confirmed" in result.json()["detail"]
+        receipt.save.assert_not_awaited()
+    else:
+        assert result.status_code == 200
+        assert receipt.response["trigger_event_id"] == "original"
+        receipt.save.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_launch_receipts_are_not_read_after_access_is_denied(client):
+    from fastapi import HTTPException
+    user = _user()
+    cookies, headers = _auth()
+    p_tok, p_user, _ = _authed(user, _auto())
+    with p_tok, p_user as MockUser, \
+         patch("app.routers.automations._load_authorized_automation", new=AsyncMock(side_effect=HTTPException(403, "Denied"))), \
+         patch("app.routers.automations.automation_launch.recover", new=AsyncMock()) as recover:
+        MockUser.find_one = AsyncMock(return_value=user)
+        result = await client.post("/api/automations/auto-1/run-now", json={"request_id": "00000000-0000-4000-8000-000000000001"}, cookies=cookies, headers=headers)
+    assert result.status_code == 403
+    recover.assert_not_awaited()

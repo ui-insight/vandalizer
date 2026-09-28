@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Play, Loader2, CheckCircle, XCircle, AlertTriangle, X, FileText, Search } from 'lucide-react'
 import { runAutomationNow, getAutomationRun } from '../../api/automations'
 import { searchDocuments } from '../../api/documents'
+import { ApiError } from '../../api/client'
 import type { Automation, RunNowResponse, AutomationRunStatus } from '../../types/automation'
 
 /**
@@ -48,14 +49,27 @@ interface Props {
   automation: Automation
   canManage: boolean
   onClose: () => void
+  userScope?: string
+}
+
+interface LaunchIntent { requestId: string; documentUuids: string[] }
+function loadIntent(key: string | null): LaunchIntent | null {
+  if (!key) return null
+  try {
+    const value = JSON.parse(sessionStorage.getItem(key) || 'null')
+    return value && typeof value.requestId === 'string' && Array.isArray(value.documentUuids)
+      && value.documentUuids.every((id: unknown) => typeof id === 'string') ? value : null
+  } catch { return null }
 }
 
 export function AutomationRunNowPanel(props: Props) {
   // A different automation starts with its own document selection and run state.
-  return <RunNowSession key={props.automation.id} {...props} />
+  return <RunNowSession key={`${props.userScope}:${props.automation.id}`} {...props} />
 }
 
-function RunNowSession({ automation, canManage, onClose }: Props) {
+function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
+  const storageKey = userScope ? `automation-launch:${JSON.stringify([userScope, automation.id])}` : null
+  const [launch, setLaunch] = useState<LaunchIntent | null>(() => loadIntent(storageKey))
   const needsDocs = TRIGGERS_NEEDING_DOCUMENTS.has(automation.trigger_type)
     || (automation.trigger_type === 'folder_watch' && !automation.trigger_config?.folder_id)
   const [chosen, setChosen] = useState<{ uuid: string; title: string }[]>([])
@@ -79,7 +93,7 @@ function RunNowSession({ automation, canManage, onClose }: Props) {
     return () => { mounted.current = false }
   }, [])
   const inFlight = !!started && (!run || !TERMINAL.has(run.status))
-  const documentsLocked = !canManage || starting || inFlight
+  const documentsLocked = !canManage || starting || inFlight || !!launch
 
   // Ignore responses for an older query or a picker that has been closed.
   useEffect(() => {
@@ -114,6 +128,9 @@ function RunNowSession({ automation, canManage, onClose }: Props) {
         if (cancelled) return
         setRun(status)
         setStatusError(null)
+        if (TERMINAL.has(status.status) && storageKey) {
+          try { sessionStorage.removeItem(storageKey) } catch { /* Same-tab state still permits a deliberate next run. */ }
+        }
         if (!TERMINAL.has(status.status)) timer = setTimeout(tick, POLL_MS)
       } catch (reason) {
         if (!cancelled) setStatusError(reason instanceof Error ? reason.message : 'Could not check run status.')
@@ -122,28 +139,44 @@ function RunNowSession({ automation, canManage, onClose }: Props) {
     setStatusError(null)
     void tick()
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [started, automation.id, statusAttempt])
+  }, [started, automation.id, statusAttempt, storageKey])
 
   const handleRun = async () => {
-    if (startingRef.current || inFlight || !canManage || !automation.action_id || (needsDocs && !chosen.length)) return
+    if (startingRef.current || inFlight || !canManage || (!launch && (!automation.action_id || (needsDocs && !chosen.length)))) return
     startingRef.current = true
     setError(null)
     setStarting(true)
     setShowResults(false)
+    const intent = launch || { requestId: crypto.randomUUID(), documentUuids: chosen.map(c => c.uuid) }
     try {
-      const res = await runAutomationNow(automation.id, chosen.map(c => c.uuid))
+      // Persist identity before sending so panel navigation/reload cannot lose it.
+      // Only IDs are stored, never output settings, credentials or document text.
+      if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(intent))
+    } catch {
+      setError('Could not keep the run recovery information in this tab. The run was not submitted.')
+      startingRef.current = false; setStarting(false); return
+    }
+    setLaunch(intent)
+    try {
+      const res = await runAutomationNow(automation.id, intent.documentUuids, intent.requestId)
       if (!mounted.current) return
+      setLaunch(null)
       setRun(null)
       setStarted(res)
     } catch (err) {
-      if (mounted.current) setError(err instanceof Error ? err.message : 'Could not start the run')
+      // Only validation failures confirm that no dispatch was reserved.
+      if (err instanceof ApiError && [400, 422].includes(err.status)) {
+        if (storageKey) { try { sessionStorage.removeItem(storageKey) } catch { /* Keep in-memory feedback. */ } }
+        if (mounted.current) setLaunch(null)
+      }
+      if (mounted.current) setError(err instanceof Error ? err.message : 'Could not confirm the run')
     } finally {
       startingRef.current = false
       if (mounted.current) setStarting(false)
     }
   }
 
-  const disabled = !canManage || starting || (needsDocs && chosen.length === 0) || !automation.action_id
+  const disabled = !canManage || starting || (!launch && ((needsDocs && chosen.length === 0) || !automation.action_id))
   const result = run && TERMINAL.has(run.status) ? describeRunNowResult(run) : null
 
   return (
@@ -246,7 +279,7 @@ function RunNowSession({ automation, canManage, onClose }: Props) {
           }}
         >
           {starting || (inFlight && !statusError) ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Play style={{ width: 14, height: 14 }} />}
-          {starting ? 'Starting…' : inFlight ? statusError ? 'Status unavailable' : 'Running…' : started ? 'Run again' : 'Run now'}
+          {starting ? 'Starting…' : inFlight ? statusError ? 'Status unavailable' : 'Running…' : launch ? 'Reconnect run' : started ? 'Run again' : 'Run now'}
         </button>
         {started && (
           <span style={{ fontSize: 12, color: '#6b7280' }}>
@@ -263,6 +296,7 @@ function RunNowSession({ automation, canManage, onClose }: Props) {
           <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />{error}
         </div>
       )}
+      {launch && !starting && <p role="status" style={{ marginTop: 10, fontSize: 13, color: '#92400e' }}>Reconnect to recover this request and its current status. The original document selection is retained. This will not start a duplicate run.</p>}
       {statusError && (
         <div role="alert" style={{ marginTop: 10, fontSize: 13, color: '#92400e' }}>
           <p>Run accepted, but its current status is unavailable. {statusError}</p>

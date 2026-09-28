@@ -341,7 +341,7 @@ export function AutomationEditorPanel() {
         <AutomationSummary automation={automation} names={folderNames} actionName={automation.action_type === 'extraction' ? searchSets.find(item => item.uuid === automation.action_id || item.id === automation.action_id)?.title : workflows.find(item => item.id === automation.action_id)?.name} />
         {folderNames.error && <div className="automation-folder-error" role="status">Folder names are unavailable. <button type="button" onClick={() => void folderNames.refresh()}>Retry folder names</button></div>}
         <div ref={runNowRegion} tabIndex={-1} hidden={!runNowOpen}>
-          <AutomationRunNowPanel automation={automation} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
+          <AutomationRunNowPanel automation={automation} userScope={user?.user_id} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
         </div>
 
         {/* Sections fold so a long configuration can be worked one part at a time. */}

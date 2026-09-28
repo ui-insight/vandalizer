@@ -54,10 +54,10 @@ export function getActiveAutomations() {
 }
 
 /** Run an automation once, now, through its real pipeline (outputs fire). */
-export function runAutomationNow(id: string, documentUuids?: string[]) {
+export function runAutomationNow(id: string, documentUuids?: string[], requestId?: string) {
   return apiFetch<RunNowResponse>(`/api/automations/${id}/run-now`, {
     method: 'POST',
-    body: JSON.stringify(documentUuids && documentUuids.length ? { document_uuids: documentUuids } : {}),
+    body: JSON.stringify({ ...(documentUuids?.length ? { document_uuids: documentUuids } : {}), ...(requestId ? { request_id: requestId } : {}) }),
   })
 }
 

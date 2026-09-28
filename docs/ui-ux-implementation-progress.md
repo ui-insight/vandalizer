@@ -10,6 +10,18 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
 
 
+
+## Automation edit and launch recovery — September 28
+
+**132/169 checklist items implemented locally.** AUTO-08 is complete for the reviewed editor and manual-run flows; changes are not deployed.
+
+- Failed edits survive panel navigation in a user/automation-scoped save queue. Exact retries, pause/re-enable, description clearing, rename cancellation, IME Enter and duplicate-submit prevention pass. Unsaved configuration cannot launch. Drafts remain in tab memory and are discarded on reload, as the error message explains.
+- Manual launches carry a stable request ID, reserved in a durable server receipt before dispatch. Reconnect repeats the same identity and document selection; a competing reservation returns the existing run. Lost responses can recover the owned event, while uncertain dispatch is never automatically queued again. Manage permission is checked before receipt access. Confirmed validation rejection permits corrected input; an uncertain outcome keeps the original intent locked.
+- The browser retains launch IDs across editor switches and tab reloads. Accepted status failures retry only that event, and a deliberate run after completion receives a new ID. Completion no longer claims that every output destination received delivery.
+- Verification: 24 frontend tests across two files and 93 backend tests across five files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. The 18 edit states plus 18 launch states and 21 repeated manual-run states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- Evidence: `2026-09-28-automation-save-review`, `2026-09-28-automation-launch-evidence`, and `2026-09-28-automation-run-reconnect`. Browser APIs use fixtures and backend persistence is mocked. The frontend/API update and new unique Mongo receipt index need coordinated release; live broker delivery, model execution and output destinations are unverified. A reservation without a recoverable event remains locked for investigation rather than risking duplicate effects. Earlier clients without request IDs retain their existing behavior.
+
+
 ## Automation edit recovery — September 28
 
 **131/169 checklist items implemented locally.** AUTO-08 remains open for ambiguous manual-run launch recovery.

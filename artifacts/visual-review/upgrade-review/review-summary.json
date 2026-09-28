@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 131,
+  "completed_items": 132,
   "total_items": 169,
-  "unique_states": 711,
-  "capture_executions": 830,
+  "unique_states": 729,
+  "capture_executions": 869,
   "mobile_grade": 8,
   "areas": [
     {
@@ -34,7 +34,7 @@
       "ui": 8,
       "ux": 8,
       "evidence": "../2026-09-28-automation-summary-review/automation-summary-editor-1440.png",
-      "note": "List and editor share neutral surfaces and a readable trigger/input/action/output summary. The editor has explicit autosave state. Serialized saves preserve quick edits and failed drafts across panel navigation in tab memory; exact retries, description clearing and rename submission pass. Unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Persisted history, pagination, failed details and reconnecting to a run after leaving the editor pass frontend fixtures and backend authorization tests; live execution and ambiguous launch failures remain unverified."
+      "note": "List and editor share neutral surfaces and a readable trigger/input/action/output summary. The editor has explicit autosave state. Serialized saves preserve quick edits and failed drafts across panel navigation in tab memory; exact retries, description clearing and rename submission pass. Unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Persisted history, pagination, failed details and reconnecting to a run after leaving the editor pass frontend fixtures and backend authorization tests; Stable launch identities, durable reservations and exact-request reconnect cover ambiguous responses and tab reload. Live broker delivery and execution remain unverified."
     },
     {
       "id": "automation-wizard",
@@ -9894,6 +9894,469 @@
           },
           "pageWidth": 1440,
           "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-automation-launch-evidence",
+      "capturedAt": "2026-09-28T22:48:20.413Z",
+      "sourceFingerprint": "62fb6064b0e4cae409f0fad9eb08576fa651b63a07d4717c64f29fd3379f44e8",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/database.py\n M backend/app/routers/automations.py\n M backend/app/schemas/automations.py\n M backend/tests/test_automation_run_now.py\n M frontend/scripts/visual-review/automation-run-recovery.mjs\n M frontend/src/api/automations.ts\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.test.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n?? backend/app/models/automation_launch.py\n?? backend/app/services/automation_launch.py\n?? backend/tests/test_automation_launch.py\n?? frontend/scripts/visual-review/automation-launch-recovery.mjs",
+      "commit": "f7a46f7af50f3f9e51e9c3042ed7c451c3979840",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "automation-launch-lost-response-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-reloaded-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-unconfirmed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-reconnected-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-completed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-validation-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "automation-launch-lost-response-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-reloaded-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-unconfirmed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-reconnected-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-completed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-validation-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-lost-response-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-reloaded-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-unconfirmed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-reconnected-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-completed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-launch-validation-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-automation-run-reconnect",
+      "capturedAt": "2026-09-28T22:48:12.730Z",
+      "sourceFingerprint": "62fb6064b0e4cae409f0fad9eb08576fa651b63a07d4717c64f29fd3379f44e8",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/database.py\n M backend/app/routers/automations.py\n M backend/app/schemas/automations.py\n M backend/tests/test_automation_run_now.py\n M frontend/scripts/visual-review/automation-run-recovery.mjs\n M frontend/src/api/automations.ts\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.test.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n?? backend/app/models/automation_launch.py\n?? backend/app/services/automation_launch.py\n?? backend/tests/test_automation_launch.py\n?? frontend/scripts/visual-review/automation-launch-recovery.mjs",
+      "commit": "f7a46f7af50f3f9e51e9c3042ed7c451c3979840",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "automation-run-search-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-start-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-status-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-failed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-completed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-retained-output-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "automation-run-search-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-start-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-status-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-failed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-completed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-retained-output-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-search-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-start-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-status-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-failed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-completed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "automation-run-retained-output-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
         }
       ],
       "unmatched": [],

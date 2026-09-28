@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AutomationRunNowPanel, describeRunNowSource, describeRunNowResult } from './AutomationRunNowPanel'
 import { runAutomationNow, getAutomationRun } from '../../api/automations'
+import { ApiError } from '../../api/client'
 import { searchDocuments } from '../../api/documents'
 import type { Automation } from '../../types/automation'
 
@@ -12,6 +13,7 @@ vi.mock('../../api/automations', () => ({
 vi.mock('../../api/documents', () => ({
   searchDocuments: vi.fn().mockResolvedValue({ items: [{ uuid: 'd9', title: 'Pick me.pdf', extension: 'pdf' }] }),
 }))
+beforeEach(() => sessionStorage.clear())
 
 function auto(overrides: Partial<Automation> = {}): Automation {
   return {
@@ -60,7 +62,7 @@ describe('AutomationRunNowPanel', () => {
     expect(screen.getByRole('note')).toHaveTextContent(/does not switch it on/)
 
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
-    await waitFor(() => expect(runAutomationNow).toHaveBeenCalledWith('auto-1', []))
+    await waitFor(() => expect(runAutomationNow).toHaveBeenCalledWith('auto-1', [], expect.any(String)))
     await waitFor(() => expect(screen.getByText(/award\.pdf/)).toBeInTheDocument())
     await waitFor(() => expect(screen.getByText(/Run completed/)).toBeInTheDocument(), { timeout: 8000 })
     expect(getAutomationRun).toHaveBeenCalledWith('auto-1', 'evt-1')
@@ -85,7 +87,7 @@ describe('AutomationRunNowPanel', () => {
     expect(run).not.toBeDisabled()
 
     fireEvent.click(run)
-    await waitFor(() => expect(runAutomationNow).toHaveBeenCalledWith('auto-1', ['d9']))
+    await waitFor(() => expect(runAutomationNow).toHaveBeenCalledWith('auto-1', ['d9'], expect.any(String)))
   })
 
   it('shows the server reason when the run cannot start', async () => {
@@ -166,7 +168,7 @@ describe('manual run recovery and request isolation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run again' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Start unavailable')
     expect(screen.getByText('Retained output')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Run again' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Reconnect run' })).toBeEnabled()
   })
 
   it('ignores a late start after switching automations', async () => {
@@ -217,12 +219,57 @@ describe('manual run recovery and request isolation', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Choose Pick me.pdf' }))
     fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Start unavailable')
-    expect(screen.getByRole('button', { name: 'Remove Pick me.pdf' })).toBeEnabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    expect(screen.getByRole('button', { name: 'Remove Pick me.pdf' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect run' }))
     await screen.findByRole('button', { name: 'Retry status check' })
     expect(input).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Remove Pick me.pdf' })).toBeDisabled()
-    expect(vi.mocked(runAutomationNow).mock.calls).toEqual([['auto-1', ['d9']], ['auto-1', ['d9']]])
+    const calls = vi.mocked(runAutomationNow).mock.calls
+    expect(calls).toHaveLength(2)
+    expect(calls[1]).toEqual(calls[0])
+    expect(calls[0]).toEqual(['auto-1', ['d9'], expect.any(String)])
+  })
+
+  it('recovers a lost launch after remount with the same request and clears it only at completion', async () => {
+    vi.mocked(runAutomationNow).mockRejectedValueOnce(new Error('Lost response')).mockResolvedValueOnce(accepted)
+    vi.mocked(getAutomationRun).mockResolvedValue(completed)
+    const first = render(<AutomationRunNowPanel automation={auto()} userScope="owner" canManage onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    await screen.findByRole('button', { name: 'Reconnect run' })
+    const original = vi.mocked(runAutomationNow).mock.calls[0]
+    first.unmount()
+    const reader = render(<AutomationRunNowPanel automation={auto()} userScope="other-user" canManage onClose={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
+    reader.unmount()
+    render(<AutomationRunNowPanel automation={auto()} userScope="owner" canManage onClose={vi.fn()} />)
+    expect(runAutomationNow).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect run' }))
+    await screen.findByText(/Run completed/)
+    expect(vi.mocked(runAutomationNow).mock.calls[1]).toEqual(original)
+    expect(sessionStorage.length).toBe(0)
+    vi.mocked(runAutomationNow).mockResolvedValue(accepted)
+    fireEvent.click(screen.getByRole('button', { name: 'Run again' }))
+    await waitFor(() => expect(runAutomationNow).toHaveBeenCalledTimes(3))
+    expect(vi.mocked(runAutomationNow).mock.calls[2][2]).not.toBe(original[2])
+  })
+
+  it('permits a new selection after a confirmed validation rejection', async () => {
+    vi.mocked(runAutomationNow).mockRejectedValueOnce(new ApiError(400, 'No documents match.'))
+    render(<AutomationRunNowPanel automation={auto()} userScope="owner" canManage onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+    await screen.findByText('No documents match.')
+    expect(screen.getByRole('button', { name: 'Run now' })).toBeEnabled()
+    expect(sessionStorage.length).toBe(0)
+  })
+
+  it('does not launch if recovery identity cannot be stored', async () => {
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage unavailable') })
+    try {
+      render(<AutomationRunNowPanel automation={auto()} userScope="owner" canManage onClose={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Run now' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('run was not submitted')
+      expect(runAutomationNow).not.toHaveBeenCalled()
+    } finally { storage.mockRestore() }
   })
 
 })

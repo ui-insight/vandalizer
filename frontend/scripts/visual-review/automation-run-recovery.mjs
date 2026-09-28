@@ -31,6 +31,7 @@ async function shot(id) {
 }
 try {
   for (const [width, height] of [[320, 568], [768, 700], [1440, 900]]) {
+    await page.evaluate(() => sessionStorage.clear()).catch(() => {})
     searchFailed = true; startFailed = true; statusFailed = true; status = 'failed'; starts = []; checks = []
     await page.setViewportSize({ width, height }); await page.goto(review.baseURL + '/?mode=automations')
     await page.getByRole('button', { name: 'Open automation: Review incoming proposals', exact: true }).click()
@@ -52,7 +53,7 @@ try {
     await panel.getByText('Run could not be started.', { exact: true }).waitFor()
     assert.equal(await panel.getByRole('button', { name: 'Remove ' + selected.title }).count(), 1)
     await shot('automation-run-start-error-' + width)
-    startFailed = false; await panel.getByRole('button', { name: 'Run now', exact: true }).click()
+    startFailed = false; await panel.getByRole('button', { name: 'Reconnect run', exact: true }).click()
     await panel.getByRole('button', { name: 'Retry status check' }).waitFor()
     assert.equal(await panel.getByRole('button', { name: 'Status unavailable', exact: true }).isDisabled(), true)
     assert.equal(await search.isDisabled(), true)
@@ -77,6 +78,9 @@ try {
     await panel.getByText('Proposal review complete. Budget assumptions are documented.', { exact: true }).scrollIntoViewIfNeeded()
     await shot('automation-run-retained-output-' + width)
     assert.deepEqual(starts.map(body => body.document_uuids), Array(4).fill(['doc-0']))
+    assert.equal(starts[0].request_id, starts[1].request_id)
+    assert.notEqual(starts[1].request_id, starts[2].request_id)
+    assert.notEqual(starts[2].request_id, starts[3].request_id)
   }
   assert.deepEqual(review.errors, []); assert.deepEqual([...review.unmatched], [])
 } catch (error) { await review.capture('automation-run-blocked', String(error)); throw error }
