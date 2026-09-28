@@ -3832,17 +3832,12 @@ async def _build_workspace_inventory(
         lines.append("")
         lines.append("## Post-demo guidance")
         lines.append(
-            "This user has only the onboarding sample — no real documents yet. "
-            "Guide them to one concrete next step:\n"
-            "- **Upload documents**: 'Upload a few documents you're working with "
-            "and I'll help you extract data or build a custom template.'\n"
-            "- **Explore the sample**: 'Want me to show you something else with "
-            "the sample proposal? I can run a different template or search the "
-            "knowledge base.'\n"
-            "- **Start certification**: 'The Vandal Workflow Architect program "
-            "walks you through everything with guided labs.'\n"
-            "Don't repeat the demo. Suggest uploading their own document as the "
-            "highest-value next action."
+            "The documents listed here are onboarding samples. Do not assume "
+            "they represent the user's work or interests. Follow the user's goal: "
+            "answer a question, use an available knowledge base, help with a task, "
+            "or build a workflow. Offer an upload only when their task needs a "
+            "document that is not already available. Do not repeat the demo or "
+            "require certification before helping them."
         )
 
     result = "\n".join(lines)

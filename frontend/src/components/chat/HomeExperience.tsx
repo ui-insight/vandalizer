@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   ArrowRight,
   Award,
+  BookOpen,
   CheckCircle2,
   Clock3,
   FileSearch,
@@ -16,7 +17,6 @@ import type { OnboardingStatus, RecentActivityItem } from '../../api/config'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { ConceptStrip } from './ConceptTip'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
-import { OnboardingStepper } from './WelcomeExperience'
 
 /**
  * "Start certification" / "Continue certification" home CTA. The course runs
@@ -43,30 +43,11 @@ function useCertificationCta(): { label: string; message: string } | null {
   }
 }
 
-const FIRST_RUN_PROMPTS = [
-  {
-    label: 'Extract deadlines',
-    prompt: 'Extract every deadline, deliverable, and owner from this document.',
-  },
-  {
-    label: 'Find compliance gaps',
-    prompt: 'Review this document for compliance gaps, missing requirements, and follow-up risks.',
-  },
-  {
-    label: 'Summarize a proposal',
-    prompt: 'Summarize this grant proposal into the key aims, budget notes, timeline, and risk areas.',
-  },
-  {
-    label: 'Compare versions',
-    prompt: 'Compare these two documents and highlight the material differences that need review.',
-  },
-] as const
-
 const DEFAULT_RETURNING_PROMPTS = [
-  'Summarize my latest document in 5 bullets.',
-  'Extract deadlines, owners, and deliverables from my latest documents.',
-  'Find compliance gaps or missing fields in the documents I should review today.',
-  'Compare two versions and tell me what changed.',
+  'Help me plan and carry out a task.',
+  'Find the knowledge bases available to me.',
+  'Help me turn a recurring task into a workflow.',
+  'Summarize the documents I select and cite the sources.',
 ]
 
 interface UploadPrimaryButtonProps {
@@ -504,32 +485,16 @@ function returningHeroTitle(status: OnboardingStatus | null): string {
   if ((status?.recent_activity.length ?? 0) > 0) return 'Resume work in one click'
   if ((status?.unprocessed_doc_count ?? 0) > 0) return 'Your latest documents are ready'
   if (status?.has_documents) return 'Jump back into active work'
-  return 'Start with one real document'
+  return 'What would you like to get done?'
 }
 
 function starterSuggestions(status: OnboardingStatus | null, suggestionPills: string[]): string[] {
   if (suggestionPills.length > 0) return suggestionPills.slice(0, 4)
   if (status?.suggestion_pills?.length) return status.suggestion_pills.slice(0, 4)
-  if (status?.has_only_onboarding_docs) {
-    return [
-      'Help me move from the sample demo to my own documents.',
-      'What should I upload first to get useful results fast?',
-      'Show me the exact pattern I should reuse on my own files.',
-      'Run the sample demo again and tell me what to notice.',
-    ]
-  }
-  if (status && !status.has_documents) {
-    return [
-      'Help me upload and analyze my first document.',
-      'Show me how source-linked answers work in Vandalizer.',
-      'What kind of documents can I upload here?',
-      'Run the sample demo and explain what to notice.',
-    ]
-  }
   return DEFAULT_RETURNING_PROMPTS
 }
 
-type ReturningActionKind = 'upload' | 'resume' | 'alert' | 'process' | 'composer' | 'demo'
+type ReturningActionKind = 'knowledge' | 'upload' | 'resume' | 'alert' | 'process' | 'composer' | 'demo'
 
 interface ReturningPrimaryAction {
   kind: ReturningActionKind
@@ -553,31 +518,18 @@ function processingPrompt(status: OnboardingStatus): string {
 
 function deriveReturningPrimaryAction(
   status: OnboardingStatus | null,
-  orgName: string,
 ): ReturningPrimaryAction {
-  if (!status) {
-    return {
-      kind: 'upload',
-      eyebrow: 'Start here',
-      title: 'Upload a document',
-      description: `${orgName} gets useful once it has a real file to analyze.`,
-      cta: 'Upload a document',
-      icon: FileUp,
-    }
+  const startAction: ReturningPrimaryAction = {
+    kind: 'composer',
+    eyebrow: 'Start with a goal',
+    title: 'Ask a question or give the assistant a task',
+    description: 'Explore an idea, draft a plan, use a knowledge base, or build a workflow. Add sources when your task needs them.',
+    cta: 'Start a conversation',
+    icon: MessageSquare,
   }
+  if (!status) return startAction
 
   const firstAlert = status.active_alerts[0]
-  if (status.has_only_onboarding_docs) {
-    return {
-      kind: 'upload',
-      eyebrow: 'Next step',
-      title: 'Upload one of your own documents',
-      description: 'Replace the demo with a real proposal, policy, or compliance file so this home can start surfacing actual work.',
-      cta: 'Upload your document',
-      icon: FileUp,
-    }
-  }
-
   if (firstAlert) {
     return {
       kind: 'alert',
@@ -602,6 +554,27 @@ function deriveReturningPrimaryAction(
       prompt: activityResumeMessage(recent),
     }
   }
+
+  if (status.has_ready_knowledge_base) {
+    return {
+      kind: 'knowledge', eyebrow: 'Ready to explore',
+      title: 'Ask your knowledge base',
+      description: 'Choose a knowledge base and ask across its sources, with references you can inspect.',
+      cta: 'Choose a knowledge base', icon: BookOpen,
+    }
+  }
+
+  if (!status.has_documents && status.has_workflows) {
+    return {
+      kind: 'resume', eyebrow: 'Use your tools',
+      title: 'Work with your saved workflows',
+      description: 'Find a workflow, inspect its steps, or adapt it to your next task.',
+      cta: 'Find a workflow', icon: Workflow,
+      prompt: 'List my available workflows and help me choose one for my next task.',
+    }
+  }
+
+  if (status.has_only_onboarding_docs) return startAction
 
   if (status.unprocessed_doc_count > 0) {
     return {
@@ -641,14 +614,7 @@ function deriveReturningPrimaryAction(
     }
   }
 
-  return {
-    kind: 'upload',
-    eyebrow: 'Activation',
-    title: 'Upload a real document',
-    description: 'Skip the generic tour and give the workspace something real to reason over.',
-    cta: 'Upload a document',
-    icon: FileUp,
-  }
+  return startAction
 }
 
 function FocusNowCard({
@@ -657,6 +623,7 @@ function FocusNowCard({
   onRunDemo,
   onAttachFiles,
   onFocusComposer,
+  onChooseKnowledgeBase,
   onSendMessage,
 }: {
   action: ReturningPrimaryAction
@@ -664,11 +631,16 @@ function FocusNowCard({
   onRunDemo: () => void
   onAttachFiles: (files: File[]) => void
   onFocusComposer: () => void
+  onChooseKnowledgeBase: () => void
   onSendMessage: (message: string) => void
 }) {
   const Icon = action.icon
 
   const handleAction = () => {
+    if (action.kind === 'knowledge') {
+      onChooseKnowledgeBase()
+      return
+    }
     if (action.kind === 'demo') {
       onRunDemo()
       return
@@ -868,8 +840,8 @@ function ResumeQueue({
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <PromptButton
-            label="Help me upload and analyze my first document."
-            onClick={() => onSendMessage('Help me upload and analyze my first document.')}
+            label="Help me choose a useful task to start with."
+            onClick={() => onSendMessage('Help me choose a useful task to start with.')}
           />
         </div>
       </SurfaceCard>
@@ -920,8 +892,8 @@ function ResumeQueue({
           ) : (
             <>
               <PromptButton
-                label="Help me upload and analyze my first document."
-                onClick={() => onSendMessage('Help me upload and analyze my first document.')}
+                label="Help me choose a useful task to start with."
+                onClick={() => onSendMessage('Help me choose a useful task to start with.')}
               />
               <PromptButton
                 label="Show me how source-linked answers work."
@@ -971,9 +943,9 @@ function ResumeQueue({
           {status.has_only_onboarding_docs && (
             <QueueItemButton
               icon={FileUp}
-              title="Replace the sample with your own file"
-              subtitle="Upload a real document so the assistant can show live deadlines, risks, and extracted fields from your work."
-              onClick={() => onSendMessage('Help me move from the sample demo to my own documents.')}
+              title="Choose your next task"
+              subtitle="Continue with a question, a knowledge base, your own files, or a reusable workflow."
+              onClick={() => onSendMessage('Help me choose a useful task to start with.')}
             />
           )}
         </div>
@@ -1011,25 +983,41 @@ interface SharedHomeProps {
   onRunDemo: () => void
   onAttachFiles: (files: File[]) => void
   onFocusComposer: () => void
+  onChooseKnowledgeBase: () => void
   onSendMessage: (message: string) => void
 }
 
-export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onSendMessage }: SharedHomeProps) {
+export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage }: SharedHomeProps) {
   const certCta = useCertificationCta()
   return (
     <div className="chat-home first-session-home">
       <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
-        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>Start with a document. Find an answer.</h2><p>Upload a file or try the sample, then ask a question and inspect its supporting sources.</p></div>
+        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Ask questions, work across your knowledge, and let the assistant help carry out tasks. Start with a goal; add sources when you need them.</p></div>
       </div>
-      <ol className="first-task-steps" aria-label="Your first task"><li aria-current="step"><strong>1</strong> Choose a document</li><li><strong>2</strong> Ask a question</li><li><strong>3</strong> Check the evidence</li></ol>
-      <div className="home-primary-actions"><UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} /><ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} /></div>
       <div className="home-two-columns">
-        <SurfaceCard title="Questions to try" subtitle="Once your file is attached, start with a specific question.">
-          {FIRST_RUN_PROMPTS.map(prompt => <PromptButton key={prompt.label} label={prompt.label} onClick={() => onSendMessage(prompt.prompt)} />)}
+        <SurfaceCard title="Think it through" subtitle="Ask a question, explore an idea, or draft a plan. You can start with just a conversation.">
+          <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
         </SurfaceCard>
-        <SampleAnswerPreview />
+        <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
+          <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />
+        </SurfaceCard>
+        <SurfaceCard title="Work with documents" subtitle="Summarize, compare, or extract useful details from files you bring to the chat.">
+          <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
+        </SurfaceCard>
+        <SurfaceCard title="Put the assistant to work" subtitle="Give it a goal, build a reusable workflow, or set up an automation. Review proposed changes before they run.">
+          <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
+        </SurfaceCard>
       </div>
+      <details>
+        <summary className="home-learning-link">Try a sample document demo</summary>
+        <div className="home-two-columns">
+          <SurfaceCard title="See one example" subtitle="Use a sample proposal to try extraction and source references.">
+            <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />
+          </SurfaceCard>
+          <SampleAnswerPreview />
+        </div>
+      </details>
       <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
       <GlossaryDisclosure />
       {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
@@ -1037,9 +1025,9 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
   )
 }
 
-export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onSendMessage, status, suggestionPills }: SharedHomeProps & { status: OnboardingStatus | null; suggestionPills: string[] }) {
+export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, status, suggestionPills }: SharedHomeProps & { status: OnboardingStatus | null; suggestionPills: string[] }) {
   const certCta = useCertificationCta()
-  const primaryAction = deriveReturningPrimaryAction(status, orgName)
+  const primaryAction = deriveReturningPrimaryAction(status)
   const suggestions = starterSuggestions(status, suggestionPills).slice(0, 3)
   const hasQueue = !!status && (status.recent_activity.length > 0 || status.active_alerts.length > 0 || status.unprocessed_doc_count > 0 || status.has_only_onboarding_docs)
   const readyBadges = [status?.top_extraction_set_name ? `Extraction: ${status.top_extraction_set_name}` : null, status?.top_workflow_name ? `Workflow: ${status.top_workflow_name}` : null, status?.has_ready_knowledge_base ? 'Knowledge base ready' : null].filter((value): value is string => !!value)
@@ -1047,11 +1035,13 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
     <div className="chat-home">
       <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
-        <div><span className="home-eyebrow">Your workspace</span><h2>{returningHeroTitle(status)}</h2>{status?.daily_guidance && <p>{status.daily_guidance}</p>}</div>
+        <div><span className="home-eyebrow">Your {orgName} workspace</span><h2>{returningHeroTitle(status)}</h2>{status?.daily_guidance && <p>{status.daily_guidance}</p>}</div>
       </div>
-      <FocusNowCard action={primaryAction} disabled={disabled} onRunDemo={onRunDemo} onAttachFiles={onAttachFiles} onFocusComposer={onFocusComposer} onSendMessage={onSendMessage} />
+      <FocusNowCard action={primaryAction} disabled={disabled} onRunDemo={onRunDemo} onAttachFiles={onAttachFiles} onFocusComposer={onFocusComposer} onChooseKnowledgeBase={onChooseKnowledgeBase} onSendMessage={onSendMessage} />
       <div className="home-primary-actions">
-        {primaryAction.kind !== 'upload' && <UploadPillButton label="Upload another document" disabled={disabled} onAttachFiles={onAttachFiles} />}
+        {primaryAction.kind !== 'knowledge' && <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />}
+        <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
+        {primaryAction.kind !== 'upload' && <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />}
         {!status?.has_documents && <ActionPillButton label="Run sample demo" icon={Zap} disabled={disabled} onClick={onRunDemo} />}
       </div>
       <div className="home-two-columns">
@@ -1061,7 +1051,6 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
         </SurfaceCard>
       </div>
       {readyBadges.length > 0 && <div className="home-ready-assets"><span>Ready in this workspace</span>{readyBadges.map(badge => <ReadyAssetBadge key={badge} label={badge} />)}</div>}
-      {status && !status.has_documents && <OnboardingStepper status={status} hasChatAboutDocs={status.has_chatted_with_docs} />}
       {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     </div>
   )

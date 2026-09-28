@@ -673,3 +673,50 @@ class TestChatRecordsItsDocumentScope:
             {"uuid": "d1", "title": "Proposal A.pdf"},
             {"uuid": "d2", "title": "Proposal B.pdf"},
         ]
+
+
+class TestExplicitSampleDemo:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(('message', 'run_demo'), [
+        ('Show me my workflows', False),
+        ('Show me what you can do', False),
+        ('go', False),
+        ('Show me what Vandalizer can do', True),
+    ])
+    async def test_only_explicit_demo_action_provisions_sample(self, client, message, run_demo):
+        user = _make_user()
+        cookies, headers = _auth()
+        captured = {}
+
+        async def fake_stream(**kwargs):
+            captured.update(kwargs)
+            yield '{"kind": "text", "content": "ok"}\n'
+
+        with (
+            patch('app.dependencies.decode_token', return_value={'sub': 'testuser', 'type': 'access'}),
+            patch('app.dependencies.User') as mock_user,
+            patch('app.routers.chat.access_control.get_team_access_context', new_callable=AsyncMock),
+            patch('app.routers.chat.activity_service') as mock_activity,
+            patch('app.routers.chat.ChatConversation') as mock_conversation,
+            patch('app.routers.chat.chat_stream', new=fake_stream),
+            patch('app.services.onboarding_service.provision_onboarding_sample', new_callable=AsyncMock) as provision,
+        ):
+            mock_user.find_one = AsyncMock(return_value=user)
+            conversation = MagicMock()
+            conversation.uuid = 'conversation-1'
+            conversation.insert = AsyncMock()
+            conversation.add_message = AsyncMock()
+            mock_conversation.return_value = conversation
+            activity = MagicMock()
+            activity.id = 'activity-1'
+            activity.title = 'Chat'
+            mock_activity.activity_start = AsyncMock(return_value=activity)
+            mock_activity.get_activity = AsyncMock(return_value=None)
+            response = await client.post('/api/chat', json={
+                'message': message, 'is_first_session': True, 'run_demo': run_demo,
+            }, cookies=cookies, headers=headers)
+
+        assert response.status_code == 200
+        assert captured['message'] == message
+        assert captured['run_demo'] is run_demo
+        assert provision.await_count == int(run_demo)

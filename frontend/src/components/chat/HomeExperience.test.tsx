@@ -86,8 +86,10 @@ const baseStatus: OnboardingStatus = {
 }
 
 describe('FirstSessionHome', () => {
-  it('surfaces task-first onboarding and trust proof', () => {
+  it('offers conversation, knowledge, documents, and agent work as starting points', () => {
     const onSendMessage = vi.fn()
+    const onFocusComposer = vi.fn()
+    const onChooseKnowledgeBase = vi.fn()
 
     render(
       <FirstSessionHome
@@ -95,23 +97,27 @@ describe('FirstSessionHome', () => {
         brandIcon={null}
         onRunDemo={vi.fn()}
         onAttachFiles={vi.fn()}
-        onFocusComposer={vi.fn()}
+        onChooseKnowledgeBase={onChooseKnowledgeBase}
+        onFocusComposer={onFocusComposer}
         onSendMessage={onSendMessage}
       />,
     )
 
-    expect(screen.getByText('Start with a document. Find an answer.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Upload a document/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Run sample demo/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Ask a question/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Preview of the demo result')).toBeInTheDocument()
-    expect(screen.getByText(/Question:/i)).toBeInTheDocument()
-    expect(screen.getByRole('list', { name: 'Your first task' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: /Extract deadlines/i }))
-    expect(onSendMessage).toHaveBeenCalledWith(
-      'Extract every deadline, deliverable, and owner from this document.',
-    )
+    expect(screen.getByText('What would you like to get done?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Upload a document' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Start a conversation' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose a knowledge base' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Start a conversation' }))
+    expect(onFocusComposer).toHaveBeenCalledOnce()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a knowledge base' }))
+    expect(onChooseKnowledgeBase).toHaveBeenCalledOnce()
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(screen.queryByRole('list', { name: 'Your first task' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Run sample demo' })).not.toBeVisible()
+    fireEvent.click(screen.getByText('Try a sample document demo'))
+    expect(screen.getByRole('button', { name: 'Run sample demo' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Build a workflow' }))
+    expect(onSendMessage).toHaveBeenCalledWith('Help me turn a recurring task into a workflow.')
   })
 
   it('offers to start the certification course in chat', () => {
@@ -124,6 +130,7 @@ describe('FirstSessionHome', () => {
         brandIcon={null}
         onRunDemo={vi.fn()}
         onAttachFiles={vi.fn()}
+        onChooseKnowledgeBase={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={onSendMessage}
       />,
@@ -146,6 +153,7 @@ describe('ReturningHome', () => {
         brandIcon={null}
         onRunDemo={vi.fn()}
         onAttachFiles={vi.fn()}
+        onChooseKnowledgeBase={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={onSendMessage}
         status={baseStatus}
@@ -168,6 +176,32 @@ describe('ReturningHome', () => {
     )
   })
 
+  it.each(['empty', 'knowledge', 'workflows', 'sample', 'unavailable'] as const)('offers useful work without requiring uploads: %s', (mode) => {
+    const onFocusComposer = vi.fn()
+    const onChooseKnowledgeBase = vi.fn()
+    const onSendMessage = vi.fn()
+    const status = mode === 'unavailable' ? null : {
+      ...baseStatus, has_documents: mode === 'sample', has_only_onboarding_docs: mode === 'sample',
+      has_workflows: mode === 'workflows', has_ready_knowledge_base: mode === 'knowledge',
+      has_knowledge_base: mode === 'knowledge', recent_activity: [], active_alerts: [],
+      unprocessed_doc_count: 0, suggestion_pills: [], daily_guidance: null,
+    }
+    render(<ReturningHome orgName="Vandalizer" brandIcon={null} onRunDemo={vi.fn()}
+      onAttachFiles={vi.fn()} onFocusComposer={onFocusComposer} onChooseKnowledgeBase={onChooseKnowledgeBase}
+      onSendMessage={onSendMessage} status={status} suggestionPills={[]} />)
+    expect(screen.queryByText('Getting started')).not.toBeInTheDocument()
+    if (mode === 'knowledge') {
+      fireEvent.click(screen.getByRole('button', { name: 'Choose a knowledge base' }))
+      expect(onChooseKnowledgeBase).toHaveBeenCalledOnce()
+    } else if (mode === 'workflows') {
+      fireEvent.click(screen.getByRole('button', { name: 'Find a workflow' }))
+      expect(onSendMessage).toHaveBeenCalledWith('List my available workflows and help me choose one for my next task.')
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Start a conversation' }))
+      expect(onFocusComposer).toHaveBeenCalledOnce()
+    }
+  })
+
   it('shows a continue-certification CTA with the completed count', async () => {
     const onSendMessage = vi.fn()
     certApi.progress = certProgress(['ai_literacy', 'foundations'])
@@ -178,6 +212,7 @@ describe('ReturningHome', () => {
         brandIcon={null}
         onRunDemo={vi.fn()}
         onAttachFiles={vi.fn()}
+        onChooseKnowledgeBase={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={onSendMessage}
         status={baseStatus}
@@ -201,6 +236,7 @@ describe('ReturningHome', () => {
         brandIcon={null}
         onRunDemo={vi.fn()}
         onAttachFiles={vi.fn()}
+        onChooseKnowledgeBase={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={vi.fn()}
         status={baseStatus}

@@ -153,7 +153,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
   const effectiveFirstSession = lockedFirstSession.current ?? isFirstSession
   const firstSessionMarked = useRef(false)
-  const demoTriggered = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [linkLoading, setLinkLoading] = useState(false)
@@ -522,10 +521,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
-    // Detect "show me" to track demo trigger (backend does the real routing)
-    if (firstSession && /^show\s*me/i.test(message.trim())) {
-      demoTriggered.current = true
-    }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBs.map(kb => kb.uuid), includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
@@ -557,7 +552,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleRunDemo = () => {
-    demoTriggered.current = true
+    // Once the user brings their own sources, demonstrate value on those
+    // sources through the normal send path (including processing readiness).
+    if (hasDocContext || activeKBs.length > 0 || activeProjectUuid) {
+      handleSend('Show me what you can do with the content attached to this chat. Start with a brief summary, extract the most useful facts or action items, and cite the sources. Suggest a relevant next step based on what you find.')
+      return
+    }
+    if (chatUploads.uploading || linkLoading) {
+      toast('Wait for the attachment transfer to finish before sending.', 'info')
+      return
+    }
     send(
       `Show me what ${branding.appName} can do`,
       selectedDocUuids,
@@ -801,7 +805,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const homeActionsDisabled = attachLoading || !!processingDoc
-  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && messages.length === 0 && !isStreaming && !onboardingLoading
+  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !onboardingLoading
   const showReturningHome = !effectiveFirstSession
     && messages.length === 0
     && !isStreaming
@@ -810,7 +814,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     && !activeProjectUuid
     && !activeKBUuid
     && !hasDocContext
-  const showContextualEmptyState = (!effectiveFirstSession || hasDocContext)
+  const showContextualEmptyState = (!effectiveFirstSession || hasDocContext || !!activeKBUuid || !!activeProjectUuid)
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
@@ -904,7 +908,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       )}
 
       {linkLoading && <div role="status" className="px-4 py-2 text-sm text-gray-600">Adding website…</div>}
-      {effectiveFirstSession && (hasDocContext || messages.length > 0) && (
+      {effectiveFirstSession && hasDocContext && (
         <div className="first-task-progress" role="status">
           <strong>{messages.some(message => message.role === 'assistant') ? '3. Check the evidence' : '2. Ask a question'}</strong>
           <span>{messages.some(message => message.role === 'assistant') ? 'Open source references in the answer to compare it with the original document.' : 'Your document is attached. Ask a specific question, such as “What are the key deadlines?”'}</span>
@@ -930,6 +934,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               onRunDemo={handleRunDemo}
               onAttachFiles={handleAttachFile}
               onFocusComposer={focusChat}
+              onChooseKnowledgeBase={() => setShowAttachKB(true)}
               onSendMessage={(msg) => handleSend(msg)}
             />
           </div>
@@ -944,11 +949,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               onRunDemo={handleRunDemo}
               onAttachFiles={handleAttachFile}
               onFocusComposer={focusChat}
-              onSendMessage={(msg) => {
-                const hasServerPills = (onboardingStatus?.suggestion_pills?.length ?? 0) > 0
-                const needsOnboardingContext = !hasServerPills && !onboardingStatus?.has_documents
-                handleSend(msg, needsOnboardingContext)
-              }}
+              onChooseKnowledgeBase={() => setShowAttachKB(true)}
+              onSendMessage={(msg) => handleSend(msg)}
               status={onboardingStatus}
               suggestionPills={onboardingPills}
             />
@@ -1067,10 +1069,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   onSend={(msg) => handleSend(msg)}
                 />
               )}
-              {/* Demo pill — hidden once user reaches practitioner stage or has deeply engaged */}
+              {/* Demonstrate on attached sources; use the sample only without a scope. */}
               {!activeProjectUuid && !(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows) || (onboardingStatus?.maturity_stage && ['practitioner', 'builder', 'architect'].includes(onboardingStatus.maturity_stage))) && (
               <button
-                disabled={!!processingDoc}
+                disabled={homeActionsDisabled}
                 onClick={handleRunDemo}
                 style={{
                   display: 'inline-flex',
@@ -1084,12 +1086,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   borderRadius: 20,
                   backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
                   color: '#374151',
-                  cursor: processingDoc ? 'default' : 'pointer',
+                  cursor: homeActionsDisabled ? 'default' : 'pointer',
                   transition: 'all 0.15s',
-                  opacity: processingDoc ? 0.5 : 1,
+                  opacity: homeActionsDisabled ? 0.5 : 1,
                 }}
                 onMouseEnter={e => {
-                  if (processingDoc) return
+                  if (homeActionsDisabled) return
                   e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
                   e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)'
                 }}
@@ -1167,7 +1169,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             )}
 
             {/* Getting-started stepper for returning users who haven't finished basics */}
-            {onboardingStatus && !effectiveFirstSession && (
+            {onboardingStatus && !effectiveFirstSession && hasDocContext && (
               <div style={{ marginTop: 12 }}>
                 <OnboardingStepper
                   status={onboardingStatus}

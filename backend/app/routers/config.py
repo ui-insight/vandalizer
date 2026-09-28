@@ -297,7 +297,7 @@ def _generate_daily_guidance(
     if has_only_onboarding_docs:
         return (
             "You've seen Vandalizer in action with a sample proposal. "
-            "Upload one of your own documents and I'll help you build a custom template for it."
+            "Choose your next task: ask a question, explore a knowledge base, or build a workflow."
         )
 
     # Critical alerts take priority
@@ -324,7 +324,7 @@ def _generate_daily_guidance(
 
     # Maturity-driven nudge for users with no pressing items
     if maturity_stage == "newcomer" and doc_count == 0:
-        return "Upload your first document and I'll help you get value from it immediately."
+        return "Start with a question or a task. Add documents or a knowledge base when you need sources."
     if maturity_stage == "explorer" and doc_count > 0:
         return "You have documents ready — want me to run an extraction template on them?"
 
@@ -413,7 +413,9 @@ def _generate_action_pills(
     has_only_sample = doc_count > 0 and doc_count == onboarding_doc_count
     if has_only_sample:
         pills.append("Ask me anything about the sample NSF proposal")
-        pills.append("Upload your own documents to get started")
+        pills.append("Help me plan and carry out a task")
+        pills.append("Find the knowledge bases available to me")
+        pills.append("Help me turn a recurring task into a workflow")
         return pills[:4]
 
     # Continue where you left off — returning users with real content
@@ -453,7 +455,8 @@ def _generate_action_pills(
 
     # 7. Empty workspace
     if doc_count == 0:
-        pills.append("Upload your first document to get started")
+        pills.append("Help me plan and carry out a task")
+        pills.append("Help me turn a recurring task into a workflow")
 
     # 8. Maturity-aware escalation pills (fill remaining slots)
     if len(pills) < 4:

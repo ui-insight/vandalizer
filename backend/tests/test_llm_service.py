@@ -20,23 +20,16 @@ def _cfg(**model_fields):
     return {"available_models": [model_fields]}
 
 
-class TestFirstSessionPromptEscapeHatch:
-    """A brand-new user who asks for a concrete action (e.g. build a workflow)
-    must be served, not funneled into onboarding Q&A. The onboarding prompt
-    must permit fulfilling such requests with tools and override its own
-    'never perform a task' funnel."""
+class TestFirstSessionPrompt:
+    def test_retains_the_normal_agent_tool_and_confirmation_rules(self):
+        assert FIRST_SESSION_SYSTEM_PROMPT.startswith(llm_service.AGENTIC_CHAT_SYSTEM_PROMPT)
+        assert "create_workflow" in FIRST_SESSION_SYSTEM_PROMPT
 
-    def test_permits_creating_a_workflow_via_tool(self):
-        p = FIRST_SESSION_SYSTEM_PROMPT
-        assert "create_workflow" in p
-
-    def test_escape_hatch_overrides_the_no_task_funnel(self):
-        p = FIRST_SESSION_SYSTEM_PROMPT
-        # The escape hatch must explicitly outrank the pacing / never-perform
-        # rules, or the model keeps asking onboarding questions.
-        assert "overrides the pacing" in p
-        # And the closing rule must no longer be an unconditional ban.
-        assert "This does NOT override HARD RULE 6" in p
+    def test_supports_starting_without_documents_or_a_tour(self):
+        assert "No upload is required" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Knowledge bases may already contain" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Fulfill concrete requests immediately" in FIRST_SESSION_SYSTEM_PROMPT
+        assert "Phase 1:" not in FIRST_SESSION_SYSTEM_PROMPT
 
 
 class TestExplicitProtocol:

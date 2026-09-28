@@ -179,11 +179,8 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
-    # Auto-detect "show me" intent during first session → route to scripted demo
-    if body.is_first_session and not body.run_demo:
-        _msg = (body.message or "").strip().lower()
-        if _msg.startswith("show me") or _msg in {"demo", "just show me", "go", "let's go"}:
-            body.run_demo = True
+    # Only the explicit sample-demo action sets run_demo. Natural-language
+    # requests such as "show me my workflows" belong to the assistant.
 
     # Provision the onboarding sample ONLY when the scripted demo is actually
     # going to run. Provisioning for every first-session message leaks the
