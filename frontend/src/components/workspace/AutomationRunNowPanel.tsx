@@ -17,7 +17,7 @@ import type { Automation, RunNowResponse, AutomationRunStatus } from '../../type
  */
 
 export const TRIGGERS_NEEDING_DOCUMENTS = new Set(['api', 'm365_intake'])
-const TERMINAL = new Set(['completed', 'failed', 'skipped', 'error', 'canceled'])
+const TERMINAL = new Set(['completed', 'failed', 'skipped', 'error', 'canceled', 'cancelled'])
 const POLL_MS = 3000
 
 export function describeRunNowSource(automation: Pick<Automation, 'trigger_type' | 'trigger_config'>): string {
@@ -41,7 +41,7 @@ export function describeRunNowResult(run: AutomationRunStatus): { tone: 'ok' | '
   if (run.status === 'skipped') {
     return { tone: 'warn', text: `Run skipped${run.error ? `: ${run.error}` : ''}.` }
   }
-  return { tone: 'bad', text: `Run ${run.status}${run.error ? `: ${run.error}` : ''}.` }
+  return { tone: 'bad', text: `Run ${run.status}${run.error ? `: ${run.error.replace(/[.!?]+$/, '')}` : ''}.` }
 }
 
 interface Props {
@@ -50,7 +50,12 @@ interface Props {
   onClose: () => void
 }
 
-export function AutomationRunNowPanel({ automation, canManage, onClose }: Props) {
+export function AutomationRunNowPanel(props: Props) {
+  // A different automation starts with its own document selection and run state.
+  return <RunNowSession key={props.automation.id} {...props} />
+}
+
+function RunNowSession({ automation, canManage, onClose }: Props) {
   const needsDocs = TRIGGERS_NEEDING_DOCUMENTS.has(automation.trigger_type)
     || (automation.trigger_type === 'folder_watch' && !automation.trigger_config?.folder_id)
   const [chosen, setChosen] = useState<{ uuid: string; title: string }[]>([])
@@ -61,59 +66,84 @@ export function AutomationRunNowPanel({ automation, canManage, onClose }: Props)
   const [started, setStarted] = useState<RunNowResponse | null>(null)
   const [run, setRun] = useState<AutomationRunStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-
-  // Document search for triggers that have no documents of their own.
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searching, setSearching] = useState(false)
+  const [searchAttempt, setSearchAttempt] = useState(0)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [statusAttempt, setStatusAttempt] = useState(0)
+  const searchInput = useRef<HTMLInputElement>(null)
+  const startingRef = useRef(false)
+  const mounted = useRef(true)
   useEffect(() => {
-    if (!needsDocs || !showResults) return
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const inFlight = !!started && (!run || !TERMINAL.has(run.status))
+  const documentsLocked = !canManage || starting || inFlight
+
+  // Ignore responses for an older query or a picker that has been closed.
+  useEffect(() => {
+    if (!needsDocs || !showResults || documentsLocked) return
+    let cancelled = false
+    setSearching(true)
+    setSearchError(null)
+    setResults([])
     const q = query.trim()
     const t = setTimeout(async () => {
       try {
         const res = await searchDocuments(q, 20)
-        setResults(res.items.map(d => ({ uuid: d.uuid, title: d.title })).filter(d => !chosen.some(c => c.uuid === d.uuid)))
-      } catch {
-        setResults([])
+        if (!cancelled) setResults(res.items.map(d => ({ uuid: d.uuid, title: d.title })).filter(d => !chosen.some(c => c.uuid === d.uuid)))
+      } catch (reason) {
+        if (!cancelled) setSearchError(reason instanceof Error ? reason.message : 'Could not search documents.')
+      } finally {
+        if (!cancelled) setSearching(false)
       }
     }, q ? 250 : 0)
-    return () => clearTimeout(t)
-  }, [query, showResults, needsDocs, chosen])
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [query, showResults, needsDocs, chosen, searchAttempt, documentsLocked])
 
-  // Poll the run until it settles.
+  // Poll sequentially: slow requests must not overlap or overwrite a newer state.
+  // On failure, retry the same accepted event rather than submitting another run.
   useEffect(() => {
     if (!started) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
     const tick = async () => {
       try {
         const status = await getAutomationRun(automation.id, started.trigger_event_id)
+        if (cancelled) return
         setRun(status)
-        if (TERMINAL.has(status.status) && pollRef.current) {
-          clearInterval(pollRef.current)
-          pollRef.current = null
-        }
-      } catch {
-        // keep polling — a transient fetch failure is not a run failure
+        setStatusError(null)
+        if (!TERMINAL.has(status.status)) timer = setTimeout(tick, POLL_MS)
+      } catch (reason) {
+        if (!cancelled) setStatusError(reason instanceof Error ? reason.message : 'Could not check run status.')
       }
     }
+    setStatusError(null)
     void tick()
-    pollRef.current = setInterval(tick, POLL_MS)
-    return () => { if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null } }
-  }, [started, automation.id])
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [started, automation.id, statusAttempt])
 
   const handleRun = async () => {
+    if (startingRef.current || inFlight || !canManage || !automation.action_id || (needsDocs && !chosen.length)) return
+    startingRef.current = true
     setError(null)
-    setRun(null)
     setStarting(true)
+    setShowResults(false)
     try {
       const res = await runAutomationNow(automation.id, chosen.map(c => c.uuid))
+      if (!mounted.current) return
+      setRun(null)
       setStarted(res)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not start the run')
+      if (mounted.current) setError(err instanceof Error ? err.message : 'Could not start the run')
     } finally {
-      setStarting(false)
+      startingRef.current = false
+      if (mounted.current) setStarting(false)
     }
   }
 
   const disabled = !canManage || starting || (needsDocs && chosen.length === 0) || !automation.action_id
-  const inFlight = !!started && (!run || !TERMINAL.has(run.status))
   const result = run && TERMINAL.has(run.status) ? describeRunNowResult(run) : null
 
   return (
@@ -121,7 +151,7 @@ export function AutomationRunNowPanel({ automation, canManage, onClose }: Props)
       aria-label="Run now"
       style={{
         border: '1px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 8,
-        padding: 16, marginBottom: 20,
+        padding: 16, marginBottom: 20, overflowWrap: 'anywhere',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
@@ -150,38 +180,52 @@ export function AutomationRunNowPanel({ automation, canManage, onClose }: Props)
           {chosen.length > 0 && (
             <ul style={{ listStyle: 'none', margin: '0 0 6px', padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {chosen.map(d => (
-                <li key={d.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 12, backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 999 }}>
+                <li key={d.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 12, backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, maxWidth: '100%', minWidth: 0 }}>
                   <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
                   {d.title}
-                  <button type="button" aria-label={`Remove ${d.title}`} onClick={() => setChosen(c => c.filter(x => x.uuid !== d.uuid))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#6b7280', display: 'flex' }}>
+                  <button type="button" disabled={documentsLocked} aria-label={`Remove ${d.title}`} onClick={() => setChosen(c => c.filter(x => x.uuid !== d.uuid))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#6b7280', display: 'flex' }}>
                     <X style={{ width: 12, height: 12 }} />
                   </button>
                 </li>
               ))}
             </ul>
           )}
-          <div style={{ position: 'relative' }}>
-            <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+          <div style={{ position: 'relative' }} onBlur={e => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setShowResults(false)
+          }}>
+            <Search style={{ width: 13, height: 13, position: 'absolute', left: 8, top: 9, color: '#6b7280' }} />
             <input
+              ref={searchInput}
               aria-label="Search documents to run with"
               type="text"
+              disabled={documentsLocked}
               value={query}
-              onChange={e => setQuery(e.target.value)}
+              onChange={e => { setQuery(e.target.value); setShowResults(true) }}
               onFocus={() => setShowResults(true)}
-              onBlur={() => setTimeout(() => setShowResults(false), 200)}
+              onClick={() => setShowResults(true)}
+              onKeyDown={e => { if (e.key === 'Escape') setShowResults(false) }}
               placeholder="Search your library…"
-              style={{ width: '100%', padding: '6px 10px 6px 26px', fontSize: 12, fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '6px 10px 6px 26px', fontSize: 12, fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
             />
-            {showResults && (
-              <div role="listbox" aria-label="Documents" style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, maxHeight: 180, overflowY: 'auto' }}>
-                {results.length === 0 ? (
-                  <div style={{ padding: '6px 10px', fontSize: 12, color: '#6b7280' }}>No documents found</div>
-                ) : results.map(d => (
-                  <div key={d.uuid} role="option" aria-selected={false} onMouseDown={() => { setChosen(c => [...c, d]); setQuery('') }} style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</span>
+            {showResults && !documentsLocked && (
+              <div role="group" aria-label="Document search results" style={{ marginTop: 4, backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: 6, maxHeight: 180, overflowY: 'auto' }}>
+                {searching ? <div role="status" style={{ padding: 10, fontSize: 12 }}>Searching documents…</div>
+                  : searchError ? <div role="alert" style={{ padding: 10, fontSize: 12, color: '#b91c1c' }}>
+                    {searchError}
+                    <button type="button" onClick={() => setSearchAttempt(n => n + 1)} style={{ display: 'block', marginTop: 8 }}>Retry document search</button>
                   </div>
-                ))}
+                  : results.length === 0 ? <div role="status" style={{ padding: 10, fontSize: 12, color: '#555e68' }}>No documents found. Try a different search.</div>
+                  : results.map(d => (
+                    <button key={d.uuid} type="button" aria-label={`Choose ${d.title}`} onClick={() => {
+                      setChosen(c => c.some(item => item.uuid === d.uuid) ? c : [...c, d])
+                      setQuery('')
+                      searchInput.current?.focus()
+                      setShowResults(false)
+                    }} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', font: 'inherit', fontSize: 12, background: '#fff', color: '#374151', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <FileText style={{ width: 12, height: 12, flexShrink: 0 }} />
+                      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{d.title}</span>
+                    </button>
+                  ))}
               </div>
             )}
           </div>
@@ -201,8 +245,8 @@ export function AutomationRunNowPanel({ automation, canManage, onClose }: Props)
             cursor: disabled || inFlight ? 'not-allowed' : 'pointer', opacity: disabled || inFlight ? 0.6 : 1,
           }}
         >
-          {starting || inFlight ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Play style={{ width: 14, height: 14 }} />}
-          {inFlight ? 'Running…' : started ? 'Run again' : 'Run now'}
+          {starting || (inFlight && !statusError) ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Play style={{ width: 14, height: 14 }} />}
+          {starting ? 'Starting…' : inFlight ? statusError ? 'Status unavailable' : 'Running…' : started ? 'Run again' : 'Run now'}
         </button>
         {started && (
           <span style={{ fontSize: 12, color: '#6b7280' }}>
@@ -219,10 +263,20 @@ export function AutomationRunNowPanel({ automation, canManage, onClose }: Props)
           <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />{error}
         </div>
       )}
-      {inFlight && (
+      {statusError && (
+        <div role="alert" style={{ marginTop: 10, fontSize: 13, color: '#92400e' }}>
+          <p>Run accepted, but its current status is unavailable. {statusError}</p>
+          <p>The run may still finish. Checking again will not start another run.</p>
+          <button type="button" onClick={() => setStatusAttempt(n => n + 1)} style={{ marginTop: 8 }}>Retry status check</button>
+        </div>
+      )}
+      {inFlight && !statusError && (
         <div role="status" style={{ marginTop: 10, fontSize: 12, color: '#6b7280' }}>
           Started — {run?.status ?? 'queued'}. This panel updates as the run progresses.
         </div>
+      )}
+      {result && (error || starting) && (
+        <div style={{ marginTop: 12, fontSize: 12, fontWeight: 600, color: '#374151' }}>Previous run</div>
       )}
       {result && (
         <div role="status" style={{

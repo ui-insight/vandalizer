@@ -30,6 +30,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
 
+## Automation manual-run recovery — September 28
+
+Progress toward AUTO-08/09; the broader automation acceptance items remain open. The completed checklist count stays at 127/169.
+
+Document search now distinguishes loading, failure/retry and no results, retains its query on failure, ignores stale responses and supports keyboard selection. Pending/accepted runs lock their document selection and block duplicate starts. Status requests run sequentially; a failed status read explicitly explains that the accepted run may still finish and offers a retry of that same event. Late responses cannot update another automation. Collapsing and reopening Run now preserves its accepted run; previous output remains clearly labeled if a new launch fails.
+
+Verification: 18 focused manual-run/autosave tests, TypeScript, Vite production build and touched-file ESLint pass. The production browser journey covers keyboard document choice, search failure/empty state, start failure, status retry without relaunch, panel close/reopen, failed/completed outcomes and retained output at 320/768/1440px. All 21 captured states have zero axe findings, page overflow, uncaught page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+
+Evidence: `2026-09-28-automation-run-evidence`; recipe: `frontend/scripts/visual-review/automation-run-recovery.mjs`. API responses and execution are synthetic. Accepted-run recovery after leaving the editor/reloading, ambiguous launch failures, full history and live worker/output delivery remain unverified; this pass does not close AUTO-08/09.
+
 ## Files and Projects recovery — September 28
 
 **127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
@@ -82,7 +92,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 594 distinct states / 686 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 615 distinct states / 707 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -171,6 +181,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-28-file-library-evidence](../2026-09-28-file-library-evidence/manifest.json): 30 states; source `7a42314934b1b90e86fb59a116253f54e851ec074509436c370b165d0c41368b`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-projects-restored-layout](../2026-09-28-projects-restored-layout/manifest.json): 39 states; source `dbfff5c474499b27dd914e221843a04bfb912042947b4511c356b97e4387ed92`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-files-restored-layout](../2026-09-28-files-restored-layout/manifest.json): 33 states; source `449342649e3042a4729bded577766c57e4f4a6e01a6384e91bd6517e0655e7cd`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-28-automation-run-evidence](../2026-09-28-automation-run-evidence/manifest.json): 21 states; source `23a01df2593e624f9ae9f8090d4774ed49d1df4a57c2a7ff0e56ae726e980f09`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

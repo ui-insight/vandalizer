@@ -3,7 +3,7 @@ import json, html, re
 root=Path(__file__).resolve().parents[3]
 out=Path(__file__).resolve().parent
 base=root/'artifacts/visual-review'
-runs=['upgrade-final','upgrade-final-responsive','upgrade-final-recheck','upgrade-final-detail-recheck','upgrade-followup-detail','upgrade-followup-responsive','upgrade-polish-final-journeys','upgrade-polish-final-context','upgrade-folder-recheck','2026-09-26-recovery-verified','2026-09-26-recovery-layout-verified','2026-09-28-wizard-flow-verified','2026-09-28-wizard-api-verified','2026-09-28-wizard-mobile-final','2026-09-28-history-verified','2026-09-28-lifecycle-evidence','2026-09-28-resumption-final','2026-09-28-questions-final','2026-09-28-sources-release','2026-09-28-uploads-evidence','2026-09-28-validation-scope','2026-09-28-source-intake-final','2026-09-28-catalog-filters-evidence','2026-09-28-catalog-evidence-review','2026-09-28-chat-navigation-evidence','2026-09-28-chat-scope-final','2026-09-28-file-library-evidence','2026-09-28-projects-restored-layout','2026-09-28-files-restored-layout']
+runs=['upgrade-final','upgrade-final-responsive','upgrade-final-recheck','upgrade-final-detail-recheck','upgrade-followup-detail','upgrade-followup-responsive','upgrade-polish-final-journeys','upgrade-polish-final-context','upgrade-folder-recheck','2026-09-26-recovery-verified','2026-09-26-recovery-layout-verified','2026-09-28-wizard-flow-verified','2026-09-28-wizard-api-verified','2026-09-28-wizard-mobile-final','2026-09-28-history-verified','2026-09-28-lifecycle-evidence','2026-09-28-resumption-final','2026-09-28-questions-final','2026-09-28-sources-release','2026-09-28-uploads-evidence','2026-09-28-validation-scope','2026-09-28-source-intake-final','2026-09-28-catalog-filters-evidence','2026-09-28-catalog-evidence-review','2026-09-28-chat-navigation-evidence','2026-09-28-chat-scope-final','2026-09-28-file-library-evidence','2026-09-28-projects-restored-layout','2026-09-28-files-restored-layout','2026-09-28-automation-run-evidence']
 captures={}; manifests=[]
 for name in runs:
  p=base/name;m=json.loads((p/'manifest.json').read_text())
@@ -72,6 +72,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Automation manual-run recovery — September 28
+
+Progress toward AUTO-08/09; the broader automation acceptance items remain open. The completed checklist count stays at 127/169.
+
+Document search now distinguishes loading, failure/retry and no results, retains its query on failure, ignores stale responses and supports keyboard selection. Pending/accepted runs lock their document selection and block duplicate starts. Status requests run sequentially; a failed status read explicitly explains that the accepted run may still finish and offers a retry of that same event. Late responses cannot update another automation. Collapsing and reopening Run now preserves its accepted run; previous output remains clearly labeled if a new launch fails.
+
+Verification: 18 focused manual-run/autosave tests, TypeScript, Vite production build and touched-file ESLint pass. The production browser journey covers keyboard document choice, search failure/empty state, start failure, status retry without relaunch, panel close/reopen, failed/completed outcomes and retained output at 320/768/1440px. All 21 captured states have zero axe findings, page overflow, uncaught page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+
+Evidence: `2026-09-28-automation-run-evidence`; recipe: `frontend/scripts/visual-review/automation-run-recovery.mjs`. API responses and execution are synthetic. Accepted-run recovery after leaving the editor/reloading, ambiguous launch failures, full history and live worker/output delivery remain unverified; this pass does not close AUTO-08/09.
 
 ## Files and Projects recovery — September 28
 

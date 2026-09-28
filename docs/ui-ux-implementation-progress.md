@@ -9,6 +9,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
 
+## Automation manual-run recovery — September 28
+
+Progress toward AUTO-08/09; the broader automation acceptance items remain open. The completed checklist count stays at 127/169.
+
+Document search now distinguishes loading, failure/retry and no results, retains its query on failure, ignores stale responses and supports keyboard selection. Pending/accepted runs lock their document selection and block duplicate starts. Status requests run sequentially; a failed status read explicitly explains that the accepted run may still finish and offers a retry of that same event. Late responses cannot update another automation. Collapsing and reopening Run now preserves its accepted run; previous output remains clearly labeled if a new launch fails.
+
+Verification: 18 focused manual-run/autosave tests, TypeScript, Vite production build and touched-file ESLint pass. The production browser journey covers keyboard document choice, search failure/empty state, start failure, status retry without relaunch, panel close/reopen, failed/completed outcomes and retained output at 320/768/1440px. All 21 captured states have zero axe findings, page overflow, uncaught page errors or unmatched fixture requests. Representative screenshots were inspected directly.
+
+Evidence: `2026-09-28-automation-run-evidence`; recipe: `frontend/scripts/visual-review/automation-run-recovery.mjs`. API responses and execution are synthetic. Accepted-run recovery after leaving the editor/reloading, ambiguous launch failures, full history and live worker/output delivery remain unverified; this pass does not close AUTO-08/09.
+
 ## Files and Projects recovery — September 28
 
 **127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.

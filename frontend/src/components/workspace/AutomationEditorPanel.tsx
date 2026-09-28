@@ -321,11 +321,9 @@ export function AutomationEditorPanel() {
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
         />
 
-        {runNowOpen && (
-
+        <div hidden={!runNowOpen}>
           <AutomationRunNowPanel automation={automation} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
-
-        )}
+        </div>
 
         {/* Sections fold so a long configuration can be worked one part at a time. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
