@@ -10,6 +10,7 @@ import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
+import { AutomationRunHistory } from './AutomationRunHistory'
 import { AutomationRunNowPanel } from './AutomationRunNowPanel'
 import { ScheduleConfigFields } from './ScheduleConfigFields'
 import { CollapsibleSection } from '../shared/CollapsibleSection'
@@ -74,6 +75,12 @@ export function AutomationEditorPanel() {
 
   const canManage = automation?.can_manage ?? true
   const [runNowOpen, setRunNowOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const runNowRegion = useRef<HTMLDivElement>(null)
+  const prepareRun = () => {
+    setRunNowOpen(true)
+    requestAnimationFrame(() => { runNowRegion.current?.scrollIntoView({ block: 'start' }); runNowRegion.current?.focus() })
+  }
 
   const save = async (updates: Parameters<typeof updateAutomation>[1]) => {
     if (!openAutomationId || !canManage) return false
@@ -321,12 +328,15 @@ export function AutomationEditorPanel() {
           onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
         />
 
-        <div hidden={!runNowOpen}>
+        <div ref={runNowRegion} tabIndex={-1} hidden={!runNowOpen}>
           <AutomationRunNowPanel automation={automation} canManage={canManage && autosave.state === 'saved'} onClose={() => setRunNowOpen(false)} />
         </div>
 
         {/* Sections fold so a long configuration can be worked one part at a time. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <CollapsibleSection title="Run history" summary="Recorded status and results" open={historyOpen} onToggle={setHistoryOpen}>
+          <AutomationRunHistory automationId={automation.id} open={historyOpen} canRun={canManage && autosave.state === 'saved'} onPrepareRun={prepareRun} />
+        </CollapsibleSection>
         {/* Section A — Trigger */}
         <CollapsibleSection title="Trigger" summary={triggerSummary(automation)} testId="automation-trigger-section">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, margin: '8px 0 16px' }}>

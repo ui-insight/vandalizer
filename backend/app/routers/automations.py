@@ -20,6 +20,7 @@ from app.models.user import User
 from app.models.workflow import WorkflowResult
 from app.rate_limit import limiter
 from app.schemas.automations import (
+    AutomationHistoryResponse,
     RunNowRequest,
     RunNowResponse,
     AutomationResponse,
@@ -32,7 +33,7 @@ from app.schemas.automations import (
 from app.services import access_control, audit_service
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
-from app.services import automation_run_now
+from app.services import automation_history, automation_run_now
 from app.services import automation_schedule
 
 logger = logging.getLogger(__name__)
@@ -659,6 +660,22 @@ async def run_automation_now(
         document_source=selection["source"],
         documents_matched=selection["matched"],
     )
+
+
+@router.get("/{automation_id}/runs", response_model=AutomationHistoryResponse)
+@limiter.limit("120/minute")
+async def get_automation_history(
+    request: Request,
+    automation_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    before: datetime.datetime | None = None,
+    before_id: str | None = Query(None, pattern=r"^[0-9a-fA-F]{24}$"),
+    user: User = Depends(get_current_user),
+):
+    auto, _team_access = await _load_authorized_automation(automation_id, user)
+    if (before is None) != (before_id is None):
+        raise HTTPException(status_code=400, detail="Both history cursor fields are required")
+    return await automation_history.list_runs(str(auto.id), limit, before, before_id)
 
 
 @router.get("/{automation_id}/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)

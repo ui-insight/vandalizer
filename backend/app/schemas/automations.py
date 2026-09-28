@@ -128,3 +128,13 @@ class RunNowResponse(BaseModel):
     documents: list[RunNowDocument]
     document_source: str  # chosen | folder | configured
     documents_matched: int  # eligible before the folder cap
+
+
+class AutomationHistoryCursor(BaseModel):
+    before: str
+    before_id: str
+
+
+class AutomationHistoryResponse(BaseModel):
+    items: list[TriggerEventStatusResponse]
+    next_cursor: Optional[AutomationHistoryCursor] = None
