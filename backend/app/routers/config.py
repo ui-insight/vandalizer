@@ -403,7 +403,6 @@ def _generate_action_pills(
     knowledge_bases: list,
     has_chatted_with_docs: bool,
     quality_map: dict[str, float],
-    last_activity_title: str | None = None,
     maturity_stage: str = "newcomer",
 ) -> list[str]:
     """Generate up to 4 personalised, action-oriented suggestion pills."""
@@ -416,9 +415,9 @@ def _generate_action_pills(
         pills.append("Upload your own documents to get started")
         return pills[:4]
 
-    # Continue where you left off — returning users with real content
-    if last_activity_title and doc_count > 0:
-        pills.append(f"Pick up where I left off: {last_activity_title}")
+    # No "pick up where I left off" pill: pills are sent to the agent as
+    # prompts, and reopening a past conversation or run is navigation the
+    # agent has no tool for. The home's resume card opens it by activity id.
 
     ready_kbs = [kb for kb in knowledge_bases if getattr(kb, "status", "") == "ready"]
 
@@ -543,8 +542,6 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
             if vr.item_id not in quality_map and vr.accuracy is not None:
                 quality_map[vr.item_id] = round(vr.accuracy * 100)
 
-    last_activity_title = recent_activities[0].title if recent_activities else None
-
     is_certified = bool(cert_progress and cert_progress.certified)
     has_enabled_automation = any(getattr(a, "enabled", False) for a in automations)
 
@@ -564,7 +561,6 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         knowledge_bases=knowledge_bases,
         has_chatted_with_docs=doc_chat_count > 0,
         quality_map=quality_map,
-        last_activity_title=last_activity_title,
         maturity_stage=maturity_stage,
     )
 
@@ -573,6 +569,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
 
     recent_activity_items = [
         RecentActivityItem(
+            id=str(ev.id),
             type=ev.type,
             title=ev.title or "Activity",
             relative_time=_relative_time(ev.last_updated_at) if ev.last_updated_at else "",

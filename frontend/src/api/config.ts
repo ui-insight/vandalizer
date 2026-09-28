@@ -64,6 +64,7 @@ export function updateThemeConfig(data: {
 // Onboarding status
 
 export interface RecentActivityItem {
+  id: string
   type: string
   title: string
   relative_time: string

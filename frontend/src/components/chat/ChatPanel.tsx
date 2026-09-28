@@ -20,6 +20,7 @@ import { AttachKBModal } from './AttachKBModal'
 import { useChat } from '../../hooks/useChat'
 import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
+import { useOpenActivity } from '../../hooks/useOpenActivity'
 import { useWorkspace, MAX_ATTACHED_KBS, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useBranding } from '../../contexts/BrandingContext'
@@ -143,6 +144,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }))
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
+  const { openActivityById } = useOpenActivity()
   const shareLink = useShareLink()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
@@ -949,6 +951,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 const needsOnboardingContext = !hasServerPills && !onboardingStatus?.has_documents
                 handleSend(msg, needsOnboardingContext)
               }}
+              onOpenActivity={openActivityById}
               status={onboardingStatus}
               suggestionPills={onboardingPills}
             />

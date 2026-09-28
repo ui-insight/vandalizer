@@ -66,6 +66,7 @@ const baseStatus: OnboardingStatus = {
   top_workflow_name: 'Budget Review Workflow',
   recent_activity: [
     {
+      id: 'act-workflow-1',
       type: 'workflow_run',
       title: 'Budget review workflow',
       relative_time: '2 hours ago',
@@ -139,6 +140,7 @@ describe('FirstSessionHome', () => {
 describe('ReturningHome', () => {
   it('helps returning users resume work and review issues', () => {
     const onSendMessage = vi.fn()
+    const onOpenActivity = vi.fn()
 
     render(
       <ReturningHome
@@ -148,6 +150,7 @@ describe('ReturningHome', () => {
         onAttachFiles={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={onSendMessage}
+        onOpenActivity={onOpenActivity}
         status={baseStatus}
         suggestionPills={baseStatus.suggestion_pills}
       />,
@@ -161,11 +164,46 @@ describe('ReturningHome', () => {
     fireEvent.click(screen.getByRole('button', { name: /Review alert/i }))
     expect(onSendMessage).toHaveBeenNthCalledWith(1, 'Check quality of Budget Review')
 
+    // Resuming reopens the run itself. It must not become a chat prompt:
+    // the agent has no tool that reopens past work, so a prompt sends it
+    // searching the user's files for the title.
     fireEvent.click(screen.getByRole('button', { name: /Budget review workflow/i }))
-    expect(onSendMessage).toHaveBeenNthCalledWith(
-      2,
-      'Show me the results from my "Budget review workflow" workflow run',
+    expect(onOpenActivity).toHaveBeenCalledWith('act-workflow-1')
+    expect(onSendMessage).toHaveBeenCalledTimes(1)
+  })
+
+  it('reopens the last conversation from the resume card instead of prompting the agent', () => {
+    const onSendMessage = vi.fn()
+    const onOpenActivity = vi.fn()
+    const status: OnboardingStatus = {
+      ...baseStatus,
+      active_alerts: [],
+      recent_activity: [{
+        id: 'act-conv-1',
+        type: 'conversation',
+        title: 'Reviewing NSF Proposal Cover Sheet',
+        relative_time: 'yesterday',
+        status: 'completed',
+      }],
+    }
+
+    render(
+      <ReturningHome
+        orgName="Vandalizer"
+        brandIcon={null}
+        onRunDemo={vi.fn()}
+        onAttachFiles={vi.fn()}
+        onFocusComposer={vi.fn()}
+        onSendMessage={onSendMessage}
+        onOpenActivity={onOpenActivity}
+        status={status}
+        suggestionPills={status.suggestion_pills}
+      />,
     )
+
+    fireEvent.click(screen.getByRole('button', { name: /Continue chat/i }))
+    expect(onOpenActivity).toHaveBeenCalledWith('act-conv-1')
+    expect(onSendMessage).not.toHaveBeenCalled()
   })
 
   it('shows a continue-certification CTA with the completed count', async () => {
@@ -180,6 +218,7 @@ describe('ReturningHome', () => {
         onAttachFiles={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={onSendMessage}
+        onOpenActivity={vi.fn()}
         status={baseStatus}
         suggestionPills={baseStatus.suggestion_pills}
       />,
@@ -203,6 +242,7 @@ describe('ReturningHome', () => {
         onAttachFiles={vi.fn()}
         onFocusComposer={vi.fn()}
         onSendMessage={vi.fn()}
+        onOpenActivity={vi.fn()}
         status={baseStatus}
         suggestionPills={baseStatus.suggestion_pills}
       />,
