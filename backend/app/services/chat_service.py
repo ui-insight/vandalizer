@@ -789,9 +789,6 @@ async def chat_stream(
     kb_sources: list[dict] = []
     kb_manifest: list[dict] = []
     manifests: dict[str, list[dict]] = {}
-    # The snippet text the model is shown, kept so the finished answer's
-    # figures can be checked against it (see kb_answer_grounding).
-    kb_snippet_text = ""
     if active_kbs:
         from app.services.knowledge_service import get_kb_manifest
 
@@ -821,7 +818,6 @@ async def chat_stream(
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
-                kb_snippet_text = kb_segment.text
         except Exception as e:
             logger.error(
                 "KB context retrieval failed for kb_uuids=%s: %s",
@@ -1128,10 +1124,13 @@ async def chat_stream(
                 assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 thinking_text = "".join(full_thinking) or None
                 # A KB answer's dollar amounts and percentages must come from
-                # the snippets (or the question). One that doesn't came from the
+                # what the model was shown: the KB snippets, any attached
+                # document, or the question. One that doesn't came from the
                 # model's memory, which may predate the current regulation.
                 unsupported = (
-                    unsupported_figures(assistant_message, f"{kb_snippet_text}\n{message}")
+                    unsupported_figures(assistant_message, "\n".join(
+                        [s.text for s in (*doc_segments, *attachment_segments)] + [message]
+                    ))
                     if active_kbs else []
                 )
                 await _finalize(
