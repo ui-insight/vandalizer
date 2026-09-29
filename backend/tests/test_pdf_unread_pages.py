@@ -314,3 +314,140 @@ class TestOcrOutageTask:
 
         with pytest.raises(OcrUnavailableError):
             self._run(tmp_path, 0)
+
+
+class TestOnlyTheProblemPageGoesToOcr:
+    """Follow-up ticket: one flagged page sent the whole file to OCR, the pages
+    already read were thrown away, and OCR then dropped a different page."""
+
+    CLEAN = TestFastPath.CLEAN
+
+    def _read(self, path, result, ocr, *, final=False):
+        import pdf_inspector
+
+        seen: list[int] = []
+
+        def fake_ocr(pdf_path, report=None, **_kw):
+            import pymupdf
+
+            with pymupdf.open(pdf_path) as d:
+                seen.append(d.page_count)
+            if isinstance(ocr, Exception):
+                raise ocr
+            return ocr
+
+        report: dict = {}
+        with patch.object(pdf_inspector, "extract_pages_markdown", return_value=result), \
+             patch.object(dr, "_classify_pdf", return_value=self.CLEAN), \
+             patch.object(dr, "ocr_extract_text_from_pdf", side_effect=fake_ocr):
+            text, markers = dr._extract_pdf_text_and_markers(
+                path, report=report, local_on_ocr_outage=final,
+            )
+        return text, [m["value"] for m in markers], report, seen
+
+    def _result(self, pages):
+        return TestFastPath()._result(pages)
+
+    def test_the_flagged_page_is_read_by_ocr_and_the_rest_kept(self, tmp_path):
+        path = _ledger(tmp_path, totals_as_image=True)
+        text, pages, report, seen = self._read(
+            path, self._result([(BODY, False), ("", True)]), TOTALS,
+        )
+        assert seen == [1]  # one request, holding one page
+        assert "Line item 29" in text and "Grand total 623,619.43" in text
+        assert pages == [1, 2]
+        assert "unread_pages" not in report
+
+    def test_ocr_reading_nothing_falls_back_to_the_text_layer(self, tmp_path):
+        path = _ledger(tmp_path, totals_as_image=False)
+        text, pages, report, _ = self._read(
+            path, self._result([(BODY, False), ("", True)]), "",
+        )
+        assert "Grand total" in text and "Line item 0" in text
+        assert pages == [1, 2]
+        assert "unread_pages" not in report
+
+    def test_a_page_no_reader_can_read_is_named(self, tmp_path):
+        path = _ledger(tmp_path, totals_as_image=True)
+        text, pages, report, _ = self._read(
+            path, self._result([(BODY, False), ("", True)]), "",
+        )
+        assert "Line item 0" in text
+        assert pages == [1]
+        assert report["unread_pages"] == [2]
+
+    def test_an_outage_still_raises_for_a_retry(self, tmp_path):
+        import pytest
+
+        from app.services.ocr_client import OcrUnavailableError
+
+        with pytest.raises(OcrUnavailableError):
+            self._read(
+                _ledger(tmp_path, totals_as_image=True),
+                self._result([(BODY, False), ("", True)]), OcrUnavailableError("down"),
+            )
+
+    def test_an_outage_on_the_final_attempt_keeps_what_was_read(self, tmp_path):
+        from app.services.ocr_client import OcrUnavailableError
+
+        text, pages, report, _ = self._read(
+            _ledger(tmp_path, totals_as_image=True),
+            self._result([(BODY, False), ("", True)]), OcrUnavailableError("down"),
+            final=True,
+        )
+        assert "Line item 0" in text
+        assert report["unread_pages"] == [2]
+        assert report["ocr_unavailable_local_fallback"] is True
+
+    def test_a_flagged_blank_page_is_never_sent_to_ocr(self, tmp_path):
+        """OCR's vision model invents text for a blank page."""
+        import pymupdf
+
+        doc = pymupdf.open()
+        doc.new_page().insert_text((50, 60), BODY, fontsize=9)
+        doc.new_page()
+        path = tmp_path / "blank.pdf"
+        doc.save(str(path))
+        text, pages, report, seen = self._read(
+            str(path), self._result([(BODY, False), ("", True)]), "invented",
+        )
+        assert seen == []
+        assert pages == [1]
+        assert "invented" not in text
+
+
+class TestOcrCoverage:
+    """When the whole file does go to OCR, a page OCR left out is named."""
+
+    def _three_pages(self, tmp_path):
+        import pymupdf
+
+        doc = pymupdf.open()
+        pages = []
+        for n, label in enumerate(["Personnel", "Operating", "Travel"]):
+            body = "\n".join(
+                f"{label} account {n}{i:02d} {label.lower()}word{i} amount {i * 113}.97"
+                for i in range(25)
+            )
+            doc.new_page().insert_text((50, 60), body, fontsize=9)
+            pages.append(body)
+        path = tmp_path / "three.pdf"
+        doc.save(str(path))
+        return str(path), pages
+
+    def _read(self, path, ocr_text):
+        report: dict = {}
+        with patch.object(dr, "_classify_pdf", return_value=None), \
+             patch.object(dr, "ocr_extract_text_from_pdf", return_value=ocr_text):
+            text, _ = dr._extract_pdf_text_and_markers(path, report=report)
+        return text, report
+
+    def test_a_page_ocr_skipped_is_named(self, tmp_path):
+        path, pages = self._three_pages(tmp_path)
+        _, report = self._read(path, pages[0] + "\n" + pages[2])
+        assert report["unread_pages"] == [2]
+
+    def test_complete_ocr_reports_nothing(self, tmp_path):
+        path, pages = self._three_pages(tmp_path)
+        _, report = self._read(path, "\n".join(pages))
+        assert "unread_pages" not in report
