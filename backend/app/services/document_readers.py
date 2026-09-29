@@ -1377,6 +1377,19 @@ def _fast_path_with_page_ocr(
             # is named rather than dropped.
             page = doc[n]
             local = _pymupdf_page_text(page)
+            if outage:
+                # The fast path flagged this page and OCR never saw it, so its
+                # text layer is unvetted: hold it to the quality bar the
+                # whole-document outage fallback uses, and name the page either
+                # way so the stored warning says OCR still owes it a reading
+                # and Retry extraction knows to re-read it.
+                from app.config import Settings
+                from app.utils.extraction_quality import nonletter_ratio
+
+                if local.strip() and nonletter_ratio(local) <= Settings().extraction_max_nonletter_ratio:
+                    page_texts[n + 1] = local
+                unread.append(n + 1)
+                continue
             if local.strip():
                 page_texts[n + 1] = local
             if _page_has_unread_content(page, local):

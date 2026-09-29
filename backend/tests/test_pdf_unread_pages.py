@@ -399,6 +399,33 @@ class TestOnlyTheProblemPageGoesToOcr:
         assert report["unread_pages"] == [2]
         assert report["ocr_unavailable_local_fallback"] is True
 
+    def test_an_outage_names_a_flagged_page_even_when_its_text_layer_is_kept(self, tmp_path):
+        """Review of #966: the flagged page's text layer went in unvetted and
+        unnamed, so the stored warning said nothing was missing."""
+        from app.services.ocr_client import OcrUnavailableError
+
+        text, pages, report, _ = self._read(
+            _ledger(tmp_path, totals_as_image=False),
+            self._result([(BODY, False), ("", True)]), OcrUnavailableError("down"),
+            final=True,
+        )
+        assert "Grand total" in text
+        assert pages == [1, 2]
+        assert report["unread_pages"] == [2]
+
+    def test_an_outage_drops_a_low_quality_text_layer(self, tmp_path):
+        from app.services.ocr_client import OcrUnavailableError
+
+        with patch("app.utils.extraction_quality.nonletter_ratio", return_value=1.0):
+            text, pages, report, _ = self._read(
+                _ledger(tmp_path, totals_as_image=False),
+                self._result([(BODY, False), ("", True)]), OcrUnavailableError("down"),
+                final=True,
+            )
+        assert "Line item 0" in text and "Grand total" not in text
+        assert pages == [1]
+        assert report["unread_pages"] == [2]
+
     def test_a_flagged_blank_page_is_never_sent_to_ocr(self, tmp_path):
         """OCR's vision model invents text for a blank page."""
         import pymupdf
