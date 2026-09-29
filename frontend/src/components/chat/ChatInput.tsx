@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
-import { Send, Square, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback, useId, type KeyboardEvent, type ReactNode } from 'react'
+import { FocusTrap } from 'focus-trap-react'
+import { Send, Square, X, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
@@ -7,7 +8,7 @@ import { useBranding } from '../../contexts/BrandingContext'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
 interface Props {
-  onSend: (message: string) => void
+  onSend: (message: string) => void | Promise<void>
   onAttachFile?: (files: File[]) => void
   onAttachLink?: (url: string) => void
   // Opens the knowledge base screen so the user can pick a KB to chat with.
@@ -18,6 +19,7 @@ interface Props {
   onStop?: () => void
   selectedModel?: string
   onModelChange?: (model: string) => void
+  onModelsLoaded?: (models: ModelInfo[]) => void
   onExport?: (format: string) => void
   hasMessages?: boolean
   hasDocuments?: boolean
@@ -33,7 +35,7 @@ const MIN_COMPOSER_TEXT_HEIGHT = 24
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled, sendDisabled,
   isStreaming, onStop,
-  selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
+  selectedModel, onModelChange, onModelsLoaded, onExport, hasMessages, hasDocuments,
   contextMeter, memoryControl, focusSignal,
 }: Props) {
   const branding = useBranding()
@@ -45,6 +47,15 @@ export function ChatInput({
   const [showModelMenu, setShowModelMenu] = useState(false)
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [models, setModels] = useState<ModelInfo[]>([])
+  const [modelError, setModelError] = useState(false)
+  const [modelsLoading, setModelsLoading] = useState(true)
+  const [sendError, setSendError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const sending = useRef(false)
+  const modelRequest = useRef(0)
+  const helpId = useId()
+  const onModelsLoadedRef = useRef(onModelsLoaded)
+  onModelsLoadedRef.current = onModelsLoaded
   const fileInputRef = useRef<HTMLInputElement>(null)
   const addMenuRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
@@ -72,7 +83,6 @@ export function ChatInput({
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (addMenuRef.current && !addMenuRef.current.contains(target)) setShowAddMenu(false)
-      if (modelMenuRef.current && !modelMenuRef.current.contains(target)) setShowModelMenu(false)
       if (exportMenuRef.current && !exportMenuRef.current.contains(target)) setShowExportMenu(false)
     }
     // Use 'click' instead of 'mousedown' so the handler fires AFTER React
@@ -81,18 +91,40 @@ export function ChatInput({
     return () => document.removeEventListener('click', handler)
   }, [])
 
-  // Fetch models eagerly so the button label resolves immediately
-  useEffect(() => {
-    if (models.length === 0) {
-      getModels().then(setModels).catch(() => {})
+  const loadModels = useCallback(async () => {
+    const request = ++modelRequest.current
+    setModelsLoading(true)
+    setModelError(false)
+    try {
+      const result = await getModels()
+      if (request !== modelRequest.current) return
+      setModels(result)
+      onModelsLoadedRef.current?.(result)
+    } catch {
+      if (request === modelRequest.current) setModelError(true)
+    } finally {
+      if (request === modelRequest.current) setModelsLoading(false)
     }
-  }, [models.length])
+  }, [])
+  const cancelModelRead = useCallback(() => { modelRequest.current++ }, [])
+  useEffect(() => { void loadModels(); return cancelModelRead }, [loadModels, cancelModelRead])
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = message.trim()
-    if (!trimmed || disabled || sendDisabled) return
-    onSend(trimmed)
-    setMessage('')
+    if (!trimmed || disabled || sendDisabled || sending.current) return
+    sending.current = true
+    setSubmitting(true)
+    setSendError(null)
+    try {
+      await onSend(trimmed)
+      // A new draft typed during submission belongs to the next message.
+      setMessage(current => current === message ? '' : current)
+    } catch (reason) {
+      setSendError(reason instanceof Error ? reason.message : 'Could not send.')
+    } finally {
+      sending.current = false
+      setSubmitting(false)
+    }
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -155,6 +187,9 @@ export function ChatInput({
         </div>
       )}
 
+      {submitting && isStreaming && <p role="status" className="mb-2 text-sm text-gray-700">Queueing message…</p>}
+      {sendError && <p role="alert" className="mb-2 text-sm text-red-800">{sendError} Your draft is kept; try again.</p>}
+      <p id={helpId} className="sr-only">{isStreaming ? 'Enter queues your message for the current conversation.' : 'Enter sends your message.'} Shift+Enter adds a new line.</p>
       {/* Ask question container */}
       <div
         className="flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
@@ -177,6 +212,7 @@ export function ChatInput({
                 : `Ask ${branding.appName}…`
             }
             aria-label="Message input"
+            aria-describedby={helpId}
             rows={1}
             wrap="soft"
             className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#626a75] placeholder:font-medium focus:outline-none focus-visible:outline-none"
@@ -258,7 +294,8 @@ export function ChatInput({
               <button
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 aria-expanded={showModelMenu}
-                aria-haspopup="true"
+                aria-haspopup="dialog"
+                aria-label={`Choose chat model: ${displayModel || 'default'}`}
                 className="flex min-w-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
               >
                 <Cpu className="h-3 w-3 shrink-0" />
@@ -267,18 +304,16 @@ export function ChatInput({
               </button>
 
               {showModelMenu && (
-                <div
-                  role="dialog"
-                  aria-label="Select model effort level"
-                  className="absolute left-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
-                  style={{ bottom: 'calc(100% + 8px)', width: 310, maxWidth: 'calc(100vw - 30px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
-                  onKeyDown={(e) => { if (e.key === 'Escape') setShowModelMenu(false) }}
-                >
-                  <ModelEffortPicker
-                    models={uniqueModels}
-                    selectedModel={selectedModel ?? ''}
-                    onChange={(tag) => { onModelChange(tag); setShowModelMenu(false) }}
-                  />
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/20 p-4" onClick={e => { if (e.target === e.currentTarget) setShowModelMenu(false) }}>
+                  <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
+                    <div role="dialog" aria-modal="true" aria-label="Choose chat model" className="w-full max-w-md overflow-y-auto rounded-xl border border-gray-300 bg-white p-3 shadow-xl" style={{ maxHeight: 'calc(100dvh - 32px)' }} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setShowModelMenu(false) } }}>
+                      <div className="mb-2 flex items-center justify-between gap-3"><h2 className="text-base font-semibold text-gray-900">Choose chat model</h2><button type="button" aria-label="Close model picker" className="rounded p-2 text-gray-700" onClick={() => setShowModelMenu(false)}><X size={18} /></button></div>
+                      {modelsLoading ? <p role="status" className="p-3 text-sm text-gray-700">Loading models…</p>
+                        : modelError ? <div role="alert" className="p-3 text-sm text-red-800">Could not load available models. <button type="button" className="underline" onClick={() => void loadModels()}>Retry models</button></div>
+                        : uniqueModels.length === 0 ? <p className="p-3 text-sm text-gray-700">No models are currently available. Contact your administrator or <button type="button" className="underline" onClick={() => void loadModels()}>Refresh models</button>.</p>
+                        : <ModelEffortPicker models={uniqueModels} selectedModel={selectedModel ?? ''} onChange={tag => { onModelChange(tag); setShowModelMenu(false) }} />}
+                    </div>
+                  </FocusTrap>
                 </div>
               )}
             </div>
@@ -331,6 +366,8 @@ export function ChatInput({
             </div>
           )}
 
+          {/* A queued message is also available to touch users while Stop stays reachable. */}
+          {isStreaming && onStop && message.trim() && <button type="button" onClick={() => void handleSend()} disabled={disabled || sendDisabled || submitting} aria-label="Queue message" title="Queue message" className="shrink-0 rounded border border-gray-400 bg-white p-2 text-xs text-gray-800 disabled:opacity-50">Queue</button>}
           {/* Send / Stop button */}
           {isStreaming && onStop ? (
             <button
@@ -346,7 +383,7 @@ export function ChatInput({
             <button
               type="button"
               onClick={handleSend}
-              disabled={!message.trim() || disabled || sendDisabled}
+              disabled={!message.trim() || disabled || sendDisabled || submitting}
               aria-label="Send message"
               className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >

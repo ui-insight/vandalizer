@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 138,
+  "completed_items": 139,
   "total_items": 169,
-  "unique_states": 847,
-  "capture_executions": 1017,
+  "unique_states": 873,
+  "capture_executions": 1043,
   "mobile_grade": 8,
   "areas": [
     {
@@ -93,8 +93,8 @@
       "baseline_ux": 6,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-polish-final-context/chat-home.png",
-      "note": "A compact task launcher and shorter composer establish a clear primary action. Stopped/interrupted responses preserve partial output, and retry retains completed artifacts. Long response/table/code reading, retained scroll position, latest-response navigation, draft retention and narrow composer controls pass fixture checks. Model-selection and broader assistive-technology journeys remain open."
+      "evidence": "../2026-09-29-chat-composer-evidence/composer-queue-error-draft-768.png",
+      "note": "Model loading/default-save recovery, keyboard selection and focus return, Enter/Shift+Enter/IME, touch queueing, retained failed drafts and selected-model request payloads pass. First-response identity supports queueing and preserves context after Stop. Reading/scroll and source scope checks remain in the earlier evidence; live execution, queue consumption and assistive-technology devices are unverified."
     },
     {
       "id": "onboarding",
@@ -12078,6 +12078,311 @@
       "errors": [],
       "observations": [
         "Project pin failure/retry, and exactly the pinned KB from the second server page at 320/768/1440px. Synthetic APIs, no live permission check."
+      ]
+    },
+    {
+      "directory": "2026-09-29-chat-composer-evidence",
+      "capturedAt": "2026-09-29T16:54:03.274Z",
+      "sourceFingerprint": "90c99a4a7969939d035ba81d66ecef0e593343dff01279f9219d35e503a159d5",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/api/chat.ts\n M frontend/src/components/ModelEffortPicker.tsx\n M frontend/src/components/chat/ChatInput.test.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/hooks/useChat.interruption.test.ts\n M frontend/src/hooks/useChat.ts\n?? frontend/scripts/visual-review/chat-composer.mjs\n?? frontend/src/api/chat.test.ts\n?? frontend/src/hooks/useChatModelPreference.test.ts\n?? frontend/src/hooks/useChatModelPreference.ts",
+      "commit": "9b81749a2bd0776204cdc3bd7f7f5ec13bf7750f",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "composer-preference-load-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-model-list-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-model-list-empty-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-model-long-list-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-model-save-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-keyboard-sent-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-queue-error-draft-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-queue-accepted-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-preference-load-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-list-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-list-empty-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-long-list-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-save-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-keyboard-sent-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-queue-error-draft-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-queue-accepted-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "composer-preference-load-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-list-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-list-empty-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-long-list-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-model-save-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-keyboard-sent-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-queue-error-draft-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-queue-accepted-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "composer-first-turn-queue-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "composer-first-turn-stop-resume-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Saved-model read retry, available-model failure/empty/long-list recovery, focus containment/return, arrow selection, default-save retry without draft loss, whitespace, Enter/Shift+Enter/IME, selected model in request, touch queue failure/retained draft/retry and Stop. 320/768-short/1440; synthetic APIs/stream, no model or worker execution."
       ]
     }
   ]

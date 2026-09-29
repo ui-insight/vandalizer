@@ -29,9 +29,9 @@ import { addLink, removeDocument, removeLink, truncateContext, compactContext, c
 import { useChatUploads } from '../../hooks/useChatUploads'
 import { pollStatus } from '../../api/documents'
 import { convertDocumentsToKB, getKnowledgeBase } from '../../api/knowledge'
-import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
+import { markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
-import type { ModelInfo } from '../../types/workflow'
+import { useChatModelPreference } from '../../hooks/useChatModelPreference'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
 import { shouldAutoContinueAfterAttach } from './autoContinue'
@@ -159,9 +159,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [linkLoading, setLinkLoading] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<string>('')
+  const modelPreference = useChatModelPreference()
+  const { selectedModel, models: modelsList } = modelPreference
   const [showAttachKB, setShowAttachKB] = useState(false)
-  const [modelsList, setModelsList] = useState<ModelInfo[]>([])
   const [showContextDialog, setShowContextDialog] = useState(false)
   const [showContextNudge, setShowContextNudge] = useState(false)
   const contextNudgeShownRef = useRef(false)
@@ -199,22 +199,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const dragCounter = useRef(0)
 
 
-  // Load saved model preference on mount
-  useEffect(() => {
-    getUserConfig().then(cfg => {
-      if (cfg.available_models?.length) {
-        setModelsList(cfg.available_models)
-      }
-      if (cfg.model) {
-        setSelectedModel(cfg.model)
-      } else if (cfg.available_models?.length) {
-        const first = cfg.available_models[0].tag || cfg.available_models[0].name
-        setSelectedModel(first)
-        updateUserConfig({ model: first }).catch(() => {})
-      }
-    }).catch(() => {})
-  }, [])
-
   // Derive the context window size for the currently selected model
   const contextWindow = (() => {
     const match = modelsList.find(
@@ -242,8 +226,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [contextTokens, contextWindow, contextMeter])
 
   const handleModelChange = (model: string) => {
-    setSelectedModel(model)
-    updateUserConfig({ model }).catch(() => {})
+    modelPreference.select(model)
   }
 
   const handleTruncate = async () => {
@@ -275,7 +258,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // reset. It sticks for the rest of the conversation, which is what the
   // model picker already does.
   const handleUseSuggestedModel = async (name: string) => {
-    setSelectedModel(name)
+    modelPreference.select(name, false)
   }
 
   const handleConvertToKB = async () => {
@@ -1389,7 +1372,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
                 <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
                   {m}
-                  <span className="ml-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                  <span className="ml-2 text-xs font-medium uppercase tracking-wide text-gray-600">
                     Queued
                   </span>
                 </div>
@@ -1583,6 +1566,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {(attachLoading || anySelectedProcessing) && <div role="status" className="px-4 py-2 text-xs text-gray-600">{attachLoading ? 'Attachments are transferring. Keep typing; Send becomes available when the transfer finishes.' : 'Attached files are processing. Send will queue your question until processing finishes.'}</div>}
       {/* Input. Typing stays enabled while a turn streams (Phase 10):
           submits mid-run queue into the current turn instead of sending. */}
+      {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
+      {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
       <ChatInput
         onSend={(msg) => (isStreaming ? queueMessage(msg) : handleSend(msg))}
         onAttachFile={handleAttachFile}
@@ -1594,6 +1579,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onStop={stop}
         selectedModel={selectedModel}
         onModelChange={handleModelChange}
+        onModelsLoaded={modelPreference.setModels}
         onExport={handleExport}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}

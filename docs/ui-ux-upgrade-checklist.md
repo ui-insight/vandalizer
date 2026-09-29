@@ -201,7 +201,7 @@ Acceptance: users can find, organize and open an item quickly; no item is clippe
 - [x] **CHAT-07 · P2 · Verify:** Long answers, lists, tables, links and code have readable wrapping and usable copy/source actions.
 - [x] **CHAT-08 · P2 · Verify:** Streaming, stop, interruption, retry and connection failure preserve the conversation and show accurate state.
 - [x] **CHAT-09 · P2 · Verify:** Auto-scroll respects a user reading earlier messages and provides a clear way to return to the latest response.
-- [ ] **CHAT-10 · P2 · Verify:** Send-button state, Enter/Shift+Enter, model selection and errors remain understandable with keyboard, touch and assistive technology.
+- [x] **CHAT-10 · P2 · Verify:** Send-button state, Enter/Shift+Enter, model selection and errors remain understandable with keyboard, touch and assistive technology.
 
 Acceptance: composing, sending, reading, interrupting and recovering from a conversation feel predictable, and the source scope is always clear.
 

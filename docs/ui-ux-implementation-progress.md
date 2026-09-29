@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**138/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**139/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,17 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Chat composer and model recovery — September 29
+
+**139/169 checklist items implemented locally.** CHAT-10 is complete for the reviewed composer flows; changes are not deployed.
+
+- The model picker distinguishes loading, failure and an empty configured list, offers retry, fits short screens, contains focus and returns it on Escape or selection. Radio options support arrow/Home/End keys; long model names and metadata remain readable. Retry no longer dismisses the picker when its content changes.
+- A selected model applies to this chat immediately. Default saves are serialized, a late preference read cannot overwrite a deliberate choice, and save failures keep the selected model with explicit retry. Context-window metadata follows the loaded model list.
+- Whitespace cannot send; Enter sends, Shift+Enter adds a line and IME confirmation does not submit. Touch users can Queue while Stop remains available. Pending submissions prevent duplicates and preserve any newly typed draft; a queue failure keeps the attempted message and does not mark the active response failed.
+- The accepted conversation/activity IDs are captured from response headers before streaming finishes, so the first response supports queueing and Stop retains the identity for the next turn.
+- Verification: 23 frontend/API tests across six files, TypeScript and production build pass. ESLint has zero errors and one existing ChatPanel dependency warning. All 26 browser states at 320/768-short/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Focus containment/return, selected-model request payloads, first-turn queueing and post-Stop activity identity are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-chat-composer-evidence`; recipe: `frontend/scripts/visual-review/chat-composer.mjs`. APIs and streams use fixtures. Live model execution, queue consumption, ambiguous server-side queue acceptance and assistive-technology device behavior are not certified; broader agent/accessibility acceptance stays open.
 
 ## Knowledge ownership, sharing and availability — September 29
 

@@ -2,7 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StreamChunk } from '../types/chat'
 import { useChat } from './useChat'
-import { streamChat } from '../api/chat'
+import { streamChat, queueChatMessage } from '../api/chat'
 vi.mock('../api/chat', () => ({ streamChat: vi.fn(), getHistory: vi.fn(), queueChatMessage: vi.fn() }))
 beforeEach(() => vi.clearAllMocks())
 describe('interrupted agent responses', () => {
@@ -40,4 +40,34 @@ describe('interrupted agent responses', () => {
     expect(result.current.messages[1].tool_results?.[0].content).toEqual({ workflow_id: 'wf-1' })
     expect(result.current.messages.at(-1)?.content).toBe('Checking the existing workflow.')
   })
+})
+
+
+it('rolls back a failed queued message and rejects to the composer without marking the active run failed', async () => {
+  vi.mocked(streamChat).mockResolvedValue({ conversationUuid: 'conversation', activityId: 'activity' })
+  vi.mocked(queueChatMessage).mockRejectedValueOnce(new Error('Queue unavailable'))
+  const { result } = renderHook(() => useChat())
+  await act(async () => { await result.current.send('Start') })
+  await act(async () => { await expect(result.current.queueMessage('Next instruction')).rejects.toThrow('Queue unavailable') })
+  expect(result.current.queuedMessages).toEqual([])
+  expect(result.current.error).toBeNull()
+})
+
+
+it('accepts first-turn identity before completion so queueing and Stop preserve the conversation', async () => {
+  vi.mocked(streamChat).mockImplementation(async (_m, _d, _a, onChunk, _model, _kb, _o, _f, _first, _demo, signal, _project, onStarted) => {
+    onStarted?.({ conversationUuid: 'first-conversation', activityId: 'first-activity' })
+    onChunk?.({ kind: 'text', content: 'Working' })
+    return new Promise((_resolve, reject) => signal?.addEventListener('abort', () => reject(new DOMException('Stopped', 'AbortError'))))
+  })
+  vi.mocked(queueChatMessage).mockResolvedValue({ success: true })
+  const { result } = renderHook(() => useChat())
+  act(() => { void result.current.send('Start') })
+  expect(result.current.conversationUuid).toBe('first-conversation')
+  await act(async () => { await result.current.queueMessage('Next instruction') })
+  expect(queueChatMessage).toHaveBeenLastCalledWith('first-conversation', 'Next instruction')
+  act(() => result.current.stop())
+  await waitFor(() => expect(result.current.isStreaming).toBe(false))
+  expect(result.current.conversationUuid).toBe('first-conversation')
+  expect(result.current.activityId).toBe('first-activity')
 })

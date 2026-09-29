@@ -43,7 +43,7 @@ const BAR_COLORS = {
 function StatBar({ label, value, color, title }: { label: string; value: number; color: string; title?: string }) {
   return (
     <div title={title} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 10.5, color: '#6b7280', width: 74, flexShrink: 0, fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 12, color: '#4b5563', width: 74, flexShrink: 0, fontWeight: 500 }}>{label}</span>
       <div style={{ flex: 1, height: 5, backgroundColor: '#efefef', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{
           width: `${Math.round(value * 100)}%`,
@@ -98,7 +98,7 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
 
   return (
     <div role="radiogroup" aria-label="Model" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
-      {models.map(model => {
+      {models.map((model, index) => {
         const selected = model.tag === selectedModel
 
         return (
@@ -108,6 +108,17 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
             role="radio"
             aria-checked={selected}
             aria-label={model.tag}
+            tabIndex={selected || (!models.some(item => item.tag === selectedModel) && index === 0) ? 0 : -1}
+            onKeyDown={event => {
+              const next = event.key === 'ArrowDown' || event.key === 'ArrowRight' ? (index + 1) % models.length
+                : event.key === 'ArrowUp' || event.key === 'ArrowLeft' ? (index + models.length - 1) % models.length
+                : event.key === 'Home' ? 0 : event.key === 'End' ? models.length - 1 : null
+              if (next === null) return
+              event.preventDefault()
+              const radios = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')
+              radios?.[next]?.focus()
+              onChange(models[next].tag)
+            }}
             onClick={() => onChange(model.tag)}
             style={{
               display: 'flex',
@@ -121,6 +132,7 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
               fontFamily: 'inherit',
               textAlign: 'left',
               width: '100%',
+              overflowWrap: 'anywhere',
               transition: 'border-color 0.12s, background-color 0.12s',
             }}
           >
@@ -133,9 +145,9 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
                   backgroundColor: '#fff',
                   transition: 'border 0.12s',
                 }} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{model.tag}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#111', minWidth: 0 }}>{model.name || model.tag}{model.name && model.name !== model.tag && <span style={{ display: 'block', fontSize: 12, fontWeight: 400, color: '#4b5563' }}>{model.tag}</span>}</span>
                 {model.external && (
-                  <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 500 }}>external</span>
+                  <span style={{ fontSize: 12, color: '#4b5563', fontWeight: 500 }}>external</span>
                 )}
               </div>
             </div>

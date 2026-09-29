@@ -4,6 +4,17 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Chat composer and model recovery — September 29
+
+**139/169 checklist items implemented locally.** CHAT-10 is complete for the reviewed composer flows; changes are not deployed.
+
+- The model picker distinguishes loading, failure and an empty configured list, offers retry, fits short screens, contains focus and returns it on Escape or selection. Radio options support arrow/Home/End keys; long model names and metadata remain readable. Retry no longer dismisses the picker when its content changes.
+- A selected model applies to this chat immediately. Default saves are serialized, a late preference read cannot overwrite a deliberate choice, and save failures keep the selected model with explicit retry. Context-window metadata follows the loaded model list.
+- Whitespace cannot send; Enter sends, Shift+Enter adds a line and IME confirmation does not submit. Touch users can Queue while Stop remains available. Pending submissions prevent duplicates and preserve any newly typed draft; a queue failure keeps the attempted message and does not mark the active response failed.
+- The accepted conversation/activity IDs are captured from response headers before streaming finishes, so the first response supports queueing and Stop retains the identity for the next turn.
+- Verification: 23 frontend/API tests across six files, TypeScript and production build pass. ESLint has zero errors and one existing ChatPanel dependency warning. All 26 browser states at 320/768-short/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Focus containment/return, selected-model request payloads, first-turn queueing and post-Stop activity identity are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-chat-composer-evidence`; recipe: `frontend/scripts/visual-review/chat-composer.mjs`. APIs and streams use fixtures. Live model execution, queue consumption, ambiguous server-side queue acceptance and assistive-technology device behavior are not certified; broader agent/accessibility acceptance stays open.
+
 ## Knowledge ownership, sharing and availability — September 29
 
 **138/169 checklist items implemented locally.** KB-11/12 are complete for the reviewed Knowledge flows; changes are not deployed.
@@ -455,7 +466,7 @@ Acceptance: users can find, organize and open an item quickly; no item is clippe
 - [x] **CHAT-07 · P2 · Verify:** Long answers, lists, tables, links and code have readable wrapping and usable copy/source actions.
 - [x] **CHAT-08 · P2 · Verify:** Streaming, stop, interruption, retry and connection failure preserve the conversation and show accurate state.
 - [x] **CHAT-09 · P2 · Verify:** Auto-scroll respects a user reading earlier messages and provides a clear way to return to the latest response.
-- [ ] **CHAT-10 · P2 · Verify:** Send-button state, Enter/Shift+Enter, model selection and errors remain understandable with keyboard, touch and assistive technology.
+- [x] **CHAT-10 · P2 · Verify:** Send-button state, Enter/Shift+Enter, model selection and errors remain understandable with keyboard, touch and assistive technology.
 
 Acceptance: composing, sending, reading, interrupting and recovering from a conversation feel predictable, and the source scope is always clear.
 

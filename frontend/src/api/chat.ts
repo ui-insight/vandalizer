@@ -14,6 +14,7 @@ export async function streamChat(
   runDemo?: boolean,
   signal?: AbortSignal,
   projectUuid?: string,
+  onStarted?: (identity: { conversationUuid: string; activityId: string }) => void,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -42,6 +43,8 @@ export async function streamChat(
 
   const conversationUuid = res.headers.get('X-Conversation-UUID') || ''
   const returnedActivityId = res.headers.get('X-Activity-ID') || ''
+  // Queueing and Stop need the accepted conversation identity before the body ends.
+  if (conversationUuid && returnedActivityId) onStarted?.({ conversationUuid, activityId: returnedActivityId })
 
   const reader = res.body?.getReader()
   if (!reader) throw new Error('No response stream')

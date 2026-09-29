@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 138/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 139/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,17 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Chat composer and model recovery — September 29
+
+**139/169 checklist items implemented locally.** CHAT-10 is complete for the reviewed composer flows; changes are not deployed.
+
+- The model picker distinguishes loading, failure and an empty configured list, offers retry, fits short screens, contains focus and returns it on Escape or selection. Radio options support arrow/Home/End keys; long model names and metadata remain readable. Retry no longer dismisses the picker when its content changes.
+- A selected model applies to this chat immediately. Default saves are serialized, a late preference read cannot overwrite a deliberate choice, and save failures keep the selected model with explicit retry. Context-window metadata follows the loaded model list.
+- Whitespace cannot send; Enter sends, Shift+Enter adds a line and IME confirmation does not submit. Touch users can Queue while Stop remains available. Pending submissions prevent duplicates and preserve any newly typed draft; a queue failure keeps the attempted message and does not mark the active response failed.
+- The accepted conversation/activity IDs are captured from response headers before streaming finishes, so the first response supports queueing and Stop retains the identity for the next turn.
+- Verification: 23 frontend/API tests across six files, TypeScript and production build pass. ESLint has zero errors and one existing ChatPanel dependency warning. All 26 browser states at 320/768-short/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Focus containment/return, selected-model request payloads, first-turn queueing and post-Stop activity identity are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-chat-composer-evidence`; recipe: `frontend/scripts/visual-review/chat-composer.mjs`. APIs and streams use fixtures. Live model execution, queue consumption, ambiguous server-side queue acceptance and assistive-technology device behavior are not certified; broader agent/accessibility acceptance stays open.
 
 ## Knowledge ownership, sharing and availability — September 29
 
@@ -134,7 +145,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | KB validation system | 6.5/6.5 | 8/8 | [validation-history-run-card-320](../2026-09-28-history-verified/validation-history-run-card-320.png) |
 | Explore / shared catalog | 7/6.5 | 8/8 | [catalog-save-success](../2026-09-26-recovery-verified/catalog-save-success.png) |
 | Library | 5.5/5.5 | 8/8 | [library-mixed-types-return-1440](../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png) |
-| Chat workspace | 6.5/6 | 8/8 | [chat-home](../upgrade-polish-final-context/chat-home.png) |
+| Chat workspace | 6.5/6 | 8/8 | [composer-queue-error-draft-768](../2026-09-29-chat-composer-evidence/composer-queue-error-draft-768.png) |
 | Basic chat onboarding | 7/6.5 | 8/8 | [onboarding-evidence-checked-mobile](../upgrade-polish-final-journeys/onboarding-evidence-checked-mobile.png) |
 | Chat uploads | 6/3 | 8/8 | [chat-upload-error](../upgrade-final/chat-upload-error.png) |
 | Chat knowledge-base interactions | 7/7 | 8/8 | [chat-citation-preview-mobile](../upgrade-polish-final-journeys/chat-citation-preview-mobile.png) |
@@ -153,7 +164,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 847 distinct states / 1017 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 873 distinct states / 1043 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -255,6 +266,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-28-file-library-regression](../2026-09-28-file-library-regression/manifest.json): 30 states; source `6d0eba57af1b0af8f66e6bd427e6477a3b9bb330401dbf2199a3dedb739979ba`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-knowledge-states-evidence](../2026-09-29-knowledge-states-evidence/manifest.json): 40 states; source `d87b6c4df69d29f484bb98876c08893839157a8e7facce628813ee44a65bbb88`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-knowledge-project-final](../2026-09-29-knowledge-project-final/manifest.json): 6 states; source `db482784faf138c697a3a9f4c1e12a69f210c3e184da69d6da37db399f9829aa`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-chat-composer-evidence](../2026-09-29-chat-composer-evidence/manifest.json): 26 states; source `90c99a4a7969939d035ba81d66ecef0e593343dff01279f9219d35e503a159d5`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -274,7 +286,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Library:** Folder-aware search, type filters, sorting, favorites, pins, retained errors and exact-target retries pass. Folder create/rename/move/delete preserve failed drafts and restore items after deletion. Mixed long names, 120-item lists, unavailable-item recovery and focus-contained prompt previews pass at mobile/tablet/desktop widths. The file-and-Library workflow remains intact; live permissions and execution remain unverified.
 
-**Chat workspace:** A compact task launcher and shorter composer establish a clear primary action. Stopped/interrupted responses preserve partial output, and retry retains completed artifacts. Long response/table/code reading, retained scroll position, latest-response navigation, draft retention and narrow composer controls pass fixture checks. Model-selection and broader assistive-technology journeys remain open.
+**Chat workspace:** Model loading/default-save recovery, keyboard selection and focus return, Enter/Shift+Enter/IME, touch queueing, retained failed drafts and selected-model request payloads pass. First-response identity supports queueing and preserves context after Stop. Reading/scroll and source scope checks remain in the earlier evidence; live execution, queue consumption and assistive-technology devices are unverified.
 
 **Basic chat onboarding:** A mobile first session now exercises upload → scoped question → source preview. One progress guide stays visible, with concise contextual guidance. Full guided-tour coexistence remains open.
 

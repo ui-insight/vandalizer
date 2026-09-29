@@ -308,6 +308,11 @@ export function useChat() {
           runDemo,
           controller.signal,
           projectUuid,
+          identity => {
+            if (controller.signal.aborted || abortRef.current !== controller) return
+            setConversationUuid(identity.conversationUuid)
+            setActivityId(identity.activityId)
+          },
         )
 
         setConversationUuid(result.conversationUuid)
@@ -427,7 +432,7 @@ export function useChat() {
    * turn — the badge clears when that turn's queue_consumed chunk arrives. */
   const queueMessage = useCallback(async (text: string) => {
     const trimmed = text.trim()
-    if (!trimmed || !conversationUuid) return
+    if (!trimmed || !conversationUuid) throw new Error('This conversation is still starting. Keep your message and try again shortly.')
     setQueuedMessages((prev) => [...prev, trimmed])
     try {
       await queueChatMessage(conversationUuid, trimmed)
@@ -439,7 +444,7 @@ export function useChat() {
         next.splice(idx, 1)
         return next
       })
-      setError(e instanceof Error ? e.message : 'Could not queue the message')
+      throw new Error(e instanceof Error ? e.message : 'Could not queue the message')
     }
   }, [conversationUuid])
 
