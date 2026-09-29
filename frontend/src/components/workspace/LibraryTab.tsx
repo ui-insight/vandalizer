@@ -360,7 +360,9 @@ export function LibraryTab() {
     // Pinned first, then favorited
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     if (a.favorited !== b.favorited) return a.favorited ? -1 : 1
-    // Then by most recently used/created (descending)
+    // Then used items by most recent use; never-used items after them,
+    // newest first — a fresh item must not outrank one actually run.
+    if (Boolean(a.last_used_at) !== Boolean(b.last_used_at)) return a.last_used_at ? -1 : 1
     const aTime = a.last_used_at || a.created_at || ''
     const bTime = b.last_used_at || b.created_at || ''
     if (aTime !== bTime) return bTime.localeCompare(aTime)
@@ -1354,8 +1356,9 @@ export function LibraryTab() {
                   qualityScore={item.quality_score}
                   regressionPending={item.regression_pending_review}
                   onOpen={(it) => {
+                    // Opening is not using: a workflow's or extraction's
+                    // last-used comes from its run history (server-side).
                     if (it.kind === 'workflow') {
-                      markUsed(it.id)
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
                       // Preview first — the prompt only launches into the
@@ -1363,7 +1366,6 @@ export function LibraryTab() {
                       // which is also what bumps last-used.
                       openPromptModal(it, 'preview')
                     } else if (it.set_type === 'extraction' && it.item_uuid) {
-                      markUsed(it.id)
                       openExtraction(it.item_uuid)
                     }
                   }}
