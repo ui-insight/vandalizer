@@ -1,3 +1,4 @@
+import { CatalogUsage } from '../library/CatalogUsage'
 import { useState } from 'react'
 import {
   Search, ShieldCheck, BookOpen, FolderOpen, Star, X,
@@ -170,7 +171,7 @@ function KBCatalogCard({
     >
       <div style={{ display: 'flex', alignItems: 'start', gap: 6, marginBottom: 6 }}>
         <ShieldCheck size={14} style={{ color: tierIconColor, flexShrink: 0, marginTop: 2 }} />
-        <button type="button" onClick={onClick} style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
+        <button type="button" onClick={onClick} style={{ minHeight: 36, fontSize: 16, fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
           {item.display_name || item.name}
         </button>
       </div>
@@ -196,11 +197,8 @@ function KBCatalogCard({
         <CatalogSignals item={item} style={{ fontSize: 12, color: C.textFaint }} />
       </div>
 
-      {item.description && (
-        <p style={{ fontSize: 12, color: '#bdbdbd', margin: '0 0 8px 0', lineHeight: 1.4 }}>
-          {item.description}
-        </p>
-      )}
+      <p style={{ fontSize: 13, color: '#d1d5db', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
+      <CatalogUsage item={item} compact dark />
 
       {item.created_by && (
         <div style={{ marginBottom: 8 }}>

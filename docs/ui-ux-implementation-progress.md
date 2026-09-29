@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**139/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**140/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Explore purpose and usage — September 29
+
+**140/169 checklist items implemented locally.** EXP-05 is complete for the reviewed catalog flows; changes are not deployed.
+
+- Cards and details lead with purpose, item type, required input and intended output. Prompt templates have the correct label and share the Extractions & prompts filter. Displayed published descriptions participate in search.
+- Workflow summaries distinguish text, documents, fixed documents and no-input configuration, with full output-step names in details. Missing definitions or output steps remain explicit. Knowledge availability and answer evidence are separate from catalog quality signals.
+- Summaries derive from published definitions without exposing private document identifiers, destinations or verification-submission instructions. Card titles and tags are separate keyboard controls.
+- Verification: 17 frontend tests and 77 backend tests pass (two existing backend skips). TypeScript, production build, ESLint, Ruff and diff checks pass. Sixty-six browser states cover usage details and filter/retry regression at 320/768/1440px with zero axe findings, overflow, uncaught errors or unmatched requests. Primary actions and focus return are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-catalog-usage-final` and `2026-09-29-catalog-filter-regression`. Browser APIs use fixtures and backend persistence is mocked; live execution and permissions are not certified.
 
 ## Chat composer and model recovery — September 29
 

@@ -168,7 +168,7 @@ Acceptance: a user can set up a meaningful check, understand what it costs and m
 - [x] **EXP-02 · P2 · Fix:** Use one contextual catalog search instead of displaying competing Library and catalog search fields.
 - [x] **EXP-03 · P2 · Fix:** Collapse or remove the wide single-option All Knowledge Bases sidebar.
 - [x] **EXP-04 · P2 · Fix:** Standardize Checked/Verified terminology and explain what each trust indicator actually establishes.
-- [ ] **EXP-05 · P2 · Improve:** Prioritize item purpose, type, required inputs and intended output in cards and details.
+- [x] **EXP-05 · P2 · Improve:** Prioritize item purpose, type, required inputs and intended output in cards and details.
 - [x] **EXP-06 · P2 · Improve:** Make quality, sample count, validation recency, provenance and available limitations legible; distinguish unmeasured quality from low quality.
 - [x] **EXP-07 · P2 · Verify:** Search, kind filters, quality filters, sorting, clearing filters and no-results recovery work together.
 - [x] **EXP-08 · P2 · Verify:** Save to Library clearly indicates destination, pending/error state and already-saved state, then offers a useful next action.

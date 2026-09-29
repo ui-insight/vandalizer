@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Explore purpose and usage — September 29
+
+**140/169 checklist items implemented locally.** EXP-05 is complete for the reviewed catalog flows; changes are not deployed.
+
+- Cards and details lead with purpose, item type, required input and intended output. Prompt templates have the correct label and share the Extractions & prompts filter. Displayed published descriptions participate in search.
+- Workflow summaries distinguish text, documents, fixed documents and no-input configuration, with full output-step names in details. Missing definitions or output steps remain explicit. Knowledge availability and answer evidence are separate from catalog quality signals.
+- Summaries derive from published definitions without exposing private document identifiers, destinations or verification-submission instructions. Card titles and tags are separate keyboard controls.
+- Verification: 17 frontend tests and 77 backend tests pass (two existing backend skips). TypeScript, production build, ESLint, Ruff and diff checks pass. Sixty-six browser states cover usage details and filter/retry regression at 320/768/1440px with zero axe findings, overflow, uncaught errors or unmatched requests. Primary actions and focus return are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-catalog-usage-final` and `2026-09-29-catalog-filter-regression`. Browser APIs use fixtures and backend persistence is mocked; live execution and permissions are not certified.
+
 ## Chat composer and model recovery — September 29
 
 **139/169 checklist items implemented locally.** CHAT-10 is complete for the reviewed composer flows; changes are not deployed.
@@ -433,7 +443,7 @@ Acceptance: a user can set up a meaningful check, understand what it costs and m
 - [x] **EXP-02 · P2 · Fix:** Use one contextual catalog search instead of displaying competing Library and catalog search fields.
 - [x] **EXP-03 · P2 · Fix:** Collapse or remove the wide single-option All Knowledge Bases sidebar.
 - [x] **EXP-04 · P2 · Fix:** Standardize Checked/Verified terminology and explain what each trust indicator actually establishes.
-- [ ] **EXP-05 · P2 · Improve:** Prioritize item purpose, type, required inputs and intended output in cards and details.
+- [x] **EXP-05 · P2 · Improve:** Prioritize item purpose, type, required inputs and intended output in cards and details.
 - [x] **EXP-06 · P2 · Improve:** Make quality, sample count, validation recency, provenance and available limitations legible; distinguish unmeasured quality from low quality.
 - [x] **EXP-07 · P2 · Verify:** Search, kind filters, quality filters, sorting, clearing filters and no-results recovery work together.
 - [x] **EXP-08 · P2 · Verify:** Save to Library clearly indicates destination, pending/error state and already-saved state, then offers a useful next action.

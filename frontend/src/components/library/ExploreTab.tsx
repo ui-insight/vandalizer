@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
-  Search, ShieldCheck, BookOpen, Workflow, FileSearch,
+  Search, ShieldCheck, BookOpen, Workflow, FileSearch, MessageSquare,
   FolderOpen, Star, X, Plus, ArrowUpDown,
   Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2, Users,
   Pin, PinOff,
@@ -12,6 +12,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
+import { CatalogUsage } from './CatalogUsage'
 import { CatalogSignals, CatalogEvidence } from './CatalogSignals'
 import { useCatalogBrowser, SORT_OPTIONS, QUALITY_FILTER_OPTIONS, type KindFilter, type QualityFilter, type SortOption } from './useCatalogBrowser'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
@@ -71,6 +72,11 @@ const KIND_CONFIG = {
     icon: FileSearch,
     bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200',
     heroBg: 'from-teal-500 to-teal-700',
+  },
+  prompt: {
+    label: 'Prompt', icon: MessageSquare,
+    bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200',
+    heroBg: 'from-gray-600 to-gray-800',
   },
   knowledge_base: {
     label: 'Knowledge Base',
@@ -148,7 +154,7 @@ export function ItemDetailModal({
     } finally { adoptingRef.current = false; setAdopting(null) }
   }
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
-  const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
+  const kindConf = KIND_CONFIG[(item.kind === 'search_set' && item.set_type === 'prompt' ? 'prompt' : item.kind) as keyof typeof KIND_CONFIG]
   const shareLink = useShareLink()
   const shareKind: 'workflow' | 'extraction' | 'kb' | null =
     item.kind === 'workflow' ? 'workflow'
@@ -183,9 +189,7 @@ export function ItemDetailModal({
                 </span>
               </div>
               <h2 className="text-xl font-bold">{item.display_name || item.name}</h2>
-              {item.description && (
-                <p className="mt-1.5 text-sm text-white/80">{item.description}</p>
-              )}
+              <p className="mt-1.5 text-sm text-white/80">{item.description || 'Purpose not described.'}</p>
             </div>
             <button type="button" disabled={!!adopting} onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
               <X className="h-5 w-5" />
@@ -219,6 +223,7 @@ export function ItemDetailModal({
 
         {/* Body */}
         <div className="px-6 py-5">
+          <CatalogUsage item={item} />
           {/* Tags */}
           {item.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-5">
@@ -387,8 +392,8 @@ function CatalogCard({
   const tierStyle = item.quality_asserted ? undefined : TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
 
   return (
-    <button
-      onClick={onClick}
+    <article
+      style={{ overflowWrap: 'anywhere', minWidth: 0 }}
       className={`group flex flex-col rounded-xl border bg-white p-4 text-left transition-all hover:shadow-md ${
         tierStyle ? `ring-1 ${tierStyle.ring} hover:${tierStyle.glow}` : 'border-gray-200 hover:border-gray-300'
       }`}
@@ -398,13 +403,20 @@ function CatalogCard({
           <div className="flex items-start gap-1.5 mb-1">
             <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${tierStyle ? tierStyle.accent : 'text-gray-400'}`} />
             <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
-            <span className="text-sm font-semibold text-gray-900 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
+            <button type="button" onClick={onClick} className="min-h-9 text-base font-semibold text-gray-900 flex-1 min-w-0 text-left group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
-            </span>
+            </button>
           </div>
           <div className="flex items-center gap-1.5 flex-wrap">
-            <KindBadge kind={item.kind} />
-            <QualityBadge
+            <KindBadge kind={item.kind === 'search_set' && item.set_type === 'prompt' ? 'prompt' : item.kind} />
+          </div>
+        </div>
+      </div>
+
+      <p className="text-sm text-gray-700 mb-3">{item.description || 'Purpose not described.'}</p>
+      <CatalogUsage item={item} compact />
+      <div className="flex flex-wrap items-center gap-2 mb-3">
+        <QualityBadge
               tier={item.quality_tier}
               score={item.quality_score}
               asserted={item.quality_asserted}
@@ -412,13 +424,7 @@ function CatalogCard({
               variant="catalog"
             />
             <CatalogSignals item={item} className="text-xs text-gray-500" />
-          </div>
-        </div>
       </div>
-
-      {item.description && (
-        <p className="text-xs text-gray-600 mb-2">{item.description}</p>
-      )}
 
       {(item.submitted_by || item.credit || item.created_by) && (
         <div className="mb-2">
@@ -436,20 +442,20 @@ function CatalogCard({
       {item.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-auto pt-2">
           {item.tags.slice(0, 4).map((tag, i) => (
-            <span
+            <button type="button"
               key={i}
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
               className="text-xs px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-700 cursor-pointer transition-colors"
             >
               {tag}
-            </span>
+            </button>
           ))}
           {item.tags.length > 4 && (
             <span className="text-xs text-gray-500">+{item.tags.length - 4}</span>
           )}
         </div>
       )}
-    </button>
+    </article>
   )
 }
 
@@ -614,7 +620,7 @@ export function ExploreTab() {
   const kindFilters: [KindFilter, string][] = [
     ['', 'All'],
     ['workflow', 'Workflows'],
-    ['search_set', 'Extractions'],
+    ['search_set', 'Extractions & prompts'],
     ['knowledge_base', 'Knowledge Bases'],
   ]
 

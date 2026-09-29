@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 139,
+  "completed_items": 140,
   "total_items": 169,
-  "unique_states": 873,
-  "capture_executions": 1043,
+  "unique_states": 903,
+  "capture_executions": 1109,
   "mobile_grade": 8,
   "areas": [
     {
@@ -12384,6 +12384,768 @@
       "observations": [
         "Saved-model read retry, available-model failure/empty/long-list recovery, focus containment/return, arrow selection, default-save retry without draft loss, whitespace, Enter/Shift+Enter/IME, selected model in request, touch queue failure/retained draft/retry and Stop. 320/768-short/1440; synthetic APIs/stream, no model or worker execution."
       ]
+    },
+    {
+      "directory": "2026-09-29-catalog-usage-final",
+      "capturedAt": "2026-09-29T17:11:36.841Z",
+      "sourceFingerprint": "0e20919019d0e30019feaac40bce460afbf5a9200457aab0fd6e7e7724e5f2bb",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/services/verification_service.py\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/library/ExploreTab.test.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/types/library.ts\n?? backend/app/services/catalog_usage.py\n?? backend/tests/test_catalog_usage.py\n?? frontend/scripts/visual-review/catalog-usage.mjs\n?? frontend/src/components/library/CatalogUsage.test.tsx\n?? frontend/src/components/library/CatalogUsage.tsx",
+      "commit": "b70de812d1ade65bdcc68d1bc0aa5f37d05957fb",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "catalog-purpose-first-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-files-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-text-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-none-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-extraction-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-prompt-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-kb-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-usage-unknown-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-prompts-filter-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-knowledge-input-output-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-purpose-first-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-files-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-text-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-none-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-extraction-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-prompt-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-kb-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-unknown-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-prompts-filter-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-knowledge-input-output-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-purpose-first-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-files-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-text-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-none-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-extraction-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-prompt-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-kb-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-usage-unknown-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-prompts-filter-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-knowledge-input-output-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Purpose/type/input/output hierarchy for files/text/no-input workflows, extraction, long prompt, unindexed KB and missing documentation. Complete output labels and fixed-document caveats in details; action reachability and keyboard focus return; honest combined extraction/prompt filter; KB Explore summary. 320/768/1440 synthetic catalog entries; no execution."
+      ]
+    },
+    {
+      "directory": "2026-09-29-catalog-filter-regression",
+      "capturedAt": "2026-09-29T17:07:38.089Z",
+      "sourceFingerprint": "03d414db121fc5955f7641f27543b7928d2eca43ebddf2d632adf0271fb39dd7",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/services/verification_service.py\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/library/ExploreTab.test.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/types/library.ts\n?? backend/app/services/catalog_usage.py\n?? backend/tests/test_catalog_usage.py\n?? frontend/scripts/visual-review/catalog-usage.mjs\n?? frontend/src/components/library/CatalogUsage.test.tsx\n?? frontend/src/components/library/CatalogUsage.tsx",
+      "commit": "b70de812d1ade65bdcc68d1bc0aa5f37d05957fb",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "catalog-collections-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-combined-filters-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-filters-cleared-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-query-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-pagination-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-pagination-retried-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-collections-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-combined-filters-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-filters-cleared-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-query-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "catalog-collections-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-combined-filters-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-filters-cleared-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-query-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-pagination-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-pagination-retried-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-collections-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-combined-filters-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-filters-cleared-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-query-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-collections-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-combined-filters-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-filters-cleared-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-query-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-pagination-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-pagination-retried-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-collections-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-combined-filters-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-filters-cleared-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-query-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
     }
   ]
 }
