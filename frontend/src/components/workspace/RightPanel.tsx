@@ -20,8 +20,8 @@ export function RightPanel() {
   // Library's filters, search, folder selection, and scroll likewise survive
   // opening and closing an editor.
   const editor = openAutomationId ? <AutomationEditorPanel key={openAutomationId} />
-    : openExtractionId ? <ExtractionEditorPanel />
-    : openWorkflowId ? <WorkflowEditorPanel />
+    : openExtractionId ? <ExtractionEditorPanel key={openExtractionId} />
+    : openWorkflowId ? <WorkflowEditorPanel key={openWorkflowId} />
     : null
 
   return (

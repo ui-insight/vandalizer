@@ -28,6 +28,7 @@ import type { LibraryItem, LibraryFolder } from '../../types/library'
 interface Props {
   item: LibraryItem
   scope: 'mine' | 'team'
+  busy?: boolean
   onPin: (id: string, pinned: boolean) => void
   onFavorite: (id: string, favorited: boolean) => void
   onClone: (id: string) => void
@@ -42,7 +43,7 @@ interface Props {
   regressionPending?: boolean
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
+export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore, regressionPending }: Props) {
   const shareLabel = useShareLabel()
   const { user } = useAuth()
   const { toast } = useToast()
@@ -84,6 +85,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
   useEffect(() => {
     if (!menuOpen) return
+    menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     const handler = (e: MouseEvent) => {
       const target = e.target as Node
       if (
@@ -123,7 +125,8 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             fontWeight: 500,
             fontSize: 14,
             color: '#202124',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
+            overflowWrap: 'anywhere',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             display: 'flex',
@@ -162,7 +165,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             {item.description}
           </div>
         )}
-        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 12, color: '#5f6368', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{kindLabel}</span>
           {item.verified && (
             <span style={{ color: '#b45309', fontWeight: 500 }}>Shared with everyone</span>
@@ -228,7 +231,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           }}
         >
             {/* Favorite */}
-            <button
+            <button disabled={busy}
               onClick={(e) => {
                 e.stopPropagation()
                 onFavorite(item.id, !item.favorited)
@@ -259,7 +262,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             </button>
 
             {/* Pin */}
-            <button
+            <button disabled={busy}
               onClick={(e) => {
                 e.stopPropagation()
                 onPin(item.id, !item.pinned)
@@ -290,7 +293,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             </button>
 
             <div style={{ position: 'relative', display: 'inline-block' }}>
-              <button
+              <button disabled={busy}
                 ref={triggerRef}
                 aria-label="More actions"
                 title="More actions"
@@ -318,12 +321,19 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               {menuOpen && createPortal(
                 <div
                   ref={menuRef}
+                  role="group"
+                  aria-label={`Actions for ${item.name}`}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setMenuOpen(false); setFolderSubmenuOpen(false); triggerRef.current?.focus() }
+                  }}
                   style={{
                     position: 'fixed',
-                    left: Math.max(0, menuPos.left),
+                    left: Math.max(8, Math.min(menuPos.left, window.innerWidth - 248)),
                     ...(flipUp ? { bottom: window.innerHeight - menuPos.top + 4 } : { top: menuPos.top }),
                     zIndex: 9999,
-                    minWidth: 200,
+                    width: Math.min(240, window.innerWidth - 16),
+                    maxHeight: 'calc(100dvh - 24px)',
+                    overflowY: 'auto',
                     borderRadius: 'var(--ui-radius, 12px)',
                     border: '1px solid rgba(0,0,0,0.15)',
                     background: '#fff',
@@ -331,7 +341,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     padding: '6px 0',
                   }}
                 >
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Pin size={14} />}
                     label={
                       item.folder
@@ -344,7 +354,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       setMenuOpen(false)
                     }}
                   />
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Star size={14} />}
                     label={
                       item.folder
@@ -358,7 +368,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     }}
                   />
                   {onEdit && (item.set_type === 'prompt' || item.set_type === 'formatter') && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Pencil size={14} />}
                       label="Edit"
                       onClick={() => {
@@ -368,7 +378,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     />
                   )}
                   {(item.set_type === 'prompt' || item.set_type === 'formatter') && item.item_uuid && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Download size={14} />}
                       label="Download JSON"
                       title="Download as a shareable JSON file"
@@ -380,7 +390,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   )}
                   <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                   {(item.kind === 'workflow' || item.kind === 'search_set') && (item.item_uuid || item.item_id) && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Link2 size={14} />}
                       label="Copy share link"
                       onClick={() => {
@@ -392,7 +402,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   )}
                   {scope === 'mine' ? (
                     <>
-                      <MenuItem
+                      <MenuItem disabled={busy}
                         icon={<Copy size={14} />}
                         label="Duplicate"
                         onClick={() => {
@@ -400,7 +410,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                           setMenuOpen(false)
                         }}
                       />
-                      <MenuItem
+                      <MenuItem disabled={busy}
                         icon={<Share2 size={14} />}
                         label="Send to team…"
                         onClick={() => {
@@ -410,7 +420,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       />
                     </>
                   ) : (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<Copy size={14} />}
                       label="Add to my library"
                       onClick={() => {
@@ -420,7 +430,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     />
                   )}
                   {!item.verified && (
-                    <MenuItem
+                    <MenuItem disabled={busy}
                       icon={<ShieldCheck size={14} />}
                       label={shareLabel}
                       onClick={() => {
@@ -434,12 +444,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                       {/* Move to folder submenu trigger */}
                       <div style={{ position: 'relative' }}>
-                        <button
-                          onMouseEnter={() => setFolderSubmenuOpen(true)}
-                          onMouseLeave={() => setFolderSubmenuOpen(false)}
+                        <button disabled={busy}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setFolderSubmenuOpen(true)
+                            setFolderSubmenuOpen(open => !open)
                           }}
                           style={{
                             display: 'flex',
@@ -454,8 +462,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                             color: '#1f2937',
                             textAlign: 'left',
                           }}
-                          onFocus={() => setFolderSubmenuOpen(true)}
-                          onBlur={() => setFolderSubmenuOpen(false)}
+                          aria-expanded={folderSubmenuOpen}
                         >
                           <span style={{ width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
                             <FolderInput size={14} />
@@ -465,12 +472,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
                         {folderSubmenuOpen && (
                           <div
-                            onMouseEnter={() => setFolderSubmenuOpen(true)}
-                            onMouseLeave={() => setFolderSubmenuOpen(false)}
                             style={{
-                              position: 'absolute',
-                              right: 'calc(100% + 4px)',
-                              top: 0,
+                              position: 'relative',
+                              margin: '4px 8px',
                               zIndex: 1100,
                               minWidth: 180,
                               borderRadius: 'var(--ui-radius, 12px)',
@@ -482,7 +486,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                           >
                             {/* Remove from folder option */}
                             {item.folder && (
-                              <button
+                              <button disabled={busy}
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   onMoveToFolder(item.id, null)
@@ -510,7 +514,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                               </button>
                             )}
                             {folders.map((folder) => (
-                              <button
+                              <button disabled={busy}
                                 key={folder.uuid}
                                 onClick={(e) => {
                                   e.stopPropagation()
@@ -549,7 +553,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   {/* Only owners can truly delete. For a bookmark of someone
                       else's item (e.g. added from Explore) removal only drops
                       the bookmark, so label it "Remove" — same as KB cards. */}
-                  <MenuItem
+                  <MenuItem disabled={busy}
                     icon={<Trash2 size={14} />}
                     label={canDelete ? 'Delete' : 'Remove'}
                     title={canDelete ? undefined : `Remove from library — the ${kindLabel.toLowerCase()} itself is kept by its owner`}
@@ -583,19 +587,21 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
 function MenuItem({
   icon,
+  disabled,
   label,
   title,
   danger,
   onClick,
 }: {
   icon: React.ReactNode
+  disabled?: boolean
   label: string
   title?: string
   danger?: boolean
   onClick: () => void
 }) {
   return (
-    <button
+    <button disabled={disabled}
       title={title}
       onClick={(e) => {
         e.stopPropagation()

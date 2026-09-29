@@ -177,3 +177,12 @@
 .automation-primary { margin-top: 16px; padding: 9px 14px; background: var(--highlight-color); color: var(--highlight-text-color); border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer; }
 .automation-folder-error { padding: 10px 12px; color: #92400e; font-size: 13px; line-height: 1.5; }
 .automation-folder-error button { text-decoration: underline; margin-left: 6px; cursor: pointer; }
+
+/* Library recovery and organization controls share the content surface. */
+.library-recovery-feedback { position: sticky; top: 0; z-index: 3; }
+.library-feedback { padding: 12px 16px; background: #fff; border-bottom: 1px solid #d1d5db; color: #374151; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.library-feedback[role="alert"] { color: #b91c1c; }
+.library-feedback button, .library-folder-form-actions button { border: 1px solid #d1d5db; border-radius: 6px; background: #fff; padding: 6px 10px; font: inherit; cursor: pointer; }
+.library-folder-form-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 12px; }
+.library-workspace .folder-menu-btn { opacity: 1 !important; min-width: 32px; min-height: 32px; }
+.library-item-actions button:disabled, .library-folder-form-actions button:disabled { opacity: .55; cursor: wait; }

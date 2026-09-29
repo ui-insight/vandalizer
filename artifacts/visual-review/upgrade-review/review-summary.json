@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 132,
+  "completed_items": 136,
   "total_items": 169,
-  "unique_states": 729,
-  "capture_executions": 869,
+  "unique_states": 801,
+  "capture_executions": 971,
   "mobile_grade": 8,
   "areas": [
     {
@@ -83,8 +83,8 @@
       "baseline_ux": 5.5,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-followup-responsive/library-320.png",
-      "note": "Mobile type and sort controls share one row. Saved views are keyboard buttons, show the selected view, close after selection and explain favorites, pins, folders and project scope. Broader folder operations remain open."
+      "evidence": "../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png",
+      "note": "Folder-aware search, type filters, sorting, favorites, pins, retained errors and exact-target retries pass. Folder create/rename/move/delete preserve failed drafts and restore items after deletion. Mixed long names, 120-item lists, unavailable-item recovery and focus-contained prompt previews pass at mobile/tablet/desktop widths. The file-and-Library workflow remains intact; live permissions and execution remain unverified."
     },
     {
       "id": "chat",
@@ -10357,6 +10357,1179 @@
           },
           "pageWidth": 1440,
           "smallText": 4
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-library-recovery-evidence",
+      "capturedAt": "2026-09-29T01:52:57.101Z",
+      "sourceFingerprint": "d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/library/LibraryItemRow.test.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/LibraryTab.test.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/hooks/useLibrary.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/library-opening.mjs\n?? frontend/scripts/visual-review/library-recovery.mjs\n?? frontend/src/hooks/useLibrary.test.ts",
+      "commit": "8897bc8e3fb5599ae35c88891ac29eaabeef6982",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "library-items-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-folders-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "library-search-folder-match-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-favorite-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-favorite-saved-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-pinned-view-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-folder-create-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 4
+        },
+        {
+          "id": "library-folder-rename-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 4
+        },
+        {
+          "id": "library-empty-folder-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-keyboard-folder-menu-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-move-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-moved-item-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-folder-delete-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 4
+        },
+        {
+          "id": "library-folder-delete-restores-items-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-large-list-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-empty-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-items-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-folders-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "library-search-folder-match-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-favorite-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-favorite-saved-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-pinned-view-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-folder-create-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "library-folder-rename-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "library-empty-folder-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-keyboard-folder-menu-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-move-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-moved-item-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-folder-delete-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "library-folder-delete-restores-items-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-large-list-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-empty-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-items-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-folders-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "library-search-folder-match-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-favorite-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-favorite-saved-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-pinned-view-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-folder-create-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "library-folder-rename-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "library-empty-folder-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-keyboard-folder-menu-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-move-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-moved-item-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-folder-delete-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "library-folder-delete-restores-items-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-large-list-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-empty-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-library-opening-evidence",
+      "capturedAt": "2026-09-29T01:51:51.065Z",
+      "sourceFingerprint": "d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/library/LibraryItemRow.test.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/LibraryTab.test.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/hooks/useLibrary.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/library-opening.mjs\n?? frontend/scripts/visual-review/library-recovery.mjs\n?? frontend/src/hooks/useLibrary.test.ts",
+      "commit": "8897bc8e3fb5599ae35c88891ac29eaabeef6982",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "library-workflow-unavailable-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-workflow-recovered-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-extraction-unavailable-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-extraction-recovered-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-prompt-content-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-prompt-long-content-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-mixed-types-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "library-workflow-unavailable-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-workflow-recovered-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-extraction-unavailable-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-extraction-recovered-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-prompt-content-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-prompt-long-content-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-mixed-types-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "library-workflow-unavailable-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-workflow-recovered-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-extraction-unavailable-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-extraction-recovered-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-prompt-content-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-prompt-long-content-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-mixed-types-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-28-file-library-regression",
+      "capturedAt": "2026-09-29T01:47:53.484Z",
+      "sourceFingerprint": "6d0eba57af1b0af8f66e6bd427e6477a3b9bb330401dbf2199a3dedb739979ba",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/library/LibraryItemRow.test.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/LibraryTab.test.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/hooks/useLibrary.ts\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/library-opening.mjs\n?? frontend/scripts/visual-review/library-recovery.mjs\n?? frontend/src/hooks/useLibrary.test.ts",
+      "commit": "8897bc8e3fb5599ae35c88891ac29eaabeef6982",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
         }
       ],
       "unmatched": [],

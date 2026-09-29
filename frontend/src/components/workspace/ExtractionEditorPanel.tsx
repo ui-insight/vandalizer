@@ -114,6 +114,7 @@ export function ExtractionEditorPanel() {
   const confirm = useConfirm()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('design')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -170,10 +171,12 @@ export function ExtractionEditorPanel() {
   // Background refresh — does NOT set loading:true so ValidateTab state is preserved
   const refresh = useCallback(async () => {
     if (!openExtractionId) return
+    setLoadError(null)
     try {
       const ss = await getSearchSet(openExtractionId)
       setSearchSet(ss)
-    } catch {
+    } catch (reason) {
+      setLoadError(reason instanceof Error ? reason.message : 'Could not load this extraction.')
       // silent — don't clear searchSet on refresh failure
     }
     refreshSparkline()
@@ -187,6 +190,7 @@ export function ExtractionEditorPanel() {
   useEffect(() => {
     if (!openExtractionId) return
     setLoading(true)
+    setLoadError(null)
     const pending = consumeExtractionResults()
     setResultSets(pending ? [pending.values] : [])
     setResultSourceSets(pending ? [pending.sources ?? {}] : [])
@@ -207,7 +211,7 @@ export function ExtractionEditorPanel() {
     setActiveTab('design')
     getSearchSet(openExtractionId)
       .then(setSearchSet)
-      .catch(() => setSearchSet(null))
+      .catch(reason => { setSearchSet(null); setLoadError(reason instanceof Error ? reason.message : 'Could not load this extraction.') })
       .finally(() => setLoading(false))
     refreshSparkline()
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
@@ -641,7 +645,7 @@ export function ExtractionEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Loading..." onClose={closeExtraction} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>
+        <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 13 }}>
           Loading extraction...
         </div>
       </div>
@@ -652,9 +656,7 @@ export function ExtractionEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Extraction" onClose={closeExtraction} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 13 }}>
-          Extraction not found.
-        </div>
+        <div role="alert" style={{ padding: 24, textAlign: 'center', color: '#b91c1c', fontSize: 13 }}><p>{loadError || 'Extraction unavailable.'}</p><button type="button" onClick={async () => { setLoading(true); await refresh(); setLoading(false) }} style={{ marginTop: 12 }}>Retry extraction</button><p style={{ marginTop: 12, color: '#59616b' }}>Close this panel to return to your Library.</p></div>
       </div>
     )
   }
@@ -893,7 +895,7 @@ export function ExtractionEditorPanel() {
       </div>
 
       {/* Tab content — all tabs stay mounted to preserve state */}
-      <div role="tabpanel" id="extraction-tabpanel-design" aria-labelledby="extraction-tab-design" hidden={activeTab !== 'design'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
+      <div role="tabpanel" tabIndex={0} id="extraction-tabpanel-design" aria-labelledby="extraction-tab-design" hidden={activeTab !== 'design'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
         <DesignTab
           items={items}
           itemsLoading={itemsLoading}
@@ -4681,6 +4683,8 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
         {title}
       </div>
       <button
+        type="button"
+        aria-label="Close extraction"
         onClick={onClose}
         style={{
           background: 'none',

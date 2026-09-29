@@ -11,6 +11,19 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Library recovery and item opening — September 28
+
+**136/169 checklist items implemented locally.** LIB-06/07/08/09 are complete for the reviewed Library flows; changes are not deployed.
+
+- Search includes matching tools stored in folders, trims whitespace and combines with type filters. Recent, pinned and favorite work remains reachable through the saved views, with create and catalog entry points retained. Folder-only, genuinely empty and no-result states explain the next action.
+- Item/folder/library failures are visible and retryable. Loaded rows survive refresh failures; late searches, old scopes and mutations cannot replace another scope. Favorite, pin, copy and move actions expose pending/success/failure feedback and keep the exact failed target for retry. Folder create/rename errors preserve names, Enter submits once, and deletion failures retain the folder and its contents. Successful folder deletion returns its items to the root.
+- Folder navigation and actions are separate keyboard controls. Item menus use an inline folder choice that fits narrow screens, close with Escape and restore focus. Long names wrap, metadata retains contrast on hover, and 120-item mixed lists stay accessible. Older extraction entries without a type label or separate UUID open correctly.
+- Workflow/extraction load failures distinguish unavailable content and offer retry. Editor instances are keyed to the item while the Library and file pane remain in place. Prompt content failures disable use/edit until a successful retry; stale reads cannot replace another preview. Long previews fit short screens, contain keyboard focus, allow keyboard scrolling and return focus on Escape.
+- Verification: 48 frontend regression tests across six files, TypeScript, production build and touched-file lint pass (four existing editor hook-dependency warnings, no lint errors). The final browser set covers 51 Library recovery states, 21 opening/long-content states at 320/768/1440px, and 30 repeated file → Library → run-on-the-selected-file states at 320/390/768/1024/1440px. All have zero axe findings, page overflow, uncaught errors or unmatched fixture requests; representative screenshots inspected directly.
+- Evidence: `2026-09-28-library-recovery-evidence`, `2026-09-28-library-opening-evidence`, and `2026-09-28-file-library-regression`. APIs and execution use fixtures; live permissions and backend/model execution remain unverified. Broader shared theme, zoom and cross-surface acceptance remain open.
+
+
 ## Automation edit and launch recovery — September 28
 
 **132/169 checklist items implemented locally.** AUTO-08 is complete for the reviewed editor and manual-run flows; changes are not deployed.

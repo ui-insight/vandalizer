@@ -104,4 +104,13 @@ describe('RightPanel tab switching', () => {
     expect(screen.getByTestId('assistant-marker')).toBe(original)
     expect(screen.getByTestId('assistant-marker').closest('div.hidden')).toBeNull()
   })
+  it('isolates editor state by item while retaining the Library underneath', () => {
+    h.tab = 'library'; h.workflowId = 'first'
+    const { rerender } = render(<RightPanel />)
+    const first = screen.getByTestId('workflow-editor-marker')
+    const library = screen.getByTestId('library-marker')
+    h.workflowId = 'second'; rerender(<RightPanel />)
+    expect(screen.getByTestId('workflow-editor-marker')).not.toBe(first)
+    expect(screen.getByTestId('library-marker')).toBe(library)
+  })
 })

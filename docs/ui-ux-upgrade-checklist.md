@@ -183,10 +183,10 @@ Acceptance: users can find an appropriate item, understand its fit and trust evi
 - [x] **LIB-03 · P2 · Fix:** Increase contrast and readability of timestamps, item types, tags and quality metadata.
 - [x] **LIB-04 · P2 · Improve:** Reduce stacked scope/filter/sidebar controls and group personal/team ownership, item type and saved views coherently.
 - [x] **LIB-05 · P2 · Improve:** Explain the practical distinction between favorites, pins, folders and project membership; avoid presenting all as equal first-use decisions.
-- [ ] **LIB-06 · P2 · Improve:** Make search and useful recent/pinned work prominent, with consistent create and browse actions.
-- [ ] **LIB-07 · P2 · Verify:** Item opening, type filters, sorting, favorites, pins and folder actions target the correct item and provide visible feedback.
-- [ ] **LIB-08 · P2 · Verify:** Empty Library, empty folder, no results, unavailable item and large populated lists have clear, efficient states.
-- [ ] **LIB-09 · P2 · Verify:** Long names and mixed workflow/extraction/prompt items remain readable with reliable row actions on desktop and mobile.
+- [x] **LIB-06 · P2 · Improve:** Make search and useful recent/pinned work prominent, with consistent create and browse actions.
+- [x] **LIB-07 · P2 · Verify:** Item opening, type filters, sorting, favorites, pins and folder actions target the correct item and provide visible feedback.
+- [x] **LIB-08 · P2 · Verify:** Empty Library, empty folder, no results, unavailable item and large populated lists have clear, efficient states.
+- [x] **LIB-09 · P2 · Verify:** Long names and mixed workflow/extraction/prompt items remain readable with reliable row actions on desktop and mobile.
 
 Acceptance: users can find, organize and open an item quickly; no item is clipped and mobile retains the essential desktop capabilities.
 

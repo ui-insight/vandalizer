@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { FocusTrap } from 'focus-trap-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -121,7 +122,7 @@ export function LibraryTab() {
 
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
-  const { folders, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  const { folders, loading: foldersLoading, error: foldersError, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
   const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null)
   const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 }) // folder uuid with open menu
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
@@ -129,6 +130,26 @@ export function LibraryTab() {
   const [newFolderMode, setNewFolderMode] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const folderMenuRef = useRef<HTMLDivElement>(null)
+  const folderMenuTrigger = useRef<HTMLButtonElement>(null)
+  const [folderSaving, setFolderSaving] = useState(false)
+  const folderSavingRef = useRef(false)
+  const [folderSaveError, setFolderSaveError] = useState<string | null>(null)
+  const currentScope = useRef(`${scope}:${teamId}`)
+  currentScope.current = `${scope}:${teamId}`
+  const submitFolder = async (uuid?: string) => {
+    const name = normalizeName(uuid ? renameValue : newFolderName)
+    if (!name || folderSavingRef.current) return
+    const scopeAtStart = currentScope.current
+    folderSavingRef.current = true; setFolderSaving(true); setFolderSaveError(null)
+    try {
+      if (uuid) await renameFolder(uuid, name)
+      else await createFolder(name)
+      if (currentScope.current !== scopeAtStart) return
+      setRenamingFolder(null); setNewFolderMode(false); setNewFolderName('')
+    } catch (reason) {
+      if (currentScope.current === scopeAtStart) setFolderSaveError(reason instanceof Error ? reason.message : 'Could not save this folder.')
+    } finally { folderSavingRef.current = false; setFolderSaving(false) }
+  }
 
   // Collections (Explore tab)
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
@@ -156,6 +177,7 @@ export function LibraryTab() {
   // Close folder context menu on outside click
   useEffect(() => {
     if (!folderMenuOpen) return
+    folderMenuRef.current?.querySelector<HTMLButtonElement>('button')?.focus()
     const handler = (e: MouseEvent) => {
       if (folderMenuRef.current && !folderMenuRef.current.contains(e.target as Node)) {
         setFolderMenuOpen(null)
@@ -167,13 +189,12 @@ export function LibraryTab() {
 
   // Reset folder view when scope changes
   useEffect(() => {
-    if (viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned') {
-      setViewFilter('all')
-    }
+    setViewFilter(current => ['all', 'favorites', 'pinned'].includes(current) ? current : 'all')
     setFolderMenuOpen(null)
     setRenamingFolder(null)
     setNewFolderMode(false)
-  }, [scope])
+    setFolderSaveError(null)
+  }, [scope, teamId])
 
   // Find the library matching current scope
   const activeLibrary =
@@ -186,11 +207,11 @@ export function LibraryTab() {
   // Items — pass folder filter when a folder is selected
   const isCollectionFilter = viewFilter.startsWith('collection:')
   const selectedFolder = viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned' && !isCollectionFilter ? viewFilter : undefined
-  const { items, loading: itemsLoading, refresh: refreshItems, update, remove } = useLibraryItems(
+  const { items, loading: itemsLoading, error: itemsError, refresh: refreshItems, update, remove } = useLibraryItems(
     activeLibrary?.id ?? null,
     {
       // Kind is filtered client-side so we can show per-kind counts on the filter chips.
-      search: search || undefined,
+      search: search.trim() || undefined,
       folder: selectedFolder,
     },
   )
@@ -215,17 +236,32 @@ export function LibraryTab() {
   // underlying workflow/extraction (not just remove the bookmark).
   const [deleteTarget, setDeleteTarget] = useState<LibraryItem | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [itemAction, setItemAction] = useState<{ scope: string; label: string; pending: boolean; error: string | null; retry: () => void } | null>(null)
+  const itemActionBusy = useRef(false)
+  const performItemAction = async (itemId: string, verb: string, action: () => Promise<unknown>) => {
+    if (itemActionBusy.current) return
+    const actionScope = currentScope.current
+    const label = `${verb}: ${items.find(item => item.id === itemId)?.name || 'Library item'}`
+    const retry = () => { void performItemAction(itemId, verb, action) }
+    itemActionBusy.current = true
+    setItemAction({ scope: actionScope, label, pending: true, error: null, retry })
+    try {
+      await action()
+      if (currentScope.current === actionScope) setItemAction({ scope: actionScope, label, pending: false, error: null, retry })
+    } catch (reason) {
+      if (currentScope.current === actionScope) setItemAction({ scope: actionScope, label, pending: false, error: reason instanceof Error ? reason.message : 'Could not update this item.', retry })
+    } finally { itemActionBusy.current = false }
+  }
 
   // Actions
   const handlePin = async (itemId: string, pinned: boolean) => {
-    await update(itemId, { pinned })
+    await performItemAction(itemId, pinned ? 'Pin item' : 'Unpin item', () => update(itemId, { pinned }))
   }
   const handleFavorite = async (itemId: string, favorited: boolean) => {
-    await update(itemId, { favorited })
+    await performItemAction(itemId, favorited ? 'Favorite item' : 'Unfavorite item', () => update(itemId, { favorited }))
   }
   const handleClone = async (itemId: string) => {
-    await cloneToPersonal(itemId)
-    refreshItems()
+    await performItemAction(itemId, 'Copy to My Library', async () => { await cloneToPersonal(itemId); await refreshItems() })
   }
   const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
   const handleShare = (itemId: string) => {
@@ -333,9 +369,10 @@ export function LibraryTab() {
     }
   }
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
-    await moveFolderItems([itemId], folderUuid)
-    refreshItems()
-    refreshFolders()
+    await performItemAction(itemId, folderUuid ? `Move to ${folders.find(folder => folder.uuid === folderUuid)?.name || 'folder'}` : 'Remove from folder', async () => {
+      await moveFolderItems([itemId], folderUuid)
+      await Promise.all([refreshItems(), refreshFolders()])
+    })
   }
 
   // Apply view filter + sort (folder filtering is handled server-side via useLibraryItems)
@@ -348,7 +385,7 @@ export function LibraryTab() {
   // belongs to that folder only — it should not also appear in the root list.
   // Favorites/Pinned and folder views are intentionally left untouched: the
   // first two span folders, and folder views are already server-side scoped.
-  const scopedItems = viewFilter === 'all' ? items.filter((i) => !i.folder) : items
+  const scopedItems = viewFilter === 'all' && !search.trim() ? items.filter((i) => !i.folder) : items
 
   const filtered = scopedItems.filter((item) => {
     if (!matchesKindFilter(item, kindFilter)) return false
@@ -449,8 +486,11 @@ export function LibraryTab() {
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [editLoadError, setEditLoadError] = useState<string | null>(null)
+  const editLoadVersion = useRef(0)
 
   const openPromptModal = async (item: import('../../types/library').LibraryItem, mode: 'preview' | 'edit') => {
+    const version = ++editLoadVersion.current
     setEditingItem(item)
     setEditMode(mode)
     setEditTitle(item.name)
@@ -460,23 +500,29 @@ export function LibraryTab() {
     // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditError(null)
+    setEditLoadError(null)
     setEditItemId(null)
     if (item.item_uuid) {
       setEditLoading(true)
       try {
         const items = await listSearchSetItems(item.item_uuid)
+        if (version !== editLoadVersion.current) return
         if (items.length > 0) {
           setEditItemId(items[0].id)
           if (items[0].searchphrase?.trim() || !(item.description || '').trim()) {
             setEditContent(items[0].searchphrase)
           }
         }
-      } catch { /* ignore — keep the description fallback */ }
-      setEditLoading(false)
-    }
+      } catch (reason) {
+        if (version === editLoadVersion.current) setEditLoadError(reason instanceof Error ? reason.message : 'Could not load this item.')
+      }
+      if (version === editLoadVersion.current) setEditLoading(false)
+    } else setEditLoading(false)
   }
 
   const closeEditModal = () => {
+    if (editSaving) return
+    editLoadVersion.current++
     setEditingItem(null)
     setEditTitle('')
     setEditContent('')
@@ -489,7 +535,7 @@ export function LibraryTab() {
   }
 
   const usePromptInAssistant = () => {
-    if (!editingItem) return
+    if (!editingItem || editLoading || editLoadError) return
     const content = editContent.trim()
     if (!content) return
     markUsed(editingItem.id)
@@ -500,7 +546,7 @@ export function LibraryTab() {
   }
 
   const handleEditSave = async () => {
-    if (!editingItem?.item_uuid) return
+    if (!editingItem?.item_uuid || editLoading || editLoadError || editSaving) return
     const titleError = getNameError(editTitle, 'Title')
     if (titleError) {
       setEditError(titleError)
@@ -612,7 +658,7 @@ export function LibraryTab() {
     },
   }
 
-  if (libLoading) {
+  if (libLoading && !libraries.length) {
     return (
       <div className="flex items-center justify-center h-full" style={{ fontSize: 13, color: '#666' }}>
         Loading...
@@ -620,7 +666,7 @@ export function LibraryTab() {
     )
   }
 
-  if (error) {
+  if (error && !libraries.length) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 13, color: '#666' }}>
         <p>{error}</p>
@@ -977,7 +1023,8 @@ export function LibraryTab() {
                   type="button"
                   title="New folder"
                   aria-label="New folder"
-                  onClick={() => { setNewFolderMode(true); setNewFolderName('') }}
+                  disabled={folderSaving}
+                  onClick={() => { setNewFolderMode(true); setNewFolderName(''); setFolderSaveError(null) }}
                   style={{
                     background: 'none',
                     border: 'none',
@@ -996,29 +1043,29 @@ export function LibraryTab() {
                 </button>
               </div>
 
+              {foldersError && <div role="alert" style={{ padding: 12, fontSize: 12, color: '#b91c1c' }}>Folders unavailable. {foldersError} <button type="button" onClick={() => void refreshFolders()}>Retry folders</button></div>}
+              {folderSaveError && <p role="alert" style={{ padding: '0 12px', fontSize: 12, color: '#b91c1c' }}>{folderSaveError}</p>}
+              {foldersLoading && <p role="status" style={{ padding: '0 12px', fontSize: 12 }}>Loading folders…</p>}
               {/* New folder input */}
               {newFolderMode && (
                 <div style={{ padding: '4px 8px 4px 12px' }}>
                   <input
                     autoFocus
                     type="text"
+                    aria-label="New Library folder name"
+                    disabled={folderSaving}
                     value={newFolderName}
                     maxLength={MAX_NAME_LENGTH}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="Folder name"
-                    onKeyDown={async (e) => {
+                    onKeyDown={(e) => {
+                      if (e.nativeEvent.isComposing) return
                       if (e.key === 'Enter' && newFolderName.trim()) {
-                        await createFolder(normalizeName(newFolderName))
-                        setNewFolderMode(false)
-                        setNewFolderName('')
-                      } else if (e.key === 'Escape') {
+                        e.preventDefault(); void submitFolder()
+                      } else if (e.key === 'Escape' && !folderSaving) {
                         setNewFolderMode(false)
                         setNewFolderName('')
                       }
-                    }}
-                    onBlur={() => {
-                      setNewFolderMode(false)
-                      setNewFolderName('')
                     }}
                     style={{
                       width: '100%',
@@ -1031,11 +1078,12 @@ export function LibraryTab() {
                       boxSizing: 'border-box',
                     }}
                   />
+                  <div className="library-folder-form-actions"><button type="button" disabled={folderSaving || !newFolderName.trim()} onClick={() => void submitFolder()}>{folderSaving ? 'Saving…' : 'Create folder'}</button><button type="button" disabled={folderSaving} onClick={() => { setNewFolderMode(false); setFolderSaveError(null) }}>Cancel</button></div>
                 </div>
               )}
 
               {/* Folder list */}
-              {folders.length === 0 && !newFolderMode && (
+              {folders.length === 0 && !newFolderMode && !foldersLoading && !foldersError && (
                 <div style={{ padding: '4px 12px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
                   No folders yet
                 </div>
@@ -1054,22 +1102,18 @@ export function LibraryTab() {
                         <input
                           autoFocus
                           type="text"
+                          aria-label="Rename Library folder"
+                          disabled={folderSaving}
                           value={renameValue}
                           maxLength={MAX_NAME_LENGTH}
                           onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={async (e) => {
+                          onKeyDown={(e) => {
+                            if (e.nativeEvent.isComposing) return
                             if (e.key === 'Enter' && renameValue.trim()) {
-                              await renameFolder(folder.uuid, normalizeName(renameValue))
-                              setRenamingFolder(null)
-                            } else if (e.key === 'Escape') {
+                              e.preventDefault(); void submitFolder(folder.uuid)
+                            } else if (e.key === 'Escape' && !folderSaving) {
                               setRenamingFolder(null)
                             }
-                          }}
-                          onBlur={async () => {
-                            if (renameValue.trim()) {
-                              await renameFolder(folder.uuid, normalizeName(renameValue))
-                            }
-                            setRenamingFolder(null)
                           }}
                           style={{
                             width: '100%',
@@ -1082,10 +1126,10 @@ export function LibraryTab() {
                             boxSizing: 'border-box',
                           }}
                         />
+                        <div className="library-folder-form-actions"><button type="button" disabled={folderSaving || !renameValue.trim()} onClick={() => void submitFolder(folder.uuid)}>{folderSaving ? 'Saving…' : 'Save folder name'}</button><button type="button" disabled={folderSaving} onClick={() => { setRenamingFolder(null); setFolderSaveError(null) }}>Cancel</button></div>
                       </div>
                     ) : (
                       <div
-                        onClick={() => setViewFilter(isActive ? 'all' : folder.uuid)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1112,6 +1156,7 @@ export function LibraryTab() {
                           }
                         }}
                       >
+                        <button type="button" aria-label={`Open folder ${folder.name}`} aria-pressed={isActive} onClick={() => { setViewFilter(folder.uuid); setMobileViewsOpen(false) }} style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, background: 'none', border: 0, padding: '4px 0', textAlign: 'left', color: 'inherit', font: 'inherit', cursor: 'pointer' }}>
                         {isActive
                           ? <FolderOpen style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                           : <Folder style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
@@ -1119,18 +1164,21 @@ export function LibraryTab() {
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {folder.name}
                         </span>
-                        <span style={{ fontSize: 11, color: '#999', marginRight: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 12, color: '#59616b', marginRight: 4, flexShrink: 0 }}>
                           {folder.item_count}
                         </span>
+                        </button>
                         <button
                           type="button"
-                          aria-label="Folder actions"
+                          aria-label={`Folder actions: ${folder.name}`}
+                          aria-expanded={isMenuOpen}
                           className="folder-menu-btn"
                           onClick={(e) => {
                             e.stopPropagation()
+                            folderMenuTrigger.current = e.currentTarget
                             if (!isMenuOpen) {
                               const rect = e.currentTarget.getBoundingClientRect()
-                              setFolderMenuPos({ top: rect.bottom + 4, left: rect.left })
+                              setFolderMenuPos({ top: Math.min(rect.bottom + 4, window.innerHeight - 108), left: Math.min(rect.left, window.innerWidth - 160) })
                             }
                             setFolderMenuOpen(isMenuOpen ? null : folder.uuid)
                           }}
@@ -1143,7 +1191,7 @@ export function LibraryTab() {
                             display: 'flex',
                             alignItems: 'center',
                             borderRadius: 4,
-                            opacity: isMenuOpen ? 1 : 0,
+                            opacity: 1,
                             transition: 'opacity 0.1s',
                             flexShrink: 0,
                           }}
@@ -1157,6 +1205,11 @@ export function LibraryTab() {
                     {isMenuOpen && createPortal(
                       <div
                         ref={folderMenuRef}
+                        role="group"
+                        aria-label={`Actions for folder ${folder.name}`}
+                        onKeyDown={e => {
+                          if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setFolderMenuOpen(null); folderMenuTrigger.current?.focus() }
+                        }}
                         style={{
                           position: 'fixed',
                           left: folderMenuPos.left,
@@ -1175,6 +1228,7 @@ export function LibraryTab() {
                             e.stopPropagation()
                             setRenamingFolder(folder.uuid)
                             setRenameValue(folder.name)
+                            setFolderSaveError(null)
                             setFolderMenuOpen(null)
                           }}
                           style={{
@@ -1214,9 +1268,19 @@ export function LibraryTab() {
                               setFolderMenuOpen(null)
                               return
                             }
-                            await removeFolder(folder.uuid)
-                            if (viewFilter === folder.uuid) setViewFilter('all')
-                            setFolderMenuOpen(null)
+                            if (folderSavingRef.current) return
+                            const scopeAtStart = currentScope.current
+                            folderSavingRef.current = true; setFolderSaving(true); setFolderSaveError(null)
+                            try {
+                              await removeFolder(folder.uuid)
+                              await refreshItems()
+                              if (currentScope.current === scopeAtStart) {
+                                setViewFilter(current => current === folder.uuid ? 'all' : current)
+                                setFolderMenuOpen(null)
+                              }
+                            } catch (reason) {
+                              if (currentScope.current === scopeAtStart) { setFolderSaveError(reason instanceof Error ? reason.message : 'Could not delete this folder.'); setFolderMenuOpen(null) }
+                            } finally { folderSavingRef.current = false; setFolderSaving(false) }
                           }}
                           style={{
                             display: 'flex',
@@ -1323,16 +1387,22 @@ export function LibraryTab() {
 
           {/* Items list */}
           <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
-            {itemsLoading ? (
+            <div className="library-recovery-feedback">
+            {error && <div role="alert" className="library-feedback">{error} <button type="button" onClick={() => void refresh()}>Retry libraries</button></div>}
+            {itemsError && <div role="alert" className="library-feedback">Items unavailable. {itemsError} <button type="button" onClick={() => void refreshItems()}>Retry items</button></div>}
+            {itemAction?.scope === currentScope.current && <div role={itemAction.error ? 'alert' : 'status'} className="library-feedback">{itemAction.pending ? 'Saving… ' : itemAction.error ? 'Not saved. ' : 'Saved. '}{itemAction.label}{itemAction.error && <> — {itemAction.error} <button type="button" onClick={itemAction.retry}>Retry item action</button></>}</div>}
+            {itemsLoading && items.length > 0 && <div role="status" className="library-feedback">Refreshing items…</div>}
+            </div>
+            {itemsLoading && !items.length ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 13 }}>Loading...</div>
-            ) : sorted.length === 0 ? (
+            ) : itemsError && !items.length ? null : sorted.length === 0 ? (
               <div style={{ maxWidth: 360, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }}>
                 <h2 style={{ margin: 0, color: '#303030', fontSize: 16, fontWeight: 700 }}>
-                  {hasActiveFilters ? 'No items match these filters' : 'Your library is ready for its first tool'}
+                  {selectedFolder && !search.trim() && kindFilter === 'all' ? 'This folder is empty' : hasActiveFilters ? 'No items match these filters' : 'Your library is ready for its first tool'}
                 </h2>
                 <p style={{ margin: '10px 0 18px', color: '#5f6368', fontSize: 13, lineHeight: 1.55 }}>
                   {hasActiveFilters
-                    ? 'Try clearing a filter or searching with a different term.'
+                    ? selectedFolder && !search.trim() && kindFilter === 'all' ? 'Move tools here from their item actions, or return to all items.' : 'Try clearing a filter or searching with a different term.'
                     : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work, or start from a ready-made one in the catalog.'}
                 </p>
                 {hasActiveFilters ? (
@@ -1372,6 +1442,7 @@ export function LibraryTab() {
                 <LibraryItemRow
                   key={item.id}
                   item={item}
+                  busy={itemAction?.scope === currentScope.current && itemAction.pending}
                   scope={scope}
                   onPin={handlePin}
                   onFavorite={handleFavorite}
@@ -1393,9 +1464,9 @@ export function LibraryTab() {
                       // Assistant (an LLM call) from the modal's Use button,
                       // which is also what bumps last-used.
                       openPromptModal(it, 'preview')
-                    } else if (it.set_type === 'extraction' && it.item_uuid) {
+                    } else if (it.kind === 'search_set') {
                       markUsed(it.id)
-                      openExtraction(it.item_uuid)
+                      openExtraction(it.item_uuid || it.item_id)
                     }
                   }}
                 />
@@ -1668,22 +1739,30 @@ export function LibraryTab() {
             display: 'flex',
             alignItems: 'flex-start',
             justifyContent: 'center',
-            paddingTop: '8%',
+            padding: 12,
             backgroundColor: 'rgba(0,0,0,0.4)',
           }}
           onClick={closeEditModal}
         >
+          <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${editMode === 'edit' ? 'Edit' : 'Preview'} ${editingItem.name}`}
+            onKeyDown={e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeEditModal() } }}
             onClick={(e) => e.stopPropagation()}
             style={{
               backgroundColor: '#fff',
               borderRadius: 'var(--ui-radius, 12px)',
-              padding: '28px 32px',
-              width: '90%',
+              padding: 20,
+              width: '100%',
+              maxHeight: '100%',
+              overflowY: 'auto',
               maxWidth: 480,
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
+            {editLoadError && <div role="alert" className="library-feedback">{editLoadError} <button type="button" onClick={() => void openPromptModal(editingItem, editMode)}>Retry item content</button></div>}
             {editMode === 'preview' ? (
               <>
                 <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
@@ -1693,12 +1772,15 @@ export function LibraryTab() {
                   {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
                 </div>
                 <div
+                  role="region"
+                  aria-label="Library item content"
+                  tabIndex={0}
                   style={{
                     marginBottom: 20,
                     padding: '12px 14px',
                     fontSize: 14,
                     lineHeight: 1.5,
-                    color: !editLoading && editContent.trim() ? '#3c4043' : '#9aa0a6',
+                    color: '#3c4043',
                     backgroundColor: '#f8f9fa',
                     border: '1px solid #e8eaed',
                     borderRadius: 8,
@@ -1714,10 +1796,10 @@ export function LibraryTab() {
                       ? editContent
                       : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'prompt'} has no content yet — click Edit to add some.`}
                 </div>
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                   <button
                     onClick={usePromptInAssistant}
-                    disabled={editLoading || !editContent.trim()}
+                    disabled={editLoading || !!editLoadError || !editContent.trim()}
                     style={{
                       padding: '10px 20px',
                       fontSize: 14,
@@ -1734,6 +1816,7 @@ export function LibraryTab() {
                     Use in Assistant
                   </button>
                   <button
+                    disabled={editLoading || !!editLoadError}
                     onClick={() => setEditMode('edit')}
                     style={{
                       padding: '10px 20px',
@@ -1777,6 +1860,8 @@ export function LibraryTab() {
                 onChange={(e) => { setEditTitle(e.target.value); if (editError) setEditError(null) }}
                 placeholder="Title"
                 autoFocus
+                aria-label="Library item title"
+                disabled={editLoading || !!editLoadError || editSaving}
                 maxLength={MAX_NAME_LENGTH}
                 style={{
                   width: '100%',
@@ -1792,6 +1877,8 @@ export function LibraryTab() {
             </div>
             <div style={{ marginBottom: 20 }}>
               <textarea
+                aria-label="Library item content"
+                disabled={editLoading || !!editLoadError || editSaving}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder={editingItem.set_type === 'formatter' ? 'Write your formatting instructions here' : 'Write your prompt here'}
@@ -1814,10 +1901,10 @@ export function LibraryTab() {
                 {editError}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button
                 onClick={handleEditSave}
-                disabled={editSaving || !editTitle.trim()}
+                disabled={editLoading || !!editLoadError || editSaving || !editTitle.trim()}
                 style={{
                   padding: '10px 20px',
                   fontSize: 14,
@@ -1852,6 +1939,7 @@ export function LibraryTab() {
               </>
             )}
           </div>
+          </FocusTrap>
         </div>
       )}
 

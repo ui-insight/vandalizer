@@ -4,6 +4,17 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Library recovery and item opening — September 28
+
+**136/169 checklist items implemented locally.** LIB-06/07/08/09 are complete for the reviewed Library flows; changes are not deployed.
+
+- Search includes matching tools stored in folders, trims whitespace and combines with type filters. Recent, pinned and favorite work remains reachable through the saved views, with create and catalog entry points retained. Folder-only, genuinely empty and no-result states explain the next action.
+- Item/folder/library failures are visible and retryable. Loaded rows survive refresh failures; late searches, old scopes and mutations cannot replace another scope. Favorite, pin, copy and move actions expose pending/success/failure feedback and keep the exact failed target for retry. Folder create/rename errors preserve names, Enter submits once, and deletion failures retain the folder and its contents. Successful folder deletion returns its items to the root.
+- Folder navigation and actions are separate keyboard controls. Item menus use an inline folder choice that fits narrow screens, close with Escape and restore focus. Long names wrap, metadata retains contrast on hover, and 120-item mixed lists stay accessible. Older extraction entries without a type label or separate UUID open correctly.
+- Workflow/extraction load failures distinguish unavailable content and offer retry. Editor instances are keyed to the item while the Library and file pane remain in place. Prompt content failures disable use/edit until a successful retry; stale reads cannot replace another preview. Long previews fit short screens, contain keyboard focus, allow keyboard scrolling and return focus on Escape.
+- Verification: 48 frontend regression tests across six files, TypeScript, production build and touched-file lint pass (four existing editor hook-dependency warnings, no lint errors). The final browser set covers 51 Library recovery states, 21 opening/long-content states at 320/768/1440px, and 30 repeated file → Library → run-on-the-selected-file states at 320/390/768/1024/1440px. All have zero axe findings, page overflow, uncaught errors or unmatched fixture requests; representative screenshots inspected directly.
+- Evidence: `2026-09-28-library-recovery-evidence`, `2026-09-28-library-opening-evidence`, and `2026-09-28-file-library-regression`. APIs and execution use fixtures; live permissions and backend/model execution remain unverified. Broader shared theme, zoom and cross-surface acceptance remain open.
+
 ## Automation edit and launch recovery — September 28
 
 **132/169 checklist items implemented locally.** AUTO-08 is complete for the reviewed editor and manual-run flows; changes are not deployed.
@@ -416,10 +427,10 @@ Acceptance: users can find an appropriate item, understand its fit and trust evi
 - [x] **LIB-03 · P2 · Fix:** Increase contrast and readability of timestamps, item types, tags and quality metadata.
 - [x] **LIB-04 · P2 · Improve:** Reduce stacked scope/filter/sidebar controls and group personal/team ownership, item type and saved views coherently.
 - [x] **LIB-05 · P2 · Improve:** Explain the practical distinction between favorites, pins, folders and project membership; avoid presenting all as equal first-use decisions.
-- [ ] **LIB-06 · P2 · Improve:** Make search and useful recent/pinned work prominent, with consistent create and browse actions.
-- [ ] **LIB-07 · P2 · Verify:** Item opening, type filters, sorting, favorites, pins and folder actions target the correct item and provide visible feedback.
-- [ ] **LIB-08 · P2 · Verify:** Empty Library, empty folder, no results, unavailable item and large populated lists have clear, efficient states.
-- [ ] **LIB-09 · P2 · Verify:** Long names and mixed workflow/extraction/prompt items remain readable with reliable row actions on desktop and mobile.
+- [x] **LIB-06 · P2 · Improve:** Make search and useful recent/pinned work prominent, with consistent create and browse actions.
+- [x] **LIB-07 · P2 · Verify:** Item opening, type filters, sorting, favorites, pins and folder actions target the correct item and provide visible feedback.
+- [x] **LIB-08 · P2 · Verify:** Empty Library, empty folder, no results, unavailable item and large populated lists have clear, efficient states.
+- [x] **LIB-09 · P2 · Verify:** Long names and mixed workflow/extraction/prompt items remain readable with reliable row actions on desktop and mobile.
 
 Acceptance: users can find, organize and open an item quickly; no item is clipped and mobile retains the essential desktop capabilities.
 

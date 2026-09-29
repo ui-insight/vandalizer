@@ -2,7 +2,7 @@
 
 September 28, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 132/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 136/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,17 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Library recovery and item opening — September 28
+
+**136/169 checklist items implemented locally.** LIB-06/07/08/09 are complete for the reviewed Library flows; changes are not deployed.
+
+- Search includes matching tools stored in folders, trims whitespace and combines with type filters. Recent, pinned and favorite work remains reachable through the saved views, with create and catalog entry points retained. Folder-only, genuinely empty and no-result states explain the next action.
+- Item/folder/library failures are visible and retryable. Loaded rows survive refresh failures; late searches, old scopes and mutations cannot replace another scope. Favorite, pin, copy and move actions expose pending/success/failure feedback and keep the exact failed target for retry. Folder create/rename errors preserve names, Enter submits once, and deletion failures retain the folder and its contents. Successful folder deletion returns its items to the root.
+- Folder navigation and actions are separate keyboard controls. Item menus use an inline folder choice that fits narrow screens, close with Escape and restore focus. Long names wrap, metadata retains contrast on hover, and 120-item mixed lists stay accessible. Older extraction entries without a type label or separate UUID open correctly.
+- Workflow/extraction load failures distinguish unavailable content and offer retry. Editor instances are keyed to the item while the Library and file pane remain in place. Prompt content failures disable use/edit until a successful retry; stale reads cannot replace another preview. Long previews fit short screens, contain keyboard focus, allow keyboard scrolling and return focus on Escape.
+- Verification: 48 frontend regression tests across six files, TypeScript, production build and touched-file lint pass (four existing editor hook-dependency warnings, no lint errors). The final browser set covers 51 Library recovery states, 21 opening/long-content states at 320/768/1440px, and 30 repeated file → Library → run-on-the-selected-file states at 320/390/768/1024/1440px. All have zero axe findings, page overflow, uncaught errors or unmatched fixture requests; representative screenshots inspected directly.
+- Evidence: `2026-09-28-library-recovery-evidence`, `2026-09-28-library-opening-evidence`, and `2026-09-28-file-library-regression`. APIs and execution use fixtures; live permissions and backend/model execution remain unverified. Broader shared theme, zoom and cross-surface acceptance remain open.
 
 ## Automation edit and launch recovery — September 28
 
@@ -112,7 +123,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | Knowledge bases | 6/5.5 | 8/8 | [knowledge-sources-mobile](../upgrade-followup-responsive/knowledge-sources-mobile.png) |
 | KB validation system | 6.5/6.5 | 8/8 | [validation-history-run-card-320](../2026-09-28-history-verified/validation-history-run-card-320.png) |
 | Explore / shared catalog | 7/6.5 | 8/8 | [catalog-save-success](../2026-09-26-recovery-verified/catalog-save-success.png) |
-| Library | 5.5/5.5 | 8/8 | [library-320](../upgrade-followup-responsive/library-320.png) |
+| Library | 5.5/5.5 | 8/8 | [library-mixed-types-return-1440](../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png) |
 | Chat workspace | 6.5/6 | 8/8 | [chat-home](../upgrade-polish-final-context/chat-home.png) |
 | Basic chat onboarding | 7/6.5 | 8/8 | [onboarding-evidence-checked-mobile](../upgrade-polish-final-journeys/onboarding-evidence-checked-mobile.png) |
 | Chat uploads | 6/3 | 8/8 | [chat-upload-error](../upgrade-final/chat-upload-error.png) |
@@ -132,7 +143,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 729 distinct states / 869 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 801 distinct states / 971 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -229,6 +240,9 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-28-automation-save-review](../2026-09-28-automation-save-review/manifest.json): 18 states; source `f5bb53d9dc8f8f1c44df0a4d9afee6372ec2a9c184070f88dc82719208545558`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-automation-launch-evidence](../2026-09-28-automation-launch-evidence/manifest.json): 18 states; source `62fb6064b0e4cae409f0fad9eb08576fa651b63a07d4717c64f29fd3379f44e8`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-automation-run-reconnect](../2026-09-28-automation-run-reconnect/manifest.json): 21 states; source `62fb6064b0e4cae409f0fad9eb08576fa651b63a07d4717c64f29fd3379f44e8`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-28-library-recovery-evidence](../2026-09-28-library-recovery-evidence/manifest.json): 51 states; source `d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-28-library-opening-evidence](../2026-09-28-library-opening-evidence/manifest.json): 21 states; source `d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-28-file-library-regression](../2026-09-28-file-library-regression/manifest.json): 30 states; source `6d0eba57af1b0af8f66e6bd427e6477a3b9bb330401dbf2199a3dedb739979ba`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -246,7 +260,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Explore / shared catalog:** Destination, checking, failure/retry, saved and already-saved states lead to an Open action. KB adoption preserves errors and browsing context; long details remain usable at 320px, tablet and desktop widths. Combined filters, clearing, empty/error states and pagination recovery pass. Rating origin, date, samples and limitations are explicit. Scope/role variants remain open.
 
-**Library:** Mobile type and sort controls share one row. Saved views are keyboard buttons, show the selected view, close after selection and explain favorites, pins, folders and project scope. Broader folder operations remain open.
+**Library:** Folder-aware search, type filters, sorting, favorites, pins, retained errors and exact-target retries pass. Folder create/rename/move/delete preserve failed drafts and restore items after deletion. Mixed long names, 120-item lists, unavailable-item recovery and focus-contained prompt previews pass at mobile/tablet/desktop widths. The file-and-Library workflow remains intact; live permissions and execution remain unverified.
 
 **Chat workspace:** A compact task launcher and shorter composer establish a clear primary action. Stopped/interrupted responses preserve partial output, and retry retains completed artifacts. Long response/table/code reading, retained scroll position, latest-response navigation, draft retention and narrow composer controls pass fixture checks. Model-selection and broader assistive-technology journeys remain open.
 

@@ -240,6 +240,7 @@ export function WorkflowEditorPanel() {
   const { openWorkflowId, workflowOpenSignal, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('design')
   const [editingStepId, setEditingStepId] = useState<string | null>(null)
   const [showTaskPicker, setShowTaskPicker] = useState(false)
@@ -301,11 +302,13 @@ export function WorkflowEditorPanel() {
   const refresh = useCallback(async () => {
     if (!openWorkflowId) return
     setLoading(true)
+    setLoadError(null)
     try {
       const wf = await getWorkflow(openWorkflowId, openWorkflowShareToken ?? undefined)
       setWorkflow(wf)
-    } catch {
+    } catch (reason) {
       setWorkflow(null)
+      setLoadError(reason instanceof Error ? reason.message : 'Could not load this workflow.')
     } finally {
       setLoading(false)
     }
@@ -729,7 +732,7 @@ export function WorkflowEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Loading..." onClose={closeWorkflow} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#888', fontSize: 13 }}>Loading workflow...</div>
+        <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 13 }}>Loading workflow...</div>
       </div>
     )
   }
@@ -738,7 +741,7 @@ export function WorkflowEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Workflow" onClose={closeWorkflow} />
-        <div style={{ padding: 40, textAlign: 'center', color: '#d93025', fontSize: 13 }}>Workflow not found.</div>
+        <div role="alert" style={{ padding: 24, textAlign: 'center', color: '#b91c1c', fontSize: 13 }}><p>{loadError || 'Workflow unavailable.'}</p><button type="button" onClick={() => void refresh()} style={{ marginTop: 12 }}>Retry workflow</button><p style={{ marginTop: 12, color: '#59616b' }}>Close this panel to return to your Library.</p></div>
       </div>
     )
   }

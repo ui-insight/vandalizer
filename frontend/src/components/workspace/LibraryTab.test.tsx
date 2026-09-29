@@ -186,6 +186,35 @@ describe('LibraryTab prompt preview', () => {
     expect(openWorkflow).toHaveBeenCalledWith('wf-1')
     await waitFor(() => expect(touchItem).toHaveBeenCalledWith('li-2'))
   })
+  it('opens legacy extraction entries without a set type or separate UUID', () => {
+    mockItems.current = [makePrompt({ id: 'legacy-item', item_id: 'extraction-id', item_uuid: null, set_type: null, name: 'Legacy extraction' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Legacy extraction' }))
+    expect(openExtraction).toHaveBeenCalledWith('extraction-id')
+  })
+  it('keeps content failures visible and prevents using a stale description until retry', async () => {
+    mockItems.current = [makePrompt({ description: 'Old fallback' })]
+    vi.mocked(listSearchSetItems).mockRejectedValueOnce(new Error('Content unavailable'))
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    await screen.findByText('Content unavailable')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry item content' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    expect(screen.getByRole('button', { name: 'Use in Assistant' })).toBeEnabled()
+  })
+  it('ignores a late prompt read after closing and opening a different item', async () => {
+    let release!: (value: Awaited<ReturnType<typeof listSearchSetItems>>) => void
+    vi.mocked(listSearchSetItems).mockImplementationOnce(() => new Promise(resolve => { release = resolve }))
+    mockItems.current = [makePrompt(), makePrompt({ id: 'second', item_uuid: 'second-uuid', name: 'Second prompt' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Summarize Award' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Second prompt' }))
+    await screen.findByText('Summarize the key terms of this award.')
+    release([{ id: 'old-item', searchphrase: 'Old response' }] as Awaited<ReturnType<typeof listSearchSetItems>>)
+    await waitFor(() => expect(screen.queryByText('Old response')).not.toBeInTheDocument())
+  })
 })
 
 describe('LibraryTab delete flow', () => {
