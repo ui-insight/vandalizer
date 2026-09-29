@@ -184,7 +184,37 @@ describe('LibraryTab prompt preview', () => {
     render(<LibraryTab />)
     fireEvent.click(screen.getByText('Budget Workflow'))
     expect(openWorkflow).toHaveBeenCalledWith('wf-1')
-    await waitFor(() => expect(touchItem).toHaveBeenCalledWith('li-2'))
+  })
+})
+
+describe('LibraryTab last used', () => {
+  it('does not mark a workflow used just because it was opened', async () => {
+    mockItems.current = [makePrompt({ id: 'li-2', item_id: 'wf-1', item_uuid: null, kind: 'workflow', set_type: null, name: 'Budget Workflow' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByText('Budget Workflow'))
+    expect(openWorkflow).toHaveBeenCalledWith('wf-1')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(touchItem).not.toHaveBeenCalled()
+  })
+
+  it('does not mark an extraction used just because it was opened', async () => {
+    mockItems.current = [makePrompt({ id: 'li-3', set_type: 'extraction', name: 'Award Terms' })]
+    render(<LibraryTab />)
+    fireEvent.click(screen.getByText('Award Terms'))
+    expect(openExtraction).toHaveBeenCalledWith('ss-uuid-1')
+    await new Promise((r) => setTimeout(r, 0))
+    expect(touchItem).not.toHaveBeenCalled()
+  })
+
+  it('sorts a never-run item below one that was run, however new it is', () => {
+    mockItems.current = [
+      makePrompt({ id: 'li-new', item_id: 'wf-new', kind: 'workflow', set_type: null, name: 'Brand New Workflow', created_at: '2026-09-28T00:00:00+00:00', last_used_at: null }),
+      makePrompt({ id: 'li-ran', item_id: 'wf-ran', kind: 'workflow', set_type: null, name: 'Ran Last Month', created_at: '2026-01-01T00:00:00+00:00', last_used_at: '2026-08-01T00:00:00+00:00' }),
+    ]
+    render(<LibraryTab />)
+    const ran = screen.getByText('Ran Last Month')
+    const fresh = screen.getByText('Brand New Workflow')
+    expect(ran.compareDocumentPosition(fresh) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
