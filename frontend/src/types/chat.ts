@@ -4,6 +4,9 @@ export interface ChatMessage {
   thinking?: string
   thinking_duration?: number
   citations?: Citation[]
+  /** KB answers only: dollar amounts / percentages in the answer that no
+   *  retrieved snippet states — likely recalled from the model's memory. */
+  unsupported_figures?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -116,6 +119,7 @@ export interface StreamChunk {
     | 'context_budget'
     | 'context_notice'
     | 'sources'
+    | 'grounding_warning'
   content: string
   duration?: number
   request_tokens?: number
@@ -134,6 +138,8 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+  // grounding_warning only: figures in the finished answer no snippet states.
+  unsupported_figures?: string[]
 }
 
 export interface SuggestedModel {

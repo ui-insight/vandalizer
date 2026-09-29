@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import DOMPurify from 'dompurify'
-import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText, AlertTriangle } from 'lucide-react'
 import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import { formatPageLocator } from '../../utils/pageLocator'
@@ -365,6 +365,24 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
               style={{ fontSize: 14, lineHeight: 1.6 }}
               dangerouslySetInnerHTML={{ __html: renderedHtml! }}
             />
+          )}
+
+          {message.unsupported_figures && message.unsupported_figures.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: 8, padding: '8px 10px', display: 'flex', gap: 8, alignItems: 'flex-start',
+                backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 12, lineHeight: 1.5, color: '#92400e',
+              }}
+            >
+              <AlertTriangle aria-hidden style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2, color: '#b45309' }} />
+              <span>
+                Not in the retrieved sources: <strong>{message.unsupported_figures.join(', ')}</strong>.
+                {' '}It may come from the model's general knowledge, which can be out of date.
+                Check it against the source before relying on it — naming the section or document
+                in your question usually retrieves the passage that states it.
+              </span>
+            </div>
           )}
 
           {message.citations && message.citations.length > 0 && (() => {

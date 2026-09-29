@@ -44,6 +44,10 @@ class ChatMessage(Document):
     thinking: Optional[str] = None
     thinking_duration: Optional[float] = None
     citations: Optional[list[dict]] = None
+    # Dollar amounts / percentages in a KB answer that no retrieved snippet
+    # states — likely recalled from the model's memory, which can predate the
+    # current regulation. Chat shows them under the answer.
+    unsupported_figures: Optional[list[str]] = None
     # The documents in scope when this turn was asked: ``{uuid, title}`` each,
     # plus ``{"truncated": n}`` as a final entry if the selection was larger
     # than we record.
@@ -67,6 +71,8 @@ class ChatMessage(Document):
             d["thinking_duration"] = self.thinking_duration
         if self.citations:
             d["citations"] = self.citations
+        if self.unsupported_figures:
+            d["unsupported_figures"] = self.unsupported_figures
         if self.source_documents:
             d["source_documents"] = self.source_documents
         return d
@@ -158,6 +164,7 @@ class ChatConversation(Document):
         thinking_duration: Optional[float] = None,
         citations: Optional[list[dict]] = None,
         source_documents: Optional[list[dict]] = None,
+        unsupported_figures: Optional[list[str]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -165,6 +172,7 @@ class ChatConversation(Document):
             thinking=thinking or None,
             thinking_duration=thinking_duration,
             citations=citations or None,
+            unsupported_figures=unsupported_figures or None,
             source_documents=_cap_source_documents(source_documents),
         )
         await msg.insert()
