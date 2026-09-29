@@ -100,8 +100,8 @@ export function isStale(activity: ActivityEvent, thresholdMinutes: number): bool
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolean }) {
-  const { railDocked, toggleRailDocked, triggerNewChat, activitySignal, currentConversationUuid } = useWorkspace()
+export function ActivityRail({ forceExpanded = false, forceDocked = false, onExpand, onNavigate }: { forceExpanded?: boolean; forceDocked?: boolean; onExpand?: () => void; onNavigate?: () => void }) {
+  const { railDocked, toggleRailDocked, triggerNewChat, focusChat, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { count: pendingReviews } = useMyReviewCount()
   const navigate = useNavigate()
@@ -110,7 +110,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
   const confirm = useConfirm()
   // The mobile drawer always needs its labels; a collapsed rail inside a
   // full-width drawer would waste space and make the activity list opaque.
-  const visualDocked = forceExpanded ? false : railDocked
+  const visualDocked = forceExpanded ? false : forceDocked || railDocked
 
   const certLevel = progress?.level || 'novice'
   const certConfig = LEVEL_CONFIG[certLevel] || LEVEL_CONFIG.novice
@@ -176,12 +176,13 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
             </div>
           )}
           <button
-            onClick={toggleRailDocked}
+            onClick={forceDocked && onExpand ? onExpand : toggleRailDocked}
             className={cn(
               'flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto',
               forceExpanded && 'hidden',
             )}
             title={visualDocked ? 'Expand' : 'Collapse'}
+            aria-label={visualDocked ? 'Expand activity' : 'Collapse activity'}
           >
             {visualDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
           </button>
@@ -195,7 +196,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
           <button
             type="button"
             aria-label="New chat"
-            onClick={triggerNewChat}
+            onClick={() => { onNavigate?.(); triggerNewChat(); focusChat() }}
             className={cn(
               'flex items-center gap-2 rounded-lg cursor-pointer p-2',
               'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
@@ -216,7 +217,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
               The always-present entry point is the account menu. */}
           {pendingReviews > 0 && (
             <div
-              onClick={() => navigate({ to: '/reviews' })}
+              onClick={() => { onNavigate?.(); navigate({ to: '/reviews' }) }}
               title={`${pendingReviews} approval${pendingReviews === 1 ? '' : 's'} waiting on you`}
               className={cn(
                 'flex items-center gap-2 rounded-lg cursor-pointer p-2',
@@ -287,7 +288,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
             return (
               <div
                 key={activity.id}
-                onClick={() => handleClick(activity)}
+                onClick={() => { onNavigate?.(); handleClick(activity) }}
                 title={rowTooltip}
                 className={cn(
                   'rail-shimmer-running group relative flex items-center gap-2 rounded-lg cursor-pointer',
@@ -313,7 +314,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
                   running ? 'text-white' : awaitingReview ? 'text-[#806600]' : visualDocked ? 'text-[#999]' : 'text-[#333]',
                 )}>
                   <Icon className="h-4 w-4" />
-                  {awaitingReview && railDocked && (
+                  {awaitingReview && visualDocked && (
                     <span
                       className="absolute -right-1 -top-1 h-[7px] w-[7px] rounded-full"
                       style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
@@ -390,7 +391,7 @@ export function ActivityRail({ forceExpanded = false }: { forceExpanded?: boolea
       {/* Certification badge footer */}
       <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
         <div
-          onClick={togglePanel}
+          onClick={() => { onNavigate?.(); togglePanel() }}
           title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
           className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
           style={{

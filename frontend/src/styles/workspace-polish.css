@@ -205,3 +205,5 @@
   .agent-approval dl { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .agent-approval dd { margin-bottom: 8px; }
 }
+
+@media (max-width: 767px) { .workspace-desktop-split-toggle { display: none !important; } }

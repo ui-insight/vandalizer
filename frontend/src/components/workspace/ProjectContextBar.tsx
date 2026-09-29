@@ -7,13 +7,13 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
  * (files, chat, automations, knowledge) is the normal workspace, just scoped.
  * The gear opens the in-workspace Manage panel (rename/share/leave/delete).
  */
-export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void }) {
+export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: { onOpenManage?: () => void; railWidth?: number }) {
   const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, railDocked } = useWorkspace()
   if (!activeProjectUuid) return null
 
   // The Activity rail is fixed to the right edge; reserve its width so the
   // Manage/Exit controls aren't rendered underneath (and unclickable).
-  const railWidth = railDocked ? 64 : 220
+  const railWidth = fittedRailWidth ?? (railDocked ? 64 : 220)
 
   return (
     <div

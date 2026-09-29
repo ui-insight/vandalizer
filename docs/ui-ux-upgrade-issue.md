@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Saved panel choices and responsive sizing — September 29
+
+**146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.
+
+- Stored panel sizes reject malformed/nonfinite values and fit useful source/tool widths without replacing the preferred desktop split. Narrower windows temporarily dock Activity; expanding it opens a focus-contained drawer. Returning to a wide window restores the preferred rail and split.
+- Mobile source/tool choices are remembered separately by section within the browser session, including reload with an open editor. The project context bar uses the fitted rail width. A desktop-only split control is hidden on compact screens where it cannot display two panes.
+- The divider supports arrows, Home/End, pointer dragging and reset. Interrupted drags restore normal document interaction. Failed preference writes do not prevent workspace navigation. Activity closes on navigation; New chat hands focus to the composer, while Escape restores the drawer trigger.
+- Verification: 19 frontend tests across four files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirteen panel-preference captures plus thirty file/Library regression states have zero axe findings, overflow, uncaught errors or unmatched requests. Invalid/restored values, viewport fitting, keyboard sizing, drawer focus, reload, project alignment and unavailable storage are asserted. Opening a file, running its Library workflow through failure/retry and returning to that file pass at 320/390/768/1024/1440px; representative screenshots inspected directly.
+- Evidence: `2026-09-29-panel-preferences-final` and `2026-09-29-panel-file-library-regression`. APIs and run results are synthetic; live execution and assistive-technology devices are not certified. The wider navigation, theme and accessibility acceptance remains open.
+
 ## Agent state and workflow recovery — September 29
 
 **145/169 checklist items implemented locally.** AGT-04/07/09 are complete for the reviewed supported protocol states; changes are not deployed.
@@ -321,7 +331,7 @@ Unchecked items remain open; checked items refer to local implementation, not a 
 - [x] **SYS-01 · P2 · Fix:** Give the selected workspace the primary canvas. Stop the large returning-user chat welcome panel from competing with Files, Projects, Automations and Knowledge.
 - [x] **SYS-02 · P2 · Improve:** Make the assistant a compact, clearly labeled contextual panel that users can open and expand without losing their current task.
 - [x] **SYS-03 · P2 · Fix:** Collapse an empty Activity rail by default; keep an obvious way to open activity, notifications and run history.
-- [ ] **SYS-04 · P2 · Improve:** Preserve useful panel choices during a session without restoring layouts that do not fit the current viewport.
+- [x] **SYS-04 · P2 · Improve:** Preserve useful panel choices during a session without restoring layouts that do not fit the current viewport.
 - [ ] **SYS-05 · P2 · Improve:** Make the active section and current project context unmistakable, including when opening an item from chat or the Library.
 - [ ] **SYS-06 · P2 · Improve:** Use consistent placement for the page title, description, primary action, search, filters and secondary actions.
 - [ ] **SYS-07 · P2 · Improve:** Establish one coherent vocabulary for Files, Projects, Automations, Knowledge, Library and Explore; distinguish location from ownership/sharing scope.

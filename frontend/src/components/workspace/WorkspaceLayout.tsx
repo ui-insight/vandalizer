@@ -1,3 +1,5 @@
+import { FocusTrap } from 'focus-trap-react'
+import { fitPanelSplit, panelSplitBounds, readCompactPanelChoices, saveCompactPanelChoices } from '../../utils/workspaceLayout'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Header } from '../layout/Header'
@@ -25,13 +27,28 @@ export function WorkspaceLayout() {
   const [manageOpen, setManageOpen] = useState(false)
   const [isCompact, setIsCompact] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
-  const [assistantMode, setAssistantMode] = useState<string | null>(null)
+  const activityNavigating = useRef(false)
+  const openActivity = () => { activityNavigating.current = false; setActivityOpen(true) }
+  const [panelChoices, setPanelChoices] = useState(readCompactPanelChoices)
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
+  const choosePanel = useCallback((mode: string, panel: 'source' | 'tools') => {
+    setPanelChoices(previous => {
+      const next = { ...previous, [mode]: panel }
+      saveCompactPanelChoices(next)
+      return next
+    })
+  }, [])
+  useEffect(() => {
+    const resize = () => setViewportWidth(window.innerWidth)
+    window.addEventListener('resize', resize)
+    return () => window.removeEventListener('resize', resize)
+  }, [])
   const previousFocus = useRef(focusChatSignal)
   useEffect(() => {
     if (previousFocus.current === focusChatSignal) return
     previousFocus.current = focusChatSignal
-    setAssistantMode(workspaceMode)
-  }, [focusChatSignal, workspaceMode])
+    choosePanel(workspaceMode, 'tools')
+  }, [focusChatSignal, workspaceMode, choosePanel])
 
   useEffect(() => {
     const query = window.matchMedia('(max-width: 767px)')
@@ -82,20 +99,27 @@ export function WorkspaceLayout() {
   // purpose-built left panel as the full mobile view.
   const hasEditor = !!(openAutomationId || openWorkflowId || openExtractionId)
   const editorKey = openAutomationId ? `automation:${openAutomationId}` : openWorkflowId ? `workflow:${openWorkflowId}` : openExtractionId ? `extraction:${openExtractionId}` : null
-  const previousEditor = useRef<string | null>(null)
+  const previousEditor = useRef<string | null | undefined>(undefined)
   useEffect(() => {
     if (previousEditor.current === editorKey) return
+    const wasMounted = previousEditor.current !== undefined
     previousEditor.current = editorKey
-    if (editorKey) setAssistantMode(workspaceMode)
-  }, [editorKey, workspaceMode])
-  const assistantOpen = assistantMode === workspaceMode
+    if (editorKey && (wasMounted || !panelChoices[workspaceMode])) choosePanel(workspaceMode, 'tools')
+  }, [editorKey, workspaceMode, choosePanel, panelChoices])
+  const assistantOpen = panelChoices[workspaceMode] === 'tools'
   // Desktop keeps files/section content alongside the Library and its tools.
   // Compact screens switch panes without discarding the open file or editor.
   const showLeftOnly = isCompact && !isChat && !assistantOpen
   const collapseLeft = (isChat && (!chatSplitOpen || isCompact)) || (isCompact && assistantOpen)
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
-  const railWidth = isCompact ? 0 : railDocked ? 64 : 220
+  const autoDockRail = !isCompact && viewportWidth < 1100
+  const drawerOpen = (isCompact || autoDockRail) && activityOpen
+  const railWidth = isCompact ? 0 : railDocked || autoDockRail ? 64 : 220
+  const availableWidth = Math.max(1, viewportWidth - 48 - railWidth - 6)
+  const visibleSplit = fitPanelSplit(panelSplit, availableWidth)
+  const splitBounds = panelSplitBounds(availableWidth)
+  useEffect(() => { setActivityOpen(false) }, [isCompact, autoDockRail])
   const workspaceHeading = isChat
     ? 'Assistant workspace'
     : isProjects
@@ -115,8 +139,8 @@ export function WorkspaceLayout() {
       >
         Skip to main content
       </a>
-      <Header onOpenActivity={isCompact ? () => setActivityOpen(true) : undefined} />
-      <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
+      <Header onOpenActivity={isCompact ? openActivity : undefined} />
+      <ProjectContextBar railWidth={railWidth} onOpenManage={() => setManageOpen(true)} />
       <ProjectManageModal key={activeProjectUuid ?? 'no-project'} open={manageOpen} onClose={() => setManageOpen(false)} />
       <h1 className="sr-only">{workspaceHeading}</h1>
       <div className="flex flex-1 overflow-hidden">
@@ -131,22 +155,25 @@ export function WorkspaceLayout() {
         >
           {isCompact && !isChat && (
             <div role="group" aria-label="Workspace panels" className="flex shrink-0 flex-wrap gap-1 border-b border-gray-200 bg-white p-2">
-              <button type="button" aria-pressed={showLeftOnly} onClick={() => setAssistantMode(null)} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
+              <button type="button" aria-pressed={showLeftOnly} onClick={() => choosePanel(workspaceMode, 'source')} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
                 {isProjects ? 'Projects panel' : isAutomations ? 'Automations panel' : isKnowledge ? 'Knowledge panel' : 'Files panel'}
               </button>
-              <button type="button" aria-label={hasEditor ? 'Open tool panel' : 'Open Library panel'} aria-pressed={!showLeftOnly && (hasEditor || activeRightTab === 'library')} onClick={() => { setAssistantMode(workspaceMode); if (!hasEditor) setActiveRightTab('library') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
+              <button type="button" aria-label={hasEditor ? 'Open tool panel' : 'Open Library panel'} aria-pressed={!showLeftOnly && (hasEditor || activeRightTab === 'library')} onClick={() => { choosePanel(workspaceMode, 'tools'); if (!hasEditor) setActiveRightTab('library') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
                 {hasEditor ? 'Tool' : 'Library'}
               </button>
-              {!hasEditor && <button type="button" aria-label="Open Assistant panel" aria-pressed={!showLeftOnly && activeRightTab === 'assistant'} onClick={() => { setAssistantMode(workspaceMode); setActiveRightTab('assistant') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">Assistant</button>}
+              {!hasEditor && <button type="button" aria-label="Open Assistant panel" aria-pressed={!showLeftOnly && activeRightTab === 'assistant'} onClick={() => { choosePanel(workspaceMode, 'tools'); setActiveRightTab('assistant') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">Assistant</button>}
             </div>
           )}
           <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {/* Left panel area — hidden in chat mode (unless split view is open),
               drawer in automations/knowledge */}
           <div
+            id="workspace-source-pane"
+            role="region"
+            aria-label="Workspace source panel"
             className="overflow-hidden"
             style={{
-              width: collapseLeft ? '0%' : showLeftOnly ? '100%' : `${panelSplit}%`,
+              width: collapseLeft ? '0%' : showLeftOnly ? '100%' : `calc(${visibleSplit}% - ${6 * visibleSplit / 100}px)`,
               minWidth: 0,
               display: collapseLeft ? 'none' : undefined,
               transition: isDragging ? 'none' : 'width 0.3s ease',
@@ -160,6 +187,9 @@ export function WorkspaceLayout() {
           {!collapseLeft && !showLeftOnly && (
             <PanelResizer
               containerRef={containerRef}
+              value={visibleSplit}
+              min={splitBounds.min}
+              max={splitBounds.max}
               onDragStart={() => setIsDragging(true)}
               onDragEnd={() => setIsDragging(false)}
             />
@@ -170,43 +200,47 @@ export function WorkspaceLayout() {
           </div>
           </div>
         </main>
-        {isCompact && activityOpen && (
+        {drawerOpen && (
           <button
             type="button"
             aria-label="Close activity"
-            className="fixed inset-0 top-[69px] z-[640] cursor-default bg-black/30"
+            className="fixed inset-0 z-[640] cursor-default bg-black/30"
             onClick={() => setActivityOpen(false)}
           />
         )}
+        <FocusTrap active={drawerOpen} focusTrapOptions={{ initialFocus: '#close-workspace-activity', escapeDeactivates: false, allowOutsideClick: true, setReturnFocus: node => activityNavigating.current ? false : node, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
         <div
-          aria-label={isCompact ? 'Activity' : undefined}
-          aria-modal={isCompact || undefined}
+          aria-label={drawerOpen ? 'Activity' : undefined}
+          aria-modal={drawerOpen || undefined}
           className="shrink-0"
-          role={isCompact ? 'dialog' : undefined}
+          role={drawerOpen ? 'dialog' : undefined}
+          onKeyDown={event => { if (drawerOpen && event.key === 'Escape') { event.stopPropagation(); setActivityOpen(false) } }}
           style={{
             position: 'fixed',
             top: 69,
             right: 0,
             bottom: 0,
-            width: isCompact ? 'min(320px, calc(100vw - 48px))' : railDocked ? 64 : 'var(--rail-w)',
+            width: drawerOpen || isCompact ? 'min(320px, calc(100vw - 48px))' : railWidth,
             zIndex: 650,
             transition: 'width 0.3s ease, transform 0.25s ease',
             transform: isCompact && !activityOpen ? 'translateX(100%)' : undefined,
             visibility: isCompact && !activityOpen ? 'hidden' : undefined,
           }}
         >
-          {isCompact && (
+          {drawerOpen && (
             <button
+              id="close-workspace-activity"
               type="button"
               aria-label="Close activity"
-              className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-md text-[#333] hover:bg-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-highlight"
+              className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-md text-[#333] hover:bg-[#e0e0e0] focus:outline-none focus:ring-2 focus:ring-highlight"
               onClick={() => setActivityOpen(false)}
             >
               <X className="h-4 w-4" />
             </button>
           )}
-          <ActivityRail forceExpanded={isCompact} />
+          <ActivityRail forceExpanded={drawerOpen} forceDocked={autoDockRail} onExpand={openActivity} onNavigate={() => { activityNavigating.current = true; setActivityOpen(false) }} />
         </div>
+        </FocusTrap>
       </div>
     </div>
   )

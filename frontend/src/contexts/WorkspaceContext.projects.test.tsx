@@ -13,6 +13,19 @@ const setup = () => renderHook(() => useWorkspace(), { wrapper: WorkspaceProvide
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); mocks.search = {}; mocks.teamsLoading = false; mocks.team = { uuid: 'team-1' } })
 
 describe('Project scope boundaries', () => {
+  it('clamps stored panel sizes and keeps navigation usable when storage writes fail', () => {
+    localStorage.setItem('workspace:panelSplit', '1000')
+    const { result } = setup()
+    expect(result.current.panelSplit).toBe(80)
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage unavailable') })
+    try {
+      act(() => { result.current.setPanelSplit(NaN); result.current.toggleRailDocked(); result.current.setWorkspaceMode('files') })
+      expect(result.current.panelSplit).toBe(60)
+      expect(result.current.railDocked).toBe(false)
+      expect(mocks.navigate).toHaveBeenCalled()
+    } finally { write.mockRestore() }
+  })
+
   it('opening the project picker outside a project preserves the current attachments', () => {
     const { result } = setup()
     act(() => result.current.setSelectedDocUuids(['doc-a']))

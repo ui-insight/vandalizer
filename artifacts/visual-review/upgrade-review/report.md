@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 145/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 146/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Saved panel choices and responsive sizing — September 29
+
+**146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.
+
+- Stored panel sizes reject malformed/nonfinite values and fit useful source/tool widths without replacing the preferred desktop split. Narrower windows temporarily dock Activity; expanding it opens a focus-contained drawer. Returning to a wide window restores the preferred rail and split.
+- Mobile source/tool choices are remembered separately by section within the browser session, including reload with an open editor. The project context bar uses the fitted rail width. A desktop-only split control is hidden on compact screens where it cannot display two panes.
+- The divider supports arrows, Home/End, pointer dragging and reset. Interrupted drags restore normal document interaction. Failed preference writes do not prevent workspace navigation. Activity closes on navigation; New chat hands focus to the composer, while Escape restores the drawer trigger.
+- Verification: 19 frontend tests across four files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirteen panel-preference captures plus thirty file/Library regression states have zero axe findings, overflow, uncaught errors or unmatched requests. Invalid/restored values, viewport fitting, keyboard sizing, drawer focus, reload, project alignment and unavailable storage are asserted. Opening a file, running its Library workflow through failure/retry and returning to that file pass at 320/390/768/1024/1440px; representative screenshots inspected directly.
+- Evidence: `2026-09-29-panel-preferences-final` and `2026-09-29-panel-file-library-regression`. APIs and run results are synthetic; live execution and assistive-technology devices are not certified. The wider navigation, theme and accessibility acceptance remains open.
 
 ## Agent state and workflow recovery — September 29
 
@@ -195,7 +205,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 975 distinct states / 1181 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 988 distinct states / 1224 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -302,6 +312,8 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-29-catalog-filter-regression](../2026-09-29-catalog-filter-regression/manifest.json): 36 states; source `03d414db121fc5955f7641f27543b7928d2eca43ebddf2d632adf0271fb39dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-onboarding-tour-evidence](../2026-09-29-onboarding-tour-evidence/manifest.json): 30 states; source `9d7c5e257da88c233b9bf0fa46df6acfff44e220b7719cd8e168137f95a7b00e`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-agent-recovery-evidence](../2026-09-29-agent-recovery-evidence/manifest.json): 42 states; source `5f95e759e077e2d106800ae4d4b2b67c8ae851cbb834c03c2bd1e02aad674dbe`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-panel-preferences-final](../2026-09-29-panel-preferences-final/manifest.json): 13 states; source `326e8376576d1a85f635d0dbbbdc41c633b6b089825e76765f239010c1e8ec36`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-panel-file-library-regression](../2026-09-29-panel-file-library-regression/manifest.json): 30 states; source `0589b6350acd79e4d8e99b5bb802d4a28e54ea295f0172542a1bebe754f96a3f`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

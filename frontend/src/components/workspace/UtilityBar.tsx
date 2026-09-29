@@ -113,6 +113,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           <div style={{ width: 24, height: 1, background: '#333', margin: '4px 0 2px' }} />
           <button
             onClick={() => setChatSplitOpen(!chatSplitOpen)}
+            className="workspace-desktop-split-toggle"
             title={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
             aria-label={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
             aria-pressed={chatSplitOpen}

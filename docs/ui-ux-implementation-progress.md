@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**145/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**146/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Saved panel choices and responsive sizing — September 29
+
+**146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.
+
+- Stored panel sizes reject malformed/nonfinite values and fit useful source/tool widths without replacing the preferred desktop split. Narrower windows temporarily dock Activity; expanding it opens a focus-contained drawer. Returning to a wide window restores the preferred rail and split.
+- Mobile source/tool choices are remembered separately by section within the browser session, including reload with an open editor. The project context bar uses the fitted rail width. A desktop-only split control is hidden on compact screens where it cannot display two panes.
+- The divider supports arrows, Home/End, pointer dragging and reset. Interrupted drags restore normal document interaction. Failed preference writes do not prevent workspace navigation. Activity closes on navigation; New chat hands focus to the composer, while Escape restores the drawer trigger.
+- Verification: 19 frontend tests across four files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirteen panel-preference captures plus thirty file/Library regression states have zero axe findings, overflow, uncaught errors or unmatched requests. Invalid/restored values, viewport fitting, keyboard sizing, drawer focus, reload, project alignment and unavailable storage are asserted. Opening a file, running its Library workflow through failure/retry and returning to that file pass at 320/390/768/1024/1440px; representative screenshots inspected directly.
+- Evidence: `2026-09-29-panel-preferences-final` and `2026-09-29-panel-file-library-regression`. APIs and run results are synthetic; live execution and assistive-technology devices are not certified. The wider navigation, theme and accessibility acceptance remains open.
 
 ## Agent state and workflow recovery — September 29
 

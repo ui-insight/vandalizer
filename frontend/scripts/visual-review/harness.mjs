@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { installFixtures } from './fixtures.mjs'
 
-export async function createReview({output='artifacts/visual-review',baseURL='http://127.0.0.1:5173'}={}) {
+export async function createReview({output='artifacts/visual-review',baseURL='http://127.0.0.1:5173',resetStorage=true}={}) {
  const root=execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim();
  const paths=execFileSync('git',['ls-files','--cached','--others','--exclude-standard','-z','frontend/src','frontend/scripts/visual-review','backend/app'],{cwd:root,encoding:'utf8'}).split('\0').filter(Boolean).sort();
  const hash=createHash('sha256');
@@ -21,7 +21,7 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
  await installFixtures(context,state,unmatched);
  // Every navigation starts from the same layout and scope. Interactions within
  // a scenario retain state; separate scenarios cannot inherit a project or KB.
- await context.addInitScript(()=>{localStorage.clear();localStorage.setItem('vandalizer:first-run-tour-dismissed','1')});
+ await context.addInitScript(reset=>{if(reset){localStorage.clear();sessionStorage.clear()}localStorage.setItem('vandalizer:first-run-tour-dismissed','1')},resetStorage);
  const page=await context.newPage(); page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message)});
  page.on('console',m=>{if(m.type()==='error')console.error('CONSOLE',m.text())});
  page.on('requestfailed',r=>console.error('REQUEST FAILED',r.url(),r.failure()));

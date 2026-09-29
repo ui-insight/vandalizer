@@ -17,11 +17,34 @@ vi.mock('./ProjectsPanel', () => ({ ProjectsPanel: () => <div>Projects</div> }))
 vi.mock('./AutomationsPanel', () => ({ AutomationsPanel: () => <div>Automations</div> }))
 vi.mock('./KnowledgePanel', () => ({ KnowledgePanel: () => <div>Knowledge</div> }))
 beforeEach(() => {
+  sessionStorage.clear()
   h.compact = false; h.mode = 'files'; h.editor = null; h.tab = 'assistant'; h.focus = 0; vi.clearAllMocks()
   vi.stubGlobal('matchMedia', () => ({ matches: h.compact, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
 })
 const rightHidden = () => screen.getByTestId('library').closest('[aria-label="Tools and assistant"]')!.classList.contains('hidden')
 describe('Files and Library share the workspace', () => {
+  it('remembers compact pane choices separately for each section and after a remount', () => {
+    h.compact = true
+    const { rerender, unmount } = render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Library panel' }))
+    h.mode = 'knowledge'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assistant panel' }))
+    h.mode = 'files'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Files panel' }))
+    unmount(); render(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+  })
+  it('restores a compact source pane even when an editor remains open', () => {
+    h.compact = true; h.editor = 'workflow-1'
+    sessionStorage.setItem('workspace:compactPanels', JSON.stringify({files:'source'}))
+    const { rerender } = render(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(true)
+    h.editor = 'workflow-2'; rerender(<WorkspaceLayout />)
+    expect(rightHidden()).toBe(false)
+  })
+
   it('keeps both desktop panes visible before and after opening a tool', () => {
     const { rerender } = render(<WorkspaceLayout />)
     expect(rightHidden()).toBe(false)

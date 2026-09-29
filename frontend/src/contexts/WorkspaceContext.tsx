@@ -1,3 +1,4 @@
+import { validPanelSplit } from '../utils/workspaceLayout'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import type { VerificationSession } from '../api/verificationSessions'
@@ -210,7 +211,7 @@ function getStoredBool(key: string, fallback: boolean): boolean {
   try {
     const v = localStorage.getItem(key)
     if (v === null) return fallback
-    return v === 'true'
+    return v === 'true' ? true : v === 'false' ? false : fallback
   } catch {
     return fallback
   }
@@ -230,8 +231,8 @@ function getStoredNumber(key: string, fallback: number): number {
   try {
     const v = localStorage.getItem(key)
     if (v === null) return fallback
-    const n = parseFloat(v)
-    return isNaN(n) ? fallback : n
+    const n = v.trim() ? Number(v) : NaN
+    return Number.isFinite(n) ? n : fallback
   } catch {
     return fallback
   }
@@ -360,7 +361,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [selectedFolderNames, setSelectedFolderNames] = useState<Record<string, string>>({})
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', true))
-  const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
+  const [panelSplit, _setPanelSplit] = useState(() => validPanelSplit(getStoredNumber('workspace:panelSplit', 60)))
   const [chatSplitOpen, _setChatSplitOpen] = useState(() => getStoredBool('workspace:chatSplit', false))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
@@ -433,7 +434,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // ── Navigation callbacks ────────────────────────────────────────────────
 
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
-    localStorage.setItem('workspace:mode', mode)
+    setStoredRaw('workspace:mode', mode)
     updateSearch((prev) => ({ ...prev, mode: mode === 'chat' ? undefined : mode }))
   }, [updateSearch])
 
@@ -506,7 +507,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const resetToHome = useCallback(() => {
     projectScopeVersion.current += 1
     updateSearch(() => emptyWorkspaceSearch())
-    localStorage.setItem('workspace:mode', 'chat')
+    setStoredRaw('workspace:mode', 'chat')
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
@@ -563,7 +564,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBs([{ uuid, title }])
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
-    localStorage.setItem('workspace:mode', 'chat')
+    setStoredRaw('workspace:mode', 'chat')
     updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch, clearChatAttachments])
 
@@ -596,7 +597,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBs([])
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
-    localStorage.setItem('workspace:mode', 'chat')
+    setStoredRaw('workspace:mode', 'chat')
     updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch, clearChatAttachments])
 
@@ -664,7 +665,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setSelectedDocNames(Object.fromEntries(titles.documents.map(d => [d.uuid, d.title])))
       setSelectedFolderUuids(titles.folders.map(f => f.uuid))
       setSelectedFolderNames(Object.fromEntries(titles.folders.map(f => [f.uuid, f.title])))
-      localStorage.setItem('workspace:mode', 'chat')
+      setStoredRaw('workspace:mode', 'chat')
       if (attached < requested) {
         const missing = requested - attached
         toast(
@@ -715,7 +716,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           // Land in whatever mode was requested (e.g. ?project=X&mode=files),
           // defaulting to chat. Viewers (shared-in PIs) are chat-only.
           const requestedMode = project.role === 'viewer' ? 'chat' : (search.mode ?? 'chat')
-          localStorage.setItem('workspace:mode', requestedMode)
+          setStoredRaw('workspace:mode', requestedMode)
           navigate({
             // Preserve any editor param so a pinned tool (e.g. ?project=X&workflow=Y)
             // opens inside the scoped project rather than being wiped.
@@ -839,22 +840,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const toggleRailDocked = useCallback(() => {
     setRailDocked(prev => {
       const next = !prev
-      localStorage.setItem('workspace:railDocked', String(next))
+      setStoredRaw('workspace:railDocked', String(next))
       return next
     })
   }, [])
 
   const setPanelSplit = useCallback((pct: number, skipPersist?: boolean) => {
-    const clamped = Math.min(80, Math.max(20, pct))
+    const clamped = validPanelSplit(pct)
     _setPanelSplit(clamped)
     if (!skipPersist) {
-      localStorage.setItem('workspace:panelSplit', String(clamped))
+      setStoredRaw('workspace:panelSplit', String(clamped))
     }
   }, [])
 
   const setChatSplitOpen = useCallback((open: boolean) => {
     _setChatSplitOpen(open)
-    try { localStorage.setItem('workspace:chatSplit', String(open)) } catch {}
+    try { setStoredRaw('workspace:chatSplit', String(open)) } catch {}
   }, [])
 
   const viewDocument = useCallback((uuid: string, title: string, highlight?: ViewDocumentRequest['highlight'], options?: { preserveChatScope?: boolean }) => {
