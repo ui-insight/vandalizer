@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import { createReview } from './harness.mjs'
 import { validationResult, queries } from './fixtures.mjs'
 
+const shortScreens = process.env.REVIEW_SHORT === '1'
+const viewports = shortScreens ? [[320,480],[768,500],[1440,600]] : [[320,568],[768,600],[1440,900]]
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, context, state } = review
 state.validationQueries = true
@@ -28,6 +30,7 @@ async function open(target = page) {
   await target.getByRole('tab', { name: 'Validation', exact: true }).click()
 }
 async function shot(id, locator) {
+  if (shortScreens) id += '-short'
   if (locator) await locator.scrollIntoViewIfNeeded()
   await review.capture(id)
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${id}: overflow`)
@@ -35,7 +38,7 @@ async function shot(id, locator) {
   console.log(`Captured ${id}`)
 }
 try {
-  for (const [width, height] of [[320,568],[768,600],[1440,900]]) {
+  for (const [width, height] of viewports) {
     task = null; failDiscovery = false
     await page.setViewportSize({ width, height }); await open()
     await page.getByText('Preview selected questions (3)', { exact: true }).click()
@@ -84,7 +87,7 @@ try {
   }
   task = { id: 'existing-subset', status: 'queued', options: { mode: 'judge', query_uuids: [queries[1].uuid], skip_judge: false } }
   failDiscovery = true
-  await page.setViewportSize({ width: 320, height: 568 }); await open()
+  await page.setViewportSize({ width: 320, height: shortScreens ? 480 : 568 }); await open()
   await page.getByText(/We could not check for unfinished validations/).waitFor()
   assert.equal(await page.getByRole('button', { name: 'Running…', exact: true }).isDisabled(), true)
   await shot('validation-resume-discovery-error-320', page.getByText(/We could not check for unfinished validations/))

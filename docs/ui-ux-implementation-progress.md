@@ -12,6 +12,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+## Paused validation screen work — September 29
+
+Review paused at the user's request for work on `main`. The acceptance count remains **146/169**; VAL-17 is still open.
+
+The checkpoint includes short-screen recipes for setup/resumption, questions, saved history and validation dialogs. Generation now uses a viewport-clamped dialog with a scrollable body, visible footer and native coverage radios. Trial details and comparisons wrap long values; comparison fetch errors offer retry. Previous optimization runs wrap metadata, and sorting controls have accessible names. Scrollable trial/comparison details are keyboard reachable.
+
+Verification is incomplete: the initial production build and touched-component lint passed. The initial short-screen setup/resumption recipe captured 29 states; the question recipe captured 21 before a click timeout. The dialog recipe captured generation states, then exposed scroll-region, sort-label and contrast findings. Fixes for those findings are included but have not been rebuilt and re-reviewed. Two focused test attempts timed out during worker startup without running tests. A third attempt was not launched because automatic approval review timed out. TypeScript verification had not returned a result at the pause. Do not treat these diagnostic captures as accepted evidence or close VAL-17 until verification completes.
+
+Resume with `frontend/scripts/visual-review/validation-dialogs.mjs` and the three `validation-*` recipes using `REVIEW_SHORT=1`, then update the issue/gallery only after the checks pass. No push or deployment has been performed.
+
 ## Saved panel choices and responsive sizing — September 29
 
 **146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.

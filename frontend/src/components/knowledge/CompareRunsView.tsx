@@ -1,3 +1,4 @@
+import './comparison-layout.css'
 import { useEffect, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X, Loader2, ArrowLeftRight } from 'lucide-react'
@@ -34,6 +35,7 @@ export function CompareRunsView({
   const [other, setOther] = useState<KBOptimizationRun | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!open || !currentRunUuid || !otherRunUuid) return
@@ -53,7 +55,7 @@ export function CompareRunsView({
       if (!cancelled) setLoading(false)
     })
     return () => { cancelled = true }
-  }, [open, kbUuid, currentRunUuid, otherRunUuid])
+  }, [open, kbUuid, currentRunUuid, otherRunUuid, attempt])
 
   // Close on Escape
   useEffect(() => {
@@ -71,25 +73,26 @@ export function CompareRunsView({
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 70,
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
-        backgroundColor: 'rgba(0,0,0,0.55)', padding: 24, overflowY: 'auto',
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
+        backgroundColor: 'rgba(0,0,0,0.55)', padding: 12,
       }}
       onClick={onClose}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Compare optimization runs"
+        className="optimization-comparison"
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(1100px, 100%)',
           backgroundColor: '#161616', border: '1px solid #2e2e2e',
-          borderRadius: 10, padding: 20,
-          display: 'flex', flexDirection: 'column', gap: 14,
+          borderRadius: 10, maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden', overflowWrap: 'anywhere',
+          display: 'flex', flexDirection: 'column', containerType: 'inline-size',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, flexShrink: 0, borderBottom: '1px solid #444' }}>
           <ArrowLeftRight size={16} style={{ color: '#a78bfa' }} aria-hidden="true" />
           <h3 style={{ margin: 0, fontSize: 14, color: '#fff' }}>
             Compare optimization runs
@@ -99,7 +102,7 @@ export function CompareRunsView({
             onClick={onClose}
             style={{
               marginLeft: 'auto', background: 'transparent', border: 'none',
-              color: '#888', cursor: 'pointer', padding: 4, fontFamily: 'inherit',
+              color: '#ccc', cursor: 'pointer', padding: 4, fontFamily: 'inherit', minWidth: 36, minHeight: 36, flexShrink: 0,
             }}
             aria-label="Close"
           >
@@ -107,16 +110,18 @@ export function CompareRunsView({
           </button>
         </div>
 
+        <div tabIndex={0} role="region" aria-label="Run comparison details" style={{ minHeight: 0, overflowY: 'auto', padding: 16 }}>
         {loading ? (
           <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 36, color: '#888' }}>
             <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
             <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading runs…</span>
           </div>
         ) : error ? (
-          <div role="alert" style={{ color: '#fca5a5', fontSize: 12 }}>{error}</div>
+          <div role="alert" style={{ color: '#fca5a5', fontSize: 12 }}>{error}<button type="button" onClick={() => setAttempt(value => value + 1)} style={{ display: 'block', minHeight: 36, marginTop: 8, padding: '6px 12px', color: '#e5e7eb', background: '#262626', border: '1px solid #666', borderRadius: 6 }}>Retry comparison</button></div>
         ) : current && other ? (
           <DiffBody left={other} right={current} />
         ) : null}
+        </div>
       </div>
       </FocusTrap>
     </div>
@@ -130,7 +135,7 @@ function DiffBody({ left, right }: { left: KBOptimizationRun; right: KBOptimizat
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{
-        display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12,
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 240px), 1fr))', gap: 12,
       }}>
         <RunHeader label="Earlier run" run={left} subtitle={leftLabel} />
         <RunHeader label="This run" run={right} subtitle={rightLabel} />
@@ -164,14 +169,14 @@ function RunHeader({ label, run, subtitle }: { label: string; run: KBOptimizatio
       padding: 12, backgroundColor: '#1a1a1a',
       border: '1px solid #2e2e2e', borderRadius: 6,
     }}>
-      <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{subtitle}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+      <div style={{ fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#aaa', marginTop: 2 }}>{subtitle}</div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: scoreColor((score ?? 0) * 100) }}>
           {score != null ? `${(score * 100).toFixed(0)}%` : '-'}
         </span>
         {lift != null && (
-          <span style={{ fontSize: 11, color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888' }}>
+          <span style={{ fontSize: 12, color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888' }}>
             {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts vs default
           </span>
         )}
@@ -184,7 +189,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <div style={{
-        fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
+        fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
       }}>{title}</div>
       {children}
     </div>
@@ -215,7 +220,7 @@ function EvalSetDrift({ left, right }: { left: KBOptimizationRun; right: KBOptim
     <div style={{
       padding: 10, backgroundColor: drifted ? 'rgba(245, 158, 11, 0.06)' : '#1a1a1a',
       border: `1px solid ${drifted ? 'rgba(245, 158, 11, 0.3)' : '#2e2e2e'}`,
-      borderRadius: 6, fontSize: 11, color: '#aaa', lineHeight: 1.6,
+      borderRadius: 6, fontSize: 12, color: '#aaa', lineHeight: 1.6,
     }}>
       <div>
         <strong>Common:</strong> {ls.query_uuids.length - removed.length} ·{' '}
@@ -314,34 +319,21 @@ function DeltaGroup({
   const fg = tone === 'good' ? '#86efac' : '#fca5a5'
   return (
     <div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: fg, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: fg, marginBottom: 4 }}>{label}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {rows.map(({ q, left }) => {
           const delta = (q.score - left.score) * 100
           return (
             <div
               key={q.query_uuid}
-              title={q.query}
-              style={{
-                display: 'grid', gridTemplateColumns: '1fr 60px 60px 50px',
-                gap: 6, padding: '4px 8px',
-                fontSize: 11, color: '#ddd',
-                backgroundColor: '#1a1a1a', border: '1px solid #262626',
-                borderRadius: 4,
-              }}
+              style={{ padding: '8px 10px', fontSize: 12, color: '#ddd', backgroundColor: '#1a1a1a', border: '1px solid #444', borderRadius: 4 }}
             >
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {q.query}
-              </span>
-              <span style={{ textAlign: 'right', color: scoreColor(left.score * 100) }}>
-                {(left.score * 100).toFixed(0)}%
-              </span>
-              <span style={{ textAlign: 'right', color: scoreColor(q.score * 100), fontWeight: 600 }}>
-                {(q.score * 100).toFixed(0)}%
-              </span>
-              <span style={{ textAlign: 'right', color: fg, fontWeight: 600 }}>
-                {delta > 0 ? '+' : ''}{delta.toFixed(0)}
-              </span>
+              <p style={{ margin: '0 0 8px', overflowWrap: 'anywhere' }}>{q.query}</p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
+                <span>Earlier: <strong style={{ color: scoreColor(left.score * 100) }}>{(left.score * 100).toFixed(0)}%</strong></span>
+                <span>This run: <strong style={{ color: scoreColor(q.score * 100) }}>{(q.score * 100).toFixed(0)}%</strong></span>
+                <span style={{ color: fg }}>Change: {delta > 0 ? '+' : ''}{delta.toFixed(0)} points</span>
+              </div>
             </div>
           )
         })}
@@ -353,17 +345,17 @@ function DeltaGroup({
 function DiffRow({ label, left, right }: { label: string; left: string; right: string }) {
   const changed = left !== right
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '160px 1fr 1fr',
+    <div className="optimization-diff-row" style={{
+      display: 'grid',
       gap: 8, padding: '4px 8px',
-      fontSize: 11, color: '#ddd',
+      fontSize: 12, color: '#ddd',
       backgroundColor: changed ? 'rgba(245, 158, 11, 0.06)' : '#1a1a1a',
       border: `1px solid ${changed ? 'rgba(245, 158, 11, 0.25)' : '#262626'}`,
       borderRadius: 4,
     }}>
-      <span style={{ color: '#888' }}>{label}</span>
-      <span style={{ color: changed ? '#fbbf24' : '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={left}>{left}</span>
-      <span style={{ color: changed ? '#fbbf24' : '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={right}>{right}</span>
+      <strong style={{ color: '#ccc' }}>{label}</strong>
+      <span style={{ color: changed ? '#fbbf24' : '#ccc', minWidth: 0, overflowWrap: 'anywhere' }}><span className="optimization-value-label">Earlier run: </span>{left}</span>
+      <span style={{ color: changed ? '#fbbf24' : '#ccc', minWidth: 0, overflowWrap: 'anywhere' }}><span className="optimization-value-label">This run: </span>{right}</span>
     </div>
   )
 }
@@ -371,7 +363,7 @@ function DiffRow({ label, left, right }: { label: string; left: string; right: s
 function Note({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      padding: 8, fontSize: 11, color: '#888',
+      padding: 8, fontSize: 12, color: '#888',
       backgroundColor: '#1a1a1a', border: '1px solid #262626',
       borderRadius: 4,
     }}>{children}</div>

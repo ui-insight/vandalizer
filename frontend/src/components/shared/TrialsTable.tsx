@@ -150,8 +150,9 @@ export function TrialsTable<TTrial>({
         </span>
         {sortOptions.length > 1 && (
           <>
-            <span style={{ marginLeft: 'auto', fontSize: 10, color: '#666' }}>Sort by:</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>Sort by:</span>
             <select
+          aria-label="Sort trials"
               value={sortKey}
               onChange={e => setSortKey(e.target.value)}
               style={{

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { Sparkles, X } from 'lucide-react'
 
@@ -6,120 +6,50 @@ interface Props {
   onConfirm: (coverage: 'quick' | 'standard' | 'exhaustive') => void
   onClose: () => void
 }
-
-const OPTIONS: { id: 'quick' | 'standard' | 'exhaustive'; label: string; count: number; cost: string }[] = [
-  { id: 'quick', label: 'Quick', count: 5, cost: '~10 LLM calls' },
-  { id: 'standard', label: 'Standard', count: 10, cost: '~20 LLM calls' },
-  { id: 'exhaustive', label: 'Exhaustive', count: 25, cost: '~50 LLM calls' },
-]
+const OPTIONS = [
+  { id: 'quick', label: 'Quick', count: 5, cost: '~10 model calls' },
+  { id: 'standard', label: 'Standard', count: 10, cost: '~20 model calls' },
+  { id: 'exhaustive', label: 'Exhaustive', count: 25, cost: '~50 model calls' },
+] as const
 
 export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
   const [choice, setChoice] = useState<'quick' | 'standard' | 'exhaustive'>('standard')
-
+  const submitted = useRef(false)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
-
   return (
-    <div style={{
-      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-    }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Auto-generate test queries"
-        style={{
-          width: 440, padding: 20, backgroundColor: '#1f1f1f',
-          border: '1px solid #2e2e2e', borderRadius: 10,
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sparkles size={16} style={{ color: '#7c3aed' }} aria-hidden="true" />
-          <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Auto-generate test queries</h3>
-          <button
-            type="button"
-            aria-label="Close"
-            onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
+    <div style={{ position:'fixed', inset:0, backgroundColor:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000, padding:12 }}>
+      <FocusTrap focusTrapOptions={{ initialFocus:'#generate-coverage-standard', escapeDeactivates:false, tabbableOptions:{displayCheck:import.meta.env.MODE === 'test' ? 'none' : 'full'} }}>
+        <div role="dialog" aria-modal="true" aria-label="Auto-generate test queries" style={{ width:440, maxWidth:'100%', maxHeight:'calc(100dvh - 24px)', display:'flex', flexDirection:'column', overflow:'hidden', backgroundColor:'#1f1f1f', border:'1px solid #444', borderRadius:10, color:'#e5e7eb', fontSize:14 }}>
+          <header style={{ display:'flex', alignItems:'center', gap:8, padding:'12px 16px', flexShrink:0, borderBottom:'1px solid #444' }}>
+            <Sparkles size={18} aria-hidden="true" style={{flexShrink:0}} />
+            <h3 style={{margin:0,fontSize:18,color:'#fff'}}>Auto-generate test queries</h3>
+            <button type="button" aria-label="Close" onClick={onClose} style={{marginLeft:'auto',flexShrink:0,display:'grid',placeItems:'center',width:36,height:36,background:'transparent',border:0,cursor:'pointer',color:'#d1d5db'}}><X size={20} aria-hidden="true" /></button>
+          </header>
+          <div style={{minHeight:0,overflowY:'auto',padding:16,lineHeight:1.5}}>
+            <p style={{margin:'0 0 16px'}}>Create draft questions from your indexed sources. Review the expected answers before using them to check answer quality.</p>
+            <fieldset style={{border:0,padding:0,margin:0,minWidth:0}}>
+              <legend style={{fontWeight:600,marginBottom:8}}>Question coverage</legend>
+              {OPTIONS.map(option => <label key={option.id} htmlFor={`generate-coverage-${option.id}`} style={{display:'flex',alignItems:'center',gap:10,padding:12,marginBottom:8,borderRadius:6,background:'#262626',border:`1px solid ${choice===option.id ? 'var(--highlight-color, #eab308)' : '#555'}`,cursor:'pointer'}}>
+                <input id={`generate-coverage-${option.id}`} type="radio" name="question-coverage" value={option.id} checked={choice===option.id} onChange={()=>setChoice(option.id)} style={{accentColor:'var(--highlight-color, #eab308)',flexShrink:0}} />
+                <span style={{minWidth:0,flex:1}}><strong>{option.label}</strong><span style={{display:'block',fontSize:12,color:'#d1d5db'}}>Up to {option.count} questions</span></span>
+                <span style={{fontSize:12,color:'#d1d5db',maxWidth:90}}>{option.cost}</span>
+              </label>)}
+            </fieldset>
+            <p style={{fontSize:12,color:'#d1d5db'}}>Estimates; actual model usage may vary.</p>
+            <details style={{fontSize:12,color:'#d1d5db',marginTop:12}}>
+              <summary style={{cursor:'pointer',padding:'8px 0'}}>How question IDs work</summary>
+              <p>Each question gets an expected answer, category, source, notes and a stable ID. Generating again creates new IDs; imported IDs are kept as provided.</p>
+            </details>
+          </div>
+          <footer style={{display:'flex',justifyContent:'flex-end',flexWrap:'wrap',gap:8,padding:'12px 16px',borderTop:'1px solid #444',flexShrink:0}}>
+            <button type="button" onClick={onClose} style={{minHeight:36,padding:'6px 14px',fontSize:14,fontFamily:'inherit',color:'#e5e7eb',background:'transparent',border:'1px solid #666',borderRadius:6,cursor:'pointer'}}>Cancel</button>
+            <button type="button" onClick={()=>{if(!submitted.current){submitted.current=true;onConfirm(choice)}}} style={{minHeight:36,padding:'6px 14px',fontSize:14,fontWeight:600,fontFamily:'inherit',color:'var(--highlight-text-color, #000)',background:'var(--highlight-color, #eab308)',border:0,borderRadius:6,cursor:'pointer'}}>Generate</button>
+          </footer>
         </div>
-        <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
-          The LLM will sample chunks from your KB and propose questions whose answers
-          require retrieval, useful for measuring how much your KB lifts answer
-          quality vs. a no-KB baseline.
-        </div>
-        <div style={{ fontSize: 11, color: '#888', marginBottom: 14 }}>
-          Each question gets the same columns as an imported set — expected answer,
-          category, source, notes — and an ID such as{' '}
-          <code style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', color: '#a78bfa' }}>
-            FCOI-AUTO-Q001
-          </code>
-          , numbered on from any it already has. An ID is assigned once and kept
-          across runs and exports; regenerating creates new IDs rather than reusing
-          old ones. Imported IDs are kept as provided.
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-          {OPTIONS.map(opt => {
-            const active = choice === opt.id
-            return (
-              <button
-                key={opt.id}
-                type="button"
-                onClick={() => setChoice(opt.id)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', textAlign: 'left',
-                  backgroundColor: active ? 'rgba(124, 58, 237, 0.12)' : '#262626',
-                  border: '1px solid ' + (active ? '#7c3aed' : '#333'),
-                  borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
-                }}
-              >
-                <span style={{
-                  width: 14, height: 14, borderRadius: '50%',
-                  border: '2px solid ' + (active ? '#7c3aed' : '#555'),
-                  backgroundColor: active ? '#7c3aed' : 'transparent',
-                  flexShrink: 0,
-                }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</div>
-                  <div style={{ fontSize: 11, color: '#888' }}>up to {opt.count} questions</div>
-                </div>
-                <div style={{ fontSize: 11, color: '#666' }}>{opt.cost}</div>
-              </button>
-            )
-          })}
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" onClick={onClose} style={{
-            padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            color: '#aaa', background: 'transparent', border: '1px solid #333',
-            borderRadius: 6, cursor: 'pointer',
-          }}>
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => onConfirm(choice)}
-            style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#fff', backgroundColor: '#7c3aed',
-              border: '1px solid #7c3aed', borderRadius: 6, cursor: 'pointer',
-            }}
-          >
-            Generate
-          </button>
-        </div>
-      </div>
       </FocusTrap>
     </div>
   )

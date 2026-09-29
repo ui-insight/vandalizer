@@ -51,6 +51,7 @@ export function OptimizationHistoryPanel({
     }}>
       <button
         onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
@@ -62,7 +63,7 @@ export function OptimizationHistoryPanel({
         <History size={14} style={{ color: '#888' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -123,7 +124,7 @@ function HistoryRow({
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: 8,
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
         padding: '7px 10px',
         background: '#1a1a1a', border: '1px solid #2a2a2a',
         borderRadius: 5,
@@ -133,25 +134,25 @@ function HistoryRow({
         onClick={() => onSelect?.(run.uuid)}
         disabled={!onSelect}
         style={{
-          flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+          flex: '1 1 220px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minHeight: 36,
           background: 'transparent', border: 'none', padding: 0,
           cursor: onSelect ? 'pointer' : 'default',
           fontFamily: 'inherit', color: '#e5e5e5', textAlign: 'left',
         }}
       >
         <StatusDot status={run.status} />
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{
             fontSize: 12, color: '#ddd',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            overflowWrap: 'anywhere',
           }}>
             {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
-            <span style={{ color: '#666' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
+            <span style={{ color: '#aaa' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
             {run.options?.apply_on_finish ? <span style={{ color: '#a78bfa' }}> · auto-applied</span> : null}
           </div>
           <div style={{
-            fontSize: 10, color: '#666',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+            fontSize: 12, color: '#aaa',
+            overflowWrap: 'anywhere', marginTop: 1,
           }}>
             {run.judge_model && <>judge: {run.judge_model}</>}
             {run.judge_model && run.eval_set_size != null && ' · '}
@@ -161,8 +162,8 @@ function HistoryRow({
           </div>
           {run.error_message && run.status === 'failed' && (
             <div style={{
-              fontSize: 10, color: '#fca5a5',
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+              fontSize: 12, color: '#fca5a5',
+              overflowWrap: 'anywhere', marginTop: 1,
             }}>
               {run.error_message}
             </div>
@@ -175,8 +176,8 @@ function HistoryRow({
         )}
         {lift != null && (
           <span style={{
-            fontSize: 10,
-            color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#666',
+            fontSize: 12,
+            color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#aaa',
             minWidth: 50, textAlign: 'right',
           }}>
             {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts
@@ -189,7 +190,7 @@ function HistoryRow({
           title="Compare this run with the current one"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '4px 8px', fontSize: 10, fontWeight: 600, fontFamily: 'inherit',
+            minHeight: 36, padding: '4px 8px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
             color: '#a78bfa', background: 'transparent',
             border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 4,
             cursor: 'pointer',

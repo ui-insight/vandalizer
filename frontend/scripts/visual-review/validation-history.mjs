@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import { createReview } from './harness.mjs'
 import { validationResult } from './fixtures.mjs'
 
+const shortScreens = process.env.REVIEW_SHORT === '1'
+const viewports = shortScreens ? [[320,480],[768,500],[1440,600]] : [[320,568],[768,600],[1440,900]]
 const review = await createReview({ output: process.env.REVIEW_OUTPUT, baseURL: process.env.REVIEW_BASE_URL })
 const { page, state } = review
 state.validationQueries = true
@@ -29,6 +31,7 @@ await page.route('**/api/knowledge/kb-1/validation-runs/*/export?*', route => {
 })
 await page.route('**/api/knowledge/kb-1/validate', route => { starts.push(route.request().postData()); return route.fulfill({ status: 500, json: { detail: 'Unexpected validation request' } }) })
 async function shot(id) {
+  if (shortScreens) id += '-short'
   await review.capture(id)
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${id}: overflow`)
   assert.deepEqual(JSON.parse(await readFile(resolve(review.out, `${id}.axe.json`), 'utf8')), [], `${id}: accessibility findings`)
@@ -41,7 +44,7 @@ async function openHistory() {
   await page.getByRole('tab', { name: 'History', exact: true }).click()
 }
 try {
-  for (const [width, height] of [[320,568], [768,600], [1440,900]]) {
+  for (const [width, height] of viewports) {
     await page.setViewportSize({ width, height })
     await openHistory()
     await page.getByText('Last 30 runs', { exact: true }).waitFor()
@@ -76,7 +79,7 @@ try {
     }
     assert.equal(starts.length, 0, 'Reopening/exporting a saved run must never launch a new validation')
   }
-  await page.setViewportSize({ width: 320, height: 568 })
+  await page.setViewportSize({ width: 320, height: shortScreens ? 480 : 568 })
   failHistory = true
   await openHistory()
   await page.getByRole('button', { name: 'Retry history' }).waitFor()

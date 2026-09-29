@@ -73,8 +73,9 @@ export function TrialQueryDeltas({
         <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
           {title} ({rows.length})
         </span>
-        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#666' }}>Sort by:</span>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>Sort by:</span>
         <select
+          aria-label="Sort question changes"
           value={sortKey}
           onChange={e => setSortKey(e.target.value as SortKey)}
           style={{

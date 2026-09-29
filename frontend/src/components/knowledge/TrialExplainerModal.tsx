@@ -1,3 +1,4 @@
+import './comparison-layout.css'
 import { useEffect } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
@@ -66,12 +67,13 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         zIndex: 1000,
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(560px, 92vw)',
-          maxHeight: '88vh',
+          width: 'min(560px, 92vw)', containerType: 'inline-size',
+          maxHeight: 'calc(100dvh - 24px)',
+          overflowWrap: 'anywhere',
           background: '#1a1a1a',
           border: '1px solid #2e2e2e',
           borderRadius: 10,
@@ -81,7 +83,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
       >
         {/* Header */}
         <header style={{
-          padding: '14px 18px',
+          padding: '14px 18px', flexShrink: 0,
           borderBottom: '1px solid #2e2e2e',
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
         }}>
@@ -94,20 +96,20 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
                 Trial details
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 3 }}>
                 <span style={{ fontSize: 18, fontWeight: 700, color: '#e5e5e5' }}>
                   {scorePct}%
                 </span>
                 {lift != null && (
                   <span style={{
-                    fontSize: 11, fontWeight: 600,
+                    fontSize: 12, fontWeight: 600,
                     color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888',
                   }}>
                     {lift > 0 ? '+' : ''}{Math.round(lift * 100)} pts vs current
                   </span>
                 )}
                 <span style={{
-                  fontSize: 10, fontWeight: 600, color: badge.color,
+                  fontSize: 12, fontWeight: 600, color: badge.color,
                   border: `1px solid ${badge.color}55`, borderRadius: 999,
                   padding: '1px 7px',
                 }}>
@@ -122,7 +124,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: '#888',
-              cursor: 'pointer', padding: 4, flexShrink: 0,
+              cursor: 'pointer', padding: 4, flexShrink: 0, minWidth: 36, minHeight: 36,
             }}
           >
             <X size={16} aria-hidden="true" />
@@ -130,7 +132,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         </header>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px 18px' }}>
+        <div tabIndex={0} role="region" aria-label="Trial explanation" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px' }}>
           {/* What it tried */}
           <Section title="What this trial tried">
             <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: '#cfcfcf' }}>
@@ -154,8 +156,8 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
           <Section title="Settings it used, and why they matter">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {params.map((p) => (
-                <div key={p.key} style={{
-                  display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10,
+                <div key={p.key} className="optimization-trial-parameter" style={{
+                  display: 'grid', gap: 10,
                   alignItems: 'baseline',
                 }}>
                   <div style={{ fontSize: 12, color: '#888' }}>
@@ -198,7 +200,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
                 <strong style={{ color: '#e0a0a0' }}>{disc.failing} that failed</strong>.
               </p>
             )}
-            <p style={{ margin: '10px 0 0', fontSize: 11, lineHeight: 1.5, color: '#6f6f6f' }}>
+            <p style={{ margin: '10px 0 0', fontSize: 12, lineHeight: 1.5, color: '#aaa' }}>
               The overall quality score blends the AI answer-quality grade (40%) with retrieval
               precision (25%), source health (20%), and how much of each document the
               answers drew on (15%).
@@ -215,8 +217,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <section style={{ marginBottom: 18 }}>
       <h3 style={{
-        margin: '0 0 8px', fontSize: 11, fontWeight: 600,
-        letterSpacing: 0.4, textTransform: 'uppercase', color: '#7a7a7a',
+        margin: '0 0 8px', fontSize: 12, fontWeight: 600,
+        letterSpacing: 0.4, textTransform: 'uppercase', color: '#aaa',
       }}>
         {title}
       </h3>
@@ -233,7 +235,7 @@ function Stat({ label, value }: { label: string; value: string }) {
       background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a',
       borderRadius: 6,
     }}>
-      <span style={{ fontSize: 9.5, color: '#777', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+      <span style={{ fontSize: 12, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         {label}
       </span>
       <span style={{ fontSize: 13, fontWeight: 600, color: '#e9e9e9', fontVariantNumeric: 'tabular-nums' }}>
