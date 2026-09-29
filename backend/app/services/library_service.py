@@ -294,7 +294,9 @@ async def add_item(
         "kind": LibraryItemKind(kind).value,
     })
     if existing:
-        return await _attach_author(await _dereference_item(existing))
+        return await _attach_author(
+            await _single_with_run_based_last_used(await _dereference_item(existing), user)
+        )
 
     now = datetime.datetime.now(datetime.timezone.utc)
     li = LibraryItem(
@@ -314,7 +316,9 @@ async def add_item(
     lib.updated_at = now
     await lib.save()
 
-    return await _attach_author(await _dereference_item(li))
+    return await _attach_author(
+        await _single_with_run_based_last_used(await _dereference_item(li), user)
+    )
 
 
 async def has_bookmark(item_id: PydanticObjectId, kind: LibraryItemKind) -> bool:
@@ -517,7 +521,9 @@ async def update_item(
         item.favorited = favorited
     if updates:
         await item.set(updates)
-    return await _attach_author(await _dereference_item(item))
+    return await _attach_author(
+        await _single_with_run_based_last_used(await _dereference_item(item), user)
+    )
 
 
 async def touch_item(item_id: str, user: User) -> bool:
@@ -625,7 +631,21 @@ def _runs_last_used(item: dict) -> bool:
     """
     if item["kind"] == LibraryItemKind.WORKFLOW.value:
         return True
+    if item["kind"] != LibraryItemKind.SEARCH_SET.value:
+        return False  # knowledge bases have no run record either
     return (item.get("set_type") or "extraction") == "extraction"
+
+
+async def _single_with_run_based_last_used(deref: dict | None, user: User) -> dict | None:
+    """One dereferenced item with its run-based ``last_used_at`` applied.
+
+    Add/pin/note/tag responses replace the item in the client's list, so they
+    must carry the same "last used" the list does — otherwise a never-run
+    workflow opened before this change jumps up "Recently used" when pinned.
+    """
+    if deref:
+        await _apply_run_based_last_used([deref], user)
+    return deref
 
 
 async def _apply_run_based_last_used(items: list[dict], user: User) -> None:
@@ -660,6 +680,11 @@ async def _apply_run_based_last_used(items: list[dict], user: User) -> None:
             "type": ActivityType.SEARCH_SET_RUN.value,
             "search_set_uuid": {"$in": search_set_uuids},
         })
+    if not or_clauses:
+        # MongoDB rejects an empty $or; nothing to look up anyway.
+        for item in run_based:
+            item["last_used_at"] = None
+        return
     pipeline = [
         {"$match": {"user_id": user.user_id, "$or": or_clauses}},
         {"$group": {
