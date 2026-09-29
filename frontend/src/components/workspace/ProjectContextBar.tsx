@@ -21,6 +21,7 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
       style={{
         display: 'flex',
         alignItems: 'center',
+        flexWrap: 'wrap',
         gap: 8,
         padding: '6px 16px',
         marginRight: railWidth,
@@ -30,12 +31,14 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
         flexShrink: 0,
       }}
     >
-      <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-      <span style={{ color: '#6b7280', fontWeight: 500 }}>Project</span>
-      <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>{activeProjectTitle}</span>
-      {activeProjectRole === 'viewer' && (
-        <span style={{ color: '#6b7280', fontSize: 12 }}>· read-only</span>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 240px', minWidth: 0 }}>
+        <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)', flexShrink: 0 }} />
+        <span style={{ color: '#59616b', fontWeight: 500 }}>Project</span>
+        <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{activeProjectTitle}</span>
+        {activeProjectRole === 'viewer' && (
+          <span style={{ color: '#59616b', fontSize: 12 }}>Read only</span>
+        )}
+      </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
         {onOpenManage && (
           <button

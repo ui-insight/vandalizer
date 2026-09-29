@@ -3,6 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { KBGridView } from './KBGridView'
 import type { KnowledgeBase } from '../../types/knowledge'
 
+let failure: Error | null = null
+const refresh = vi.fn()
 const kbs: { current: KnowledgeBase[] } = { current: [] }
 
 vi.mock('../../hooks/useKnowledgeBases', () => ({
@@ -10,7 +12,8 @@ vi.mock('../../hooks/useKnowledgeBases', () => ({
     knowledgeBases: kbs.current,
     total: kbs.current.length,
     loading: false,
-    refresh: vi.fn(),
+    refresh,
+    error: failure,
   }),
 }))
 
@@ -49,6 +52,8 @@ const baseProps = {
 // endpoint with no UI. These tests pin the button to the card.
 describe('KBGridView clone action', () => {
   beforeEach(() => {
+    failure = null
+    vi.clearAllMocks()
     kbs.current = [makeKB()]
   })
 
@@ -109,5 +114,40 @@ describe('KBGridView clone action', () => {
 
     fireEvent.click(screen.getByText('Clone'))
     expect(onClone).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('knowledge scope and availability', () => {
+  beforeEach(() => { failure = null; vi.clearAllMocks(); kbs.current = [makeKB()] })
+  it('keeps read-only KBs usable without exposing mutation controls', () => {
+    kbs.current = [makeKB({ can_manage: false, shared_with_team: true })]
+    render(<KBGridView {...baseProps} onEdit={vi.fn()} onDelete={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument()
+    expect(screen.getByText('Read only')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Chat' }))
+    expect(baseProps.onChat).toHaveBeenCalledWith('kb-1', 'Export Control Regulations')
+  })
+  it('opens and chats with the canonical target of a bookmark', () => {
+    kbs.current = [makeKB({ uuid: 'reference-view', is_reference: true, source_kb_uuid: 'canonical-kb', reference_uuid: 'bookmark' })]
+    render(<KBGridView {...baseProps} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Export Control Regulations' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Chat' }))
+    expect(baseProps.onSelect).toHaveBeenCalledWith('canonical-kb')
+    expect(baseProps.onChat).toHaveBeenCalledWith('canonical-kb', 'Export Control Regulations')
+  })
+  it('offers retry instead of an empty explainer after a list failure', () => {
+    kbs.current = []; failure = new Error('offline')
+    render(<KBGridView {...baseProps} emptyComponent={<p>Start here</p>} />)
+    expect(screen.queryByText('Start here')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry loading knowledge bases' }))
+    expect(refresh).toHaveBeenCalledOnce()
+  })
+  it('retains the last list when refreshing fails', () => {
+    failure = new Error('offline')
+    render(<KBGridView {...baseProps} />)
+    expect(screen.getByRole('button', { name: 'Export Control Regulations' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Showing the last loaded list')
   })
 })

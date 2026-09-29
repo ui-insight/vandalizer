@@ -212,10 +212,10 @@ export function setKBSourceAmends(uuid: string, sourceUuid: string, amendsSource
   })
 }
 
-export function shareKnowledgeBase(uuid: string, comment?: string) {
+export function shareKnowledgeBase(uuid: string, sharedWithTeam: boolean, comment?: string) {
   return apiFetch<{ ok: boolean; shared_with_team: boolean }>(`/api/knowledge/${uuid}/share`, {
     method: 'POST',
-    body: JSON.stringify({ comment: comment || undefined }),
+    body: JSON.stringify({ shared_with_team: sharedWithTeam, comment: comment || undefined }),
   })
 }
 

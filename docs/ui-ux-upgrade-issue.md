@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Knowledge ownership, sharing and availability — September 29
+
+**138/169 checklist items implemented locally.** KB-11/12 are complete for the reviewed Knowledge flows; changes are not deployed.
+
+- Read-only cards omit Edit/Delete, and bookmarks open and chat with the same canonical KB. Lists are cached separately by account/team; changing either clears an open detail. Failed list/project-pin reads show retry instead of an empty workspace. Building lists refresh while processing continues.
+- Sharing sends an explicit desired state, so retrying a lost acknowledgement does not reverse the setting. The dialog retains its note after failure and prevents duplicate submissions or dismissal while saving. API responses include the owning team; first sharing assigns a real team destination. Team-owned KBs cannot be unshared and lost from both Mine and Team. Legacy clients may still use toggle semantics.
+- Pagination counts organization-visible KBs before applying offsets. Bookmarks occupy only their page slots, search uses their displayed catalog name, and local project filtering/sorting includes later pages. Empty, building, partial, all-failed and validated states distinguish indexed availability from measured answer quality; empty and team badge contrast was corrected.
+- Verification: 39 frontend tests across four files and 114 backend tests across two files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. Forty-six browser states at 320/768/1440px cover list recovery, all five availability states, lost-share response/retry, sharing/ownership permissions, canonical bookmark detail/chat a 205-row list, and failed project pins recovering the pinned KB from the second page. The narrow project context bar wraps its title and actions into readable rows. No axe findings, page overflow, uncaught errors or unmatched requests in the selected run; representative screenshots inspected directly.
+- Evidence: `2026-09-29-knowledge-states-evidence` and `2026-09-29-knowledge-project-final`; recipe: `frontend/scripts/visual-review/knowledge-sharing.mjs`. Browser APIs are fixtures and backend persistence is mocked. Live team notification delivery, Mongo behavior, ingestion and model execution are not certified. Explicit sharing retries preserve the state; concurrent independent administrators are not an exactly-once notification guarantee. The wider shared-theme and accessibility acceptance items remain open.
+
 ## Library recovery and item opening — September 28
 
 **136/169 checklist items implemented locally.** LIB-06/07/08/09 are complete for the reviewed Library flows; changes are not deployed.
@@ -379,8 +389,8 @@ Acceptance: the full folder-watch path and supported alternate trigger paths can
 - [x] **KB-08 · P2 · Improve:** Standardize source rows around source identity, type, readiness, freshness and a relevant recovery action.
 - [x] **KB-09 · P2 · Verify:** Adding documents and URLs gives clear progress and success/failure feedback, including mixed-success batches and unavailable sources.
 - [x] **KB-10 · P2 · Verify:** Inspect, refresh, reprocess, retry and remove actions update the correct source and summarize their result accurately.
-- [ ] **KB-11 · P2 · Verify:** Sharing/ownership controls reflect actual permissions, and list/detail/chat source scope remains consistent after navigation.
-- [ ] **KB-12 · P2 · Verify:** Empty, building, partially ready, all-failed and validated KBs have distinct, usable presentations.
+- [x] **KB-11 · P2 · Verify:** Sharing/ownership controls reflect actual permissions, and list/detail/chat source scope remains consistent after navigation.
+- [x] **KB-12 · P2 · Verify:** Empty, building, partially ready, all-failed and validated KBs have distinct, usable presentations.
 
 Acceptance: users can tell what information is usable, what needs repair and what has actually been evaluated, then act on each without guessing.
 

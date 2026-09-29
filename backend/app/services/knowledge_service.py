@@ -107,24 +107,24 @@ async def list_knowledge_bases(
     if query is None:
         return [], 0
 
+    # Visibility must precede count/skip/limit. Filtering an already sliced
+    # page made later visible KBs disappear and exposed inaccessible row counts.
+    if user_org_ancestry is not None:
+        query = {"$and": [query, {"$or": [
+            {"user_id": user_id},
+            {"organization_ids": None},
+            {"organization_ids": {"$size": 0}},
+            {"organization_ids": {"$in": user_org_ancestry}},
+        ]}]}
+
     total = await KnowledgeBase.find(query).count()
     kbs = await (
         KnowledgeBase.find(query)
-        .sort(-KnowledgeBase.created_at)
+        .sort([("created_at", -1), ("uuid", 1)])
         .skip(skip)
         .limit(limit)
         .to_list()
     )
-
-    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
-    # Never filter out user's own KBs.
-    if user_org_ancestry is not None:
-        kbs = [
-            kb for kb in kbs
-            if kb.user_id == user_id
-            or not kb.organization_ids
-            or bool(set(kb.organization_ids) & set(user_org_ancestry))
-        ]
 
     return kbs, total
 
@@ -628,11 +628,11 @@ async def share_with_team(
     *,
     user_org_ancestry: list[str] | None = None,
     comment: str | None = None,
+    shared_with_team: bool | None = None,
 ) -> KnowledgeBase | None:
-    """Toggle shared_with_team for an authorized knowledge base.
+    """Set sharing explicitly; retain toggle behavior for legacy callers.
 
-    When toggling from unshared → shared, notifies the user's current team
-    (bell + email). Untoggling is silent.
+    Repeating the same desired state is a no-op, including notifications.
     """
     kb = await get_knowledge_base(
         uuid,
@@ -644,7 +644,16 @@ async def share_with_team(
     if not kb:
         return None
     was_shared = bool(kb.shared_with_team)
-    kb.shared_with_team = not kb.shared_with_team
+    desired = not was_shared if shared_with_team is None else shared_with_team
+    if kb.team_owned and not desired:
+        raise ValueError("Team-owned knowledge bases must remain shared with their team.")
+    if desired and not kb.team_id:
+        if not user.current_team:
+            raise ValueError("Join or select a team before sharing this knowledge base.")
+        kb.team_id = str(user.current_team)
+    elif desired == was_shared:
+        return kb
+    kb.shared_with_team = desired
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
 
@@ -1290,7 +1299,7 @@ async def list_suggestions(
     query: dict = {"knowledge_base_uuid": kb_uuid}
     if status:
         query["status"] = status
-    return await KBSuggestion.find(query).sort("-created_at").to_list()
+    return await KBSuggestion.find(query).sort([("created_at", -1), ("uuid", 1)]).to_list()
 
 
 async def review_suggestion(

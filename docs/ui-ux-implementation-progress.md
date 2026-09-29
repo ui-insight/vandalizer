@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**131/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**138/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Knowledge ownership, sharing and availability — September 29
+
+**138/169 checklist items implemented locally.** KB-11/12 are complete for the reviewed Knowledge flows; changes are not deployed.
+
+- Read-only cards omit Edit/Delete, and bookmarks open and chat with the same canonical KB. Lists are cached separately by account/team; changing either clears an open detail. Failed list/project-pin reads show retry instead of an empty workspace. Building lists refresh while processing continues.
+- Sharing sends an explicit desired state, so retrying a lost acknowledgement does not reverse the setting. The dialog retains its note after failure and prevents duplicate submissions or dismissal while saving. API responses include the owning team; first sharing assigns a real team destination. Team-owned KBs cannot be unshared and lost from both Mine and Team. Legacy clients may still use toggle semantics.
+- Pagination counts organization-visible KBs before applying offsets. Bookmarks occupy only their page slots, search uses their displayed catalog name, and local project filtering/sorting includes later pages. Empty, building, partial, all-failed and validated states distinguish indexed availability from measured answer quality; empty and team badge contrast was corrected.
+- Verification: 39 frontend tests across four files and 114 backend tests across two files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. Forty-six browser states at 320/768/1440px cover list recovery, all five availability states, lost-share response/retry, sharing/ownership permissions, canonical bookmark detail/chat a 205-row list, and failed project pins recovering the pinned KB from the second page. The narrow project context bar wraps its title and actions into readable rows. No axe findings, page overflow, uncaught errors or unmatched requests in the selected run; representative screenshots inspected directly.
+- Evidence: `2026-09-29-knowledge-states-evidence` and `2026-09-29-knowledge-project-final`; recipe: `frontend/scripts/visual-review/knowledge-sharing.mjs`. Browser APIs are fixtures and backend persistence is mocked. Live team notification delivery, Mongo behavior, ingestion and model execution are not certified. Explicit sharing retries preserve the state; concurrent independent administrators are not an exactly-once notification guarantee. The wider shared-theme and accessibility acceptance items remain open.
 
 ## Library recovery and item opening — September 28
 

@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 136,
+  "completed_items": 138,
   "total_items": 169,
-  "unique_states": 801,
-  "capture_executions": 971,
+  "unique_states": 847,
+  "capture_executions": 1017,
   "mobile_grade": 8,
   "areas": [
     {
@@ -53,8 +53,8 @@
       "baseline_ux": 5.5,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-followup-responsive/knowledge-sources-mobile.png",
-      "note": "Sources/Validation precede source controls. Tags and technical metadata are behind Manage; web refresh settings collapse. Source health and measured quality remain distinct."
+      "evidence": "../2026-09-29-knowledge-project-final/knowledge-project-later-page-320.png",
+      "note": "Knowledge ownership and explicit sharing retries preserve their intended state. Read-only bookmark detail/chat share the canonical KB; list and pin errors retry. Pagination includes later project matches and searchable bookmarks. Five availability states and validated quality remain distinct; live notifications, ingestion and model execution are unverified."
     },
     {
       "id": "validation",
@@ -11535,6 +11535,550 @@
       "unmatched": [],
       "errors": [],
       "observations": []
+    },
+    {
+      "directory": "2026-09-29-knowledge-states-evidence",
+      "capturedAt": "2026-09-29T16:38:16.622Z",
+      "sourceFingerprint": "d87b6c4df69d29f484bb98876c08893839157a8e7facce628813ee44a65bbb88",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/routers/knowledge.py\n M backend/app/schemas/knowledge.py\n M backend/app/services/knowledge_service.py\n M backend/tests/test_knowledge_routes.py\n M frontend/src/api/knowledge.ts\n M frontend/src/components/knowledge/KBGridView.test.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/library/ShareWithTeamDialog.test.tsx\n M frontend/src/components/library/ShareWithTeamDialog.tsx\n M frontend/src/components/workspace/KnowledgePanel.test.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/hooks/useKnowledgeBases.ts\n?? backend/tests/test_kb_sharing.py\n?? frontend/scripts/visual-review/knowledge-project-scope.mjs\n?? frontend/scripts/visual-review/knowledge-sharing.mjs\n?? frontend/src/components/knowledge/kbAvailability.ts\n?? frontend/src/hooks/useKnowledgeBases.test.tsx",
+      "commit": "209e095af0d81713455aa680b784422b75e24a2e",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "knowledge-list-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-availability-list-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-empty-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-building-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-partial-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-failed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-validated-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-share-response-lost-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-shared-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 5
+        },
+        {
+          "id": "knowledge-team-owned-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 4
+        },
+        {
+          "id": "knowledge-readonly-bookmark-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-readonly-detail-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-bookmark-chat-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-list-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-availability-list-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-empty-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-building-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-partial-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-failed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-validated-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-share-response-lost-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-shared-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 4
+        },
+        {
+          "id": "knowledge-team-owned-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-readonly-bookmark-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-readonly-detail-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-bookmark-chat-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-list-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-availability-list-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-empty-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-building-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-partial-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-failed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-validated-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-share-response-lost-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-shared-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 4
+        },
+        {
+          "id": "knowledge-team-owned-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "knowledge-readonly-bookmark-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-readonly-detail-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "knowledge-bookmark-chat-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-later-page-sort-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "List retry, five availability states, explicit share/unshare and lost-acknowledgement retry with preserved note, team ownership guard, read-only canonical bookmark detail/chat, 205-row pagination and sort. Synthetic APIs; no live team notification, ingestion, or model execution."
+      ]
+    },
+    {
+      "directory": "2026-09-29-knowledge-project-final",
+      "capturedAt": "2026-09-29T16:39:32.545Z",
+      "sourceFingerprint": "db482784faf138c697a3a9f4c1e12a69f210c3e184da69d6da37db399f9829aa",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M backend/app/routers/knowledge.py\n M backend/app/schemas/knowledge.py\n M backend/app/services/knowledge_service.py\n M backend/tests/test_knowledge_routes.py\n M frontend/src/api/knowledge.ts\n M frontend/src/components/knowledge/KBGridView.test.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/library/ShareWithTeamDialog.test.tsx\n M frontend/src/components/library/ShareWithTeamDialog.tsx\n M frontend/src/components/workspace/KnowledgePanel.test.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/hooks/useKnowledgeBases.ts\n?? backend/tests/test_kb_sharing.py\n?? frontend/scripts/visual-review/knowledge-project-scope.mjs\n?? frontend/scripts/visual-review/knowledge-sharing.mjs\n?? frontend/src/components/knowledge/kbAvailability.ts\n?? frontend/src/hooks/useKnowledgeBases.test.tsx",
+      "commit": "209e095af0d81713455aa680b784422b75e24a2e",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "knowledge-project-pins-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-project-later-page-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "knowledge-project-pins-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-project-later-page-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-project-pins-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-project-later-page-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Project pin failure/retry, and exactly the pinned KB from the second server page at 320/768/1440px. Synthetic APIs, no live permission check."
+      ]
     }
   ]
 }

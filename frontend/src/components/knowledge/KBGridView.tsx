@@ -6,6 +6,7 @@ import {
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
+import { describeKBAvailability } from './kbAvailability'
 import { AITrustChip } from './AITrustChip'
 import { OptimizedBadge, VerifiedBadge } from './KBTrustBadges'
 
@@ -21,8 +22,8 @@ const SORT_LABEL: Record<SortOption, string> = {
 }
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
-  building: { label: 'Building', color: '#d97706', bg: '#fef3c7' },
+  empty: { label: 'Empty', color: '#4b5563', bg: '#f3f4f6' },
+  building: { label: 'Building', color: '#92400e', bg: '#fef3c7' },
   ready: { label: 'Available', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
   // Broken bookmark: the referenced KB was deleted, retired from the catalog,
@@ -102,7 +103,6 @@ function KBGridCard({
         backgroundColor: C.card,
         border: isReference ? '1px solid rgba(37, 99, 235, 0.3)' : `1px solid ${C.border}`,
         cursor: isUnavailable ? 'default' : 'pointer',
-        opacity: isUnavailable ? 0.65 : 1,
         transition: 'all 0.15s', fontFamily: 'inherit',
       }}
       onMouseEnter={e => { if (!isUnavailable) e.currentTarget.style.backgroundColor = C.cardHover }}
@@ -115,7 +115,7 @@ function KBGridCard({
         ) : (
           <BookOpen size={14} style={{ color: '#7dd3fc', flexShrink: 0, marginTop: 2 }} />
         )}
-        <button type="button" onClick={() => onSelect(kb.uuid)} disabled={isUnavailable} style={{
+        <button type="button" onClick={() => onSelect(canonicalUuid)} disabled={isUnavailable} style={{
           background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
           fontSize: 15, fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
           lineHeight: 1.3,
@@ -131,7 +131,7 @@ function KBGridCard({
             style={{
               flexShrink: 0, display: 'flex', alignItems: 'center', padding: 2,
               background: 'transparent', border: 'none', cursor: 'pointer',
-              color: pinned ? 'var(--highlight-color, #eab308)' : '#666',
+              color: pinned ? 'var(--highlight-color, #eab308)' : C.textMuted,
             }}
           >
             {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
@@ -140,6 +140,7 @@ function KBGridCard({
       </div>
 
       <p style={{ fontSize: 12, lineHeight: 1.5, color: kb.sources_failed > 0 ? '#fcd34d' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
+      <p style={{ fontSize: 12, lineHeight: 1.5, color: C.textMuted, margin: '0 0 12px' }}>{describeKBAvailability(kb)}</p>
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
       <div style={{ marginBottom: 8 }}>
         <AITrustChip
@@ -162,11 +163,13 @@ function KBGridCard({
         {kb.shared_with_team && (
           <span style={{
             fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-            color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+            color: '#99f6e4', backgroundColor: '#134e4a',
           }}>
             Team
           </span>
         )}
+        {kb.can_manage === false && <span style={{ fontSize: 12, color: C.textMuted }}>Read only</span>}
+        {kb.team_owned && <span style={{ fontSize: 12, color: C.textMuted }}>Team owned</span>}
         {kb.verified && <VerifiedBadge />}
         <OptimizedBadge kb={kb} />
       </div>
@@ -233,7 +236,7 @@ function KBGridCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 'auto', paddingTop: 4 }}>
         {canChat && (
           <button
-            onClick={(e) => { e.stopPropagation(); onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) }}
+            onClick={(e) => { e.stopPropagation(); onChat(canonicalUuid, kb.title) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -246,7 +249,7 @@ function KBGridCard({
             Chat
           </button>
         )}
-        {onEdit && !isReference && (
+        {onEdit && !isReference && kb.can_manage !== false && (
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(kb.uuid) }}
             style={{
@@ -308,7 +311,7 @@ function KBGridCard({
             Remove
           </button>
         )}
-        {onDelete && !isReference && (
+        {onDelete && !isReference && kb.can_manage !== false && (
           <button
             type="button"
             aria-label="Delete knowledge base"
@@ -357,9 +360,9 @@ export function KBGridView({
   emptyComponent,
   filterUuids, pinnedUuids, onTogglePin,
 }: KBGridViewProps) {
-  const { knowledgeBases, loading } = useScopedKnowledgeBases({
+  const { knowledgeBases, loading, error, refresh } = useScopedKnowledgeBases({
     scope,
-    search: search || undefined,
+    search: search.trim() || undefined,
   })
   const [sort, setSort] = useState<SortOption>('newest')
 
@@ -384,7 +387,15 @@ export function KBGridView({
     )
   }
 
+  const failure = error ? (
+    <div role="alert" style={{ padding: 12, marginBottom: 12, color: '#991b1b', background: '#fef2f2', borderRadius: 8 }}>
+      <p>{knowledgeBases.length ? 'Could not refresh knowledge bases. Showing the last loaded list.' : 'Could not load knowledge bases.'}</p>
+      <button type="button" onClick={() => void refresh()}>Retry loading knowledge bases</button>
+    </div>
+  ) : null
+
   if (sorted.length === 0) {
+    if (failure) return failure
     if (emptyComponent) return <>{emptyComponent}</>
     return (
       <div style={{ textAlign: 'center', padding: '60px 16px' }}>
@@ -396,6 +407,7 @@ export function KBGridView({
 
   return (
     <div>
+      {failure}
       {/* Sort */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6, marginBottom: 12 }}>
         <ArrowUpDown size={13} style={{ color: C.textFaint }} />
@@ -418,7 +430,7 @@ export function KBGridView({
       {/* Grid */}
       <div style={{
         display: 'grid', gap: 12,
-        gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(240px, 100%), 1fr))',
       }}>
         {sorted.map(kb => (
           <KBGridCard

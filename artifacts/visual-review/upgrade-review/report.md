@@ -1,8 +1,8 @@
 # Vandalizer UX upgrade — implementation progress
 
-September 28, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
+September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 136/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 138/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Knowledge ownership, sharing and availability — September 29
+
+**138/169 checklist items implemented locally.** KB-11/12 are complete for the reviewed Knowledge flows; changes are not deployed.
+
+- Read-only cards omit Edit/Delete, and bookmarks open and chat with the same canonical KB. Lists are cached separately by account/team; changing either clears an open detail. Failed list/project-pin reads show retry instead of an empty workspace. Building lists refresh while processing continues.
+- Sharing sends an explicit desired state, so retrying a lost acknowledgement does not reverse the setting. The dialog retains its note after failure and prevents duplicate submissions or dismissal while saving. API responses include the owning team; first sharing assigns a real team destination. Team-owned KBs cannot be unshared and lost from both Mine and Team. Legacy clients may still use toggle semantics.
+- Pagination counts organization-visible KBs before applying offsets. Bookmarks occupy only their page slots, search uses their displayed catalog name, and local project filtering/sorting includes later pages. Empty, building, partial, all-failed and validated states distinguish indexed availability from measured answer quality; empty and team badge contrast was corrected.
+- Verification: 39 frontend tests across four files and 114 backend tests across two files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. Forty-six browser states at 320/768/1440px cover list recovery, all five availability states, lost-share response/retry, sharing/ownership permissions, canonical bookmark detail/chat a 205-row list, and failed project pins recovering the pinned KB from the second page. The narrow project context bar wraps its title and actions into readable rows. No axe findings, page overflow, uncaught errors or unmatched requests in the selected run; representative screenshots inspected directly.
+- Evidence: `2026-09-29-knowledge-states-evidence` and `2026-09-29-knowledge-project-final`; recipe: `frontend/scripts/visual-review/knowledge-sharing.mjs`. Browser APIs are fixtures and backend persistence is mocked. Live team notification delivery, Mongo behavior, ingestion and model execution are not certified. Explicit sharing retries preserve the state; concurrent independent administrators are not an exactly-once notification guarantee. The wider shared-theme and accessibility acceptance items remain open.
 
 ## Library recovery and item opening — September 28
 
@@ -120,7 +130,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | Projects | 6.5/6.5 | 8/8 | [projects-empty-detail-768](../2026-09-28-projects-restored-layout/projects-empty-detail-768.png) |
 | Automations screen and editor | 6/6 | 8/8 | [automation-summary-editor-1440](../2026-09-28-automation-summary-review/automation-summary-editor-1440.png) |
 | Automation creation wizard | 7.5/5.5 | 8/8 | [wizard-schedule-review-320](../2026-09-28-wizard-mobile-final/wizard-schedule-review-320.png) |
-| Knowledge bases | 6/5.5 | 8/8 | [knowledge-sources-mobile](../upgrade-followup-responsive/knowledge-sources-mobile.png) |
+| Knowledge bases | 6/5.5 | 8/8 | [knowledge-project-later-page-320](../2026-09-29-knowledge-project-final/knowledge-project-later-page-320.png) |
 | KB validation system | 6.5/6.5 | 8/8 | [validation-history-run-card-320](../2026-09-28-history-verified/validation-history-run-card-320.png) |
 | Explore / shared catalog | 7/6.5 | 8/8 | [catalog-save-success](../2026-09-26-recovery-verified/catalog-save-success.png) |
 | Library | 5.5/5.5 | 8/8 | [library-mixed-types-return-1440](../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png) |
@@ -143,7 +153,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 801 distinct states / 971 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 847 distinct states / 1017 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -243,6 +253,8 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-28-library-recovery-evidence](../2026-09-28-library-recovery-evidence/manifest.json): 51 states; source `d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-library-opening-evidence](../2026-09-28-library-opening-evidence/manifest.json): 21 states; source `d47f655df76cd82286c5283e6f89bc3c6706be0cf72c713387e6ee448e9dd0c6`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-28-file-library-regression](../2026-09-28-file-library-regression/manifest.json): 30 states; source `6d0eba57af1b0af8f66e6bd427e6477a3b9bb330401dbf2199a3dedb739979ba`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-knowledge-states-evidence](../2026-09-29-knowledge-states-evidence/manifest.json): 40 states; source `d87b6c4df69d29f484bb98876c08893839157a8e7facce628813ee44a65bbb88`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-knowledge-project-final](../2026-09-29-knowledge-project-final/manifest.json): 6 states; source `db482784faf138c697a3a9f4c1e12a69f210c3e184da69d6da37db399f9829aa`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -254,7 +266,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Automation creation wizard:** The reviewed folder/API/schedule wizard checklist is complete: required-field guidance, retained trigger drafts, readable picker selections and retry, current schedule previews, nested Escape isolation, consistent controls and short-screen review. API examples are keyboard-scrollable. M365, real credentials and actual execution remain unverified.
 
-**Knowledge bases:** Sources/Validation precede source controls. Tags and technical metadata are behind Manage; web refresh settings collapse. Source health and measured quality remain distinct.
+**Knowledge bases:** Knowledge ownership and explicit sharing retries preserve their intended state. Read-only bookmark detail/chat share the canonical KB; list and pin errors retry. Pagination includes later project matches and searchable bookmarks. Five availability states and validated quality remain distinct; live notifications, ingestion and model execution are unverified.
 
 **KB validation system:** Saved history shows comparable question sets, scoring mode, grader and answer model, keeps all 30 rows accessible, and opens/exports the intended saved result. History/export errors are retryable. Manual apply/revert now retains errors in the review, resets acknowledgment, refreshes the summary and fits short screens. Composite quality, AI-only accuracy and proposed/applied/reverted settings are distinct. Task-correlated status and recovery are verified across supported tabs; reload and competing-window resumption now pass fixture checks; cross-KB restoration passes fixture checks; live worker behavior remains unverified.
 

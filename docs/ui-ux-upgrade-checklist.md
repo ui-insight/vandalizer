@@ -135,8 +135,8 @@ Acceptance: the full folder-watch path and supported alternate trigger paths can
 - [x] **KB-08 · P2 · Improve:** Standardize source rows around source identity, type, readiness, freshness and a relevant recovery action.
 - [x] **KB-09 · P2 · Verify:** Adding documents and URLs gives clear progress and success/failure feedback, including mixed-success batches and unavailable sources.
 - [x] **KB-10 · P2 · Verify:** Inspect, refresh, reprocess, retry and remove actions update the correct source and summarize their result accurately.
-- [ ] **KB-11 · P2 · Verify:** Sharing/ownership controls reflect actual permissions, and list/detail/chat source scope remains consistent after navigation.
-- [ ] **KB-12 · P2 · Verify:** Empty, building, partially ready, all-failed and validated KBs have distinct, usable presentations.
+- [x] **KB-11 · P2 · Verify:** Sharing/ownership controls reflect actual permissions, and list/detail/chat source scope remains consistent after navigation.
+- [x] **KB-12 · P2 · Verify:** Empty, building, partially ready, all-failed and validated KBs have distinct, usable presentations.
 
 Acceptance: users can tell what information is usable, what needs repair and what has actually been evaluated, then act on each without guessing.
 

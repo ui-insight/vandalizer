@@ -225,7 +225,8 @@ describe('KnowledgePanel add-source permissions', () => {
     expect(screen.getByLabelText('Rename source')).toBeInTheDocument()
     expect(screen.getByLabelText('Refresh source')).toBeInTheDocument()
     expect(screen.getByLabelText('Remove source')).toBeInTheDocument()
-    expect(screen.getByText('Share with Team').closest('button')).not.toBeDisabled()
+    expect(screen.getByText('Share with Team').closest('button')).toBeDisabled()
+    expect(screen.getByText('Share with Team').closest('button')).toHaveAttribute('title', 'Join or select a team before sharing.')
   }, 30000)
 
   // Support ticket: a URL source's snapshot was years stale and re-adding the

@@ -137,6 +137,7 @@ def _kb_response(
         status=kb.status,
         shared_with_team=kb.shared_with_team,
         team_owned=kb.team_owned,
+        team_id=kb.team_id,
         verified=kb.verified,
         organization_ids=kb.organization_ids,
         tags=list(getattr(kb, "tags", None) or []),
@@ -457,6 +458,27 @@ async def list_knowledge_bases_v2(
         }).to_list()
         catalog_names = {m.item_id: m.display_name for m in metas if m.display_name}
 
+    # Native rows occupy the first `total` positions; bookmarks follow. Apply
+    # search to their displayed title, then slice only the remaining page slots.
+    # Appending every bookmark to every page duplicated rows and skipped native
+    # KBs when the client advanced its offset by the returned item count.
+    if search:
+        term = search.casefold()
+        ref_kbs = [
+            (ref, src) for ref, src in ref_kbs
+            if term in catalog_names.get(str(src.id), src.title).casefold()
+            or term in (src.description or "").casefold()
+        ]
+        if term not in "knowledge base no longer available":
+            broken_refs = []
+    reference_total = len(ref_kbs) + len(broken_refs)
+    reference_start = max(0, skip - total)
+    reference_slots = max(0, limit - len(kbs))
+    combined_refs = [(ref, src) for ref, src in ref_kbs] + [(ref, None) for ref in broken_refs]
+    page_refs = combined_refs[reference_start:reference_start + reference_slots]
+    ref_kbs = [(ref, src) for ref, src in page_refs if src is not None]
+    broken_refs = [ref for ref, src in page_refs if src is None]
+
     all_uuids = [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
     all_kbs = list(kbs) + [src for _, src in ref_kbs]
     latest_runs = await _latest_runs_by_kb(all_uuids)
@@ -510,7 +532,7 @@ async def list_knowledge_bases_v2(
             created_at=ref.created_at.isoformat() if ref.created_at else None,
         ))
 
-    return KBListResponse(items=items, total=total + len([i for i in items if i.is_reference]))
+    return KBListResponse(items=items, total=total + reference_total)
 
 
 @router.delete("/reference/{ref_uuid}")
@@ -695,12 +717,16 @@ async def share_knowledge_base(
 ):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     comment = req.comment if req else None
-    kb = await svc.share_with_team(
-        uuid,
-        user,
-        user_org_ancestry=user_org_ancestry,
-        comment=comment,
-    )
+    try:
+        kb = await svc.share_with_team(
+            uuid,
+            user,
+            user_org_ancestry=user_org_ancestry,
+            comment=comment,
+            shared_with_team=req.shared_with_team if req else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True, "shared_with_team": kb.shared_with_team}

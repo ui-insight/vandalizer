@@ -43,6 +43,7 @@ class ConvertDocumentsRequest(BaseModel):
 
 class ShareKBRequest(BaseModel):
     comment: Optional[str] = None
+    shared_with_team: bool | None = None  # omitted by legacy toggle clients
 
 
 class AddUrlsRequest(BaseModel):
@@ -190,6 +191,7 @@ class KBResponse(BaseModel):
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     # Scope & ownership fields for the UI
+    team_id: Optional[str] = None
     user_id: Optional[str] = None
     scope: Optional[str] = None  # "mine" | "team" | "verified" | "reference"
     is_reference: bool = False

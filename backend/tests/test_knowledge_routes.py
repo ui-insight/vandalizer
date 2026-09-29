@@ -226,6 +226,7 @@ class TestKnowledgeCloneAuth:
         cloned_kb.created_at = None
         cloned_kb.updated_at = None
         cloned_kb.user_id = "viewer"
+        cloned_kb.team_id = None
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
@@ -879,10 +880,13 @@ class TestKnowledgeCRUD:
 
             resp = await client.post(
                 "/api/knowledge/kb-uuid-1/share",
+                json={"shared_with_team": True, "comment": "Please review"},
                 cookies=cookies,
                 headers=headers,
             )
 
+        assert mock_svc.share_with_team.call_args.kwargs["shared_with_team"] is True
+        assert mock_svc.share_with_team.call_args.kwargs["comment"] == "Please review"
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
         assert resp.json()["shared_with_team"] is True
@@ -1685,6 +1689,7 @@ class TestConvertDocumentsToKB:
         fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.user_id = "user1"
+        fake_kb.team_id = None
         fake_kb.save = AsyncMock()
 
         with (
@@ -1757,6 +1762,7 @@ class TestConvertDocumentsToKB:
         fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
         fake_kb.user_id = "user1"
+        fake_kb.team_id = None
         fake_kb.save = AsyncMock()
 
         with (
@@ -3353,3 +3359,60 @@ class TestKnowledgeOptimizationStatus:
 
         assert resp.status_code == 200
         assert resp.json()["items"][0]["optimization"] is None
+
+
+class TestKnowledgePaginationRecovery:
+    @pytest.mark.asyncio
+    async def test_bookmarks_fill_only_remaining_slots_and_search_the_displayed_name(self):
+        from app.routers.knowledge import list_knowledge_bases_v2
+
+        native = [_mock_kb(uuid=f"native-{i}", team_id="owning-team") for i in range(3)]
+        source = _mock_kb(uuid="source", title="Raw name", user_id="other")
+        source.id = "source-id"
+        ref = SimpleNamespace(uuid="bookmark", source_kb_uuid="source")
+        meta = SimpleNamespace(item_id="source-id", display_name="Curated policy")
+
+        async def native_page(*args, **kwargs):
+            if kwargs["search"]:
+                return [], 0
+            return native[kwargs["skip"]:kwargs["skip"] + kwargs["limit"]], len(native)
+
+        with (
+            patch("app.routers.knowledge.svc.list_knowledge_bases", side_effect=native_page),
+            patch("app.routers.knowledge.svc.list_references", AsyncMock(return_value=[ref])),
+            patch("app.routers.knowledge.svc.resolve_reference", AsyncMock(return_value=source)),
+            patch("app.routers.knowledge.svc.get_kb_usage_map", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.organization_service.get_user_org_ancestry", AsyncMock(return_value=[])),
+            patch("app.routers.knowledge._latest_runs_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge._manage_flags_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.optimization_status_by_kb", AsyncMock(return_value={})),
+            patch("app.routers.knowledge.VerifiedItemMetadata") as metadata,
+        ):
+            metadata.find.return_value.to_list = AsyncMock(return_value=[meta])
+            first = await list_knowledge_bases_v2(scope="mine", search=None, skip=0, limit=2, user=_make_user())
+            second = await list_knowledge_bases_v2(scope="mine", search=None, skip=2, limit=2, user=_make_user())
+            assert [k.uuid for k in first.items + second.items] == ["native-0", "native-1", "native-2", "source"]
+            assert first.total == second.total == 4
+            assert first.items[0].team_id == "owning-team"
+            match = await list_knowledge_bases_v2(scope="mine", search="CURATED", skip=0, limit=2, user=_make_user())
+            assert [k.title for k in match.items] == ["Curated policy"]
+            missing = await list_knowledge_bases_v2(scope="mine", search="unrelated", skip=0, limit=2, user=_make_user())
+            assert missing.total == 0 and missing.items == []
+
+    @pytest.mark.asyncio
+    async def test_visibility_is_applied_before_count_and_offset(self):
+        from app.services.knowledge_service import list_knowledge_bases
+
+        with patch("app.services.knowledge_service.KnowledgeBase") as model:
+            query = model.find.return_value
+            query.count = AsyncMock(return_value=1)
+            query.sort.return_value.skip.return_value.limit.return_value.to_list = AsyncMock(return_value=["visible"])
+            rows, total = await list_knowledge_bases("reader", "team", ["department"], scope="team", skip=20)
+            assert rows == ["visible"] and total == 1
+            count_query = model.find.call_args_list[0].args[0]
+            page_query = model.find.call_args_list[1].args[0]
+            assert count_query == page_query
+            visibility = count_query["$and"][1]["$or"]
+            assert {"user_id": "reader"} in visibility
+            assert {"organization_ids": {"$in": ["department"]}} in visibility
+            query.sort.return_value.skip.assert_called_once_with(20)

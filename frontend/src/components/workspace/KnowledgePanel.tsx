@@ -16,6 +16,7 @@ import { inFlightText, settleReprocesses, startMessage, type TrackedReprocess } 
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
+import { describeKBAvailability } from '../knowledge/kbAvailability'
 import { KBGridView } from '../knowledge/KBGridView'
 import { KBValidationPanel } from '../knowledge/KBValidationPanel'
 import { KBSourceInspectorModal } from '../knowledge/KBSourceInspectorModal'
@@ -40,7 +41,7 @@ const TABS: { key: TabKey; label: string }[] = [
 ]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
-  empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
+  empty: { label: 'Empty', color: '#4b5563', bg: '#f3f4f6' },
   building: { label: 'Building', color: '#92400e', bg: '#fef3c7' },
   ready: { label: 'Available', color: '#15803d', bg: '#dcfce7' },
   error: { label: 'Error', color: '#b91c1c', bg: '#fef2f2' },
@@ -553,6 +554,8 @@ export function KnowledgePanel() {
   }
 
   const [shareDialogKB, setShareDialogKB] = useState<KnowledgeBase | null>(null)
+  const sharingRequest = useRef(false)
+  const [sharing, setSharing] = useState(false)
   // Sharing a KB flips its flag within the team that owns it — there is no
   // destination to choose, but the dialog should still say which team. Same
   // resolution as the backend's notification: the KB's team, else current.
@@ -561,39 +564,55 @@ export function KnowledgePanel() {
       ? teams.find((t) => t.id === kb.team_id || t.uuid === kb.team_id)?.name
       : currentTeam?.name
 
+  const setTeamSharing = async (kb: KnowledgeBase, desired: boolean, comment?: string) => {
+    if (sharingRequest.current || kb.can_manage === false) return
+    sharingRequest.current = true
+    const version = detailRequest.current
+    setSharing(true)
+    try {
+      const result = await api.shareKnowledgeBase(kb.uuid, desired, comment)
+      if (version === detailRequest.current) setSelectedKB(prev => prev?.uuid === kb.uuid ? { ...prev, shared_with_team: result.shared_with_team } : prev)
+      if (detailTarget.current === kb.uuid) void refreshSelectedDetail(kb.uuid)
+      void refresh()
+    } finally {
+      sharingRequest.current = false
+      setSharing(false)
+    }
+  }
+
   const handleToggleShare = async (kb: KnowledgeBase) => {
-    // Sharing for the first time → prompt for a note.
+    if (sharingRequest.current || kb.can_manage === false || kb.team_owned) return
     if (!kb.shared_with_team) {
       setShareDialogKB(kb)
       return
     }
     try {
-      const result = await api.shareKnowledgeBase(kb.uuid)
-      toast(result.shared_with_team ? 'Shared with team' : 'Unshared from team', 'success')
-      if (detailTarget.current === kb.uuid) refreshSelectedDetail(kb.uuid)
-      refresh()
+      await setTeamSharing(kb, false)
+      toast('Unshared from team', 'success')
     } catch (err) {
-      console.error('Failed to toggle sharing:', err)
-      toast(err instanceof Error ? err.message : 'Failed to update team sharing', 'error')
+      toast(err instanceof Error ? err.message : 'Failed to update team sharing. Try again.', 'error')
     }
   }
 
   const confirmShareKB = async (comment: string) => {
     if (!shareDialogKB) return
-    const kbUuid = shareDialogKB.uuid
-    try {
-      await api.shareKnowledgeBase(kbUuid, comment || undefined)
-      const teamName = shareTeamName(shareDialogKB)
-      toast(teamName ? `Shared with ${teamName}` : 'Shared with team', 'success')
-      if (detailTarget.current === kbUuid) refreshSelectedDetail(kbUuid)
-      refresh()
-    } catch (err) {
-      console.error('Failed to share KB:', err)
-      toast('Failed to share knowledge base', 'error')
-    } finally {
-      setShareDialogKB(null)
-    }
+    // Reject to the dialog so a failed request retains its note and destination.
+    await setTeamSharing(shareDialogKB, true, comment || undefined)
+    const teamName = shareTeamName(shareDialogKB)
+    toast(teamName ? `Shared with ${teamName}` : 'Shared with team', 'success')
+    setShareDialogKB(null)
   }
+
+  useEffect(() => {
+    detailTarget.current = null
+    detailRequest.current++
+    setSelectedKB(null)
+    setDetailLoading(false)
+    setShareDialogKB(null)
+    setShowUrlModal(false)
+    setShowDocPicker(false)
+    setInspectingSource(null)
+  }, [user?.user_id, user?.current_team])
 
   const handleOpenOrgsModal = () => {
     if (!selectedKB) return
@@ -706,6 +725,7 @@ export function KnowledgePanel() {
 
   const shareDialogJSX = shareDialogKB ? (
     <ShareWithTeamDialog
+      busy={sharing}
       itemName={shareDialogKB.title}
       teamName={shareTeamName(shareDialogKB)}
       onCancel={() => setShareDialogKB(null)}
@@ -804,6 +824,9 @@ export function KnowledgePanel() {
     // adopted verified catalog KB could walk the whole add-source flow and only
     // hit "You don't have permission to manage this knowledge base." on submit.
     const canManageKB = selectedKB.can_manage !== false
+    const shareDisabledReason = !canManageKB ? "You don't have permission to manage this knowledge base."
+      : selectedKB.team_owned ? 'Team-owned knowledge bases remain shared with their team.'
+      : !selectedKB.team_id && !currentTeam ? 'Join or select a team before sharing.' : undefined
     const noManageReason = "You don't have permission to manage this knowledge base."
     // A ready KB with zero indexed chunks has nothing to retrieve — chatting
     // with it only produces a misleading "still indexing" reply.
@@ -905,7 +928,7 @@ export function KnowledgePanel() {
           {selectedKB.shared_with_team && (
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-              color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+              color: '#99f6e4', backgroundColor: '#134e4a',
             }}>
               Team
             </span>
@@ -1039,7 +1062,7 @@ export function KnowledgePanel() {
               )}
             </div>
 
-            <div className="kb-health-summary" data-attention={selectedKB.sources_failed > 0} role="status"><strong>{selectedKB.sources_ready} of {selectedKB.total_sources} sources ready</strong>{selectedKB.sources_failed > 0 && <span> · {selectedKB.sources_failed} need attention</span>}<span className="kb-health-caption">Answer quality is measured in Validation.</span></div>
+            <div className="kb-health-summary" data-attention={selectedKB.sources_failed > 0} role="status"><strong>{selectedKB.sources_ready} of {selectedKB.total_sources} sources ready</strong>{selectedKB.sources_failed > 0 && <span> · {selectedKB.sources_failed} need attention</span>}<span className="kb-health-caption">{describeKBAvailability(selectedKB)} Answer quality is measured in Validation.</span></div>
             {/* Crawling / adding URLs progress banner */}
             {addingUrls && (
               <div role="status" aria-live="polite" style={{
@@ -1171,13 +1194,13 @@ export function KnowledgePanel() {
                 role="switch"
                 aria-checked={!!selectedKB.shared_with_team}
                 onClick={() => handleToggleShare(selectedKB)}
-                disabled={!canManageKB}
-                title={canManageKB ? undefined : noManageReason}
+                disabled={!!shareDisabledReason || sharing}
+                title={shareDisabledReason}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: selectedKB.shared_with_team ? 'rgb(0, 128, 128)' : '#e5e5e5',
-                  backgroundColor: selectedKB.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#2a2a2a',
+                  color: selectedKB.shared_with_team ? '#99f6e4' : '#e5e5e5',
+                  backgroundColor: selectedKB.shared_with_team ? '#134e4a' : '#2a2a2a',
                   border: selectedKB.shared_with_team ? '1px solid rgba(0, 128, 128, 0.3)' : '1px solid #3a3a3a',
                   borderRadius: 6,
                   cursor: canManageKB ? 'pointer' : 'default',
@@ -1185,7 +1208,7 @@ export function KnowledgePanel() {
                 }}
               >
                 <Users size={13} />
-                {selectedKB.shared_with_team ? 'Shared with Team' : 'Share with Team'}
+                {sharing ? 'Updating sharing…' : selectedKB.team_owned ? 'Team owned' : selectedKB.shared_with_team ? 'Shared with Team' : 'Share with Team'}
               </button>
               <button
                 onClick={handleExport}
@@ -2058,7 +2081,11 @@ export function KnowledgePanel() {
         <KBExploreTab onAdopted={refresh} />
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 84px', position: 'relative' }}>
-          <KBGridView
+          {isProjectScoped && projectPins.error ? (
+            <div role="alert" style={{ color: '#991b1b', background: '#fef2f2', padding: 12, borderRadius: 8 }}>Could not load this project's knowledge bases. <button type="button" onClick={() => void projectPins.refresh()}>Retry project knowledge bases</button></div>
+          ) : isProjectScoped && projectPins.loading ? (
+            <p role="status" style={{ color: '#e5e5e5' }}>Loading project knowledge bases…</p>
+          ) : <KBGridView
             scope={listScope}
             search={search}
             allOrgs={allOrgs}
@@ -2113,7 +2140,7 @@ export function KnowledgePanel() {
                   ? 'No knowledge bases shared with your team yet.'
                   : 'No knowledge bases found.'
             }
-          />
+          />}
         </div>
       )}
       </div>
