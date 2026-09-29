@@ -408,6 +408,7 @@ def test_kb_chat_prompt_has_numeric_and_consistency_guardrails():
     from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
 
     assert "Never derive figures" in KB_CHAT_SYSTEM_PROMPT
+    assert "Never supply a figure from memory" in KB_CHAT_SYSTEM_PROMPT
     assert "Consistency questions" in KB_CHAT_SYSTEM_PROMPT
     assert "same field, period, and unit" in KB_CHAT_SYSTEM_PROMPT
 

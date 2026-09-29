@@ -735,6 +735,37 @@ def _load_seed_source_text(src_data: dict) -> str | None:
     return text if text.strip() else None
 
 
+async def retire_dropped_sources(
+    kb: KnowledgeBase, meta: dict, current_sources: list[KnowledgeBaseSource],
+) -> list[KnowledgeBaseSource]:
+    """Remove the sources a seed lists under ``retired_source_urls``.
+
+    The update path only ever adds sources, so a URL dropped from a seed lived
+    on in every KB seeded before the drop. The 2 CFR 200 KB kept a dead
+    cfo.gov page (failed, empty) and a grants.gov page whose cached text was
+    the .gov banner ("A lock … means you've safely connected"), which
+    Autovalidate turned into 16 test questions about site chrome (support
+    ticket, 2026-08). Only URLs a seed names are removed — a source an admin
+    added to the catalog KB is never touched — and crawl children of a
+    removed source go with it. Returns the sources still in the KB.
+    """
+    retired_urls = set(meta.get("retired_source_urls") or [])
+    if not retired_urls:
+        return current_sources
+    from app.services.knowledge_service import remove_source
+
+    doomed = {s.uuid for s in current_sources if s.url in retired_urls}
+    doomed |= {
+        s.uuid for s in current_sources
+        if getattr(s, "parent_source_uuid", None) in doomed
+    }
+    for src in current_sources:
+        if src.uuid in doomed:
+            await remove_source(kb, src.uuid)
+            print(f"    - retired source {src.url}")
+    return [s for s in current_sources if s.uuid not in doomed]
+
+
 async def seed_knowledge_base(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
     refresh_urls: bool = False,
@@ -781,6 +812,9 @@ async def seed_knowledge_base(
         current_sources = await KnowledgeBaseSource.find(
             KnowledgeBaseSource.knowledge_base_uuid == existing.uuid,
         ).to_list()
+        before_retire = len(current_sources)
+        current_sources = await retire_dropped_sources(existing, meta, current_sources)
+        retired = before_retire - len(current_sources)
         existing_urls = {s.url for s in current_sources if s.url}
         new_sources_ingested = 0
         for src_data in item.get("sources", []):
@@ -856,7 +890,7 @@ async def seed_knowledge_base(
                     refreshed += 1
             print(f"    ~ refreshed {refreshed} URL source(s) from their live pages ({kept} kept previous text)")
 
-        if new_sources_ingested or repaired or refreshed or kept:
+        if new_sources_ingested or repaired or refreshed or kept or retired:
             await _recalc_kb_stats(existing)
 
         await ensure_library_item(verified_lib, existing.id, LibraryItemKind.KNOWLEDGE_BASE)

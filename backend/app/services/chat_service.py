@@ -32,6 +32,7 @@ from app.services.context_budget import (
     plan_and_compact_context,
     token_safety_margin,
 )
+from app.services.kb_answer_grounding import unsupported_figures
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -1122,13 +1123,30 @@ async def chat_stream(
                 # Safety-net: strip any residual think tags the parser missed
                 assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 thinking_text = "".join(full_thinking) or None
+                # A KB answer's dollar amounts and percentages must come from
+                # what the model was shown: the KB snippets, any attached
+                # document, or the question. One that doesn't came from the
+                # model's memory, which may predate the current regulation.
+                unsupported = (
+                    unsupported_figures(assistant_message, "\n".join(
+                        [s.text for s in (*doc_segments, *attachment_segments)] + [message]
+                    ))
+                    if active_kbs else []
+                )
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
                     thinking=thinking_text,
                     thinking_duration=thinking_duration,
                     citations=kb_sources or None,
+                    unsupported_figures=unsupported or None,
                 )
+                if unsupported:
+                    yield json.dumps({
+                        "kind": "grounding_warning",
+                        "content": "",
+                        "unsupported_figures": unsupported,
+                    }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
                 # the model charged are both in hand exactly once per request —
@@ -2167,6 +2185,7 @@ async def _finalize(
     thinking: Optional[str] = None,
     thinking_duration: Optional[float] = None,
     citations: Optional[list[dict]] = None,
+    unsupported_figures: Optional[list[str]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -2175,6 +2194,7 @@ async def _finalize(
         thinking=thinking,
         thinking_duration=thinking_duration,
         citations=citations,
+        unsupported_figures=unsupported_figures,
     )
 
     if activity_id:
