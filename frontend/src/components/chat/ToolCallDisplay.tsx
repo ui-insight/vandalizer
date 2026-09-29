@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
@@ -539,30 +539,19 @@ function hasRichContent(toolName: string, obj: Record<string, unknown> | undefin
 
 /** Small inline copy button with checkmark feedback. */
 function CopyButton({ text, label = 'Copy data' }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false)
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const handleCopy = async (event: React.MouseEvent) => {
+    event.stopPropagation()
+    try { await navigator.clipboard.writeText(text); setCopyState('copied') }
+    catch { setCopyState('failed') }
   }
-  return (
-    <button
-      onClick={handleCopy}
-      title={label}
-      aria-label={label}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 20, height: 20, borderRadius: 4, border: 'none',
-        background: 'transparent', cursor: 'pointer',
-        color: copied ? '#16a34a' : '#c4c9d1',
-        transition: 'color 0.15s',
-        flexShrink: 0,
-      }}
-    >
-      {copied ? <Check size={11} /> : <ClipboardCopy size={11} />}
+  return <span className="agent-copy-control">
+    <button type="button" onClick={handleCopy} title={label} aria-label={label}
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#4b5563', flexShrink: 0 }}>
+      {copyState === 'copied' ? <Check size={14} /> : <ClipboardCopy size={14} />}
     </button>
-  )
+    {copyState !== 'idle' && <span role="status" className={copyState === 'copied' ? 'sr-only' : 'text-xs text-red-800'}>{copyState === 'copied' ? `${label}: copied` : 'Copy failed. Try again or select the result text.'}</span>}
+  </span>
 }
 
 /** Small inline CSV download button. */
@@ -733,7 +722,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
             <button
               onClick={() => setShowAll(true)}
               style={{
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
                 color: '#3b82f6', fontSize: 11,
               }}
             >
@@ -744,7 +733,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
             <button
               onClick={() => setShowAll(false)}
               style={{
-                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
                 color: '#3b82f6', fontSize: 11,
               }}
             >
@@ -820,7 +809,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           <button
             onClick={() => setShowAll(true)}
             style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
               color: '#3b82f6', fontSize: 10,
             }}
           >
@@ -831,7 +820,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           <button
             onClick={() => setShowAll(false)}
             style={{
-              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
               color: '#3b82f6', fontSize: 10,
             }}
           >
@@ -969,30 +958,12 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
     )
   }
 
-  // If output is an object with key-value data, render as pairs
-  if (typeof output === 'object' && !Array.isArray(output)) {
-    const entries = Object.entries(output as Record<string, unknown>)
-      .filter(([, v]) => v != null && String(v).trim() !== '')
-      .slice(0, 12)
-    if (entries.length === 0) return null
-    return (
-      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 12, lineHeight: 1.7 }}>
-        {entries.map(([k, v]) => (
-          <div key={k} style={{ display: 'flex', gap: 8 }}>
-            <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{k}</span>
-            <span style={{ color: '#374151' }}>
-              {String(v).length > 80 ? String(v).slice(0, 77) + '...' : String(v)}
-            </span>
-          </div>
-        ))}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
-          <CopyButton text={copyText} label="Copy workflow output" />
-        </div>
-      </div>
-    )
-  }
-
-  return null
+  return (
+    <div className="agent-workflow-output">
+      <pre tabIndex={0} aria-label="Workflow output">{copyText}</pre>
+      <CopyButton text={copyText} label="Copy workflow output" />
+    </div>
+  )
 }
 
 const WORKFLOW_TERMINAL = new Set(['completed', 'failed', 'error', 'canceled'])
@@ -1007,103 +978,55 @@ const WORKFLOW_POLL_MS = 2500
  * moment the run reaches a terminal (or paused) state. On a history reload an
  * already-finished run resolves in a single fetch and renders its output.
  */
-function WorkflowProgress({ sessionId, initialStatus }: { sessionId: string; initialStatus?: string }) {
+export function WorkflowProgress({ sessionId, initialStatus, workflowId }: { sessionId: string; initialStatus?: string; workflowId?: string }) {
+  const { openWorkflow } = useWorkspace()
   const [status, setStatus] = useState<WorkflowStatus | null>(null)
   const [fetchFailed, setFetchFailed] = useState(false)
-
+  const [checking, setChecking] = useState(true)
+  const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
-
     const tick = async () => {
+      setChecking(true)
       try {
-        const s = await getWorkflowStatus(sessionId)
+        const next = await getWorkflowStatus(sessionId)
         if (cancelled) return
-        setStatus(s)
+        setStatus(next)
         setFetchFailed(false)
-        // Stop on terminal states; 'paused' needs an approval the chat surface
-        // can't grant, so we stop and surface it rather than busy-poll.
-        if (WORKFLOW_TERMINAL.has(s.status) || s.status === 'paused') return
-        timer = setTimeout(tick, WORKFLOW_POLL_MS)
+        if (!WORKFLOW_TERMINAL.has(next.status) && next.status !== 'paused') timer = setTimeout(tick, WORKFLOW_POLL_MS)
       } catch {
-        if (cancelled) return
-        setFetchFailed(true)
-      }
+        if (!cancelled) setFetchFailed(true)
+      } finally { if (!cancelled) setChecking(false) }
     }
-
-    tick()
-    return () => {
-      cancelled = true
-      if (timer) clearTimeout(timer)
-    }
-  }, [sessionId])
+    void tick()
+    return () => { cancelled = true; if (timer) clearTimeout(timer) }
+  }, [sessionId, attempt])
 
   const effective = status?.status || initialStatus || 'running'
   const done = status?.num_steps_completed ?? 0
   const total = status?.num_steps_total ?? 0
-  const stepName = status?.current_step_name
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
-
-  const wrap = (children: ReactNode) => (
-    <div style={{ marginTop: 6, marginLeft: 20 }}>{children}</div>
-  )
-
-  if (fetchFailed && !status) {
-    return wrap(
-      <div style={{ fontSize: 11, color: '#9ca3af' }}>
-        Couldn&rsquo;t reach the workflow for live progress. Check the Activity rail.
-      </div>,
-    )
-  }
-
-  if (effective === 'completed') {
-    const normalized = { status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }
-    return (
-      <>
-        {wrap(
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#16a34a', fontWeight: 500 }}>
-            <Check size={13} /> Workflow complete
-          </div>,
-        )}
-        <WorkflowOutput content={normalized} />
-      </>
-    )
-  }
-
-  if (effective === 'failed' || effective === 'error' || effective === 'canceled') {
-    const label = effective === 'canceled' ? 'Workflow canceled' : 'Workflow failed'
-    return wrap(
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626' }}>
-        <AlertTriangle size={13} />
-        {label}{status?.error ? `: ${status.error}` : ''}
-      </div>,
-    )
-  }
-
-  if (effective === 'paused') {
-    return wrap(
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#b45309' }}>
-        <AlertTriangle size={13} /> Paused, awaiting approval in the workflow runner.
-      </div>,
-    )
-  }
-
-  // running / queued
-  return wrap(
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280' }}>
-        <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#8b5cf6', flexShrink: 0 }} />
-        <span>
-          {total > 0 ? `${done}/${total} steps` : 'Running'}
-          {stepName ? ` · ${stepName}` : ''}
-        </span>
+  const labels: Record<string, string> = { queued: 'Workflow queued', pending: 'Workflow queued', running: 'Workflow running', completed: 'Workflow complete', failed: 'Workflow failed', error: 'Workflow failed', canceled: 'Workflow canceled', paused: 'Awaiting workflow approval' }
+  const failed = effective === 'failed' || effective === 'error'
+  const active = ['running', 'queued', 'pending'].includes(effective)
+  const partial = status?.steps_output && Object.keys(status.steps_output).length ? JSON.stringify(status.steps_output, null, 2) : null
+  return (
+    <section className="agent-workflow-progress" aria-label="Workflow run progress">
+      <div role="status" aria-atomic="true" className="agent-run-status">
+        {active && !fetchFailed ? <Loader2 size={14} className="animate-spin" aria-hidden="true" /> : effective === 'completed' ? <Check size={14} aria-hidden="true" /> : <AlertTriangle size={14} aria-hidden="true" />}
+        <span>{fetchFailed ? 'Workflow status unavailable' : labels[effective] || `Workflow status: ${effective}`}{total > 0 && ` · ${done}/${total} steps completed`}</span>
       </div>
-      {total > 0 && (
-        <div style={{ marginTop: 5, height: 4, borderRadius: 4, background: '#ede9fe', overflow: 'hidden' }}>
-          <div style={{ width: `${pct}%`, height: '100%', background: '#8b5cf6', transition: 'width 0.4s ease' }} />
-        </div>
-      )}
-    </div>,
+      {fetchFailed && <div role="alert" className="agent-run-error">Could not refresh this run. {status ? `Last known state: ${labels[effective] || effective}.` : 'Its current state is not confirmed.'} Checking again does not start another run.</div>}
+      {status?.current_step_name && <p><strong>{failed ? 'Failed step' : 'Current step'}:</strong> {status.current_step_name}</p>}
+      {failed && <p className="agent-run-error">{status?.error || status?.current_step_detail || 'The run reported a failure without further details.'}</p>}
+      {effective === 'canceled' && <p>The run was canceled. {partial ? 'Completed results remain available below.' : 'No completed step results were returned.'}</p>}
+      {effective === 'paused' && <p>Review the proposed step in the workflow runner before continuing.</p>}
+      {(fetchFailed || effective === 'paused') && <button type="button" className="chat-action-btn" disabled={checking} onClick={() => { setChecking(true); setAttempt(value => value + 1) }}>{checking ? 'Checking workflow status…' : 'Check workflow status'}</button>}
+      {workflowId && <button type="button" className="chat-action-btn" onClick={() => openWorkflow(workflowId, sessionId)}>Open this workflow run</button>}
+      {partial && effective !== 'completed' && <details><summary>Completed step results</summary><pre tabIndex={0} aria-label="Completed workflow step results">{partial}</pre><CopyButton text={partial} label="Copy completed step results" /></details>}
+      {effective === 'completed' && <WorkflowOutput content={{ status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }} />}
+      {effective === 'completed' && status && status.final_output == null && <p>No final output was returned for this run.</p>}
+    </section>
   )
 }
 
@@ -1185,7 +1108,7 @@ export function ToolStatusLine({
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
-  onConfirm?: (message: string) => void
+  onConfirm?: (message: string) => boolean | void
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession, openWorkflow, openExtraction, openAutomation } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
@@ -1193,7 +1116,8 @@ export function ToolStatusLine({
   const accent = CATEGORY_ACCENT[meta.category]
   const args = call?.args || {}
   const obj = result?.content as Record<string, unknown> | undefined
-  const isError = Boolean(obj?.error)
+  const canceled = obj?.status === 'canceled' || obj?.status === 'cancelled'
+  const isError = !canceled && (Boolean(obj?.error) || obj?.status === 'failed' || obj?.status === 'error')
   const unconfirmed = !isActive && !!call && !result
 
   // Keep the Certification panel / rail badge in sync with chat-driven
@@ -1202,6 +1126,29 @@ export function ToolStatusLine({
 
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
   const [decision, setDecision] = useState<'approved' | 'canceled' | null>(null)
+  const decisionRef = useRef(false)
+  const [decisionError, setDecisionError] = useState<string | null>(null)
+  const decide = (value: 'approved' | 'canceled') => {
+    if (!onConfirm || decisionRef.current) return
+    decisionRef.current = true
+    try {
+      if (onConfirm(value === 'approved' ? 'Yes, go ahead' : 'No, cancel that') === false) {
+        setDecisionError('The decision could not be sent yet. Wait for the current attachment or response, then try again.')
+        decisionRef.current = false
+        return
+      }
+      setDecision(value); setDecisionError(null)
+    } catch {
+      decisionRef.current = false
+      setDecisionError('The decision could not be sent. Try again.')
+    }
+  }
+  const executionLabel = needsConfirmation ? decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Awaiting approval'
+    : canceled ? 'Canceled' : isError ? 'Failed' : unconfirmed ? 'Completion not confirmed' : isActive ? 'Running'
+    : name === 'run_workflow' && typeof obj?.session_id === 'string' ? 'Run accepted'
+    : obj?.status === 'queued' || obj?.status === 'pending' ? 'Queued'
+    : obj?.status === 'running' ? 'Running' : obj?.status === 'paused' ? 'Awaiting approval' : obj?.status && obj.status !== 'completed' ? 'Result received' : 'Completed'
+
   const actionLabel = ({ create_workflow: 'Create workflow', create_automation: 'Create automation', create_extraction_from_document: 'Create extraction', run_workflow: 'Run workflow', run_validation: 'Run validation' } as Record<string, string>)[name] ?? `Approve ${name.replaceAll('_', ' ')}`
   const target = args.name ?? args.title ?? obj?.default_title
   const artifact = !isActive && !needsConfirmation && !isError && obj
@@ -1247,10 +1194,11 @@ export function ToolStatusLine({
   }
 
   return (
-    <div>
+    <div className="agent-tool-result" data-tool-state={executionLabel}>
+      <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · {executionLabel}</p>
       {/* Status line */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
         fontSize: 13, lineHeight: '20px', minHeight: 22,
       }}>
         {/* Activity indicator */}
@@ -1343,7 +1291,7 @@ export function ToolStatusLine({
         <WorkflowOutput content={obj} />
       )}
       {result && name === 'run_workflow' && typeof obj?.session_id === 'string' && (
-        <WorkflowProgress sessionId={obj.session_id as string} initialStatus={obj?.status as string | undefined} />
+        <WorkflowProgress key={obj.session_id} sessionId={obj.session_id as string} initialStatus={obj?.status as string | undefined} workflowId={typeof args.workflow_id === 'string' ? args.workflow_id : undefined} />
       )}
       {result && name === 'propose_test_case' && obj?.verification_session_id != null && (
         <VerificationLauncher content={obj} actions={verificationActions} />
@@ -1364,14 +1312,22 @@ export function ToolStatusLine({
         <CertCompletionCard content={obj} />
       )}
 
+      {isError && <div className="agent-tool-recovery">
+        {typeof obj?.hint === 'string' && <p>{obj.hint}</p>}
+        {typeof obj?.error_detail === 'string' && <p>{obj.error_detail}</p>}
+        {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
+      </div>}
       {artifact && <button type="button" className="chat-action-btn" style={{ margin: '8px 0 8px 20px' }} onClick={artifact.open}>{artifact.label}</button>}
-      {needsConfirmation && onConfirm && (
+      {needsConfirmation && (
         <section className="agent-approval" aria-label="Review proposed action">
-          <strong>{decision === 'approved' ? 'Approval sent' : decision === 'canceled' ? 'Cancellation sent' : 'Your approval is needed'}</strong>
+          <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
           <dl><dt>Action</dt><dd>{actionLabel}</dd>{typeof target === 'string' && <><dt>Name</dt><dd>{target}</dd></>}<dt>Change</dt><dd>{typeof obj?.preview === 'string' ? obj.preview : 'Review the proposed action above before approving.'}</dd></dl>
-          {!decision && <div className="agent-approval-actions">
-            <button type="button" onClick={() => { setDecision('approved'); onConfirm('Yes, go ahead') }}>{actionLabel}</button>
-            <button type="button" onClick={() => { setDecision('canceled'); onConfirm('No, cancel that') }}>Cancel action</button>
+          {decision && <p>Check the Assistant’s next response for the outcome.</p>}
+          {decisionError && <p role="alert">{decisionError}</p>}
+          {!decision && !onConfirm && <p>Continue from the latest Assistant response to make a decision about this preview.</p>}
+          {!decision && onConfirm && <div className="agent-approval-actions">
+            <button type="button" onClick={() => decide('approved')}>{actionLabel}</button>
+            <button type="button" onClick={() => decide('canceled')}>Cancel action</button>
           </div>}
         </section>
       )}
@@ -1387,9 +1343,10 @@ interface Props {
   toolCalls: ToolCallInfo[]
   toolResults: ToolResultInfo[]
   isStreaming?: boolean
+  onConfirm?: (message: string) => boolean | void
 }
 
-export function ToolCallDisplay({ toolCalls, toolResults, isStreaming }: Props) {
+export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm }: Props) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
 
   if (toolCalls.length === 0 && toolResults.length === 0) return null
@@ -1424,14 +1381,17 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming }: Props) 
           <div key={callId}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <div style={{ flex: 1 }}>
-                <ToolStatusLine call={call} result={result} isActive={isActive} />
+                <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} />
               </div>
               {expandable && (
                 <button
+                  type="button"
+                  aria-label={`Details for ${getMeta(name).label.toLowerCase()}`}
+                  aria-expanded={expanded}
                   onClick={() => toggle(callId)}
                   style={{
                     display: 'flex', alignItems: 'center',
-                    background: 'none', border: 'none', padding: 0,
+                    background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36,
                     cursor: 'pointer', color: '#c4c9d1', flexShrink: 0,
                   }}
                 >

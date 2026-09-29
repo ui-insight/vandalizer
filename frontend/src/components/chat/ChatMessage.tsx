@@ -87,7 +87,7 @@ interface Props {
   /** Ordered stream segments for interleaved rendering */
   streamSegments?: StreamSegment[]
   /** Callback to inject a message into the chat (used for confirmation buttons) */
-  onSendMessage?: (message: string) => void
+  onSendMessage?: (message: string) => boolean | void
 }
 
 /** The nearest ancestor that clips its contents horizontally.
@@ -523,6 +523,7 @@ export function ChatMessage({
                     toolCalls={calls}
                     toolResults={results}
                     isStreaming={isStreamingProp}
+                    onConfirm={onSendMessage}
                   />
                 )
               })()}

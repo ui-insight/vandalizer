@@ -17,7 +17,7 @@ export function PlanChecklist({ tasks, isStreaming = true }: PlanChecklistProps)
 
   if (allDone) {
     return (
-      <div className="mt-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800 border border-emerald-200">
+      <div role="status" className="mt-2 flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-xs text-emerald-800 border border-emerald-200">
         <Check size={14} className="shrink-0" />
         <span>
           {tasks.length === 1
@@ -30,12 +30,12 @@ export function PlanChecklist({ tasks, isStreaming = true }: PlanChecklistProps)
 
   return (
     <div className="mt-2 rounded-md bg-gray-50 px-3 py-2 border border-gray-200">
-      <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500">
+      <div role="status" className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
         Plan · {completed}/{tasks.length} done{!isStreaming && ' · response ended'}
       </div>
-      <ul className="space-y-1">
+      <ul className="space-y-2" aria-label="Plan steps">
         {tasks.map((task, i) => (
-          <li key={i} className="flex items-start gap-2 text-xs">
+          <li key={i} className="flex flex-wrap items-start gap-2 text-xs" style={{ overflowWrap: 'anywhere' }}>
             {task.status === 'completed' ? (
               <Check size={13} className="mt-0.5 shrink-0 text-emerald-600" />
             ) : task.status === 'in_progress' && isStreaming ? (
@@ -46,14 +46,15 @@ export function PlanChecklist({ tasks, isStreaming = true }: PlanChecklistProps)
             <span
               className={
                 task.status === 'completed'
-                  ? 'text-gray-600 line-through'
+                  ? 'min-w-0 flex-1 text-gray-600'
                   : task.status === 'in_progress'
-                    ? 'text-gray-900 font-medium'
-                    : 'text-gray-600'
+                    ? 'min-w-0 flex-1 text-gray-900 font-medium'
+                    : 'min-w-0 flex-1 text-gray-600'
               }
             >
-              {task.status === 'in_progress' && isStreaming ? task.active_form : task.content}{!isStreaming && task.status !== 'completed' && ' · not confirmed'}
+              {task.status === 'in_progress' && isStreaming ? task.active_form : task.content}
             </span>
+            <span className="text-gray-600">{task.status === 'completed' ? 'Completed' : !isStreaming ? 'Not confirmed' : task.status === 'in_progress' ? 'Running' : 'Planned'}</span>
           </li>
         ))}
       </ul>

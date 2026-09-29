@@ -4,6 +4,17 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Agent state and workflow recovery — September 29
+
+**145/169 checklist items implemented locally.** AGT-04/07/09 are complete for the reviewed supported protocol states; changes are not deployed.
+
+- Tool results explicitly label awaiting approval, queued/running, failed, canceled, completed and unconfirmed work. A sent approval or cancellation remains a request until the subsequent response establishes its outcome; blocked decisions stay actionable. Persisted tool results without interleaved segments expose the same approval controls.
+- Failed tools show their step, available recovery hint and an action to review recovery without repeating completed changes. Existing artifacts and Knowledge context survive that follow-up. Plan rows distinguish completed, running, planned and unconfirmed work, and stopped work no longer appears active.
+- Workflow status failures retain the last known state and completed step results. Check workflow status reconnects to the same session without relaunching. Paused runs link to the exact runner; canceled and completed results remain explicit. Long structured output is not truncated, and clipboard failures no longer report success.
+- Narrow approval previews stack their labels and values; controls support keyboard and practical touch targets. State changes have concise status announcements; scrollable output is keyboard reachable.
+- Verification: 42 frontend tests across seven files, TypeScript and production build pass. ESLint reports zero errors and one existing ChatPanel dependency warning. Forty-two browser states at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. Exact workflow session reads, no launch writes during reconnect, keyboard decisions, retained KB context, partial results and Stop are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-agent-recovery-evidence`; recipe: `frontend/scripts/visual-review/agent-recovery.mjs`. APIs and streams are synthetic. Live execution, model adherence to recovery instructions and assistive-technology devices are not certified. Status checks never infer server cancellation from a local Stop.
+
 ## Optional tour and first actions — September 29
 
 **142/169 checklist items implemented locally.** ONB-06/07 are complete for the reviewed onboarding flows; changes are not deployed.
@@ -532,12 +543,12 @@ Acceptance: the user knows which KB is attached, what its coverage limitations a
 - [x] **AGT-01 · P2 · Fix:** Replace generic Confirm wording with an action-specific approval label when the operation and target are known.
 - [x] **AGT-02 · P2 · Improve:** Present a structured preview of the proposed action, target and meaningful consequences, visually separated from ordinary assistant prose.
 - [x] **AGT-03 · P2 · Fix:** Associate each plan/progress display with its operation or turn so a prior completed plan cannot appear to describe a later failure.
-- [ ] **AGT-04 · P2 · Improve:** Clearly distinguish awaiting approval, queued/running, failed, cancelled and completed states when those states are supported by the event protocol.
+- [x] **AGT-04 · P2 · Improve:** Clearly distinguish awaiting approval, queued/running, failed, cancelled and completed states when those states are supported by the event protocol.
 - [x] **AGT-05 · P2 · Verify:** Confirm, cancel and repeated clicks do not leave stale approvals or submit unintended duplicate actions.
 - [x] **AGT-06 · P2 · Improve:** Show a concise completion summary and a direct Open workflow/View result action when a valid artifact reference is available.
-- [ ] **AGT-07 · P2 · Verify:** Tool failure identifies the failed step and an appropriate recovery action while preserving any completed work and the user's context.
+- [x] **AGT-07 · P2 · Verify:** Tool failure identifies the failed step and an appropriate recovery action while preserving any completed work and the user's context.
 - [x] **AGT-08 · P2 · Verify:** Multiple tool calls, partial completion, interrupted streams and supported retry/cancel flows maintain accurate operation status.
-- [ ] **AGT-09 · P2 · Verify:** Approval previews, progress, errors and result actions remain accessible on mobile and with keyboard/screen-reader navigation.
+- [x] **AGT-09 · P2 · Verify:** Approval previews, progress, errors and result actions remain accessible on mobile and with keyboard/screen-reader navigation.
 
 Acceptance: users can tell what is proposed, what was approved, what is running, what failed and where the outcome is. Frontend grading does not certify autonomous execution safety or model correctness.
 

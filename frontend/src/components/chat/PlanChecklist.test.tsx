@@ -35,4 +35,13 @@ describe('PlanChecklist', () => {
     expect(screen.getByText('All 3 steps completed')).toBeInTheDocument()
     expect(screen.queryByText(/Plan ·/)).not.toBeInTheDocument()
   })
+
+  it('preserves completed steps and labels unfinished work without a running indicator after Stop', () => {
+    const { container } = render(<PlanChecklist tasks={tasks} isStreaming={false} />)
+    expect(screen.getByRole('status')).toHaveTextContent('1/3 done · response ended')
+    expect(screen.getByText('Completed')).toBeInTheDocument()
+    expect(screen.getAllByText('Not confirmed')).toHaveLength(2)
+    expect(container.querySelector('.animate-spin')).toBeNull()
+    expect(screen.getByText('Run extraction')).toBeInTheDocument()
+  })
 })

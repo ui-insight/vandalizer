@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**142/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**145/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,17 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Agent state and workflow recovery — September 29
+
+**145/169 checklist items implemented locally.** AGT-04/07/09 are complete for the reviewed supported protocol states; changes are not deployed.
+
+- Tool results explicitly label awaiting approval, queued/running, failed, canceled, completed and unconfirmed work. A sent approval or cancellation remains a request until the subsequent response establishes its outcome; blocked decisions stay actionable. Persisted tool results without interleaved segments expose the same approval controls.
+- Failed tools show their step, available recovery hint and an action to review recovery without repeating completed changes. Existing artifacts and Knowledge context survive that follow-up. Plan rows distinguish completed, running, planned and unconfirmed work, and stopped work no longer appears active.
+- Workflow status failures retain the last known state and completed step results. Check workflow status reconnects to the same session without relaunching. Paused runs link to the exact runner; canceled and completed results remain explicit. Long structured output is not truncated, and clipboard failures no longer report success.
+- Narrow approval previews stack their labels and values; controls support keyboard and practical touch targets. State changes have concise status announcements; scrollable output is keyboard reachable.
+- Verification: 42 frontend tests across seven files, TypeScript and production build pass. ESLint reports zero errors and one existing ChatPanel dependency warning. Forty-two browser states at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. Exact workflow session reads, no launch writes during reconnect, keyboard decisions, retained KB context, partial results and Stop are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-agent-recovery-evidence`; recipe: `frontend/scripts/visual-review/agent-recovery.mjs`. APIs and streams are synthetic. Live execution, model adherence to recovery instructions and assistive-technology devices are not certified. Status checks never infer server cancellation from a local Stop.
 
 ## Optional tour and first actions — September 29
 

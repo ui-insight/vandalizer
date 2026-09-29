@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 142,
+  "completed_items": 145,
   "total_items": 169,
-  "unique_states": 933,
-  "capture_executions": 1139,
+  "unique_states": 975,
+  "capture_executions": 1181,
   "mobile_grade": 8,
   "areas": [
     {
@@ -134,7 +134,7 @@
       "ui": 8,
       "ux": 8,
       "evidence": "../2026-09-26-recovery-verified/agent-partial-completion-mobile.png",
-      "note": "Approvals and artifact shortcuts are clear. Stopped or interrupted tool calls show completion not confirmed, ended plans stop spinning, and retries retain prior work. Live execution, all protocol failures and broader assistive-technology journeys remain open."
+      "note": "Approvals and artifact shortcuts are clear. Stopped or interrupted tool calls show completion not confirmed, ended plans stop spinning, and retries retain prior work. Explicit protocol states, keyboard decisions, failed-step recovery and same-session workflow status retries pass across mobile/tablet/desktop. Partial results and long final output remain available; live execution and assistive-technology devices are unverified."
     }
   ],
   "axe_latest_violations": [],
@@ -13494,6 +13494,487 @@
       "errors": [],
       "observations": [
         "First-session action reachability, sample demo and evidence, optional tour all steps/Back/Skip/finish/Escape, focus containment and restoration, reload without interruptions, scoped KB guidance and returning users at 320/768-short/1440. Fixture API; no live demo execution or assistive-technology device certification."
+      ]
+    },
+    {
+      "directory": "2026-09-29-agent-recovery-evidence",
+      "capturedAt": "2026-09-29T18:25:05.694Z",
+      "sourceFingerprint": "5f95e759e077e2d106800ae4d4b2b67c8ae851cbb834c03c2bd1e02aad674dbe",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/PlanChecklist.test.tsx\n M frontend/src/components/chat/PlanChecklist.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/agent-recovery.mjs\n?? frontend/src/components/chat/ToolCallDisplay.test.tsx",
+      "commit": "c583d917a6a5f1d9b8ec3a60dde3c58ef0b77dde",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "agent-approval-review-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-approval-requested-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-cancellation-requested-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-failed-step-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-recovery-keeps-context-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-queued-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-running-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-status-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-partial-failure-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-paused-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-canceled-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-workflow-completed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-plan-running-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-plan-stopped-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "agent-approval-review-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-approval-requested-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-cancellation-requested-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-failed-step-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-recovery-keeps-context-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-queued-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-running-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-status-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-partial-failure-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-paused-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-canceled-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-completed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-plan-running-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-plan-stopped-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "agent-approval-review-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-approval-requested-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-cancellation-requested-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-failed-step-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-recovery-keeps-context-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-queued-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-running-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-status-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-partial-failure-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-paused-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-canceled-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-workflow-completed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-plan-running-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "agent-plan-stopped-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Explicit tool states, long approval previews and keyboard decisions, failed-step recovery with preserved KB context/artifacts, queued/running/paused/canceled/completed workflows, same-session status retry without writes, partial and long final output, clipboard failure, plan progress and Stop. Three widths; synthetic APIs/streams, no live workflow execution or device screen-reader certification."
       ]
     }
   ]

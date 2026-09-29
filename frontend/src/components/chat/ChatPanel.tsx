@@ -494,17 +494,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [justDroppedUuids])
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    if (isLoadingHistory) return
+    if (isLoadingHistory || isStreaming) return false
+    if (conversationUuid && !activityId) {
+      toast('Reopen this conversation from Activity before sending.', 'info')
+      return false
+    }
     if (chatUploads.uploading || linkLoading) {
       toast('Wait for the attachment transfer to finish before sending.', 'info')
-      return
+      return false
     }
     // Auto-hold: if the user attached document(s) that aren't readable yet,
     // don't fire a question at a file the model can't see. Queue it and let the
     // readiness effect below auto-send once text extraction finishes.
     if (anySelectedProcessing) {
       setHeldMessage({ message, includeOnboardingContext })
-      return
+      return true
     }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
@@ -516,6 +520,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
+    return true
   }
 
   // Keep the latest handleSend in a ref so the auto-fire effect can call it
@@ -545,10 +550,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       handleSend('Show me what you can do with the content attached to this chat. Start with a brief summary, extract the most useful facts or action items, and cite the sources. Suggest a relevant next step based on what you find.')
       return
     }
-    if (isLoadingHistory) return
+    if (isLoadingHistory) return false
     if (chatUploads.uploading || linkLoading) {
       toast('Wait for the attachment transfer to finish before sending.', 'info')
-      return
+      return false
     }
     send(
       `Show me what ${branding.appName} can do`,
@@ -1569,7 +1574,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {modelPreference.error && <div role="alert" className="px-4 py-2 text-sm text-red-800">{modelPreference.error} <button type="button" onClick={modelPreference.retry} className="underline">Retry model preference</button></div>}
       {modelPreference.saving && <p role="status" className="px-4 py-1 text-xs text-gray-600">Saving default model…</p>}
       <ChatInput
-        onSend={(msg) => (isStreaming ? queueMessage(msg) : handleSend(msg))}
+        onSend={async (msg) => {
+          if (isStreaming) await queueMessage(msg)
+          else if (!handleSend(msg)) throw new Error('Message was not sent. Check the current conversation and attachments, then try again.')
+        }}
         onAttachFile={handleAttachFile}
         onAttachLink={handleAttachLink}
         onAddKnowledge={() => setShowAttachKB(true)}

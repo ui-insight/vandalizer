@@ -186,3 +186,22 @@
 .library-folder-form-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; font-size: 12px; }
 .library-workspace .folder-menu-btn { opacity: 1 !important; min-width: 32px; min-height: 32px; }
 .library-item-actions button:disabled, .library-folder-form-actions button:disabled { opacity: .55; cursor: wait; }
+
+/* Agent results keep the state, recovery action and preserved work together. */
+.agent-tool-result { min-width: 0; overflow-wrap: anywhere; container-type: inline-size; }
+.agent-tool-state { margin: 6px 0 4px; color: #374151; font-size: 12px; font-weight: 600; }
+.agent-tool-recovery { margin: 8px 0; font-size: 13px; color: #4b5563; }
+.agent-tool-result .chat-action-btn, .agent-workflow-progress button { min-height: 36px; white-space: normal; }
+.agent-workflow-progress { margin: 10px 0; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; font-size: 13px; line-height: 1.5; color: #374151; overflow-wrap: anywhere; }
+.agent-workflow-progress p { margin: 8px 0; }
+.agent-run-status { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+.agent-run-status svg { flex-shrink: 0; }
+.agent-run-error { color: #991b1b; margin: 8px 0; }
+.agent-workflow-progress summary { cursor: pointer; padding: 10px 0; }
+.agent-workflow-progress pre, .agent-workflow-output pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow: auto; font-size: 12px; padding: 10px; border: 1px solid #d1d5db; background: white; border-radius: 6px; }
+.agent-workflow-output { min-width: 0; margin: 8px 0; }
+@container (max-width: 360px) {
+  .agent-approval { margin-left: 0; }
+  .agent-approval dl { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .agent-approval dd { margin-bottom: 8px; }
+}

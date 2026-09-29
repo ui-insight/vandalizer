@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 142/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 145/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,17 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Agent state and workflow recovery — September 29
+
+**145/169 checklist items implemented locally.** AGT-04/07/09 are complete for the reviewed supported protocol states; changes are not deployed.
+
+- Tool results explicitly label awaiting approval, queued/running, failed, canceled, completed and unconfirmed work. A sent approval or cancellation remains a request until the subsequent response establishes its outcome; blocked decisions stay actionable. Persisted tool results without interleaved segments expose the same approval controls.
+- Failed tools show their step, available recovery hint and an action to review recovery without repeating completed changes. Existing artifacts and Knowledge context survive that follow-up. Plan rows distinguish completed, running, planned and unconfirmed work, and stopped work no longer appears active.
+- Workflow status failures retain the last known state and completed step results. Check workflow status reconnects to the same session without relaunching. Paused runs link to the exact runner; canceled and completed results remain explicit. Long structured output is not truncated, and clipboard failures no longer report success.
+- Narrow approval previews stack their labels and values; controls support keyboard and practical touch targets. State changes have concise status announcements; scrollable output is keyboard reachable.
+- Verification: 42 frontend tests across seven files, TypeScript and production build pass. ESLint reports zero errors and one existing ChatPanel dependency warning. Forty-two browser states at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. Exact workflow session reads, no launch writes during reconnect, keyboard decisions, retained KB context, partial results and Stop are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-agent-recovery-evidence`; recipe: `frontend/scripts/visual-review/agent-recovery.mjs`. APIs and streams are synthetic. Live execution, model adherence to recovery instructions and assistive-technology devices are not certified. Status checks never infer server cancellation from a local Stop.
 
 ## Optional tour and first actions — September 29
 
@@ -184,7 +195,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 933 distinct states / 1139 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 975 distinct states / 1181 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -290,6 +301,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-29-catalog-usage-final](../2026-09-29-catalog-usage-final/manifest.json): 30 states; source `0e20919019d0e30019feaac40bce460afbf5a9200457aab0fd6e7e7724e5f2bb`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-catalog-filter-regression](../2026-09-29-catalog-filter-regression/manifest.json): 36 states; source `03d414db121fc5955f7641f27543b7928d2eca43ebddf2d632adf0271fb39dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-onboarding-tour-evidence](../2026-09-29-onboarding-tour-evidence/manifest.json): 30 states; source `9d7c5e257da88c233b9bf0fa46df6acfff44e220b7719cd8e168137f95a7b00e`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-agent-recovery-evidence](../2026-09-29-agent-recovery-evidence/manifest.json): 42 states; source `5f95e759e077e2d106800ae4d4b2b67c8ae851cbb834c03c2bd1e02aad674dbe`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -317,4 +329,4 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Chat knowledge-base interactions:** Readable citation chips open a passage preview beside the answer; the submitted KB UUID is asserted. Missing/inaccessible/failed source recovery, full document/URL navigation, return position and multi-KB/document scope combinations pass fixture checks. Live retrieval and permissions remain unverified.
 
-**Agentic chat UI:** Approvals and artifact shortcuts are clear. Stopped or interrupted tool calls show completion not confirmed, ended plans stop spinning, and retries retain prior work. Live execution, all protocol failures and broader assistive-technology journeys remain open.
+**Agentic chat UI:** Approvals and artifact shortcuts are clear. Stopped or interrupted tool calls show completion not confirmed, ended plans stop spinning, and retries retain prior work. Explicit protocol states, keyboard decisions, failed-step recovery and same-session workflow status retries pass across mobile/tablet/desktop. Partial results and long final output remain available; live execution and assistive-technology devices are unverified.
