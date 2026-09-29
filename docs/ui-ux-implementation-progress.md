@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**140/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**142/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Optional tour and first actions — September 29
+
+**142/169 checklist items implemented locally.** ONB-06/07 are complete for the reviewed onboarding flows; changes are not deployed.
+
+- The tour opens only from the home invitation, so first visits, returning users and dismissed sessions are not interrupted. It can be restarted deliberately and does not depend on browser storage. Updated guidance describes the working Files/Library panes and source verification.
+- Dialog focus starts at the step title, remains contained, follows Back/Next, and returns to the trigger on Skip, completion, Close or Escape. The body scrolls while the title bar and footer remain reachable on short screens.
+- Conversation and upload actions now precede secondary cards. The sample demo disclosure and its evidence are near the top. A selected Knowledge base still replaces first-session home with scoped guidance.
+- Verification: 18 frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirty browser captures at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. First-action and sample-disclosure reachability, all tour steps, keyboard containment/return, reload without interruption, and returning/scoped users are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-onboarding-tour-evidence`; recipe: `frontend/scripts/visual-review/onboarding-tour.mjs`. Browser APIs use fixtures. Real demo execution and assistive-technology device behavior are not certified.
 
 ## Explore purpose and usage — September 29
 

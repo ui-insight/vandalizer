@@ -1,12 +1,13 @@
 import { WorkspaceProvider } from '../contexts/WorkspaceContext'
 import { WorkspaceLayout } from '../components/workspace/WorkspaceLayout'
-import { FirstRunTour } from '../components/workspace/FirstRunTour'
+import { WorkspaceTourProvider } from '../contexts/WorkspaceTourContext'
 
 export function Workspace() {
   return (
     <WorkspaceProvider>
-      <WorkspaceLayout />
-      <FirstRunTour />
+      <WorkspaceTourProvider>
+        <WorkspaceLayout />
+      </WorkspaceTourProvider>
     </WorkspaceProvider>
   )
 }

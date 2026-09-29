@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import type { OnboardingStatus, RecentActivityItem } from '../../api/config'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import { useWorkspaceTour } from '../../contexts/WorkspaceTourContext'
 import { ConceptStrip } from './ConceptTip'
 import { useUploadPolicy } from '../../hooks/useUploadPolicy'
 
@@ -983,25 +984,16 @@ interface SharedHomeProps {
 
 export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage }: SharedHomeProps) {
   const certCta = useCertificationCta()
+  const openTour = useWorkspaceTour()
   return (
     <div className="chat-home first-session-home">
       <div className="chat-home-heading">
         {brandIcon && <img src={brandIcon} alt="" />}
-        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Ask questions, work across your knowledge, and let the assistant help carry out tasks. Start with a goal; add sources when you need them.</p></div>
+        <div><span className="home-eyebrow">Welcome to {orgName}</span><h2>What would you like to get done?</h2><p>Start with a conversation. Add sources when you need them, or try a sample.</p></div>
       </div>
-      <div className="home-two-columns">
-        <SurfaceCard title="Think it through" subtitle="Ask a question, explore an idea, or draft a plan. You can start with just a conversation.">
-          <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
-        </SurfaceCard>
-        <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
-          <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />
-        </SurfaceCard>
-        <SurfaceCard title="Work with documents" subtitle="Summarize, compare, or extract useful details from files you bring to the chat.">
-          <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
-        </SurfaceCard>
-        <SurfaceCard title="Put the assistant to work" subtitle="Give it a goal, build a reusable workflow, or set up an automation. Review proposed changes before they run.">
-          <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
-        </SurfaceCard>
+      <div className="home-primary-actions">
+        <ActionPillButton label="Start a conversation" icon={MessageSquare} disabled={disabled} onClick={onFocusComposer} />
+        <UploadPillButton label="Upload a document" disabled={disabled} onAttachFiles={onAttachFiles} />
       </div>
       <details>
         <summary className="home-learning-link">Try a sample document demo</summary>
@@ -1012,8 +1004,17 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
           <SampleAnswerPreview />
         </div>
       </details>
+      <div className="home-two-columns">
+        <SurfaceCard title="Explore your knowledge" subtitle="Ask across a knowledge base and follow the references back to the original sources.">
+          <ActionPillButton label="Choose a knowledge base" icon={BookOpen} disabled={disabled} onClick={onChooseKnowledgeBase} />
+        </SurfaceCard>
+        <SurfaceCard title="Put the assistant to work" subtitle="Build a reusable workflow for a recurring task.">
+          <ActionPillButton label="Build a workflow" icon={Workflow} disabled={disabled} onClick={() => onSendMessage('Help me turn a recurring task into a workflow.')} />
+        </SurfaceCard>
+      </div>
       <p className="home-evidence-note">For document and knowledge-base answers, open the source references to check the original context. Missing or incomplete sources can limit an answer.</p>
       <GlossaryDisclosure />
+      {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
       {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     </div>
   )
@@ -1021,6 +1022,7 @@ export function FirstSessionHome({ orgName, brandIcon, disabled, onRunDemo, onAt
 
 export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttachFiles, onFocusComposer, onChooseKnowledgeBase, onSendMessage, onOpenActivity, status, suggestionPills }: SharedHomeProps & { onOpenActivity: (activityId: string) => void; status: OnboardingStatus | null; suggestionPills: string[] }) {
   const certCta = useCertificationCta()
+  const openTour = useWorkspaceTour()
   const primaryAction = deriveReturningPrimaryAction(status)
   const suggestions = starterSuggestions(status, suggestionPills).slice(0, 3)
   const hasQueue = !!status && (status.recent_activity.length > 0 || status.active_alerts.length > 0 || status.unprocessed_doc_count > 0 || status.has_only_onboarding_docs)
@@ -1045,6 +1047,7 @@ export function ReturningHome({ orgName, brandIcon, disabled, onRunDemo, onAttac
         </SurfaceCard>
       </div>
       {readyBadges.length > 0 && <div className="home-ready-assets"><span>Ready in this workspace</span>{readyBadges.map(badge => <ReadyAssetBadge key={badge} label={badge} />)}</div>}
+      {openTour && <button className="home-learning-link" type="button" onClick={openTour}>Take a quick tour</button>}
       {certCta && <button className="home-learning-link" type="button" disabled={disabled} onClick={() => onSendMessage(certCta.message)}><Award size={14} /> {certCta.label}</button>}
     </div>
   )

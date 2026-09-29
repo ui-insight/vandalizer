@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Optional tour and first actions — September 29
+
+**142/169 checklist items implemented locally.** ONB-06/07 are complete for the reviewed onboarding flows; changes are not deployed.
+
+- The tour opens only from the home invitation, so first visits, returning users and dismissed sessions are not interrupted. It can be restarted deliberately and does not depend on browser storage. Updated guidance describes the working Files/Library panes and source verification.
+- Dialog focus starts at the step title, remains contained, follows Back/Next, and returns to the trigger on Skip, completion, Close or Escape. The body scrolls while the title bar and footer remain reachable on short screens.
+- Conversation and upload actions now precede secondary cards. The sample demo disclosure and its evidence are near the top. A selected Knowledge base still replaces first-session home with scoped guidance.
+- Verification: 18 frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirty browser captures at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. First-action and sample-disclosure reachability, all tour steps, keyboard containment/return, reload without interruption, and returning/scoped users are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-onboarding-tour-evidence`; recipe: `frontend/scripts/visual-review/onboarding-tour.mjs`. Browser APIs use fixtures. Real demo execution and assistive-technology device behavior are not certified.
+
 ## Explore purpose and usage — September 29
 
 **140/169 checklist items implemented locally.** EXP-05 is complete for the reviewed catalog flows; changes are not deployed.
@@ -487,8 +497,8 @@ Acceptance: composing, sending, reading, interrupting and recovering from a conv
 - [x] **ONB-03 · P2 · Improve:** Guide one complete first success: choose a source → ask a suggested question → inspect the supporting evidence.
 - [x] **ONB-04 · P2 · Fix:** Replace the unconditional promise that every answer links to sources with accurate language about source-grounded tasks.
 - [x] **ONB-05 · P2 · Improve:** Keep sample content visibly identified as a demo and provide a clear transition into the user's own work.
-- [ ] **ONB-06 · P2 · Verify:** First visit, dismissed onboarding, returning user and the optional guided-tour overlay coexist without trapping focus or repeatedly interrupting work.
-- [ ] **ONB-07 · P2 · Verify:** The first useful action and demo evidence are reachable on mobile without excessive scrolling.
+- [x] **ONB-06 · P2 · Verify:** First visit, dismissed onboarding, returning user and the optional guided-tour overlay coexist without trapping focus or repeatedly interrupting work.
+- [x] **ONB-07 · P2 · Verify:** The first useful action and demo evidence are reachable on mobile without excessive scrolling.
 
 Acceptance: a new user can understand what to do, complete one useful task and identify where the answer came from without reading a landing page.
 

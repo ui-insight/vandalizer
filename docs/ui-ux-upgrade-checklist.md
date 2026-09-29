@@ -212,8 +212,8 @@ Acceptance: composing, sending, reading, interrupting and recovering from a conv
 - [x] **ONB-03 · P2 · Improve:** Guide one complete first success: choose a source → ask a suggested question → inspect the supporting evidence.
 - [x] **ONB-04 · P2 · Fix:** Replace the unconditional promise that every answer links to sources with accurate language about source-grounded tasks.
 - [x] **ONB-05 · P2 · Improve:** Keep sample content visibly identified as a demo and provide a clear transition into the user's own work.
-- [ ] **ONB-06 · P2 · Verify:** First visit, dismissed onboarding, returning user and the optional guided-tour overlay coexist without trapping focus or repeatedly interrupting work.
-- [ ] **ONB-07 · P2 · Verify:** The first useful action and demo evidence are reachable on mobile without excessive scrolling.
+- [x] **ONB-06 · P2 · Verify:** First visit, dismissed onboarding, returning user and the optional guided-tour overlay coexist without trapping focus or repeatedly interrupting work.
+- [x] **ONB-07 · P2 · Verify:** The first useful action and demo evidence are reachable on mobile without excessive scrolling.
 
 Acceptance: a new user can understand what to do, complete one useful task and identify where the answer came from without reading a landing page.
 

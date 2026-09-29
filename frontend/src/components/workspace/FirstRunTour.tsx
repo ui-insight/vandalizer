@@ -1,152 +1,61 @@
-import { useEffect, useState } from 'react'
-import {
-  MessageSquare,
-  BadgeCheck,
-  Award,
-  Settings,
-  ChevronRight,
-  X,
-  Sparkles,
-} from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
+import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-const STORAGE_KEY = 'vandalizer:first-run-tour-dismissed'
-
-interface TourStep {
-  icon: React.ElementType
-  accent: string
-  title: string
-  body: string
-}
-
-const STEPS: TourStep[] = [
+const STEPS = [
   {
-    icon: MessageSquare,
-    accent: 'text-highlight',
     title: 'Welcome to Vandalizer 5.0',
-    body:
-      'The chat on your left is the whole product. Ask it to search your files, run extractions, query knowledge bases, or dispatch workflows, all in plain English.',
+    body: 'Use the Assistant to ask questions and carry out tasks. Open Files alongside the Library to run a saved prompt, extraction or workflow on your documents. On smaller screens, use the pane buttons to switch between them.',
   },
   {
-    icon: BadgeCheck,
-    accent: 'text-green-400',
-    title: 'Quality is measured, not claimed',
-    body:
-      'Results from validated templates carry a quality badge with accuracy, consistency, and test-case count — click the badge for the full breakdown. Templates without validation runs show Unscored until you validate them.',
+    title: 'Start with your sources',
+    body: 'Upload a document or attach a knowledge base when your question needs context. Open the source references in an answer to compare it with the original. Missing or incomplete sources can limit an answer.',
   },
   {
-    icon: Award,
-    accent: 'text-blue-400',
-    title: 'Learn by doing',
-    body:
-      'Open the Certification panel from the top nav. Module 1 walks through the agentic chat in about 10 minutes and earns you 50 XP.',
+    title: 'Review what will run',
+    body: 'Check the selected sources and proposed changes before approving an action. The Library holds reusable tools; Explore shows shared items, their inputs and outputs, and available validation evidence.',
   },
   {
-    icon: Settings,
-    accent: 'text-gray-300',
-    title: 'You control your inbox',
-    body:
-      'Email preferences live on your Account page. Opt in or out of tutorials, activity nudges, and announcements anytime.',
+    title: 'Learn at your own pace',
+    body: 'Start the certification course from the Assistant home when you want a guided exercise. You can revisit this tour from home anytime. Email preferences are available on your Account page.',
   },
 ]
 
-export function FirstRunTour() {
-  const [open, setOpen] = useState(false)
+/** Optional, explicitly opened help. Never interrupts a first or returning session. */
+export function FirstRunTour({ onDismiss }: { onDismiss: () => void }) {
   const [step, setStep] = useState(0)
-
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    try {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        setOpen(true)
-      }
-    } catch {
-      // localStorage disabled — skip the tour
-    }
-  }, [])
-
-  const dismiss = () => {
-    try {
-      localStorage.setItem(STORAGE_KEY, '1')
-    } catch {
-      // ignore
-    }
-    setOpen(false)
-  }
-
-  if (!open) return null
-
-  const s = STEPS[step]
-  const Icon = s.icon
-  const isLast = step === STEPS.length - 1
-
+    headingRef.current?.focus({ preventScroll: true })
+    contentRef.current?.scrollTo?.(0, 0)
+  }, [step])
+  const current = STEPS[step]
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div role="dialog" aria-modal="true" aria-labelledby="first-run-tour-title" className="relative w-full max-w-md rounded-2xl border border-white/10 bg-[#171717] shadow-2xl">
-        <button
-          type="button"
-          onClick={dismiss}
-          aria-label="Dismiss tour"
-          className="absolute top-3 right-3 p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-white/5 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-        <div className="p-6">
-          <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-wide text-highlight">
-            <Sparkles className="w-3.5 h-3.5" />
-            Vandalizer 5.0
-            <span className="ml-auto text-gray-500 font-normal">
-              {step + 1} / {STEPS.length}
-            </span>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+      <FocusTrap focusTrapOptions={{ initialFocus: '#first-run-tour-title', escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="first-run-tour-title" aria-describedby="first-run-tour-body"
+          className="flex max-h-[calc(100dvh-32px)] w-full max-w-md flex-col overflow-hidden rounded-xl border border-gray-200 bg-white text-gray-900 shadow-xl"
+          onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onDismiss() } }}>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+            <span className="text-sm font-semibold">Quick tour · {step + 1} of {STEPS.length}</span>
+            <button type="button" onClick={onDismiss} aria-label="Dismiss tour" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-gray-100"><X className="h-5 w-5" /></button>
           </div>
-          <div className="flex items-start gap-4">
-            <div className={`shrink-0 p-2.5 rounded-lg bg-white/5 border border-white/10 ${s.accent}`}>
-              <Icon className="w-6 h-6" />
-            </div>
-            <div className="flex-1">
-              <h2 id="first-run-tour-title" className="text-lg font-bold text-white mb-2">{s.title}</h2>
-              <p className="text-sm text-gray-400 leading-relaxed">{s.body}</p>
-            </div>
+          <div ref={contentRef} className="min-h-0 overflow-y-auto p-5">
+            <h2 ref={headingRef} tabIndex={-1} id="first-run-tour-title" className="mb-3 text-xl font-semibold">{current.title}</h2>
+            <p id="first-run-tour-body" className="text-sm leading-relaxed text-gray-700">{current.body}</p>
           </div>
-
-          <div className="flex items-center gap-2 mt-6">
-            {STEPS.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  i === step ? 'bg-highlight' : i < step ? 'bg-highlight/30' : 'bg-white/10'
-                }`}
-              />
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between mt-6">
-            <button
-              type="button"
-              onClick={dismiss}
-              className="text-sm text-gray-300 hover:text-white transition-colors"
-            >
-              Skip tour
-            </button>
-            {isLast ? (
-              <button
-                type="button"
-                onClick={dismiss}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-highlight px-4 py-2 text-sm font-bold text-highlight-text transition-colors hover:bg-highlight-hover"
-              >
-                Get started
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-gray-200 p-4">
+            <button type="button" onClick={onDismiss} className="min-h-9 rounded-md px-2 text-sm text-gray-700 hover:bg-gray-100">Skip tour</button>
+            <div className="flex gap-2">
+              {step > 0 && <button type="button" onClick={() => setStep(value => value - 1)} className="inline-flex min-h-9 items-center gap-1 rounded-md border border-gray-300 px-3 text-sm hover:bg-gray-100"><ChevronLeft className="h-4 w-4" />Back</button>}
+              <button type="button" onClick={() => step === STEPS.length - 1 ? onDismiss() : setStep(value => value + 1)} className="inline-flex min-h-9 items-center gap-1 rounded-md bg-highlight px-3 text-sm font-semibold text-highlight-text hover:bg-highlight-hover">
+                {step === STEPS.length - 1 ? 'Get started' : <>Next<ChevronRight className="h-4 w-4" /></>}
               </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-highlight px-4 py-2 text-sm font-bold text-highlight-text transition-colors hover:bg-highlight-hover"
-              >
-                Next
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            )}
+            </div>
           </div>
         </div>
-      </div>
+      </FocusTrap>
     </div>
   )
 }

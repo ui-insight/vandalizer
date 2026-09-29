@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 140/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 142/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Optional tour and first actions — September 29
+
+**142/169 checklist items implemented locally.** ONB-06/07 are complete for the reviewed onboarding flows; changes are not deployed.
+
+- The tour opens only from the home invitation, so first visits, returning users and dismissed sessions are not interrupted. It can be restarted deliberately and does not depend on browser storage. Updated guidance describes the working Files/Library panes and source verification.
+- Dialog focus starts at the step title, remains contained, follows Back/Next, and returns to the trigger on Skip, completion, Close or Escape. The body scrolls while the title bar and footer remain reachable on short screens.
+- Conversation and upload actions now precede secondary cards. The sample demo disclosure and its evidence are near the top. A selected Knowledge base still replaces first-session home with scoped guidance.
+- Verification: 18 frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirty browser captures at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. First-action and sample-disclosure reachability, all tour steps, keyboard containment/return, reload without interruption, and returning/scoped users are asserted; representative screenshots inspected directly.
+- Evidence: `2026-09-29-onboarding-tour-evidence`; recipe: `frontend/scripts/visual-review/onboarding-tour.mjs`. Browser APIs use fixtures. Real demo execution and assistive-technology device behavior are not certified.
 
 ## Explore purpose and usage — September 29
 
@@ -174,7 +184,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 903 distinct states / 1109 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 933 distinct states / 1139 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -279,6 +289,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-29-chat-composer-evidence](../2026-09-29-chat-composer-evidence/manifest.json): 26 states; source `90c99a4a7969939d035ba81d66ecef0e593343dff01279f9219d35e503a159d5`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-catalog-usage-final](../2026-09-29-catalog-usage-final/manifest.json): 30 states; source `0e20919019d0e30019feaac40bce460afbf5a9200457aab0fd6e7e7724e5f2bb`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-29-catalog-filter-regression](../2026-09-29-catalog-filter-regression/manifest.json): 36 states; source `03d414db121fc5955f7641f27543b7928d2eca43ebddf2d632adf0271fb39dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-29-onboarding-tour-evidence](../2026-09-29-onboarding-tour-evidence/manifest.json): 30 states; source `9d7c5e257da88c233b9bf0fa46df6acfff44e220b7719cd8e168137f95a7b00e`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 
@@ -300,7 +311,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 
 **Chat workspace:** Model loading/default-save recovery, keyboard selection and focus return, Enter/Shift+Enter/IME, touch queueing, retained failed drafts and selected-model request payloads pass. First-response identity supports queueing and preserves context after Stop. Reading/scroll and source scope checks remain in the earlier evidence; live execution, queue consumption and assistive-technology devices are unverified.
 
-**Basic chat onboarding:** A mobile first session now exercises upload → scoped question → source preview. One progress guide stays visible, with concise contextual guidance. Full guided-tour coexistence remains open.
+**Basic chat onboarding:** A mobile first session now exercises upload → scoped question → source preview. One progress guide stays visible, with concise contextual guidance. The optional tour now fits short screens and restores focus; first/returning/dismissed sessions do not reopen it automatically.
 
 **Chat uploads:** Successful siblings survive failures, transfer retry/cancel are explicit, and scope preservation is asserted. Live ingestion and all supported intake paths remain unverified.
 
