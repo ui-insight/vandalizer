@@ -51,7 +51,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }>
 
 const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }> = {
   pending: { icon: Loader2, color: '#6b7280' },
-  processing: { icon: Loader2, color: '#d97706' },
+  processing: { icon: Loader2, color: 'var(--workspace-warning)' },
   ready: { icon: CheckCircle2, color: '#15803d' },
   error: { icon: AlertCircle, color: '#b91c1c' },
 }
@@ -741,16 +741,16 @@ export function KnowledgePanel() {
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
       <div style={{
-        backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 400,
-        border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
+        backgroundColor: 'var(--workspace-canvas)', borderRadius: 12, padding: 24, width: 400,
+        border: '1px solid var(--workspace-border)', maxHeight: '80vh', overflowY: 'auto',
       }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
           <ShareLabel />
         </div>
-        <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 16 }}>
           {verifyKB.title}
         </div>
-        <label htmlFor="verify-summary" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
+        <label htmlFor="verify-summary" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 4 }}>Summary</label>
         <input
           id="verify-summary"
           value={verifySummary}
@@ -758,11 +758,11 @@ export function KnowledgePanel() {
           placeholder="Brief summary of this knowledge base"
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', marginBottom: 12, boxSizing: 'border-box',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+            color: 'var(--workspace-text)', marginBottom: 12, boxSizing: 'border-box',
           }}
         />
-        <label htmlFor="verify-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Description</label>
+        <label htmlFor="verify-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 4 }}>Description</label>
         <textarea
           id="verify-description"
           value={verifyDescription}
@@ -771,12 +771,12 @@ export function KnowledgePanel() {
           rows={3}
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', marginBottom: 12, resize: 'vertical',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+            color: 'var(--workspace-text)', marginBottom: 12, resize: 'vertical',
             boxSizing: 'border-box',
           }}
         />
-        <label htmlFor="verify-category" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Category</label>
+        <label htmlFor="verify-category" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 4 }}>Category</label>
         <input
           id="verify-category"
           value={verifyCategory}
@@ -784,8 +784,8 @@ export function KnowledgePanel() {
           placeholder="e.g. Legal, Medical, Research"
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', marginBottom: 16, boxSizing: 'border-box',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+            color: 'var(--workspace-text)', marginBottom: 16, boxSizing: 'border-box',
           }}
         />
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -793,7 +793,7 @@ export function KnowledgePanel() {
             onClick={() => setVerifyKB(null)}
             style={{
               padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              color: '#aaa', backgroundColor: 'transparent', border: '1px solid #3a3a3a',
+              color: 'var(--workspace-muted)', backgroundColor: 'transparent', border: '1px solid var(--workspace-border)',
               borderRadius: 6, cursor: 'pointer',
             }}
           >
@@ -838,12 +838,12 @@ export function KnowledgePanel() {
     const hasSources = selectedKB.total_sources > 0
     return (
       <>
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
+      <div className="knowledge-surface" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--workspace-canvas)', position: 'relative' }}>
         {/* Header */}
         <div
           style={{
             minHeight: 54,
-            backgroundColor: 'var(--color-panel-dark)',
+            backgroundColor: 'var(--workspace-surface)',
             boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
             padding: '10px 12px',
             display: 'flex',
@@ -860,7 +860,7 @@ export function KnowledgePanel() {
             onClick={() => { closeDetail(); setEditingTitle(false); refresh() }}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
-            <ArrowLeft size={18} style={{ color: '#b8bec7' }} />
+            <ArrowLeft size={18} style={{ color: 'var(--workspace-muted)' }} />
           </button>
           {editingTitle ? (
             <div
@@ -880,8 +880,8 @@ export function KnowledgePanel() {
                 }}
                 style={{
                   flex: 1, fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
-                  color: '#fff', backgroundColor: '#2a2a2a',
-                  border: '1px solid #555', borderRadius: 4,
+                  color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 4,
                   padding: '2px 8px', minWidth: 0,
                 }}
               />
@@ -903,7 +903,7 @@ export function KnowledgePanel() {
                 onClick={canManageKB ? () => { setTitleDraft(selectedKB.title); setEditingTitle(true) } : undefined}
                 title={canManageKB ? 'Click to rename' : noManageReason}
                 style={{
-                  fontSize: 16, fontWeight: 600, color: '#fff',
+                  fontSize: 16, fontWeight: 600, color: 'var(--workspace-text)',
                   overflowWrap: 'anywhere', whiteSpace: 'normal',
                   cursor: canManageKB ? 'text' : 'default', borderRadius: 4, padding: '2px 0',
                   minWidth: 0,
@@ -919,7 +919,7 @@ export function KnowledgePanel() {
                   title="Edit title"
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
-                    padding: 2, display: 'flex', color: '#b8bec7', flexShrink: 0,
+                    padding: 2, display: 'flex', color: 'var(--workspace-muted)', flexShrink: 0,
                   }}
                 >
                   <Pencil size={13} />
@@ -930,7 +930,7 @@ export function KnowledgePanel() {
           {selectedKB.shared_with_team && (
             <span style={{
               fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-              color: '#99f6e4', backgroundColor: '#134e4a',
+              color: 'var(--workspace-success)', backgroundColor: 'var(--workspace-success-surface)',
             }}>
               Team
             </span>
@@ -948,7 +948,7 @@ export function KnowledgePanel() {
         </div>
 
         {detailLoading ? (
-          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: '#b8bec7' }}>
+          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: 'var(--workspace-muted)' }}>
             <Loader2 aria-hidden="true" style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
             <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', border: 0 }}>Loading knowledge base…</span>
           </div>
@@ -978,8 +978,8 @@ export function KnowledgePanel() {
                     disabled={savingDescription}
                     style={{
                       width: '100%', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.5,
-                      color: '#e5e5e5', backgroundColor: '#1a1a1a',
-                      border: '1px solid #555', borderRadius: 6,
+                      color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+                      border: '1px solid var(--workspace-border)', borderRadius: 6,
                       padding: '8px 10px',
                       resize: 'vertical', minHeight: 80,
                     }}
@@ -990,8 +990,8 @@ export function KnowledgePanel() {
                       disabled={savingDescription}
                       style={{
                         padding: '4px 10px', fontSize: 12, fontFamily: 'inherit',
-                        color: '#ccc', background: 'transparent',
-                        border: '1px solid #3a3a3a', borderRadius: 5, cursor: 'pointer',
+                        color: 'var(--workspace-text)', background: 'transparent',
+                        border: '1px solid var(--workspace-border)', borderRadius: 5, cursor: 'pointer',
                       }}
                     >
                       Cancel
@@ -1034,7 +1034,7 @@ export function KnowledgePanel() {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
                   <div style={{
                     flex: 1, fontSize: 13, lineHeight: 1.5,
-                    color: selectedKB.description ? '#aaa' : '#aeb5bf',
+                    color: selectedKB.description ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
                     fontStyle: selectedKB.description ? 'normal' : 'italic',
                     whiteSpace: 'pre-wrap',
                   }}>
@@ -1053,7 +1053,7 @@ export function KnowledgePanel() {
                       title="Edit description"
                       style={{
                         background: 'transparent', border: 'none', cursor: 'pointer',
-                        padding: 2, display: 'flex', color: '#b8bec7', flexShrink: 0,
+                        padding: 2, display: 'flex', color: 'var(--workspace-muted)', flexShrink: 0,
                         marginTop: 2,
                       }}
                     >
@@ -1073,12 +1073,12 @@ export function KnowledgePanel() {
                 backgroundColor: 'rgba(217, 119, 6, 0.1)',
                 border: '1px solid rgba(217, 119, 6, 0.25)',
               }}>
-                <Loader2 size={16} aria-hidden="true" style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <Loader2 size={16} aria-hidden="true" style={{ color: 'var(--workspace-warning)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>
                     Adding URLs & crawling pages...
                   </div>
-                  <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>
                     Sources will appear below as they are processed.
                   </div>
                 </div>
@@ -1094,14 +1094,14 @@ export function KnowledgePanel() {
                 backgroundColor: 'rgba(217, 119, 6, 0.1)',
                 border: '1px solid rgba(217, 119, 6, 0.25)',
               }}>
-                <Loader2 size={16} aria-hidden="true" style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <Loader2 size={16} aria-hidden="true" style={{ color: 'var(--workspace-warning)', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>
                     {inFlightCount > 0
                       ? `Indexing ${inFlightCount} source${inFlightCount === 1 ? '' : 's'}...`
                       : 'Adding documents...'}
                   </div>
-                  <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>
                     Large documents can take a few minutes. Sources turn green below as they
                     finish — you can leave this page and come back.
                   </div>
@@ -1122,8 +1122,8 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: '#e5e5e5',
-                  backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
+                  color: 'var(--workspace-text)',
+                  backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
                   cursor: addingDocs || !canManageKB ? 'default' : 'pointer',
                   opacity: addingDocs || !canManageKB ? 0.5 : 1,
                 }}
@@ -1138,7 +1138,7 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: '#e5e5e5', backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a',
+                  color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)',
                   borderRadius: 6,
                   cursor: addingUrls || !canManageKB ? 'default' : 'pointer',
                   opacity: addingUrls || !canManageKB ? 0.5 : 1,
@@ -1156,9 +1156,9 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: canChatKB ? 'var(--highlight-text-color, #000)' : '#aeb5bf',
-                  backgroundColor: canChatKB ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
-                  border: canChatKB ? 'none' : '1px solid #3a3a3a',
+                  color: canChatKB ? 'var(--highlight-text-color, #000)' : 'var(--workspace-muted)',
+                  backgroundColor: canChatKB ? 'var(--highlight-color, #eab308)' : 'var(--workspace-surface)',
+                  border: canChatKB ? 'none' : '1px solid var(--workspace-border)',
                   borderRadius: 6,
                   cursor: canChatKB ? 'pointer' : 'default',
                   opacity: canChatKB ? 1 : 0.5,
@@ -1180,9 +1180,9 @@ export function KnowledgePanel() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      color: pinned ? 'var(--highlight-text-color, #000)' : '#e5e5e5',
-                      backgroundColor: pinned ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
-                      border: pinned ? 'none' : '1px solid #3a3a3a',
+                      color: pinned ? 'var(--highlight-text-color, #000)' : 'var(--workspace-text)',
+                      backgroundColor: pinned ? 'var(--highlight-color, #eab308)' : 'var(--workspace-surface)',
+                      border: pinned ? 'none' : '1px solid var(--workspace-border)',
                       borderRadius: 6, cursor: 'pointer',
                     }}
                   >
@@ -1201,9 +1201,9 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: selectedKB.shared_with_team ? '#99f6e4' : '#e5e5e5',
-                  backgroundColor: selectedKB.shared_with_team ? '#134e4a' : '#2a2a2a',
-                  border: selectedKB.shared_with_team ? '1px solid rgba(0, 128, 128, 0.3)' : '1px solid #3a3a3a',
+                  color: selectedKB.shared_with_team ? 'var(--workspace-success)' : 'var(--workspace-text)',
+                  backgroundColor: selectedKB.shared_with_team ? 'var(--workspace-success-surface)' : 'var(--workspace-surface)',
+                  border: selectedKB.shared_with_team ? '1px solid rgba(0, 128, 128, 0.3)' : '1px solid var(--workspace-border)',
                   borderRadius: 6,
                   cursor: canManageKB ? 'pointer' : 'default',
                   opacity: canManageKB ? 1 : 0.5,
@@ -1221,8 +1221,8 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: '#e5e5e5', backgroundColor: '#2a2a2a',
-                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 6,
                   cursor: exporting || !hasSources ? 'default' : 'pointer',
                   opacity: exporting || !hasSources ? 0.5 : 1,
                 }}
@@ -1242,8 +1242,8 @@ export function KnowledgePanel() {
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  color: '#e5e5e5', backgroundColor: '#2a2a2a',
-                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 6,
                   cursor: cloning || !hasSources ? 'default' : 'pointer',
                   opacity: cloning || !hasSources ? 0.5 : 1,
                 }}
@@ -1267,8 +1267,8 @@ export function KnowledgePanel() {
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      color: '#e5e5e5', backgroundColor: '#2a2a2a',
-                      border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
+                      color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                      border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
                     }}
                   >
                     <Send size={13} />
@@ -1282,9 +1282,9 @@ export function KnowledgePanel() {
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                    color: (selectedKB.organization_ids?.length ?? 0) > 0 ? '#2563eb' : '#e5e5e5',
-                    backgroundColor: (selectedKB.organization_ids?.length ?? 0) > 0 ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
-                    border: (selectedKB.organization_ids?.length ?? 0) > 0 ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid #3a3a3a',
+                    color: (selectedKB.organization_ids?.length ?? 0) > 0 ? '#2563eb' : 'var(--workspace-text)',
+                    backgroundColor: (selectedKB.organization_ids?.length ?? 0) > 0 ? 'rgba(37, 99, 235, 0.1)' : 'var(--workspace-surface)',
+                    border: (selectedKB.organization_ids?.length ?? 0) > 0 ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid var(--workspace-border)',
                     borderRadius: 6, cursor: 'pointer',
                   }}
                 >
@@ -1293,7 +1293,7 @@ export function KnowledgePanel() {
                 </button>
               )}
               </div>
-              <p style={{ color: '#bec4cc', fontSize: 12 }}>{selectedKB.total_chunks} indexed chunks across {selectedKB.total_sources} sources. Chunks are searchable passages split from your sources.</p>
+              <p style={{ color: 'var(--workspace-muted)', fontSize: 12 }}>{selectedKB.total_chunks} indexed chunks across {selectedKB.total_sources} sources. Chunks are searchable passages split from your sources.</p>
             {/* Tags editor */}
             <KBTagsEditor
               tags={selectedKB.tags || []}
@@ -1313,7 +1313,7 @@ export function KnowledgePanel() {
             {!canManageKB && (
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                marginTop: -8, marginBottom: 16, fontSize: 12, color: '#b8bec7',
+                marginTop: -8, marginBottom: 16, fontSize: 12, color: 'var(--workspace-muted)',
               }}>
                 <ShieldCheck size={12} aria-hidden="true" style={{ flexShrink: 0 }} />
                 <span>View only — {noManageReason}</span>
@@ -1352,13 +1352,13 @@ export function KnowledgePanel() {
                 display: 'flex', alignItems: 'center', gap: 8, width: '100%',
                 padding: 0, marginBottom: sourcesCollapsed ? 0 : 8,
                 background: 'transparent', border: 'none',
-                fontFamily: 'inherit', cursor: 'pointer', color: '#ccc',
+                fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
                 textAlign: 'left',
               }}
             >
-              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: '#b8bec7' }} /> : <ChevronDown size={14} style={{ color: '#b8bec7' }} />}
+              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} />}
               <span style={{ fontSize: 13, fontWeight: 600 }}>Sources</span>
-              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aeb5bf' }}>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>
                 {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
               </span>
             </button>
@@ -1378,9 +1378,9 @@ export function KnowledgePanel() {
               />
               </details>
             )}
-            {sourceActionError && <div role="alert" style={{ color: '#fca5a5', fontSize: 13, lineHeight: 1.6, margin: '10px 0', overflowWrap: 'anywhere' }}>{sourceActionError}</div>}
+            {sourceActionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 13, lineHeight: 1.6, margin: '10px 0', overflowWrap: 'anywhere' }}>{sourceActionError}</div>}
             {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
-              <div style={{ fontSize: 12, color: '#b8bec7', padding: '20px 0' }}>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
@@ -1406,7 +1406,7 @@ export function KnowledgePanel() {
                       ? `Incomplete — ${source.ingestion_warning_text}; answers from this source cover only part of it.`
                       : null
                   const st = incompleteReason
-                    ? { icon: AlertTriangle, color: '#d97706' }
+                    ? { icon: AlertTriangle, color: 'var(--workspace-warning)' }
                     : (SOURCE_STATUS[source.status] || SOURCE_STATUS.pending)
                   const StatusIcon = st.icon
                   const autoLabel = source.source_type === 'url'
@@ -1435,25 +1435,25 @@ export function KnowledgePanel() {
                       key={source.uuid}
                       style={{
                         display: 'flex', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8,
-                        padding: '8px 10px', backgroundColor: '#2a2a2a',
-                        border: '1px solid #3a3a3a', borderRadius: 6,
+                        padding: '8px 10px', backgroundColor: 'var(--workspace-surface)',
+                        border: '1px solid var(--workspace-border)', borderRadius: 6,
                         cursor: canInspect ? 'pointer' : 'default',
                         transition: 'background-color 0.12s, border-color 0.12s',
                       }}
                       onMouseEnter={e => {
                         if (!canInspect) return
-                        e.currentTarget.style.backgroundColor = '#323232'
-                        e.currentTarget.style.borderColor = '#4a4a4a'
+                        e.currentTarget.style.backgroundColor = 'var(--workspace-surface)'
+                        e.currentTarget.style.borderColor = 'var(--workspace-border)'
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor = '#2a2a2a'
-                        e.currentTarget.style.borderColor = '#3a3a3a'
+                        e.currentTarget.style.backgroundColor = 'var(--workspace-surface)'
+                        e.currentTarget.style.borderColor = 'var(--workspace-border)'
                       }}
                     >
                       {source.source_type === 'document' ? (
-                        <FileText size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
+                        <FileText size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
                       ) : (
-                        <Globe size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
+                        <Globe size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
                       )}
                       <div style={{ flex: '1 1 140px', minWidth: 0 }}>
                         {isRenaming ? (
@@ -1471,27 +1471,27 @@ export function KnowledgePanel() {
                             maxLength={300}
                             disabled={savingRename}
                             style={{
-                              width: '100%', fontSize: 12, color: '#e5e5e5',
-                              backgroundColor: '#1f1f1f', border: '1px solid #4a4a4a',
+                              width: '100%', fontSize: 12, color: 'var(--workspace-text)',
+                              backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)',
                               borderRadius: 4, padding: '4px 6px', fontFamily: 'inherit',
                             }}
                           />
                         ) : (
                           <button type="button" disabled={!canInspect} onClick={() => { (toasts ?? []).filter(t => t.type !== 'error').forEach(t => dismiss(t.id)); setInspectingSource(source) }} aria-label={`Inspect source: ${displayLabel}`}
-                            style={{ background: 'transparent', padding: 0, border: 0, fontFamily: 'inherit', textAlign: 'left', cursor: canInspect ? 'pointer' : 'default', fontSize: 14, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
+                            style={{ background: 'transparent', padding: 0, border: 0, fontFamily: 'inherit', textAlign: 'left', cursor: canInspect ? 'pointer' : 'default', fontSize: 14, color: 'var(--workspace-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', overflowWrap: 'anywhere' }}
                             title={source.custom_name
                               ? `${displayLabel} (original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''})`
                               : (source.source_type === 'url' ? (source.url || '') : (source.document_uuid || ''))}
                           >
                             {displayLabel}
                             {source.custom_name && autoLabel && autoLabel !== source.custom_name && (
-                              <span style={{ color: '#b8bec7', marginLeft: 6, fontStyle: 'italic' }}>
+                              <span style={{ color: 'var(--workspace-muted)', marginLeft: 6, fontStyle: 'italic' }}>
                                 · {autoLabel}
                               </span>
                             )}
                             {docDeleted && (
                               <span
-                                style={{ color: '#d97706', marginLeft: 6, fontStyle: 'italic' }}
+                                style={{ color: 'var(--workspace-warning)', marginLeft: 6, fontStyle: 'italic' }}
                                 title="The source document was deleted from Files. This knowledge base still answers from the text it indexed."
                               >
                                 · source deleted
@@ -1501,7 +1501,7 @@ export function KnowledgePanel() {
                         )}
                         {!isRenaming && effectiveSource && (
                           <div
-                            style={{ fontSize: 12, color: '#b8bec7', marginTop: 2, overflowWrap: 'anywhere' }}
+                            style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2, overflowWrap: 'anywhere' }}
                             title={`Source: ${effectiveSource}`}
                           >
                             Source:{' '}
@@ -1511,12 +1511,12 @@ export function KnowledgePanel() {
                                 target="_blank"
                                 rel="noreferrer"
                                 onClick={e => e.stopPropagation()}
-                                style={{ color: '#7aa2f7', textDecoration: 'none' }}
+                                style={{ color: 'var(--workspace-info)', textDecoration: 'none' }}
                               >
                                 {effectiveSource}
                               </a>
                             ) : (
-                              <span style={{ color: '#bcbcbc' }}>{effectiveSource}</span>
+                              <span style={{ color: 'var(--workspace-muted)' }}>{effectiveSource}</span>
                             )}
                           </div>
                         )}
@@ -1527,16 +1527,16 @@ export function KnowledgePanel() {
                             .map(sourceDisplayName)
                           return names.length > 0 ? (
                             <div
-                              style={{ fontSize: 12, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                              style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                               title={`Amends: ${names.join('; ')}`}
                             >
-                              Amends: <span style={{ color: '#bcbcbc' }}>{names.join('; ')}</span>
+                              Amends: <span style={{ color: 'var(--workspace-muted)' }}>{names.join('; ')}</span>
                             </div>
                           ) : null
                         })()}
-                        {!isRenaming && <div style={{ fontSize: 12, color: '#c5c9d0', marginTop: 4 }}>{source.source_type === 'url' ? 'Web page' : 'Document'} · {requestPending ? 'Submitting change…' : source.status === 'ready' ? incompleteReason ? 'Partially indexed' : 'Ready' : source.status === 'error' ? 'Failed' : source.status === 'processing' ? 'Processing' : 'Queued'}</div>}
+                        {!isRenaming && <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 4 }}>{source.source_type === 'url' ? 'Web page' : 'Document'} · {requestPending ? 'Submitting change…' : source.status === 'ready' ? incompleteReason ? 'Partially indexed' : 'Ready' : source.status === 'error' ? 'Failed' : source.status === 'processing' ? 'Processing' : 'Queued'}</div>}
                         {!isRenaming && source.error_message && (
-                          <div style={{ fontSize: 12, color: '#fca5a5', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: 'var(--workspace-danger)', marginTop: 2 }}>
                             {source.error_message}
                             {canManageKB && source.status === 'error' && (
                               <button
@@ -1547,7 +1547,7 @@ export function KnowledgePanel() {
                                 style={{
                                   marginLeft: 8, padding: 0, background: 'transparent', border: 'none',
                                   fontSize: 12, fontFamily: 'inherit', fontWeight: 600,
-                                  color: '#7aa2f7', textDecoration: 'underline', cursor: 'pointer',
+                                  color: 'var(--workspace-info)', textDecoration: 'underline', cursor: 'pointer',
                                 }}
                               >
                                 Try again
@@ -1556,7 +1556,7 @@ export function KnowledgePanel() {
                           </div>
                         )}
                         {!isRenaming && isPartial && (
-                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: 'var(--workspace-warning)', marginTop: 2 }}>
                             Only part of this document is indexed — {source.ingestion_warning_text}. Answers from it cover a fraction of the file.
                           </div>
                         )}
@@ -1569,9 +1569,9 @@ export function KnowledgePanel() {
                           // opening the original.
                           const cur = describeSourceCurrency(source.currency)
                           const hash = source.currency?.content_hash
-                          const toneColor = cur?.tone === 'warn' ? '#fbbf24' : cur?.tone === 'error' ? '#ef4444' : '#b8bec7'
+                          const toneColor = cur?.tone === 'warn' ? 'var(--workspace-warning)' : cur?.tone === 'error' ? 'var(--workspace-danger)' : 'var(--workspace-muted)'
                           return (
-                            <div style={{ fontSize: 12, color: '#b8bec7', marginTop: 2 }} data-testid="source-currency">
+                            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }} data-testid="source-currency">
                               {source.chunk_count} chunks
                               {!cur && ' · Freshness not recorded'}
                               {cur && (
@@ -1603,12 +1603,12 @@ export function KnowledgePanel() {
                           )
                         })()}
                         {!isRenaming && (source.status === 'processing' || source.status === 'pending') && (
-                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: 'var(--workspace-warning)', marginTop: 2 }}>
                             {inFlightText(source.status, reprocessing[source.uuid]?.mode)}
                           </div>
                         )}
                         {!isRenaming && isTruncated && (
-                          <div style={{ fontSize: 12, color: '#fbbf24', marginTop: 2 }}>
+                          <div style={{ fontSize: 12, color: 'var(--workspace-warning)', marginTop: 2 }}>
                             Page too long — text was cut off; later sections aren’t in this source.
                           </div>
                         )}
@@ -1624,7 +1624,7 @@ export function KnowledgePanel() {
                             title="Save name"
                             style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
                           >
-                            <Check size={14} style={{ color: '#22c55e' }} />
+                            <Check size={14} style={{ color: 'var(--workspace-success)' }} />
                           </button>
                           <button
                             type="button"
@@ -1634,7 +1634,7 @@ export function KnowledgePanel() {
                             title="Cancel"
                             style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
                           >
-                            <X size={14} style={{ color: '#b8bec7' }} />
+                            <X size={14} style={{ color: 'var(--workspace-muted)' }} />
                           </button>
                         </>
                       ) : (
@@ -1659,7 +1659,7 @@ export function KnowledgePanel() {
                                 title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                               >
-                                <Pencil size={12} style={{ color: '#b8bec7' }} />
+                                <Pencil size={12} style={{ color: 'var(--workspace-muted)' }} />
                               </button>
                               {source.source_type === 'url' && (
                                 <button
@@ -1674,7 +1674,7 @@ export function KnowledgePanel() {
                                   }
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                                 >
-                                  <RefreshCw size={12} style={{ color: '#b8bec7' }} />
+                                  <RefreshCw size={12} style={{ color: 'var(--workspace-muted)' }} />
                                 </button>
                               )}
                               {source.source_type === 'document' && (
@@ -1689,7 +1689,7 @@ export function KnowledgePanel() {
                                   }
                                   style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                                 >
-                                  <RotateCcw size={12} style={{ color: '#b8bec7' }} />
+                                  <RotateCcw size={12} style={{ color: 'var(--workspace-muted)' }} />
                                 </button>
                               )}
                               <button
@@ -1700,7 +1700,7 @@ export function KnowledgePanel() {
                                 title="Remove source"
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                               >
-                                <X size={12} style={{ color: '#aeb5bf' }} />
+                                <X size={12} style={{ color: 'var(--workspace-muted)' }} />
                               </button>
                             </>
                           )}
@@ -1744,21 +1744,21 @@ export function KnowledgePanel() {
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-                  color: '#9ca3af',
-                  backgroundColor: '#262626',
-                  border: '1px solid #3a3a3a',
+                  color: 'var(--workspace-muted)',
+                  backgroundColor: 'var(--workspace-surface)',
+                  border: '1px solid var(--workspace-border)',
                   borderRadius: 999, cursor: 'pointer',
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor = '#2f2f2f'
-                  e.currentTarget.style.color = '#e5e7eb'
-                  e.currentTarget.style.borderColor = '#4a4a4a'
+                  e.currentTarget.style.backgroundColor = 'var(--workspace-hover)'
+                  e.currentTarget.style.color = 'var(--workspace-text)'
+                  e.currentTarget.style.borderColor = 'var(--workspace-border)'
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor = '#262626'
-                  e.currentTarget.style.color = '#9ca3af'
-                  e.currentTarget.style.borderColor = '#3a3a3a'
+                  e.currentTarget.style.backgroundColor = 'var(--workspace-surface)'
+                  e.currentTarget.style.color = 'var(--workspace-muted)'
+                  e.currentTarget.style.borderColor = 'var(--workspace-border)'
                 }}
               >
                 <HelpCircle size={13} />
@@ -1803,17 +1803,17 @@ export function KnowledgePanel() {
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
           }}>
             <div style={{
-              backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 400,
-              border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
+              backgroundColor: 'var(--workspace-canvas)', borderRadius: 12, padding: 24, width: 400,
+              border: '1px solid var(--workspace-border)', maxHeight: '80vh', overflowY: 'auto',
             }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 8 }}>
                 Organization Visibility
               </div>
-              <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 16 }}>
                 No orgs selected = visible to everyone. Selected orgs restrict visibility to users in those orgs and below.
               </div>
               {allOrgs.length === 0 ? (
-                <div style={{ fontSize: 13, color: '#b8bec7', padding: '20px 0', textAlign: 'center' }}>
+                <div style={{ fontSize: 13, color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
                   No organizations available. Set up the org hierarchy in the admin page.
                 </div>
               ) : (
@@ -1824,10 +1824,10 @@ export function KnowledgePanel() {
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 10px', borderRadius: 6,
-                        backgroundColor: selectedOrgIds.includes(org.uuid) ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
+                        backgroundColor: selectedOrgIds.includes(org.uuid) ? 'rgba(37, 99, 235, 0.1)' : 'var(--workspace-surface)',
                         border: selectedOrgIds.includes(org.uuid)
                           ? '1px solid rgba(37, 99, 235, 0.3)'
-                          : '1px solid #3a3a3a',
+                          : '1px solid var(--workspace-border)',
                         cursor: 'pointer',
                       }}
                     >
@@ -1844,8 +1844,8 @@ export function KnowledgePanel() {
                         style={{ accentColor: '#2563eb' }}
                       />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>{org.name}</div>
-                        <div style={{ fontSize: 12, color: '#b8bec7' }}>{org.org_type}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>{org.name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>{org.org_type}</div>
                       </div>
                     </label>
                   ))}
@@ -1856,7 +1856,7 @@ export function KnowledgePanel() {
                   onClick={() => setShowOrgsModal(false)}
                   style={{
                     padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                    color: '#aaa', backgroundColor: 'transparent', border: '1px solid #3a3a3a',
+                    color: 'var(--workspace-muted)', backgroundColor: 'transparent', border: '1px solid var(--workspace-border)',
                     borderRadius: 6, cursor: 'pointer',
                   }}
                 >
@@ -1900,8 +1900,8 @@ export function KnowledgePanel() {
   // List view
   return (
     <>
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', overflowY: 'auto' }}>
-      <WorkspaceSectionHeader title="Knowledge" dark help={<ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />} actions={
+    <div className="knowledge-surface" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--workspace-canvas)', overflowY: 'auto' }}>
+      <WorkspaceSectionHeader title="Knowledge" help={<ExplainerPill tone="light" label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />} actions={
 activeTab === 'mine' && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input
@@ -1927,9 +1927,9 @@ activeTab === 'mine' && (
                 fontSize: 13,
                 fontWeight: 600,
                 fontFamily: 'inherit',
-                color: '#e5e5e5',
-                backgroundColor: '#2a2a2a',
-                border: '1px solid #3a3a3a',
+                color: 'var(--workspace-text)',
+                backgroundColor: 'var(--workspace-surface)',
+                border: '1px solid var(--workspace-border)',
                 borderRadius: 6,
                 cursor: importing ? 'default' : 'pointer',
                 opacity: importing ? 0.6 : 1,
@@ -1969,8 +1969,8 @@ activeTab === 'mine' && (
         aria-label="Knowledge base views"
         style={{
           display: 'flex', gap: 0,
-          borderBottom: '1px solid #3a3a3a',
-          backgroundColor: 'var(--color-panel-dark)',
+          borderBottom: '1px solid var(--workspace-border)',
+          backgroundColor: 'var(--workspace-surface)',
           flexShrink: 0,
         }}
       >
@@ -1992,7 +1992,7 @@ activeTab === 'mine' && (
               fontSize: 12,
               fontWeight: 600,
               fontFamily: 'inherit',
-              color: activeTab === tab.key ? '#fff' : '#b8bec7',
+              color: activeTab === tab.key ? 'var(--workspace-text)' : 'var(--workspace-muted)',
               backgroundColor: 'transparent',
               border: 'none',
               borderBottom: activeTab === tab.key ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
@@ -2005,21 +2005,21 @@ activeTab === 'mine' && (
         ))}
       </div>
 
-      <SavedScopeHint scope={activeTab} kind="knowledge bases" dark />
+      <SavedScopeHint scope={activeTab} kind="knowledge bases" />
       {/* Project scope bar — flip between KBs pinned to this project and all of
           them. Only meaningful on the My/Team grids (Explore is the catalog). */}
       {activeProjectUuid && activeTab !== 'explore' && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '7px 12px',
-          backgroundColor: '#202020',
-          borderBottom: '1px solid #2f2f2f',
+          backgroundColor: 'var(--workspace-surface)',
+          borderBottom: '1px solid var(--workspace-border)',
           flexShrink: 0,
         }}>
-          <FolderKanban size={13} style={{ color: 'var(--highlight-color, #eab308)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <FolderKanban size={13} style={{ color: 'var(--workspace-accent-ink)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {projectScoped
-              ? <>Pinned to <strong style={{ color: '#ddd' }}>{activeProjectTitle}</strong></>
+              ? <>Pinned to <strong style={{ color: 'var(--workspace-text)' }}>{activeProjectTitle}</strong></>
               : <>All knowledge bases</>}
           </span>
           <button
@@ -2027,8 +2027,8 @@ activeTab === 'mine' && (
             style={{
               marginLeft: 'auto', flexShrink: 0,
               padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#ccc', backgroundColor: 'transparent',
-              border: '1px solid #3a3a3a', borderRadius: 12, cursor: 'pointer',
+              color: 'var(--workspace-text)', backgroundColor: 'transparent',
+              border: '1px solid var(--workspace-border)', borderRadius: 12, cursor: 'pointer',
             }}
           >
             {projectScoped ? 'Show all' : 'Show project only'}
@@ -2065,7 +2065,7 @@ activeTab === 'mine' && (
           {isProjectScoped && projectPins.error ? (
             <div role="alert" style={{ color: '#991b1b', background: '#fef2f2', padding: 12, borderRadius: 8 }}>Could not load this project's knowledge bases. <button type="button" onClick={() => void projectPins.refresh()}>Retry project knowledge bases</button></div>
           ) : isProjectScoped && projectPins.loading ? (
-            <p role="status" style={{ color: '#e5e5e5' }}>Loading project knowledge bases…</p>
+            <p role="status" style={{ color: 'var(--workspace-text)' }}>Loading project knowledge bases…</p>
           ) : <KBGridView
             scope={listScope}
             search={search}
@@ -2191,7 +2191,7 @@ function KBTagsEditor({
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Tags</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 8 }}>Tags</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
         {tags.map(t => (
           <span
@@ -2199,8 +2199,8 @@ function KBTagsEditor({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 12, fontWeight: 600, padding: '2px 4px 2px 8px', borderRadius: 8,
-              color: '#cbd5e1', backgroundColor: '#2f2f2f',
-              border: '1px solid #3a3a3a',
+              color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-hover)',
+              border: '1px solid var(--workspace-border)',
             }}
           >
             {t}
@@ -2214,7 +2214,7 @@ function KBTagsEditor({
                 style={{
                   background: 'transparent', border: 'none',
                   cursor: saving ? 'default' : 'pointer',
-                  padding: 0, display: 'flex', color: '#b8bec7',
+                  padding: 0, display: 'flex', color: 'var(--workspace-muted)',
                 }}
               >
                 <X size={11} />
@@ -2242,8 +2242,8 @@ function KBTagsEditor({
             maxLength={50}
             style={{
               minWidth: 100, fontSize: 12, fontFamily: 'inherit',
-              color: '#e5e5e5', backgroundColor: '#1a1a1a',
-              border: '1px solid #333', borderRadius: 6,
+              color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+              border: '1px solid var(--workspace-border)', borderRadius: 6,
               padding: '3px 8px',
             }}
           />

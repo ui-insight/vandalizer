@@ -45,8 +45,8 @@ export function OptimizationHistoryPanel({
 
   return (
     <div style={{
-      backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
       overflow: 'hidden',
     }}>
       <button
@@ -55,15 +55,15 @@ export function OptimizationHistoryPanel({
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
-          fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
+          fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#888' }} /> : <ChevronRight size={14} style={{ color: '#888' }} />}
-        <History size={14} style={{ color: '#888' }} />
+        {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
+        <History size={14} style={{ color: 'var(--workspace-muted)' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -72,15 +72,15 @@ export function OptimizationHistoryPanel({
       {open && (
         <div style={{ padding: '0 12px 12px 12px' }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: '#888' }}>
+            <div style={{ textAlign: 'center', padding: 16, color: 'var(--workspace-muted)' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: '#fca5a5', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 12, color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ fontSize: 12, color: '#888', padding: '12px 8px' }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '12px 8px' }}>
               No prior optimization runs for this KB.
             </div>
           )}
@@ -126,7 +126,7 @@ function HistoryRow({
       style={{
         display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
         padding: '7px 10px',
-        background: '#1a1a1a', border: '1px solid #2a2a2a',
+        background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
         borderRadius: 5,
       }}
     >
@@ -137,21 +137,21 @@ function HistoryRow({
           flex: '1 1 220px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minHeight: 36,
           background: 'transparent', border: 'none', padding: 0,
           cursor: onSelect ? 'pointer' : 'default',
-          fontFamily: 'inherit', color: '#e5e5e5', textAlign: 'left',
+          fontFamily: 'inherit', color: 'var(--workspace-text)', textAlign: 'left',
         }}
       >
         <StatusDot status={run.status} />
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{
-            fontSize: 12, color: '#ddd',
+            fontSize: 12, color: 'var(--workspace-text)',
             overflowWrap: 'anywhere',
           }}>
             {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
-            <span style={{ color: '#aaa' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
-            {run.options?.apply_on_finish ? <span style={{ color: '#a78bfa' }}> · auto-applied</span> : null}
+            <span style={{ color: 'var(--workspace-muted)' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
+            {run.options?.apply_on_finish ? <span style={{ color: 'var(--workspace-info)' }}> · auto-applied</span> : null}
           </div>
           <div style={{
-            fontSize: 12, color: '#aaa',
+            fontSize: 12, color: 'var(--workspace-muted)',
             overflowWrap: 'anywhere', marginTop: 1,
           }}>
             {run.judge_model && <>judge: {run.judge_model}</>}
@@ -162,7 +162,7 @@ function HistoryRow({
           </div>
           {run.error_message && run.status === 'failed' && (
             <div style={{
-              fontSize: 12, color: '#fca5a5',
+              fontSize: 12, color: 'var(--workspace-danger)',
               overflowWrap: 'anywhere', marginTop: 1,
             }}>
               {run.error_message}
@@ -177,7 +177,7 @@ function HistoryRow({
         {lift != null && (
           <span style={{
             fontSize: 12,
-            color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#aaa',
+            color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
             minWidth: 50, textAlign: 'right',
           }}>
             {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts
@@ -191,7 +191,7 @@ function HistoryRow({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
             minHeight: 36, padding: '4px 8px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            color: '#a78bfa', background: 'transparent',
+            color: 'var(--workspace-info)', background: 'transparent',
             border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 4,
             cursor: 'pointer',
           }}

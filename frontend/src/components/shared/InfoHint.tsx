@@ -101,9 +101,9 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
   }
 
   const isDark = theme === 'dark'
-  const tipBg = isDark ? '#1f1f2e' : '#fff'
-  const tipBorder = isDark ? '#3a3a4a' : '#d1d5db'
-  const tipText = isDark ? '#e5e5e5' : '#1f2937'
+  const tipBg = isDark ? '#1f1f2e' : 'var(--workspace-text)'
+  const tipBorder = isDark ? '#3a3a4a' : 'var(--workspace-border)'
+  const tipText = isDark ? 'var(--workspace-text)' : '#1f2937'
 
   return (
     <span ref={wrapRef} style={{ display: 'inline-flex' }}>
@@ -126,10 +126,10 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
         aria-expanded={open}
         aria-label={label}
         style={{
-          fontSize: 11, color: isDark ? '#888' : '#6b7280',
+          fontSize: 11, color: isDark ? 'var(--workspace-muted)' : '#6b7280',
           cursor: 'help', userSelect: 'none',
           background: 'transparent',
-          border: `1px solid ${isDark ? '#444' : '#9ca3af'}`,
+          border: `1px solid ${isDark ? 'var(--workspace-border)' : 'var(--workspace-border)'}`,
           borderRadius: '50%',
           width: 14, height: 14, padding: 0, lineHeight: '12px',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',

@@ -312,7 +312,7 @@ export function KBTestQueriesTab({
 
   return (
     <div>
-      {actionError && <div role="alert" style={{ color: '#fca5a5', fontSize: 13, lineHeight: 1.6, marginBottom: 12, overflowWrap: 'anywhere' }}>{actionError}</div>}
+      {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 13, lineHeight: 1.6, marginBottom: 12, overflowWrap: 'anywhere' }}>{actionError}</div>}
       {/* Action bar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
         <button
@@ -328,7 +328,7 @@ export function KBTestQueriesTab({
           type="button"
           onClick={() => setShowImport(true)}
           disabled={!!disabledReason}
-          style={btn(!disabledReason, '#0ea5e9')}
+          style={btn(!disabledReason, 'var(--workspace-info)')}
           title={disabledReason || 'Bulk-import test queries from a CSV or Excel file'}
         >
           <Upload size={12} aria-hidden="true" />
@@ -338,7 +338,7 @@ export function KBTestQueriesTab({
           type="button"
           onClick={() => setShowGen(true)}
           disabled={!!disabledReason || generating}
-          style={btn(!disabledReason && !generating, '#7c3aed')}
+          style={btn(!disabledReason && !generating, 'var(--workspace-info)')}
           title={disabledReason || 'Auto-generate test queries from KB content'}
         >
           {generating ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
@@ -350,7 +350,7 @@ export function KBTestQueriesTab({
       {showAdd && (
         <div style={{
           padding: 10, marginBottom: 10,
-          backgroundColor: '#252525', border: '1px solid #333', borderRadius: 6,
+          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
           display: 'flex', flexDirection: 'column', gap: 8,
         }}>
           <QueryFormFields draft={draft} onChange={setDraft} disabled={adding} />
@@ -369,12 +369,12 @@ export function KBTestQueriesTab({
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
           padding: '6px 8px', marginBottom: 8,
-          backgroundColor: '#222', border: '1px solid #333', borderRadius: 6,
+          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
         }}>
           {canManage && (
             <label style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 12, color: '#bbb', cursor: visible.length ? 'pointer' : 'default',
+              fontSize: 12, color: 'var(--workspace-muted)', cursor: visible.length ? 'pointer' : 'default',
             }}>
               <input
                 type="checkbox"
@@ -400,9 +400,9 @@ export function KBTestQueriesTab({
                   aria-pressed={active}
                   style={{
                     padding: '3px 8px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                    color: active ? '#e5e5e5' : '#b8bec7',
-                    backgroundColor: active ? '#333' : 'transparent',
-                    border: `1px solid ${active ? '#4a4a4a' : 'transparent'}`,
+                    color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+                    backgroundColor: active ? 'var(--workspace-surface)' : 'transparent',
+                    border: `1px solid ${active ? 'var(--workspace-border)' : 'transparent'}`,
                     borderRadius: 5, cursor: 'pointer',
                   }}
                 >
@@ -413,7 +413,7 @@ export function KBTestQueriesTab({
           </div>
 
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-            <Search size={12} style={{ color: '#b8bec7', flexShrink: 0 }} aria-hidden="true" />
+            <Search size={12} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} aria-hidden="true" />
             <input
               type="search"
               value={search}
@@ -422,15 +422,15 @@ export function KBTestQueriesTab({
               aria-label="Search test queries by ID, question, category, source or notes"
               style={{
                 width: 190, padding: '3px 6px', fontSize: 12, fontFamily: 'inherit',
-                color: '#e5e5e5', backgroundColor: '#1a1a1a',
-                border: '1px solid #333', borderRadius: 5,
+                color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+                border: '1px solid var(--workspace-border)', borderRadius: 5,
               }}
             />
           </label>
 
           {canManage && selectedCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: '#b8bec7' }} role="status">
+              <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }} role="status">
                 {selectedCount} selected
               </span>
               <button
@@ -438,7 +438,7 @@ export function KBTestQueriesTab({
                 onClick={() => setSelected(new Set())}
                 style={{
                   background: 'transparent', border: 'none', padding: 0,
-                  fontSize: 12, fontFamily: 'inherit', color: '#b8bec7',
+                  fontSize: 12, fontFamily: 'inherit', color: 'var(--workspace-muted)',
                   textDecoration: 'underline', cursor: 'pointer',
                 }}
               >
@@ -466,7 +466,7 @@ export function KBTestQueriesTab({
                 type="button"
                 onClick={handleDeleteSelected}
                 disabled={busy}
-                style={btn(!bulkDeleting, '#dc2626')}
+                style={btn(!bulkDeleting, 'var(--workspace-danger)')}
               >
                 {bulkDeleting
                   ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
@@ -480,23 +480,23 @@ export function KBTestQueriesTab({
 
       {/* Queries list */}
       {queries.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: '#b8bec7', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
           No test queries yet. Add some manually or auto-generate from KB content.
         </div>
       ) : visible.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: '#b8bec7', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
           No {FILTER_LABELS[filter].toLowerCase()} test queries{search.trim() ? ` match “${search.trim()}”` : ''}.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {visible.length > 50 && <p style={{ fontSize: 12, color: '#b8bec7', margin: '4px 0' }}>Showing {Math.min(displayLimit, visible.length)} of {visible.length} matching questions. Select all includes every matching question.</p>}
+          {visible.length > 50 && <p style={{ fontSize: 12, color: 'var(--workspace-muted)', margin: '4px 0' }}>Showing {Math.min(displayLimit, visible.length)} of {visible.length} matching questions. Select all includes every matching question.</p>}
           {visible.slice(0, displayLimit).map(q => (
             <div
               key={q.uuid}
               style={{
                 padding: 10,
-                backgroundColor: selected.has(q.uuid) ? '#2b3140' : '#262626',
-                border: `1px solid ${selected.has(q.uuid) ? '#3b82f6' : '#333'}`,
+                backgroundColor: selected.has(q.uuid) ? 'var(--workspace-info-surface)' : 'var(--workspace-surface)',
+                border: `1px solid ${selected.has(q.uuid) ? '#3b82f6' : 'var(--workspace-border)'}`,
                 borderRadius: 6,
               }}
             >
@@ -522,18 +522,18 @@ export function KBTestQueriesTab({
                     />
                   )}
                   {q.auto_generated ? (
-                    <Bot size={13} style={{ color: '#7c3aed', flexShrink: 0, marginTop: 2 }} aria-label="Auto-generated" />
+                    <Bot size={13} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 2 }} aria-label="Auto-generated" />
                   ) : (
-                    <User size={13} style={{ color: '#b8bec7', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
+                    <User size={13} style={{ color: 'var(--workspace-muted)', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: '#e5e5e5', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginBottom: 4 }}>
                       {q.external_id && (
                         <code
                           title="Question ID — assigned once and kept across validation runs and exports; regenerating creates new IDs"
                           style={{
                             fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                            color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+                            color: 'var(--workspace-info)', backgroundColor: 'var(--workspace-info-surface)',
                             padding: '1px 5px', borderRadius: 4, marginRight: 8, whiteSpace: 'nowrap',
                           }}
                         >
@@ -543,16 +543,16 @@ export function KBTestQueriesTab({
                       {q.query}
                     </div>
                     {q.expected_answer && (
-                      <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 2 }}>
-                        <span style={{ color: '#b8bec7' }}>Expected: </span>{q.expected_answer}
+                      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 2 }}>
+                        <span style={{ color: 'var(--workspace-muted)' }}>Expected: </span>{q.expected_answer}
                       </div>
                     )}
                     {q.notes && (
-                      <div style={{ fontSize: 12, color: '#b8bec7', marginBottom: 2, fontStyle: 'italic' }}>
-                        <span style={{ color: '#b8bec7', fontStyle: 'normal' }}>Notes: </span>{q.notes}
+                      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 2, fontStyle: 'italic' }}>
+                        <span style={{ color: 'var(--workspace-muted)', fontStyle: 'normal' }}>Notes: </span>{q.notes}
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 8, fontSize: 12, color: '#b8bec7', marginTop: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--workspace-muted)', marginTop: 4, flexWrap: 'wrap' }}>
                       {q.category && <span>· {q.category}</span>}
                       {q.import_batch_label && (
                         <span title={q.import_batch_at ? `Imported ${new Date(q.import_batch_at).toLocaleString()}` : undefined}>
@@ -575,7 +575,7 @@ export function KBTestQueriesTab({
                         type="button"
                         onClick={() => startEdit(q)}
                         disabled={busy}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
                         title="Edit"
                         aria-label="Edit test query"
                       >
@@ -585,7 +585,7 @@ export function KBTestQueriesTab({
                         type="button"
                         onClick={() => handleDelete(q)}
                         disabled={busy}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
                         title="Delete"
                         aria-label="Delete test query"
                       >
@@ -677,18 +677,18 @@ export function QueryFormFields({ draft, onChange, disabled = false }: { draft: 
 }
 
 function scoreColor(score: number) {
-  if (score >= 0.7) return '#22c55e'
-  if (score >= 0.4) return '#f59e0b'
-  return '#ef4444'
+  if (score >= 0.7) return 'var(--workspace-success)'
+  if (score >= 0.4) return 'var(--workspace-warning)'
+  return 'var(--workspace-danger)'
 }
 
 function btn(enabled: boolean, color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? '#e5e5e5' : '#555',
-    backgroundColor: color ? `${color}1a` : '#2a2a2a',
-    border: `1px solid ${color ? `${color}55` : '#3a3a3a'}`,
+    color: enabled ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+    backgroundColor: color ? `color-mix(in srgb, ${color} 10.2%, transparent)` : 'var(--workspace-surface)',
+    border: `1px solid ${color ? `color-mix(in srgb, ${color} 33.33%, transparent)` : 'var(--workspace-border)'}`,
     borderRadius: 5,
     cursor: enabled ? 'pointer' : 'not-allowed',
     opacity: enabled ? 1 : 0.5,
@@ -697,8 +697,8 @@ function btn(enabled: boolean, color?: string): React.CSSProperties {
 
 function input(): React.CSSProperties {
   return {
-    background: '#1a1a1a', color: '#e5e5e5',
-    border: '1px solid #333', borderRadius: 4,
+    background: 'var(--workspace-canvas)', color: 'var(--workspace-text)',
+    border: '1px solid var(--workspace-border)', borderRadius: 4,
     padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
   }
 }

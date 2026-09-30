@@ -173,9 +173,9 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
             recommendationReason={recommendationReason(opts.noKbScore, { withoutLabel: 'without the KB' })}
             description="Each candidate uses model tokens. Choose a spending limit for this experiment. More trials may help, but results depend on your test questions and are not guaranteed."
           />
-          <p style={{ fontSize: 13, lineHeight: 1.6, color: '#ccc', marginTop: 16 }}>{opts.sampleQueryIds.length} reviewed questions · {tokens_label}{cost_label ? ` · ${cost_label}` : ' · Dollar estimate unavailable for this model'}. You review the results before applying changes unless you enable automatic application below.</p>
-          <p style={{ fontSize: 13, lineHeight: 1.6, color: '#ccc' }}>Grader: {grader?.model || 'details unavailable'}. Time: {KB_BUDGET_TIERS.find(t => t.id === opts.tier)?.timeEstimate || 'no estimate for a custom budget'}{opts.tier !== 'custom' && ' (approximate)'}. Queue, models and question length affect duration. Results cover this reviewed test set; more trials do not guarantee improvement.</p>
-          <details style={{ marginTop: 16, color: '#ddd', fontSize: 13 }}><summary style={{ cursor: 'pointer' }}>Optional settings</summary><AdvancedStep applyOnFinish={opts.applyOnFinish} onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))} tokensLabel={tokens_label} costLabel={cost_label} /></details>
+          <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--workspace-text)', marginTop: 16 }}>{opts.sampleQueryIds.length} reviewed questions · {tokens_label}{cost_label ? ` · ${cost_label}` : ' · Dollar estimate unavailable for this model'}. You review the results before applying changes unless you enable automatic application below.</p>
+          <p style={{ fontSize: 13, lineHeight: 1.6, color: 'var(--workspace-text)' }}>Grader: {grader?.model || 'details unavailable'}. Time: {KB_BUDGET_TIERS.find(t => t.id === opts.tier)?.timeEstimate || 'no estimate for a custom budget'}{opts.tier !== 'custom' && ' (approximate)'}. Queue, models and question length affect duration. Results cover this reviewed test set; more trials do not guarantee improvement.</p>
+          <details style={{ marginTop: 16, color: 'var(--workspace-text)', fontSize: 13 }}><summary style={{ cursor: 'pointer' }}>Optional settings</summary><AdvancedStep applyOnFinish={opts.applyOnFinish} onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))} tokensLabel={tokens_label} costLabel={cost_label} /></details>
           </>
         )
       },
@@ -282,9 +282,9 @@ function TestSetStep({
   ]
 
   return (
-    <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>How should we build the test set?</h4>
-      <p style={{ margin: '0 0 12px 0', color: '#bbb' }}>
+    <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>How should we build the test set?</h4>
+      <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)' }}>
         Test questions represent what people should be able to ask. Expected answers give the grader a reference; expected sources identify the supporting information. Tuning compares settings against this test set. <b>Review generated questions and their expectations before continuing</b>.
       </p>
       <button
@@ -292,7 +292,7 @@ function TestSetStep({
         onClick={() => setShowExample(v => !v)}
         style={{
           marginBottom: 10, padding: 0, background: 'transparent', border: 'none',
-          color: 'var(--highlight-color, #eab308)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+          color: 'var(--workspace-accent-ink)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
           cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
         }}
         aria-expanded={showExample}
@@ -302,12 +302,12 @@ function TestSetStep({
       {showExample && (
         <div style={{
           padding: '8px 10px', marginBottom: 10,
-          background: '#181818', border: '1px solid #2a2a2a', borderRadius: 6,
-          fontSize: 12, color: '#ccc', lineHeight: 1.6,
+          background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.6,
         }}>
-          <div><span style={{ color: '#b8bec7' }}>Question:</span> Who is the principal investigator on the Reed grant?</div>
-          <div style={{ marginTop: 4 }}><span style={{ color: '#b8bec7' }}>Expected answer:</span> Dr. Maria Reed</div>
-          <div style={{ marginTop: 6, fontSize: 12, color: '#b8bec7' }}>
+          <div><span style={{ color: 'var(--workspace-muted)' }}>Question:</span> Who is the principal investigator on the Reed grant?</div>
+          <div style={{ marginTop: 4 }}><span style={{ color: 'var(--workspace-muted)' }}>Expected answer:</span> Dr. Maria Reed</div>
+          <div style={{ marginTop: 6, fontSize: 12, color: 'var(--workspace-muted)' }}>
             The grader compares the AI's answer with this reference. Check that the expected answer is correct and supported by a source.
           </div>
         </div>
@@ -324,17 +324,17 @@ function TestSetStep({
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px', textAlign: 'left',
-                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
-                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : '#333'),
+                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
                 borderRadius: 6, cursor: m.disabled ? 'not-allowed' : 'pointer',
-                fontFamily: 'inherit', color: m.disabled ? '#666' : '#e5e5e5',
+                fontFamily: 'inherit', color: m.disabled ? 'var(--workspace-muted)' : 'var(--workspace-text)',
                 opacity: m.disabled ? 0.6 : 1,
               }}
             >
               <Radio active={active} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 600 }}>{m.title}</div>
-                <div style={{ fontSize: 12, color: '#b8bec7' }}>{m.sub}</div>
+                <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>{m.sub}</div>
               </div>
             </button>
           )
@@ -343,7 +343,7 @@ function TestSetStep({
 
       {showCoverage && (
         <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, color: '#bbb', marginBottom: 6 }}>How many new questions to generate:</div>
+          <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 6 }}>How many new questions to generate:</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {(['quick', 'standard', 'exhaustive'] as const).map(c => {
               const active = coverage === c
@@ -354,13 +354,13 @@ function TestSetStep({
                   style={{
                     flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
                     padding: '6px 8px', textAlign: 'center',
-                    backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
-                    border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : '#333'),
-                    borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+                    backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+                    border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
+                    borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
                   }}
                 >
                   <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{c}</span>
-                  <span style={{ fontSize: 12, color: '#b8bec7' }}>up to {COVERAGE_COUNTS[c]}</span>
+                  <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>up to {COVERAGE_COUNTS[c]}</span>
                 </button>
               )
             })}
@@ -369,7 +369,7 @@ function TestSetStep({
       )}
 
       {showCoverage && (
-        <p style={{ marginTop: 10, fontSize: 12, color: '#b8bec7' }}>
+        <p style={{ marginTop: 10, fontSize: 12, color: 'var(--workspace-muted)' }}>
           Generated queries are saved to this KB, so future re-runs can reuse them.
         </p>
       )}
@@ -379,7 +379,7 @@ function TestSetStep({
           style={{
             marginTop: 8, fontSize: 12, fontFamily: 'inherit',
             background: 'transparent', border: 'none', padding: 0,
-            color: 'var(--highlight-color, #eab308)', cursor: 'pointer',
+            color: 'var(--workspace-accent-ink)', cursor: 'pointer',
             textDecoration: 'underline dotted', textUnderlineOffset: 2,
           }}
         >
@@ -544,9 +544,9 @@ function PreviewStep({
       : 'Generated test questions'
 
   return (
-    <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>{heading}</h4>
-      <p style={{ margin: '0 0 10px 0', color: '#bbb' }}>
+    <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>{heading}</h4>
+      <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
         {buildMode === 'existing' ? (
           <>We'll grade each tuning trial against these <b>{queries.length}</b> questions using a <TermDef term="judge">judge</TermDef>.</>
         ) : (
@@ -554,22 +554,22 @@ function PreviewStep({
         )}
       </p>
       {buildMode === 'combined' && composition && composition.generated > 0 && (
-        <div style={{ margin: '0 0 10px 0', fontSize: 12, color: 'var(--highlight-color, #eab308)' }}>
+        <div style={{ margin: '0 0 10px 0', fontSize: 12, color: 'var(--workspace-accent-ink)' }}>
           {composition.existing} saved + {composition.generated} generated = <b>{queries.length}</b> total
         </div>
       )}
       {actionError && (
-        <div style={{ margin: '0 0 8px 0', fontSize: 12, color: '#f87171' }}>{actionError}</div>
+        <div style={{ margin: '0 0 8px 0', fontSize: 12, color: 'var(--workspace-danger)' }}>{actionError}</div>
       )}
       <div role="region" aria-label="Questions and expectations" tabIndex={0} style={{
         display: 'flex', flexDirection: 'column', gap: 6,
         maxHeight: 260, overflowY: 'auto',
-        padding: 8, backgroundColor: '#181818', border: '1px solid #2a2a2a', borderRadius: 6,
+        padding: 8, backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
       }}>
         {queries.map((q, i) => (
           <div key={q.uuid} style={{
-            padding: '6px 8px', backgroundColor: '#262626', borderRadius: 4,
-            fontSize: 12, color: '#e5e5e5',
+            padding: '6px 8px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
+            fontSize: 12, color: 'var(--workspace-text)',
           }}>
             {editingUuid === q.uuid ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -581,7 +581,7 @@ function PreviewStep({
                     style={{
                       fontSize: 12, fontFamily: 'inherit', padding: '4px 10px', borderRadius: 5,
                       border: '1px solid #15803d55', backgroundColor: '#15803d1a',
-                      color: saving || !editDraft.query.trim() ? '#555' : '#e5e5e5',
+                      color: saving || !editDraft.query.trim() ? 'var(--workspace-muted)' : 'var(--workspace-text)',
                       cursor: saving || !editDraft.query.trim() ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -591,7 +591,7 @@ function PreviewStep({
                     onClick={() => setEditingUuid(null)}
                     style={{
                       fontSize: 12, fontFamily: 'inherit', padding: '4px 10px', borderRadius: 5,
-                      border: '1px solid #3a3a3a', backgroundColor: '#2a2a2a', color: '#e5e5e5', cursor: 'pointer',
+                      border: '1px solid var(--workspace-border)', backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)', cursor: 'pointer',
                     }}
                   >
                     Cancel
@@ -600,7 +600,7 @@ function PreviewStep({
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-                <span style={{ color: '#b8bec7', fontSize: 12, marginTop: 1 }}>{i + 1}.</span>
+                <span style={{ color: 'var(--workspace-muted)', fontSize: 12, marginTop: 1 }}>{i + 1}.</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <QuestionExpectations question={q} />
                 </div>
@@ -609,7 +609,7 @@ function PreviewStep({
                     type="button"
                     aria-label="Edit question"
                     onClick={() => startEdit(q)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
                     title="Edit question"
                   >
                     <Pencil size={12} />
@@ -618,7 +618,7 @@ function PreviewStep({
                     type="button"
                     aria-label="Remove question"
                     onClick={() => handleDelete(q)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
                     title="Remove question"
                   >
                     <Trash2 size={12} />
@@ -629,7 +629,7 @@ function PreviewStep({
           </div>
         ))}
         {queries.length === 0 && (
-          <div style={{ fontSize: 12, color: '#b8bec7', padding: '4px 8px' }}>
+          <div style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '4px 8px' }}>
             No test questions left. Add some on the Test Queries tab before tuning.
           </div>
         )}
@@ -640,7 +640,7 @@ function PreviewStep({
           style={{
             marginTop: 10, fontSize: 12, fontFamily: 'inherit',
             background: 'transparent', border: 'none', padding: 0,
-            color: 'var(--highlight-color, #eab308)', cursor: 'pointer',
+            color: 'var(--workspace-accent-ink)', cursor: 'pointer',
             textDecoration: 'underline dotted', textUnderlineOffset: 2,
           }}
         >
@@ -719,9 +719,9 @@ function BaselineStep({
   // No score (no queries with expected_answer) — give the user a path forward.
   if (noKbScore == null) {
     return (
-      <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>Baseline skipped</h4>
-        <p style={{ margin: '0 0 10px 0', color: '#bbb' }}>
+      <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>Baseline skipped</h4>
+        <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
           We couldn't measure a no-KB <TermDef term="baseline">baseline</TermDef> because none of your test questions have an expected answer yet. Tuning will still measure baselines during the run.
         </p>
       </div>
@@ -730,20 +730,20 @@ function BaselineStep({
 
   const scorePct = Math.round(noKbScore * 100)
   return (
-    <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>How well the model does without your KB</h4>
+    <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>How well the model does without your KB</h4>
       <div style={{
         padding: '14px 16px', marginBottom: 10,
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
         border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#fff' }}>{scorePct}%</span>
-          <span style={{ fontSize: 12, color: '#bbb' }}>
+          <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--workspace-text)' }}>{scorePct}%</span>
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
             average answer grade on a sample of up to five questions <i>without</i> the knowledge base
           </span>
         </div>
-        <div style={{ marginTop: 8, fontSize: 12, color: '#ddd' }}>
+        <div style={{ marginTop: 8, fontSize: 12, color: 'var(--workspace-text)' }}>
           {scorePct >= 85
             ? <>The model scored well on this small sample without the KB. There may be limited room to improve these questions; other questions can behave differently.</>
             : scorePct >= 60
@@ -755,7 +755,7 @@ function BaselineStep({
         onClick={() => setWhyOpen(v => !v)}
         style={{
           background: 'transparent', border: 'none', padding: 0,
-          fontSize: 12, color: '#b8bec7', fontFamily: 'inherit', cursor: 'pointer',
+          fontSize: 12, color: 'var(--workspace-muted)', fontFamily: 'inherit', cursor: 'pointer',
           textDecoration: 'underline dotted', textUnderlineOffset: 2,
         }}
       >
@@ -763,14 +763,14 @@ function BaselineStep({
       </button>
       {whyOpen && (
         <div style={{
-          marginTop: 8, padding: '8px 10px', fontSize: 12, color: '#aaa', lineHeight: 1.5,
-          backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 6,
+          marginTop: 8, padding: '8px 10px', fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
         }}>
           This asks the same questions without retrieving KB sources, then grades the answers against your expectations. Comparing those grades with KB-assisted answers helps measure the KB's contribution. Retrieval checks measure which sources were found; answer grades measure what the model said. This small sample guides a budget suggestion and does not establish performance on all your questions.
         </div>
       )}
       {recommendedTier && (
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--highlight-color, #eab308)' }}>
+        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--workspace-accent-ink)' }}>
           Suggested budget: <b style={{ textTransform: 'capitalize' }}>{recommendedTier}</b>{' '}
           (you can change this on the next step).
         </div>
@@ -793,8 +793,8 @@ function AdvancedStep({
   costLabel: string | null
 }) {
   return (
-    <div style={{ fontSize: 13, color: '#ccc' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>Advanced options</h4>
+    <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>Advanced options</h4>
       <Toggle
         label="Apply optimized settings automatically when finished"
         description="If unchecked, we'll show you the results and you can apply them manually."
@@ -806,10 +806,10 @@ function AdvancedStep({
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
         border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
       }}>
-        <div style={{ fontSize: 12, color: 'var(--highlight-color, #eab308)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 12, color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Ready to start
         </div>
-        <div style={{ fontSize: 13, color: '#e5e5e5' }}>
+        <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
           Budget: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
         </div>
       </div>

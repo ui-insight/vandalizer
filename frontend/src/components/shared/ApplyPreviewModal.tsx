@@ -95,8 +95,8 @@ export function ApplyPreviewModal({
         style={{
           width: 'min(640px, 92vw)',
           maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden', overflowWrap: 'anywhere',
-          background: '#1a1a1a',
-          border: '1px solid #2e2e2e',
+          background: 'var(--workspace-canvas)',
+          border: '1px solid var(--workspace-border)',
           borderRadius: 10,
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
@@ -104,11 +104,11 @@ export function ApplyPreviewModal({
       >
         <header style={{
           padding: '12px 18px', flexShrink: 0,
-          borderBottom: '1px solid #2e2e2e',
+          borderBottom: '1px solid var(--workspace-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)' }}>
               Confirm apply
             </span>
           </div>
@@ -117,7 +117,7 @@ export function ApplyPreviewModal({
             onClick={onCancel}
             disabled={applying}
             style={{
-              background: 'transparent', border: 'none', color: '#aeb5bf',
+              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
               cursor: applying ? 'not-allowed' : 'pointer', padding: 4, minWidth: 36, minHeight: 36,
             }}
           >
@@ -129,48 +129,48 @@ export function ApplyPreviewModal({
         {/* Summary chips */}
         <div style={{ padding: '14px 18px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <SummaryChip
-            color="#a78bfa"
+            color="var(--workspace-info)"
             label={`${preview.will_change} of ${preview.total} ${itemNounPlural} will change`}
           />
           <SummaryChip
             icon={<CheckCircle2 size={11} />}
-            color="#22c55e"
+            color="var(--workspace-success)"
             label={`${preview.improvements} improve`}
           />
           <SummaryChip
             icon={<MinusCircle size={11} />}
-            color={preview.regressions > 0 ? '#f97316' : '#888'}
+            color={preview.regressions > 0 ? 'var(--workspace-warning)' : 'var(--workspace-muted)'}
             label={`${preview.regressions} regress`}
           />
           {preview.significant_regressions > 0 && (
             <SummaryChip
               icon={<AlertTriangle size={11} />}
-              color="#fca5a5"
+              color="var(--workspace-danger)"
               label={`${preview.significant_regressions} > judge noise`}
             />
           )}
           <SummaryChip
-            color={preview.net_delta >= 0 ? '#22c55e' : '#fca5a5'}
+            color={preview.net_delta >= 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)'}
             label={`Net Δ ${preview.net_delta >= 0 ? '+' : ''}${(preview.net_delta * 100).toFixed(1)} pts`}
           />
         </div>
 
-        <p style={{ padding: '0 18px', margin: '4px 0 10px', fontSize: 12, color: '#b8bec7', lineHeight: 1.5 }}>These are recorded test scores for the current and proposed settings. Applying changes retrieval settings; it does not guarantee the same scores on future questions.</p>
+        <p style={{ padding: '0 18px', margin: '4px 0 10px', fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>These are recorded test scores for the current and proposed settings. Applying changes retrieval settings; it does not guarantee the same scores on future questions.</p>
         {/* Items table */}
         <div style={{ flexShrink: 0, padding: '4px 18px 12px' }}>
           {sortedItems.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: '#aeb5bf', fontSize: 12 }}>
+            <div style={{ padding: 24, textAlign: 'center', color: 'var(--workspace-muted)', fontSize: 12 }}>
               No per-{itemNoun} detail available for this run.
             </div>
           ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
               {sortedItems.map((item, idx) => (
-                <li key={item.item_id || idx} style={{ padding: 12, color: '#e5e5e5', border: '1px solid #444', borderRadius: 6, background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined }}>
+                <li key={item.item_id || idx} style={{ padding: 12, color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)', borderRadius: 6, background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined }}>
                   <p style={{ margin: '0 0 8px', fontSize: 13, lineHeight: 1.5 }}>{item.label || item.item_id || `${capitalize(itemNoun)} ${idx + 1}`}</p>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
                     <span>Current: <strong>{(item.baseline * 100).toFixed(0)}</strong></span>
                     <span>Proposed: <strong>{(item.winner * 100).toFixed(0)}</strong></span>
-                    <span style={{ color: item.within_noise ? '#aaa' : item.is_regression ? '#fca5a5' : '#86efac' }}>Change: {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)} points</span>
+                    <span style={{ color: item.within_noise ? 'var(--workspace-muted)' : item.is_regression ? 'var(--workspace-danger)' : 'var(--workspace-success)' }}>Change: {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)} points</span>
                     {item.significant && !item.within_noise && <span>{item.is_regression ? 'Significant regression' : 'Significant improvement'}</span>}
                   </div>
                 </li>
@@ -182,13 +182,13 @@ export function ApplyPreviewModal({
         {/* Acknowledgement + actions */}
         <div style={{
           padding: '12px 18px',
-          borderTop: '1px solid #2e2e2e',
+          borderTop: '1px solid var(--workspace-border)',
           display: 'flex', flexDirection: 'column', gap: 10,
         }}>
           {requiresAck && (
             <label style={{
               display: 'flex', gap: 8, alignItems: 'flex-start',
-              fontSize: 12, color: '#fbbf24',
+              fontSize: 12, color: 'var(--workspace-warning)',
             }}>
               <input
                 type="checkbox"
@@ -204,18 +204,18 @@ export function ApplyPreviewModal({
               </span>
             </label>
           )}
-          {error && <p ref={errorRef} role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 13, lineHeight: 1.5, color: '#fecaca', background: '#3d1c1c', borderRadius: 6 }}>{error} Review the result and try again.</p>}
+          {error && <p ref={errorRef} role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 13, lineHeight: 1.5, color: 'var(--workspace-danger)', background: 'var(--workspace-danger-surface)', borderRadius: 6 }}>{error} Review the result and try again.</p>}
         </div>
         </div>
-        <footer style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid #444' }}>
+        <footer style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--workspace-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
               onClick={onCancel}
               disabled={applying}
               style={{
                 minHeight: 36, padding: '6px 14px', fontSize: 14, fontWeight: 500,
-                color: '#bbb', background: 'transparent',
-                border: '1px solid #3a3a3a', borderRadius: 6,
+                color: 'var(--workspace-muted)', background: 'transparent',
+                border: '1px solid var(--workspace-border)', borderRadius: 6,
                 cursor: applying ? 'not-allowed' : 'pointer',
               }}
             >
@@ -226,11 +226,11 @@ export function ApplyPreviewModal({
               disabled={!canConfirm}
               style={{
                 minHeight: 36, padding: '6px 14px', fontSize: 14, fontWeight: 600,
-                color: canConfirm ? 'var(--highlight-text-color, #000)' : '#aaa',
+                color: canConfirm ? 'var(--highlight-text-color, #000)' : 'var(--workspace-muted)',
                 background: canConfirm
                   ? 'var(--highlight-color, #eab308)'
-                  : '#222',
-                border: '1px solid ' + (canConfirm ? 'var(--highlight-color, #eab308)' : '#555'),
+                  : 'var(--workspace-surface)',
+                border: '1px solid ' + (canConfirm ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
                 borderRadius: 6,
                 cursor: canConfirm ? 'pointer' : 'not-allowed',
               }}
@@ -253,7 +253,7 @@ function SummaryChip({
       display: 'inline-flex', alignItems: 'center', gap: 4,
       padding: '3px 8px',
       fontSize: 12, color,
-      background: 'rgba(255,255,255,0.03)',
+      background: 'var(--workspace-canvas)',
       border: '1px solid ' + color + '40',
       borderRadius: 999,
     }}>

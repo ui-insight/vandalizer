@@ -15,8 +15,8 @@ export function WizardSteps<T extends string>({ steps, current, labels }: Wizard
           <div key={s} aria-current={active ? 'step' : undefined} style={{
             flex: '1 1 100px', minWidth: 0, overflowWrap: 'anywhere', padding: '4px 6px', textAlign: 'center',
             fontSize: 12, fontWeight: 600,
-            color: active ? '#fff' : done ? 'var(--highlight-color, #eab308)' : '#b8bec7',
-            borderBottom: '2px solid ' + (active ? 'var(--highlight-color, #eab308)' : done ? 'color-mix(in srgb, var(--highlight-color, #eab308) 35%, transparent)' : '#333'),
+            color: active ? 'var(--workspace-text)' : done ? 'var(--workspace-accent-ink)' : 'var(--workspace-muted)',
+            borderBottom: '2px solid ' + (active ? 'var(--highlight-color, #eab308)' : done ? 'color-mix(in srgb, var(--highlight-color, #eab308) 35%, transparent)' : 'var(--workspace-border)'),
           }}>
             {labels[s]}
           </div>

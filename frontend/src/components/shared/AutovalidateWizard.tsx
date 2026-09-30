@@ -1,3 +1,4 @@
+import { createPortal } from './panelPortal'
 import { usePanelEffect } from './usePanelEffect'
 import { useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
@@ -67,7 +68,7 @@ export function AutovalidateWizard<TOptions>({
   const prev = () => { if (!isFirst) setStepIndex(i => i - 1) }
   const confirm = () => { if (canAdvance) onConfirm(options) }
 
-  return (
+  return createPortal(
     <div style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
@@ -79,19 +80,19 @@ export function AutovalidateWizard<TOptions>({
         aria-labelledby="autovalidate-wizard-title"
         style={{
           width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          padding: 16, backgroundColor: '#1f1f1f',
-          border: '1px solid #2e2e2e', borderRadius: 10,
+          padding: 16, backgroundColor: 'var(--workspace-surface)',
+          border: '1px solid var(--workspace-border)', borderRadius: 10,
         }}
       >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexShrink: 0 }}>
-          <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--highlight-color, #eab308)' }} />
-          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: '#fff' }}>{title}</h3>
+          <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--workspace-accent-ink)' }} />
+          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: 'var(--workspace-text)' }}>{title}</h3>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#b8bec7' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -123,7 +124,7 @@ export function AutovalidateWizard<TOptions>({
         </div>
       </div>
       </FocusTrap>
-    </div>
+    </div>, document.body
   )
 }
 
@@ -131,9 +132,9 @@ function btn(enabled: boolean = true, color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
     padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? color ? 'var(--highlight-text-color, #000)' : '#e5e5e5' : '#aaa',
-    backgroundColor: color ? color : '#2a2a2a',
-    border: `1px solid ${color || '#3a3a3a'}`,
+    color: enabled ? color ? 'var(--highlight-text-color, #000)' : 'var(--workspace-text)' : 'var(--workspace-muted)',
+    backgroundColor: color ? color : 'var(--workspace-surface)',
+    border: `1px solid ${color || 'var(--workspace-border)'}`,
     borderRadius: 5,
     cursor: enabled ? 'pointer' : 'not-allowed',
     opacity: enabled ? 1 : 0.5,

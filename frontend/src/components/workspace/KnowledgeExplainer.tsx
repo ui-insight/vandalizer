@@ -45,21 +45,10 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
           // chrome (zIndex 300), or that header bleeds through over the top.
           // As an inline empty-state it stays in flow below the header.
           position: 'absolute', inset: 0, zIndex: onClose ? 400 : 50,
-          background: 'radial-gradient(ellipse at top, #1f2740 0%, #131628 55%, #0c1020 100%)',
+          background: 'var(--workspace-canvas)',
           overflowY: 'auto',
         }}
       >
-        {/* Ambient glow */}
-        <div
-          className="kb-explainer-glow"
-          style={{
-            position: 'absolute', top: -120, left: '50%', transform: 'translateX(-50%)',
-            width: 520, height: 520, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(96, 165, 250, 0.18) 0%, transparent 65%)',
-            pointerEvents: 'none',
-          }}
-        />
-
         {/* Close button */}
         {onClose && (
           <button
@@ -68,9 +57,9 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               position: 'absolute', top: 14, right: 14, zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#c0c7d6', cursor: 'pointer',
+              background: 'var(--workspace-canvas)',
+              border: '1px solid var(--workspace-border)',
+              color: 'var(--workspace-muted)', cursor: 'pointer',
             }}
             aria-label="Close"
           >
@@ -86,20 +75,20 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               borderRadius: 999,
               background: 'rgba(96, 165, 250, 0.12)',
               border: '1px solid rgba(96, 165, 250, 0.3)',
-              fontSize: 11, fontWeight: 700, color: '#93c5fd',
+              fontSize: 11, fontWeight: 700, color: 'var(--workspace-info)',
               textTransform: 'uppercase', letterSpacing: '0.1em',
               marginBottom: 18,
             }}>
               <Sparkles size={12} /> Knowledge Bases
             </div>
             <h1 style={{
-              fontSize: 34, fontWeight: 700, color: '#fff', letterSpacing: '-0.025em',
+              fontSize: 34, fontWeight: 700, color: 'var(--workspace-text)', letterSpacing: '-0.025em',
               lineHeight: 1.1, margin: '0 0 14px',
             }}>
               Ask anything.<br />Get answers from your sources.
             </h1>
             <p style={{
-              fontSize: 15, color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
+              fontSize: 15, color: 'var(--workspace-muted)', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               A knowledge base turns a folder of documents, a stack of policies, or a website
               into something you can talk to, with citations back to the exact source.
@@ -137,17 +126,17 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             delay="380ms"
           >
             <UseCase
-              accent="#60a5fa"
+              accent="var(--workspace-info)"
               question="Is salary cap waivable on a K award?"
               answer="Federal regulations KB returns the answer with a citation to 2 CFR §200.305 and the relevant NIH NOT-OD notice."
             />
             <UseCase
-              accent="#a78bfa"
+              accent="var(--workspace-info)"
               question="What's the F&A rate cap for the Gates Foundation?"
               answer="Sponsor policies KB pulls the matching clause from 200+ indexed funder pages, with the source URL."
             />
             <UseCase
-              accent="#34d399"
+              accent="var(--workspace-success)"
               question="What's our process for closing out a fixed-price subaward?"
               answer="Internal SOPs KB answers from your office's playbook so new staff stop opening tickets for the same questions."
             />
@@ -174,7 +163,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
                 style={{
                   padding: '11px 26px', fontSize: 14, fontWeight: 600,
                   color: '#0c1020',
-                  background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
+                  background: 'var(--workspace-canvas)',
                   border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
                   boxShadow: '0 6px 20px -6px rgba(96, 165, 250, 0.5)',
                 }}
@@ -197,7 +186,7 @@ function Section({
   return (
     <div className="kb-explainer-section" style={{ animationDelay: delay, marginBottom: 36 }}>
       <h2 style={{
-        fontSize: 20, fontWeight: 700, color: '#fff', margin: '0 0 4px',
+        fontSize: 20, fontWeight: 700, color: 'var(--workspace-text)', margin: '0 0 4px',
         letterSpacing: '-0.01em',
       }}>
         {title}
@@ -217,8 +206,8 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
     <div style={{
       display: 'flex', gap: 14, alignItems: 'flex-start',
       padding: 16, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       <div style={{
         width: 36, height: 36, borderRadius: 10,
@@ -226,13 +215,13 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
         border: '1px solid rgba(96, 165, 250, 0.28)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
       }}>
-        <Icon size={18} style={{ color: '#93c5fd' }} />
+        <Icon size={18} style={{ color: 'var(--workspace-info)' }} />
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )
@@ -242,22 +231,22 @@ function UseCase({ question, answer, accent }: { question: string; answer: strin
   return (
     <div style={{
       padding: 16, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
       borderLeft: `3px solid ${accent}`,
     }}>
       <div style={{
         display: 'inline-block', padding: '2px 8px', borderRadius: 6,
-        background: `${accent}22`, color: accent,
+        background: `color-mix(in srgb, ${accent} 13.33%, transparent)`, color: accent,
         fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
         marginBottom: 8,
       }}>
         Ask
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#e5e7eb', marginBottom: 8, lineHeight: 1.45, fontStyle: 'italic' }}>
+      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 8, lineHeight: 1.45, fontStyle: 'italic' }}>
         "{question}"
       </div>
-      <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
         <span style={{ color: accent, fontWeight: 600 }}>→ </span>{answer}
       </div>
     </div>
@@ -269,12 +258,12 @@ function Step({ num, title, body }: { num: string; title: string; body: string }
     <div style={{
       display: 'flex', gap: 14, alignItems: 'flex-start',
       padding: 14, borderRadius: 12,
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.07)',
+      background: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       <div style={{
         width: 28, height: 28, borderRadius: '50%',
-        background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
+        background: 'var(--workspace-canvas)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         fontSize: 13, fontWeight: 700, color: '#0c1020',
         boxShadow: '0 2px 10px -2px rgba(96, 165, 250, 0.4)',
@@ -282,10 +271,10 @@ function Step({ num, title, body }: { num: string; title: string; body: string }
         {num}
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 2 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 2 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )

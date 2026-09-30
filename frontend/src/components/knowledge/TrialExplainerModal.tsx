@@ -18,9 +18,9 @@ interface Props {
 }
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
-  completed: { label: 'Completed', color: '#22c55e' },
-  early_stopped: { label: 'Stopped early', color: '#f59e0b' },
-  failed: { label: 'Failed', color: '#ef4444' },
+  completed: { label: 'Completed', color: 'var(--workspace-success)' },
+  early_stopped: { label: 'Stopped early', color: 'var(--workspace-warning)' },
+  failed: { label: 'Failed', color: 'var(--workspace-danger)' },
 }
 
 /**
@@ -50,7 +50,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
   const whatItTried = describeTrialPlainly(trial.config)
   const outcome = explainTrialOutcome(trial)
   const earlyStop = explainEarlyStop(trial.early_stop_reason)
-  const badge = STATUS_BADGE[trial.status] ?? { label: trial.status, color: '#888' }
+  const badge = STATUS_BADGE[trial.status] ?? { label: trial.status, color: 'var(--workspace-muted)' }
   const lift = trial.lift_vs_default
   const disc = trial.discrimination_summary
 
@@ -74,8 +74,8 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
           width: 'min(560px, 92vw)', containerType: 'inline-size',
           maxHeight: 'calc(100dvh - 24px)',
           overflowWrap: 'anywhere',
-          background: '#1a1a1a',
-          border: '1px solid #2e2e2e',
+          background: 'var(--workspace-canvas)',
+          border: '1px solid var(--workspace-border)',
           borderRadius: 10,
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
@@ -84,7 +84,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         {/* Header */}
         <header style={{
           padding: '14px 18px', flexShrink: 0,
-          borderBottom: '1px solid #2e2e2e',
+          borderBottom: '1px solid var(--workspace-border)',
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -93,24 +93,24 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               backgroundColor: scoreColor(score),
             }} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)' }}>
                 Trial details
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#e5e5e5' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--workspace-text)' }}>
                   {scorePct}%
                 </span>
                 {lift != null && (
                   <span style={{
                     fontSize: 12, fontWeight: 600,
-                    color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888',
+                    color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
                   }}>
                     {lift > 0 ? '+' : ''}{Math.round(lift * 100)} pts vs current
                   </span>
                 )}
                 <span style={{
                   fontSize: 12, fontWeight: 600, color: badge.color,
-                  border: `1px solid ${badge.color}55`, borderRadius: 999,
+                  border: `1px solid color-mix(in srgb, ${badge.color} 33.33%, transparent)`, borderRadius: 999,
                   padding: '1px 7px',
                 }}>
                   {badge.label}
@@ -123,7 +123,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
             aria-label="Close"
             onClick={onClose}
             style={{
-              background: 'transparent', border: 'none', color: '#888',
+              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
               cursor: 'pointer', padding: 4, flexShrink: 0, minWidth: 36, minHeight: 36,
             }}
           >
@@ -135,15 +135,15 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         <div tabIndex={0} role="region" aria-label="Trial explanation" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px' }}>
           {/* What it tried */}
           <Section title="What this trial tried">
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: '#cfcfcf' }}>
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: 'var(--workspace-text)' }}>
               {whatItTried}
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.6, color: '#9a9a9a' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
               {outcome}
             </p>
             {earlyStop && (
               <p style={{
-                margin: '10px 0 0', fontSize: 12, lineHeight: 1.55, color: '#f59e0b',
+                margin: '10px 0 0', fontSize: 12, lineHeight: 1.55, color: 'var(--workspace-warning)',
                 background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
                 borderRadius: 6, padding: '8px 10px',
               }}>
@@ -160,14 +160,14 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
                   display: 'grid', gap: 10,
                   alignItems: 'baseline',
                 }}>
-                  <div style={{ fontSize: 12, color: '#888' }}>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
                     {p.label}
                   </div>
                   <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e9e9e9' }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--workspace-text)' }}>
                       {p.value}
                     </div>
-                    <div style={{ fontSize: 11.5, lineHeight: 1.55, color: '#8f8f8f', marginTop: 2 }}>
+                    <div style={{ fontSize: 11.5, lineHeight: 1.55, color: 'var(--workspace-muted)', marginTop: 2 }}>
                       {p.why}
                     </div>
                   </div>
@@ -194,13 +194,13 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               )}
             </div>
             {disc && (disc.useful + disc.redundant + disc.failing + disc.other) > 0 && (
-              <p style={{ margin: '10px 0 0', fontSize: 11.5, lineHeight: 1.55, color: '#8f8f8f' }}>
-                Of the graded questions: <strong style={{ color: '#9fd89f' }}>{disc.useful} answered
+              <p style={{ margin: '10px 0 0', fontSize: 11.5, lineHeight: 1.55, color: 'var(--workspace-muted)' }}>
+                Of the graded questions: <strong style={{ color: 'var(--workspace-success)' }}>{disc.useful} answered
                 well</strong>, {disc.redundant} where the knowledge base added little, and{' '}
-                <strong style={{ color: '#e0a0a0' }}>{disc.failing} that failed</strong>.
+                <strong style={{ color: 'var(--workspace-danger)' }}>{disc.failing} that failed</strong>.
               </p>
             )}
-            <p style={{ margin: '10px 0 0', fontSize: 12, lineHeight: 1.5, color: '#aaa' }}>
+            <p style={{ margin: '10px 0 0', fontSize: 12, lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
               The overall quality score blends the AI answer-quality grade (40%) with retrieval
               precision (25%), source health (20%), and how much of each document the
               answers drew on (15%).
@@ -218,7 +218,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     <section style={{ marginBottom: 18 }}>
       <h3 style={{
         margin: '0 0 8px', fontSize: 12, fontWeight: 600,
-        letterSpacing: 0.4, textTransform: 'uppercase', color: '#aaa',
+        letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--workspace-muted)',
       }}>
         {title}
       </h3>
@@ -232,13 +232,13 @@ function Stat({ label, value }: { label: string; value: string }) {
     <span style={{
       display: 'inline-flex', flexDirection: 'column', gap: 1,
       padding: '5px 10px',
-      background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a',
+      background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
       borderRadius: 6,
     }}>
-      <span style={{ fontSize: 12, color: '#aaa', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+      <span style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         {label}
       </span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: '#e9e9e9', fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </span>
     </span>

@@ -23,9 +23,9 @@ export function KBSearchBar({ value, onChange, placeholder = 'Search knowledge b
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
       padding: '0 12px', margin: '8px 12px 4px',
-      backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
+      backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
     }}>
-      <Search size={13} style={{ color: '#666', flexShrink: 0 }} aria-hidden="true" />
+      <Search size={13} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} aria-hidden="true" />
       <input
         type="search"
         aria-label={placeholder}
@@ -36,7 +36,7 @@ export function KBSearchBar({ value, onChange, placeholder = 'Search knowledge b
         onBlur={e => { e.currentTarget.style.boxShadow = 'none' }}
         style={{
           flex: 1, padding: '7px 0', fontSize: 12, fontFamily: 'inherit',
-          color: '#e5e5e5', backgroundColor: 'transparent',
+          color: 'var(--workspace-text)', backgroundColor: 'transparent',
           border: 'none', outline: 'none', borderRadius: 4,
         }}
       />
@@ -47,7 +47,7 @@ export function KBSearchBar({ value, onChange, placeholder = 'Search knowledge b
           onClick={() => { setDraft(''); onChange('') }}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
         >
-          <X size={12} style={{ color: '#666' }} aria-hidden="true" />
+          <X size={12} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
         </button>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**152/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**153/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Shared workspace theme — September 30
+
+**153/169 checklist items implemented locally.** VIS-01 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Knowledge lists, sources, question management, validation history/results and workflow/extraction tuning use the same neutral canvas, surfaces, borders and readable text as Files, Projects, Library and Automations. Navigation retains its dark treatment; selection and primary actions use the configured brand accent. Shared information, success, warning and error colors have readable foregrounds and soft backgrounds.
+- Removed decorative purple/blue treatment from validation chrome and controls. Contrast checks caught and corrected comparison labels, selected-budget descriptions, catalog usage metadata and the empty-history action. Existing status meanings, source/tool navigation and layout are preserved.
+- Direct screenshot inspection found the desktop pane divider could draw over the shared tuning wizard. The wizard now uses the retained-panel-aware overlay layer. The nested extraction test-generation dialog fits narrow screens, has a named close control and contains focus; Escape returns to its trigger without closing the parent wizard.
+- Verification: TypeScript, production build, touched-file ESLint and diff checks pass. All 172 focused tests across 29 files pass. The full suite has 1,191 passing tests and three Landing failures; the same three failures reproduce on committed HEAD before these changes. No unrelated Landing changes were made.
+- The 278 selected browser captures cover Knowledge availability/sharing, source intake, questions, short-screen tuning, apply/revert review, saved history, workflow/extraction setup, nested generation, catalog recovery and retained workspace context. Selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly. API responses are synthetic; live execution and assistive-technology devices remain unverified. Typography, controls, broader accessibility and final regrading remain open.
 
 ## More room for task content — September 30
 

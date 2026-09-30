@@ -82,7 +82,7 @@ export function WebSourceRefreshBar({
       style={{
         display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
         padding: '6px 8px', marginBottom: 8, borderRadius: 6,
-        backgroundColor: '#262626', border: '1px solid #333', fontSize: 11, color: '#aaa',
+        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', fontSize: 11, color: 'var(--workspace-muted)',
       }}
     >
       <span style={{ flex: 1, minWidth: 140 }}>
@@ -97,7 +97,7 @@ export function WebSourceRefreshBar({
           onChange={e => setInterval_(e.target.value)}
           style={{
             fontSize: 11, fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
-            backgroundColor: '#1e1e1e', color: '#ddd', border: '1px solid #3a3a3a',
+            backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}
         >
           <option value="off">Off</option>
@@ -114,7 +114,7 @@ export function WebSourceRefreshBar({
           style={{
             display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'inherit',
             padding: '3px 8px', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
-            backgroundColor: 'transparent', color: '#ddd', border: '1px solid #3a3a3a',
+            backgroundColor: 'transparent', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}
         >
           <RefreshCw size={11} style={busy ? { animation: 'spin 1s linear infinite' } : undefined} />

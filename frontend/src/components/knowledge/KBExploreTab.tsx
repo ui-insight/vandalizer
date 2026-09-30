@@ -19,18 +19,18 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 
 
-// Dark palette (matches KnowledgePanel)
+// Shared workspace surface and text tokens.
 const C = {
-  bg: '#1e1e1e',
-  panel: 'var(--color-panel-dark)',
-  card: '#262626',
-  cardHover: '#2f2f2f',
-  border: '#3a3a3a',
-  borderHover: '#4a4a4a',
-  text: '#e5e5e5',
-  textMuted: '#aaa',
-  textDim: '#b8bec7',
-  textFaint: '#b8bec7',
+  bg: 'var(--workspace-canvas)',
+  panel: 'var(--workspace-surface)',
+  card: 'var(--workspace-surface)',
+  cardHover: 'var(--workspace-hover)',
+  border: 'var(--workspace-border)',
+  borderHover: 'var(--workspace-border)',
+  text: 'var(--workspace-text)',
+  textMuted: 'var(--workspace-muted)',
+  textDim: 'var(--workspace-muted)',
+  textFaint: 'var(--workspace-muted)',
 }
 
 // ---------------------------------------------------------------------------
@@ -53,8 +53,8 @@ function DarkAuthorChip({ author, size = 'sm' }: { author: AuthorRef | null | un
   )
   const style: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    fontSize, color: '#cbd5e1',
-    background: 'rgba(255,255,255,0.06)',
+    fontSize, color: 'var(--workspace-muted)',
+    background: 'var(--workspace-canvas)',
     padding: '2px 8px', borderRadius: 999, lineHeight: 1.4,
     whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
   }
@@ -81,14 +81,14 @@ const TIER_RING = {
 } as const
 
 const TIER_ICON = {
-  excellent: '#4ade80',
-  good: '#60a5fa',
-  fair: '#facc15',
+  excellent: 'var(--workspace-success)',
+  good: 'var(--workspace-info)',
+  fair: 'var(--workspace-warning)',
 } as const
 
 
 // ---------------------------------------------------------------------------
-// Featured collection card (dark)
+// Featured collection card
 // ---------------------------------------------------------------------------
 
 function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedCollection; onClick: () => void }) {
@@ -115,7 +115,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           height: 32, width: 32, borderRadius: 8,
-          backgroundColor: 'rgba(234, 179, 8, 0.15)', color: '#facc15', flexShrink: 0,
+          backgroundColor: 'rgba(234, 179, 8, 0.15)', color: 'var(--workspace-warning)', flexShrink: 0,
         }}>
           <Star size={16} fill="currentColor" />
         </div>
@@ -136,7 +136,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
 }
 
 // ---------------------------------------------------------------------------
-// Catalog card (dark, KB-specific)
+// Catalog card (KB-specific)
 // ---------------------------------------------------------------------------
 
 function KBCatalogCard({
@@ -180,7 +180,7 @@ function KBCatalogCard({
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           fontSize: 12, padding: '1px 6px', borderRadius: 4,
-          backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc',
+          backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
           border: '1px solid rgba(56, 189, 248, 0.25)',
         }}>
           <BookOpen size={11} />
@@ -197,8 +197,8 @@ function KBCatalogCard({
         <CatalogSignals item={item} style={{ fontSize: 12, color: C.textFaint }} />
       </div>
 
-      <p style={{ fontSize: 13, color: '#d1d5db', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
-      <CatalogUsage item={item} compact dark />
+      <p style={{ fontSize: 13, color: 'var(--workspace-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
+      <CatalogUsage item={item} compact />
 
       {item.created_by && (
         <div style={{ marginBottom: 8 }}>
@@ -225,7 +225,7 @@ function KBCatalogCard({
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
               style={{
                 fontSize: 12, padding: '1px 6px', borderRadius: 999,
-                backgroundColor: 'rgba(255,255,255,0.06)', color: '#c5c5c5',
+                backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
                 cursor: 'pointer', transition: 'background-color 0.15s',
               }}
             >
@@ -242,7 +242,7 @@ function KBCatalogCard({
 }
 
 // ---------------------------------------------------------------------------
-// Sidebar collection link (dark)
+// Sidebar collection link
 // ---------------------------------------------------------------------------
 
 function CollectionLink({
@@ -259,21 +259,21 @@ function CollectionLink({
       style={{
         width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
         fontSize: 13, fontFamily: 'inherit',
-        backgroundColor: active ? 'rgba(255,255,255,0.08)' : 'transparent',
-        color: active ? '#fff' : C.textMuted,
+        backgroundColor: active ? 'var(--workspace-canvas)' : 'transparent',
+        color: active ? 'var(--workspace-text)' : C.textMuted,
         border: 'none', cursor: 'pointer',
         display: 'flex', alignItems: 'flex-start', gap: 6,
         transition: 'background-color 0.15s',
       }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'rgba(255,255,255,0.04)' }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'var(--workspace-canvas)' }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
     >
-      <FolderOpen size={13} style={{ color: active ? '#cbd5e1' : C.textFaint, flexShrink: 0, marginTop: 2 }} />
+      <FolderOpen size={13} style={{ color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 2 }} />
       <span style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>{collection.title}</span>
       {collection.featured && (
-        <Star size={11} fill="currentColor" style={{ color: active ? '#fde047' : '#facc15', flexShrink: 0, marginTop: 3 }} />
+        <Star size={11} fill="currentColor" style={{ color: active ? 'var(--workspace-warning)' : 'var(--workspace-warning)', flexShrink: 0, marginTop: 3 }} />
       )}
-      <span style={{ fontSize: 12, color: active ? '#cbd5e1' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
+      <span style={{ fontSize: 12, color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
         {collection.visible_count ?? collection.item_ids.length}
       </span>
     </button>
@@ -351,20 +351,20 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             style={{
               width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
               fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              backgroundColor: !selectedCollectionId ? 'rgba(255,255,255,0.08)' : 'transparent',
-              color: !selectedCollectionId ? '#fff' : C.textMuted,
+              backgroundColor: !selectedCollectionId ? 'var(--workspace-canvas)' : 'transparent',
+              color: !selectedCollectionId ? 'var(--workspace-text)' : C.textMuted,
               border: 'none', cursor: 'pointer', marginBottom: 4,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}
           >
             <span>All Knowledge Bases</span>
-            <span style={{ fontSize: 12, color: !selectedCollectionId ? '#cbd5e1' : C.textFaint }}>{allTotal ?? total}</span>
+            <span style={{ fontSize: 12, color: !selectedCollectionId ? 'var(--workspace-muted)' : C.textFaint }}>{allTotal ?? total}</span>
           </button>
 
           {featuredCollections.length > 0 && (
             <div style={{ marginTop: 16, marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px', marginBottom: 6 }}>
-                <Star size={10} fill="currentColor" style={{ color: '#facc15' }} />
+                <Star size={10} fill="currentColor" style={{ color: 'var(--workspace-warning)' }} />
                 <span style={{ fontSize: 12, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Featured
                 </span>
@@ -412,13 +412,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     height: 40, width: 40, borderRadius: 12,
-                    background: 'linear-gradient(135deg, #38bdf8 0%, #6366f1 100%)',
-                    color: '#fff',
+                    background: 'var(--workspace-canvas)',
+                    color: 'var(--workspace-text)',
                   }}>
                     <Sparkles size={20} />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: '#fff', margin: 0 }}>
+                    <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                       Explore knowledge bases
                     </h2>
                     <p style={{ fontSize: 13, color: C.textDim, margin: '2px 0 0' }}>
@@ -447,11 +447,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FolderOpen size={18} style={{ color: C.textDim }} />
-                  <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
+                  <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                     {activeCollection.title}
                   </h2>
                   {activeCollection.featured && (
-                    <Star size={14} fill="currentColor" style={{ color: '#facc15' }} />
+                    <Star size={14} fill="currentColor" style={{ color: 'var(--workspace-warning)' }} />
                   )}
                 </div>
                 {activeCollection.description && (
@@ -526,7 +526,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     padding: '3px 10px', borderRadius: 999, fontSize: 12,
-                    backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc',
+                    backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}>
                     <Tag size={10} aria-hidden="true" /> {tagFilter}
@@ -544,7 +544,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
                     padding: '3px 10px', borderRadius: 999, fontSize: 12,
-                    backgroundColor: 'rgba(255,255,255,0.06)', color: C.text,
+                    backgroundColor: 'var(--workspace-canvas)', color: C.text,
                   }}>
                     <FolderOpen size={10} aria-hidden="true" /> {activeCollection.title}
                     <button
@@ -577,7 +577,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             {error && (
               <div role="alert" style={{
                 borderRadius: 8, padding: '10px 14px', fontSize: 13,
-                color: '#fca5a5', backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                color: 'var(--workspace-danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 border: '1px solid rgba(239, 68, 68, 0.25)', marginBottom: 14,
               }}>
                 {error}
@@ -654,7 +654,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                       <div style={{
                         height: 14, width: 14, borderRadius: 999,
-                        background: 'linear-gradient(135deg, #4ade80 0%, #16a34a 100%)',
+                        background: 'var(--workspace-canvas)',
                       }} />
                       <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>
                         Top Rated

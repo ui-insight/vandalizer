@@ -33,9 +33,9 @@ const BULLETS: Record<Kind, { when: string; why: string }[]> = {
 export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
   const [open, setOpen] = useState(false)
   const bullets = BULLETS[kind]
-  const triggerColor = theme === 'light' ? '#6b21a8' : '#a78bfa'
-  const bodyColor = theme === 'light' ? '#4b5563' : '#bbb'
-  const labelColor = theme === 'light' ? '#111827' : '#ddd'
+  const triggerColor = theme === 'light' ? '#6b21a8' : 'var(--workspace-info)'
+  const bodyColor = theme === 'light' ? '#4b5563' : 'var(--workspace-muted)'
+  const labelColor = theme === 'light' ? '#111827' : 'var(--workspace-text)'
 
   return (
     <div style={{ margin: '0 0 12px 0' }}>

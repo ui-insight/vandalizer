@@ -18,7 +18,7 @@ export function CrossJudgeNote({ crossJudge, primaryScore, primaryJudge }: Props
   // "Large" disagreement = 10pts. Arbitrary but matches the common case where
   // a single judge swing is news-worthy.
   const tone: 'good' | 'warn' = absDeltaPts > 10 ? 'warn' : 'good'
-  const fg = tone === 'good' ? '#86efac' : '#fbbf24'
+  const fg = tone === 'good' ? 'var(--workspace-success)' : 'var(--workspace-warning)'
   const bg = tone === 'good' ? 'rgba(34, 197, 94, 0.08)' : 'rgba(245, 158, 11, 0.08)'
   const border = tone === 'good' ? 'rgba(34, 197, 94, 0.25)' : 'rgba(245, 158, 11, 0.3)'
 
@@ -32,7 +32,7 @@ export function CrossJudgeNote({ crossJudge, primaryScore, primaryJudge }: Props
         <div style={{ fontSize: 12, fontWeight: 600, color: fg }}>
           Cross-judge check: {tone === 'good' ? 'judges agree' : 'judges disagree'}
         </div>
-        <div style={{ fontSize: 11, color: '#aaa', marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-muted)', marginTop: 2, lineHeight: 1.4 }}>
           <strong>{primaryJudge || 'primary'}</strong> scored {(primaryScore * 100).toFixed(0)}% ·{' '}
           <strong>{crossJudge.model}</strong> scored {(crossJudge.score * 100).toFixed(0)}%{' '}
           ({deltaPts >= 0 ? '+' : ''}{deltaPts.toFixed(0)}pts).

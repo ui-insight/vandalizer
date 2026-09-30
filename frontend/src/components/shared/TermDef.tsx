@@ -137,11 +137,11 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
   }, [open, reposition])
 
   const isDark = theme === 'dark'
-  const triggerColor = isDark ? '#c4b5fd' : '#7c3aed'
-  const tipBg = isDark ? '#1f1f2e' : '#fff'
-  const tipBorder = isDark ? 'rgba(124, 58, 237, 0.4)' : '#d1d5db'
-  const tipText = isDark ? '#e5e5e5' : '#1f2937'
-  const tipMeta = isDark ? '#9ca3af' : '#6b7280'
+  const triggerColor = isDark ? 'var(--workspace-info)' : 'var(--workspace-info)'
+  const tipBg = isDark ? '#1f1f2e' : 'var(--workspace-text)'
+  const tipBorder = isDark ? 'var(--workspace-border)' : 'var(--workspace-border)'
+  const tipText = isDark ? 'var(--workspace-text)' : '#1f2937'
+  const tipMeta = isDark ? 'var(--workspace-muted)' : '#6b7280'
 
   return (
     <span ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>

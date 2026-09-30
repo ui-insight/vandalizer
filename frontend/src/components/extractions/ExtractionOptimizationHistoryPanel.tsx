@@ -3,8 +3,7 @@
  *
  * Lazy-loads history on first open. Clicking a row notifies the parent so
  * it can fetch the full run document and flip into a read-only "viewing past
- * run" state. Dark-mode chrome to match the shared trust primitives that
- * dominate the Autovalidate surface.
+ * run" state. Uses the same neutral surfaces and semantic colors as the validation tools.
  */
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, History, Loader2 } from 'lucide-react'
@@ -46,8 +45,8 @@ export function ExtractionOptimizationHistoryPanel({
 
   return (
     <div style={{
-      backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
       overflow: 'hidden',
     }}>
       <button
@@ -55,15 +54,15 @@ export function ExtractionOptimizationHistoryPanel({
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
-          fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
+          fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#888' }} /> : <ChevronRight size={14} style={{ color: '#888' }} />}
-        <History size={14} style={{ color: '#888' }} />
+        {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
+        <History size={14} style={{ color: 'var(--workspace-muted)' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--workspace-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -72,25 +71,25 @@ export function ExtractionOptimizationHistoryPanel({
       {open && (
         <div style={{ padding: '0 12px 12px 12px' }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: '#888' }}>
+            <div style={{ textAlign: 'center', padding: 16, color: 'var(--workspace-muted)' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: '#fca5a5', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 12, color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
             <div style={{ padding: '12px 8px' }}>
-              <div style={{ fontSize: 13, color: '#ddd', fontWeight: 600, marginBottom: 6 }}>
+              <div style={{ fontSize: 13, color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 6 }}>
                 No prior tuning runs for this extraction
               </div>
-              <div style={{ fontSize: 12, color: '#999', lineHeight: 1.55 }}>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
                 Each run scores your extraction against test cases and lands here, so
                 you can see whether model or strategy changes are actually helping.
-                A run takes <b style={{ color: '#bbb' }}>5–15 minutes</b> for small
-                extractions and <b style={{ color: '#bbb' }}>up to 60–90 minutes</b> for
+                A run takes <b style={{ color: 'var(--workspace-muted)' }}>5–15 minutes</b> for small
+                extractions and <b style={{ color: 'var(--workspace-muted)' }}>up to 60–90 minutes</b> for
                 large ones (it keeps running on the server if you close the tab), and uses
-                about <b style={{ color: '#bbb' }}>$1–$5</b> worth of LLM tokens
+                about <b style={{ color: 'var(--workspace-muted)' }}>$1–$5</b> worth of LLM tokens
                 (an estimate of AI usage, not a charge to you) — nothing changes
                 until you click Apply on a recipe.
               </div>
@@ -123,26 +122,26 @@ function HistoryRow({
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '7px 10px', textAlign: 'left',
-        background: '#1a1a1a', border: '1px solid #2a2a2a',
+        background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
         borderRadius: 5, cursor: onSelect ? 'pointer' : 'default',
-        fontFamily: 'inherit', color: '#e5e5e5',
+        fontFamily: 'inherit', color: 'var(--workspace-text)',
       }}
-      onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.4)')}
-      onMouseLeave={e => onSelect && (e.currentTarget.style.borderColor = '#2a2a2a')}
+      onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = 'var(--workspace-accent-ink)')}
+      onMouseLeave={e => onSelect && (e.currentTarget.style.borderColor = 'var(--workspace-border)')}
     >
       <StatusDot status={run.status} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, color: '#ddd',
+          fontSize: 12, color: 'var(--workspace-text)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
-          <span style={{ color: '#666' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
-          {run.options?.apply_on_finish ? <span style={{ color: '#a78bfa' }}> · auto-applied</span> : null}
+          <span style={{ color: 'var(--workspace-muted)' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
+          {run.options?.apply_on_finish ? <span style={{ color: 'var(--workspace-info)' }}> · auto-applied</span> : null}
         </div>
         {run.judge_model && (
           <div style={{
-            fontSize: 10, color: '#666',
+            fontSize: 10, color: 'var(--workspace-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
           }}>
             judge: {run.judge_model}
@@ -150,7 +149,7 @@ function HistoryRow({
         )}
         {run.error_message && run.status === 'failed' && (
           <div style={{
-            fontSize: 10, color: '#fca5a5',
+            fontSize: 10, color: 'var(--workspace-danger)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
           }}>
             {run.error_message}
@@ -165,7 +164,7 @@ function HistoryRow({
       {lift != null && (
         <span style={{
           fontSize: 10,
-          color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#666',
+          color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
           minWidth: 50, textAlign: 'right',
         }}>
           {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts
@@ -176,7 +175,7 @@ function HistoryRow({
 }
 
 function scoreColor(s: number) {
-  if (s >= 0.7) return '#22c55e'
-  if (s >= 0.4) return '#f59e0b'
-  return '#ef4444'
+  if (s >= 0.7) return 'var(--workspace-success)'
+  if (s >= 0.4) return 'var(--workspace-warning)'
+  return 'var(--workspace-danger)'
 }

@@ -31,15 +31,15 @@ const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }>
   unavailable: { label: 'Unavailable', color: '#b91c1c', bg: '#fef2f2' },
 }
 
-// Dark palette (matches KBExploreTab)
+// Shared workspace surface and text tokens.
 const C = {
-  card: '#262626',
-  cardHover: '#2f2f2f',
-  border: '#3a3a3a',
-  text: '#e5e5e5',
-  textMuted: '#aaa',
-  textDim: '#b8bec7',
-  textFaint: '#aeb5bf',
+  card: 'var(--workspace-surface)',
+  cardHover: 'var(--workspace-hover)',
+  border: 'var(--workspace-border)',
+  text: 'var(--workspace-text)',
+  textMuted: 'var(--workspace-muted)',
+  textDim: 'var(--workspace-muted)',
+  textFaint: 'var(--workspace-muted)',
 }
 
 export function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
@@ -111,9 +111,9 @@ function KBGridCard({
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6, marginBottom: 6 }}>
         {isReference ? (
-          <BookmarkCheck size={14} style={{ color: '#60a5fa', flexShrink: 0, marginTop: 2 }} />
+          <BookmarkCheck size={14} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 2 }} />
         ) : (
-          <BookOpen size={14} style={{ color: '#7dd3fc', flexShrink: 0, marginTop: 2 }} />
+          <BookOpen size={14} style={{ color: 'var(--workspace-info)', flexShrink: 0, marginTop: 2 }} />
         )}
         <button type="button" onClick={() => onSelect(canonicalUuid)} disabled={isUnavailable} style={{
           background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
@@ -131,7 +131,7 @@ function KBGridCard({
             style={{
               flexShrink: 0, display: 'flex', alignItems: 'center', padding: 2,
               background: 'transparent', border: 'none', cursor: 'pointer',
-              color: pinned ? 'var(--highlight-color, #eab308)' : C.textMuted,
+              color: pinned ? 'var(--workspace-accent-ink)' : C.textMuted,
             }}
           >
             {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
@@ -139,7 +139,7 @@ function KBGridCard({
         )}
       </div>
 
-      <p style={{ fontSize: 12, lineHeight: 1.5, color: kb.sources_failed > 0 ? '#fcd34d' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
+      <p style={{ fontSize: 12, lineHeight: 1.5, color: kb.sources_failed > 0 ? 'var(--workspace-warning)' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
       <p style={{ fontSize: 12, lineHeight: 1.5, color: C.textMuted, margin: '0 0 12px' }}>{describeKBAvailability(kb)}</p>
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
       <div style={{ marginBottom: 8 }}>
@@ -163,7 +163,7 @@ function KBGridCard({
         {kb.shared_with_team && (
           <span style={{
             fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-            color: '#99f6e4', backgroundColor: '#134e4a',
+            color: 'var(--workspace-success)', backgroundColor: 'var(--workspace-success-surface)',
           }}>
             Team
           </span>
@@ -177,7 +177,7 @@ function KBGridCard({
       {/* Description */}
       {kb.description ? (
         <p style={{
-          fontSize: 12, color: '#bdbdbd', margin: '0 0 8px', lineHeight: 1.4,
+          fontSize: 12, color: 'var(--workspace-muted)', margin: '0 0 8px', lineHeight: 1.4,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
         }}>
@@ -208,7 +208,7 @@ function KBGridCard({
               <span key={gid} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
                 fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.12)',
               }}>
                 <Tag size={9} />
                 {o?.name || gid}
@@ -224,7 +224,7 @@ function KBGridCard({
           {kb.tags.map(t => (
             <span key={t} style={{
               fontSize: 12, padding: '1px 6px', borderRadius: 999,
-              backgroundColor: 'rgba(255,255,255,0.06)', color: '#c5c5c5',
+              backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
             }}>
               {t}
             </span>
@@ -255,7 +255,7 @@ function KBGridCard({
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#ccc', backgroundColor: 'transparent',
+              color: 'var(--workspace-text)', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
             }}
           >
@@ -269,7 +269,7 @@ function KBGridCard({
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: '#60a5fa', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.1)',
               border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 4, cursor: 'pointer',
             }}
           >
@@ -287,7 +287,7 @@ function KBGridCard({
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
               padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: canClone ? '#ccc' : '#777', backgroundColor: 'transparent',
+              color: canClone ? 'var(--workspace-text)' : 'var(--workspace-muted)', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4,
               cursor: canClone ? 'pointer' : 'default',
               opacity: canClone ? 1 : 0.5,

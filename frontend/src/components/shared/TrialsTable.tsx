@@ -24,9 +24,9 @@ export interface StandardTrialFields {
 
 /** Score → dot color. Green ≥0.7, amber ≥0.4, red otherwise. */
 export function scoreColor(s: number): string {
-  if (s >= 0.7) return '#22c55e'
-  if (s >= 0.4) return '#f59e0b'
-  return '#ef4444'
+  if (s >= 0.7) return 'var(--workspace-success)'
+  if (s >= 0.4) return 'var(--workspace-warning)'
+  return 'var(--workspace-danger)'
 }
 
 /**
@@ -64,7 +64,7 @@ export function TrialRow<TConfig>({
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-      padding: '8px 10px', fontSize: 12, color: '#ddd',
+      padding: '8px 10px', fontSize: 12, color: 'var(--workspace-text)',
       backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
       borderRadius: 4,
     }}>
@@ -73,15 +73,15 @@ export function TrialRow<TConfig>({
         backgroundColor: unscored ? '#aaa' : scoreColor(score),
       }} />
       <span style={{
-        flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere', color: '#ccc',
+        flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere', color: 'var(--workspace-text)',
       }}>
         {summariseConfig(trial.config)}
       </span>
       {trial.lift_vs_default != null && (
         <span style={{
           fontSize: 12,
-          color: trial.lift_vs_default > 0 ? '#22c55e'
-            : trial.lift_vs_default < 0 ? '#ef4444' : '#aaa',
+          color: trial.lift_vs_default > 0 ? 'var(--workspace-success)'
+            : trial.lift_vs_default < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
         }}>
           {trial.lift_vs_default > 0 ? '+' : ''}{(trial.lift_vs_default * 100).toFixed(0)}pts
         </span>
@@ -90,7 +90,7 @@ export function TrialRow<TConfig>({
         title={unscored ? (trial.error || 'Not scored') : undefined}
         style={{
           width: 50, textAlign: 'right', fontWeight: 600,
-          color: unscored ? '#888' : '#e5e5e5',
+          color: unscored ? 'var(--workspace-muted)' : 'var(--workspace-text)',
         }}
       >
         {unscored ? '—' : `${(score * 100).toFixed(0)}%`}
@@ -140,22 +140,22 @@ export function TrialsTable<TTrial>({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 14, backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({trials.length})
         </span>
         {sortOptions.length > 1 && (
           <>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa' }}>Sort by:</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>Sort by:</span>
             <select
           aria-label="Sort trials"
               value={sortKey}
               onChange={e => setSortKey(e.target.value)}
               style={{
-                background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
+                background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
                 borderRadius: 4, padding: '4px 6px', minHeight: 36, maxWidth: '100%', fontSize: 12, fontFamily: 'inherit',
               }}
             >
@@ -167,7 +167,7 @@ export function TrialsTable<TTrial>({
         )}
       </div>
       {caption && (
-        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 12, color: '#888', lineHeight: 1.5 }}>
+        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {caption}
         </div>
       )}

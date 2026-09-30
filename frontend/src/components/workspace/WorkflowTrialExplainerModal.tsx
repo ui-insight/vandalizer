@@ -14,10 +14,10 @@ interface Props {
 }
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
-  completed: { label: 'Completed', color: '#22c55e' },
-  early_stopped: { label: 'Stopped early', color: '#f59e0b' },
-  failed: { label: 'Failed', color: '#ef4444' },
-  cancelled: { label: 'Cancelled', color: '#888' },
+  completed: { label: 'Completed', color: 'var(--workspace-success)' },
+  early_stopped: { label: 'Stopped early', color: 'var(--workspace-warning)' },
+  failed: { label: 'Failed', color: 'var(--workspace-danger)' },
+  cancelled: { label: 'Cancelled', color: 'var(--workspace-muted)' },
 }
 
 /**
@@ -43,7 +43,7 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
   const steps = explainWorkflowSteps(trial.config)
   const whatItTried = describeWorkflowTrialPlainly(trial.config)
   const outcome = explainWorkflowOutcome(trial)
-  const badge = STATUS_BADGE[trial.status] ?? { label: trial.status, color: '#888' }
+  const badge = STATUS_BADGE[trial.status] ?? { label: trial.status, color: 'var(--workspace-muted)' }
   const lift = trial.lift_vs_default
   const breakdown = trial.step_breakdown ?? []
 
@@ -65,8 +65,8 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
         style={{
           width: 'min(560px, 92vw)',
           maxHeight: '88vh',
-          background: '#1a1a1a',
-          border: '1px solid #2e2e2e',
+          background: 'var(--workspace-canvas)',
+          border: '1px solid var(--workspace-border)',
           borderRadius: 10,
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
@@ -75,7 +75,7 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
         {/* Header */}
         <header style={{
           padding: '14px 18px',
-          borderBottom: '1px solid #2e2e2e',
+          borderBottom: '1px solid var(--workspace-border)',
           display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -84,24 +84,24 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
               backgroundColor: scoreColor(score),
             }} />
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)' }}>
                 Trial details
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#e5e5e5' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--workspace-text)' }}>
                   {scorePct}%
                 </span>
                 {lift != null && (
                   <span style={{
                     fontSize: 11, fontWeight: 600,
-                    color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888',
+                    color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
                   }}>
                     {lift > 0 ? '+' : ''}{Math.round(lift * 100)} pts vs current
                   </span>
                 )}
                 <span style={{
                   fontSize: 10, fontWeight: 600, color: badge.color,
-                  border: `1px solid ${badge.color}55`, borderRadius: 999,
+                  border: `1px solid color-mix(in srgb, ${badge.color} 33.33%, transparent)`, borderRadius: 999,
                   padding: '1px 7px',
                 }}>
                   {badge.label}
@@ -113,7 +113,7 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
             aria-label="Close"
             onClick={onClose}
             style={{
-              background: 'transparent', border: 'none', color: '#888',
+              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
               cursor: 'pointer', padding: 4, flexShrink: 0,
             }}
           >
@@ -125,15 +125,15 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px 18px' }}>
           {/* What it tried */}
           <Section title="What this trial tried">
-            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: '#cfcfcf' }}>
+            <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.6, color: 'var(--workspace-text)' }}>
               {whatItTried}
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.6, color: '#9a9a9a' }}>
+            <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
               {outcome}
             </p>
             {trial.error && (
               <p style={{
-                margin: '10px 0 0', fontSize: 12, lineHeight: 1.55, color: '#ef4444',
+                margin: '10px 0 0', fontSize: 12, lineHeight: 1.55, color: 'var(--workspace-danger)',
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
                 borderRadius: 6, padding: '8px 10px',
               }}>
@@ -145,24 +145,24 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
           {/* Per-step settings */}
           <Section title="What it changed, step by step">
             {steps.length === 0 ? (
-              <p style={{ margin: 0, fontSize: 12, color: '#8f8f8f' }}>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--workspace-muted)' }}>
                 No step-level changes. This trial ran the workflow with its current settings.
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {steps.map((s) => (
                   <div key={s.step} style={{
-                    border: '1px solid #2a2a2a', borderRadius: 6, padding: '8px 10px',
+                    border: '1px solid var(--workspace-border)', borderRadius: 6, padding: '8px 10px',
                   }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#e9e9e9', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
                       {s.step}
                     </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', fontSize: 11.5, color: '#bdbdbd' }}>
-                      <span><span style={{ color: '#777' }}>Model:</span> {s.model}</span>
-                      <span><span style={{ color: '#777' }}>Prompt:</span> {s.promptVariant}</span>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 14px', fontSize: 11.5, color: 'var(--workspace-muted)' }}>
+                      <span><span style={{ color: 'var(--workspace-muted)' }}>Model:</span> {s.model}</span>
+                      <span><span style={{ color: 'var(--workspace-muted)' }}>Prompt:</span> {s.promptVariant}</span>
                     </div>
                     {s.promptWhy && (
-                      <div style={{ fontSize: 11.5, lineHeight: 1.5, color: '#8f8f8f', marginTop: 4 }}>
+                      <div style={{ fontSize: 11.5, lineHeight: 1.5, color: 'var(--workspace-muted)', marginTop: 4 }}>
                         {s.promptWhy}
                       </div>
                     )}
@@ -199,16 +199,16 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
               <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {breakdown.map((b) => (
                   <div key={b.step} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5 }}>
-                    <span style={{ width: 150, color: '#bbb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ width: 150, color: 'var(--workspace-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {b.step}
                     </span>
-                    <div style={{ flex: 1, height: 5, background: '#2e2e2e', borderRadius: 3, overflow: 'hidden' }}>
+                    <div style={{ flex: 1, height: 5, background: 'var(--workspace-surface)', borderRadius: 3, overflow: 'hidden' }}>
                       <div style={{
                         width: `${Math.max(0, Math.min(100, b.score))}%`, height: '100%',
                         background: b.score >= 80 ? '#22c55e' : b.score >= 60 ? '#f59e0b' : '#ef4444',
                       }} />
                     </div>
-                    <span style={{ width: 70, textAlign: 'right', color: '#888', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ width: 70, textAlign: 'right', color: 'var(--workspace-muted)', fontVariantNumeric: 'tabular-nums' }}>
                       {b.score.toFixed(0)}% · {b.pass}/{b.total}
                     </span>
                   </div>
@@ -246,13 +246,13 @@ function Stat({ label, value }: { label: string; value: string }) {
     <span style={{
       display: 'inline-flex', flexDirection: 'column', gap: 1,
       padding: '5px 10px',
-      background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a',
+      background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
       borderRadius: 6,
     }}>
-      <span style={{ fontSize: 9.5, color: '#777', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+      <span style={{ fontSize: 9.5, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         {label}
       </span>
-      <span style={{ fontSize: 13, fontWeight: 600, color: '#e9e9e9', fontVariantNumeric: 'tabular-nums' }}>
+      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)', fontVariantNumeric: 'tabular-nums' }}>
         {value}
       </span>
     </span>

@@ -47,19 +47,19 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(680px, 92vw)', height: '100%',
-          backgroundColor: '#161616', borderLeft: '1px solid #2e2e2e',
+          backgroundColor: 'var(--workspace-canvas)', borderLeft: '1px solid var(--workspace-border)',
           overflow: 'hidden', overflowWrap: 'anywhere',
           display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid #444' }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: '#fff', flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
+          <h3 style={{ margin: 0, fontSize: 14, color: 'var(--workspace-text)', flex: 1 }}>
             Trace
           </h3>
           <button
             onClick={onClose}
             style={{
-              background: 'transparent', border: 'none', color: '#888',
+              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
               cursor: 'pointer', padding: 4, minWidth: 36, minHeight: 36, fontFamily: 'inherit',
             }}
             aria-label="Close"
@@ -94,7 +94,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
 
         {(optimized.retrieved_sources?.length ?? 0) > 0 && (
           <Section label="Retrieved sources">
-            <div style={{ fontSize: 12, color: '#888' }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
               {(optimized.retrieved_sources || []).join(', ')}
             </div>
           </Section>
@@ -104,7 +104,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           <Section label="Default-config answer" muted>
             <Body body={baseline.actual_answer} muted />
             {baseline.reasoning && (
-              <div style={{ marginTop: 6, fontSize: 12, color: '#aaa' }}>
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--workspace-muted)' }}>
                 <em>Judge:</em> {baseline.reasoning}
               </div>
             )}
@@ -142,19 +142,19 @@ function ScoreRow({
 function ScoreCell({
   label, score, verdict, primary = false,
 }: { label: string; score: number; verdict?: string | null; primary?: boolean }) {
-  const color = score >= 0.7 ? '#22c55e' : score >= 0.4 ? '#f59e0b' : '#ef4444'
+  const color = score >= 0.7 ? 'var(--workspace-success)' : score >= 0.4 ? 'var(--workspace-warning)' : 'var(--workspace-danger)'
   return (
     <div style={{
       padding: 10, borderRadius: 6,
-      backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : '#1f1f1f',
-      border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : '#2e2e2e'}`,
+      backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : 'var(--workspace-surface)',
+      border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : 'var(--workspace-border)'}`,
     }}>
-      <div style={{ fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color, marginTop: 2 }}>
         {(score * 100).toFixed(0)}%
       </div>
       {verdict && (
-        <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{verdict}</div>
+        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>{verdict}</div>
       )}
     </div>
   )
@@ -166,7 +166,7 @@ function Section({ label, muted = false, children }: {
   return (
     <div>
       <div style={{
-        fontSize: 12, color: muted ? '#aaa' : '#888',
+        fontSize: 12, color: muted ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
         textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
       }}>{label}</div>
       {children}
@@ -177,11 +177,11 @@ function Section({ label, muted = false, children }: {
 function Body({ body, muted = false }: { body: string; muted?: boolean }) {
   return (
     <div style={{
-      fontSize: 12, color: muted ? '#999' : '#e5e5e5',
+      fontSize: 12, color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)',
       whiteSpace: 'pre-wrap' as const, lineHeight: 1.5,
       padding: 10, borderRadius: 6,
-      backgroundColor: '#1a1a1a',
-      border: '1px solid #2a2a2a',
+      backgroundColor: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>
       {body}
     </div>
@@ -191,7 +191,7 @@ function Body({ body, muted = false }: { body: string; muted?: boolean }) {
 function FactList({
   label, items, tone,
 }: { label: string; items: string[]; tone: 'warn' | 'bad' }) {
-  const color = tone === 'bad' ? '#fca5a5' : '#fbbf24'
+  const color = tone === 'bad' ? 'var(--workspace-danger)' : 'var(--workspace-warning)'
   return (
     <Section label={label}>
       <ul style={{ margin: 0, paddingLeft: 18, color, fontSize: 12, lineHeight: 1.5 }}>

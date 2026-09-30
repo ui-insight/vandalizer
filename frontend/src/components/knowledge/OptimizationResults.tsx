@@ -95,9 +95,9 @@ export function OptimizationResults({
       id: 'default',
       label: kbLabels.yourSettings,
       score: (holdoutHeadline ? run.holdout_default_score : run.baseline_default_score) ?? null,
-      color: '#3b82f6',
+      color: 'var(--workspace-info)',
     },
-    { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
+    { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: 'var(--workspace-success)', emphasised: true },
   ]
 
   const winningPerQuery: PerQueryResult[] | undefined = winningTrial?.per_query_results
@@ -143,7 +143,7 @@ export function OptimizationResults({
                     above uses the holdout slice — without this caption the two
                     read as contradictory counts over the same queries. */}
                 {holdoutHeadline && (
-                  <div style={{ fontSize: 12, color: '#aeb5bf', marginBottom: 6, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5 }}>
                     Per-query outcomes below are from the {trainCount ?? ''} training
                     quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
                     the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
@@ -157,7 +157,7 @@ export function OptimizationResults({
       />
 
       {run.baseline_no_kb_score != null && (
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: '#b8bec7' }}>
+        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
           AI-only answer accuracy: {Math.round(run.baseline_no_kb_score * 100)}% on the training questions.
           {' '}This is a separate metric from composite quality above; the two scores cannot be subtracted to measure improvement.
         </p>
@@ -186,12 +186,12 @@ export function OptimizationResults({
             padding: '10px 14px', borderRadius: 6, fontSize: 13,
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
-            color: '#fbbf24',
+            color: 'var(--workspace-warning)',
             display: 'flex', flexDirection: 'column', gap: 4,
           }}
         >
           <div style={{ fontWeight: 600 }}>No significant improvement</div>
-          <div style={{ color: '#d1d5db' }}>
+          <div style={{ color: 'var(--workspace-muted)' }}>
             The best trial was within the <TermDef term="noise-floor">judge's measurement noise</TermDef>{' '}
             (±{((run.judge_variance ?? 0.02) * 80).toFixed(1)} pts confidence interval)
             of your current settings. Apply is disabled — your settings already
@@ -281,9 +281,9 @@ export function OptimizationResults({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-            color: canManage ? '#a78bfa' : '#555',
+            color: canManage ? 'var(--workspace-info)' : 'var(--workspace-muted)',
             background: 'transparent',
-            border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : '#333'),
+            border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : 'var(--workspace-border)'),
             borderRadius: 6, cursor: canManage ? 'pointer' : 'not-allowed',
           }}
         >
@@ -338,14 +338,14 @@ function BestConfigCard({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 14, backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Sparkles size={14} style={{ color: '#a78bfa' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Best configuration</span>
+        <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
         {hasDefault && (
-          <span style={{ fontSize: 12, color: '#aeb5bf', marginLeft: 8 }}>
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)', marginLeft: 8 }}>
             {changed.length === 0
               ? 'identical to default, no settings changed'
               : `${changed.length} setting${changed.length === 1 ? '' : 's'} changed vs default`}
@@ -359,17 +359,17 @@ function BestConfigCard({
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
           {rows.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
+              padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
             }}>
-              <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2 }}>{r.winner}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginTop: 2 }}>{r.winner}</div>
             </div>
           ))}
         </div>
       ) : changed.length === 0 ? (
         <div style={{
-          padding: '8px 12px', fontSize: 12, color: '#bbb',
-          backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a',
+          padding: '8px 12px', fontSize: 12, color: 'var(--workspace-muted)',
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
           borderRadius: 6,
         }}>
           The optimizer didn't find a better setting than your current default. Your
@@ -379,16 +379,16 @@ function BestConfigCard({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {changed.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '8px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
+              padding: '8px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
               display: 'grid', gridTemplateColumns: '1fr auto 1fr auto 1fr',
               alignItems: 'center', gap: 8,
             }}>
               <div>
-                <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
               </div>
-              <div style={{ fontSize: 12, color: '#aeb5bf', textDecoration: 'line-through' }}>{r.def}</div>
-              <div style={{ fontSize: 12, color: '#aeb5bf', textAlign: 'center' }}>→</div>
-              <div style={{ fontSize: 13, color: '#86efac', fontWeight: 600 }}>{r.winner}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textDecoration: 'line-through' }}>{r.def}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textAlign: 'center' }}>→</div>
+              <div style={{ fontSize: 13, color: 'var(--workspace-success)', fontWeight: 600 }}>{r.winner}</div>
               <div />
             </div>
           ))}
@@ -397,7 +397,7 @@ function BestConfigCard({
               onClick={() => setShowUnchanged(v => !v)}
               style={{
                 marginTop: 4, padding: '4px 8px',
-                fontSize: 12, fontFamily: 'inherit', color: '#aeb5bf',
+                fontSize: 12, fontFamily: 'inherit', color: 'var(--workspace-muted)',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 textAlign: 'left',
               }}
@@ -409,10 +409,10 @@ function BestConfigCard({
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
               {unchanged.map(r => (
                 <div key={r.key} title={r.hint} style={{
-                  padding: '6px 10px', backgroundColor: '#202020', borderRadius: 4, cursor: 'help',
+                  padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
                 }}>
-                  <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-                  <div style={{ fontSize: 12, color: '#999', marginTop: 2 }}>{r.winner}</div>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>{r.winner}</div>
                 </div>
               ))}
             </div>
@@ -433,9 +433,9 @@ function BestConfigCard({
             disabled={!canManage || reverting}
             style={{
               padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-              color: canManage && !reverting ? '#bbb' : '#555',
+              color: canManage && !reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
               background: 'transparent',
-              border: '1px solid #3a3a3a',
+              border: '1px solid var(--workspace-border)',
               borderRadius: 6,
               cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
             }}

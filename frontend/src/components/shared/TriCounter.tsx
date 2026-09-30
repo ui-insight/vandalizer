@@ -18,7 +18,7 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
   const counts = computeCounts(optimized || [], baseline || [], epsilon)
   if (counts == null) {
     return (
-      <div style={{ fontSize: 11, color: '#666', padding: '6px 0' }}>
+      <div style={{ fontSize: 11, color: 'var(--workspace-muted)', padding: '6px 0' }}>
         Per-query comparison unavailable for this run.
       </div>
     )
@@ -30,31 +30,31 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
       padding: '10px 12px',
-      backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e',
+      backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)',
       borderRadius: 8,
     }}>
       <Counter
         icon={<ArrowUpRight size={14} />}
         value={improved}
         label="improved"
-        color="#22c55e"
+        color="var(--workspace-success)"
       />
       <Counter
         icon={<ArrowDownRight size={14} />}
         value={regressed}
         label="regressed"
-        color={regressed > 0 ? '#ef4444' : '#666'}
+        color={regressed > 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)'}
       />
       <Counter
         icon={<Minus size={14} />}
         value={unchanged}
         label="unchanged"
-        color="#888"
+        color="var(--workspace-muted)"
       />
       {biggestRegression && (
         <div style={{
-          marginLeft: 'auto', fontSize: 10, color: '#fca5a5',
+          marginLeft: 'auto', fontSize: 10, color: 'var(--workspace-danger)',
           maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}
@@ -75,7 +75,7 @@ function Counter({
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ color }}>{icon}</span>
       <span style={{ fontSize: 18, fontWeight: 700, color }}>{value}</span>
-      <span style={{ fontSize: 11, color: '#888' }}>{label}</span>
+      <span style={{ fontSize: 11, color: 'var(--workspace-muted)' }}>{label}</span>
     </div>
   )
 }

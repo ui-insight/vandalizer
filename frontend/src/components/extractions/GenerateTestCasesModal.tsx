@@ -6,7 +6,9 @@
  * approve and save. The user is in the loop for every saved test case, so
  * we never bake "extract once" bias into ground truth.
  */
+import { createPortal } from '../shared/panelPortal'
 import { useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Loader2, FileText, Check, AlertCircle } from 'lucide-react'
 import {
   generateTestCaseProposals,
@@ -103,25 +105,29 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
     })
   }
 
-  return (
+  return createPortal(
     <>
       <div style={{
         position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}>
-        <div style={{
+        <FocusTrap active={!showPicker} focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, initialFocus: '#generate-test-cases-title' }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="generate-test-cases-title" onKeyDown={event => {
+          if (event.key === 'Escape' && !showPicker) { event.preventDefault(); event.stopPropagation(); onClose() }
+        }} style={{
           width: step === 'review' ? 720 : 480,
+          maxWidth: 'calc(100vw - 24px)',
           maxHeight: '90vh', overflowY: 'auto',
           padding: 22, backgroundColor: '#fff',
           border: '1px solid #e5e7eb', borderRadius: 10,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <h3 style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>
+            <h3 id="generate-test-cases-title" tabIndex={-1} style={{ margin: 0, fontSize: 16, color: '#1f2937' }}>
               {step === 'review' ? 'Review proposed test cases' : 'Generate test cases'}
             </h3>
             <button
-              onClick={onClose}
-              style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
+              onClick={onClose} aria-label="Close test case generation"
+              style={{ marginLeft: 'auto', minWidth: 36, minHeight: 36, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
             >
               <X size={18} />
             </button>
@@ -136,8 +142,8 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
           )}
 
           {step === 'generating' && (
-            <div style={{ padding: '40px 0', textAlign: 'center', color: '#6b7280' }}>
-              <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: '#7c3aed' }} />
+            <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--workspace-muted)' }}>
+              <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--workspace-info)' }} />
               <div style={{ marginTop: 12, fontSize: 13 }}>Generating proposals…</div>
             </div>
           )}
@@ -157,6 +163,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
             />
           )}
         </div>
+        </FocusTrap>
       </div>
 
       {showPicker && (
@@ -166,7 +173,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
           onSelect={handleDocumentsPicked}
         />
       )}
-    </>
+    </>, document.body
   )
 }
 
@@ -197,20 +204,20 @@ function PickStep({
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
                   padding: '8px 12px', textAlign: 'left',
-                  backgroundColor: active ? '#f3e8ff' : '#f9fafb',
-                  border: '1px solid ' + (active ? '#7c3aed' : '#e5e7eb'),
+                  backgroundColor: active ? 'var(--workspace-selected)' : '#f9fafb',
+                  border: '1px solid ' + (active ? 'var(--workspace-accent-ink)' : '#e5e7eb'),
                   borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 <span style={{
                   width: 14, height: 14, borderRadius: '50%',
-                  border: '2px solid ' + (active ? '#7c3aed' : '#9ca3af'),
-                  backgroundColor: active ? '#7c3aed' : 'transparent',
+                  border: '2px solid ' + (active ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
+                  backgroundColor: active ? 'var(--highlight-color, #eab308)' : 'transparent',
                   flexShrink: 0,
                 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>{COVERAGE_LABELS[c].label}</div>
-                  <div style={{ fontSize: 11, color: '#6b7280' }}>{COVERAGE_LABELS[c].description}</div>
+                  <div style={{ fontSize: 11, color: 'var(--workspace-muted)' }}>{COVERAGE_LABELS[c].description}</div>
                 </div>
               </button>
             )
@@ -222,9 +229,9 @@ function PickStep({
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-          color: '#fff',
-          background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-          border: '1px solid #7c3aed',
+          color: 'var(--workspace-text)',
+          background: 'var(--workspace-canvas)',
+          border: '1px solid var(--workspace-accent-ink)',
           borderRadius: 6, cursor: 'pointer',
         }}
       >
@@ -258,7 +265,7 @@ function ReviewStep({
           padding: 12, marginBottom: 14,
           background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6,
         }}>
-          <AlertCircle size={14} style={{ color: '#dc2626', flexShrink: 0, marginTop: 2 }} />
+          <AlertCircle size={14} style={{ color: 'var(--workspace-danger)', flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: 12, color: '#7f1d1d' }}>
             <div style={{ fontWeight: 600, marginBottom: 4 }}>No proposals could be generated.</div>
             {errors.map((e, i) => (
@@ -273,7 +280,7 @@ function ReviewStep({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12, color: '#6b7280' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 12, color: 'var(--workspace-muted)' }}>
         <span><strong style={{ color: '#1f2937' }}>{selectedIds.size}</strong> of {proposals.length} selected</span>
         <button
           onClick={onSelectAll}
@@ -291,7 +298,7 @@ function ReviewStep({
           background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6,
           fontSize: 11, color: '#78350f',
         }}>
-          <AlertCircle size={12} style={{ color: '#d97706', flexShrink: 0, marginTop: 2 }} />
+          <AlertCircle size={12} style={{ color: 'var(--workspace-warning)', flexShrink: 0, marginTop: 2 }} />
           <div>
             {errors.length} document{errors.length === 1 ? '' : 's'} couldn't be processed.
           </div>
@@ -307,7 +314,7 @@ function ReviewStep({
               style={{
                 padding: 12,
                 background: selected ? '#fff' : '#f9fafb',
-                border: '1px solid ' + (selected ? '#7c3aed' : '#e5e7eb'),
+                border: '1px solid ' + (selected ? 'var(--workspace-accent-ink)' : '#e5e7eb'),
                 borderRadius: 6,
                 opacity: selected ? 1 : 0.6,
               }}
@@ -345,11 +352,11 @@ function ReviewStep({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            color: '#fff',
+            color: 'var(--workspace-text)',
             background: saving || selectedIds.size === 0
               ? '#9ca3af'
-              : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-            border: '1px solid ' + (saving || selectedIds.size === 0 ? '#9ca3af' : '#7c3aed'),
+              : 'var(--workspace-canvas)',
+            border: '1px solid ' + (saving || selectedIds.size === 0 ? 'var(--workspace-border)' : 'var(--workspace-accent-ink)'),
             borderRadius: 6,
             cursor: saving || selectedIds.size === 0 ? 'not-allowed' : 'pointer',
           }}
@@ -367,7 +374,7 @@ function Row({
 }: { field: string; value: string; disabled: boolean; onChange: (v: string) => void }) {
   return (
     <>
-      <div style={{ color: '#6b7280', alignSelf: 'center' }}>{field}:</div>
+      <div style={{ color: 'var(--workspace-muted)', alignSelf: 'center' }}>{field}:</div>
       <input
         value={value}
         disabled={disabled}
@@ -378,7 +385,7 @@ function Row({
           padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
           color: '#1f2937',
           background: disabled ? '#f3f4f6' : '#fff',
-          border: '1px solid #d1d5db',
+          border: '1px solid var(--workspace-border)',
           borderRadius: 4,
         }}
       />
@@ -389,11 +396,11 @@ function Row({
 const cancelBtnStyle: React.CSSProperties = {
   padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
   color: '#374151', background: '#fff',
-  border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
+  border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
 }
 
 const linkBtnStyle: React.CSSProperties = {
   padding: '2px 8px', fontSize: 11, fontFamily: 'inherit',
-  color: '#7c3aed', background: 'transparent', border: 'none',
+  color: 'var(--workspace-info)', background: 'transparent', border: 'none',
   cursor: 'pointer', textDecoration: 'underline',
 }

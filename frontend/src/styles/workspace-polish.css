@@ -45,14 +45,14 @@
 .first-task-steps strong { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: #edf0f2; color: #414b55; }
 .first-task-steps [aria-current] { color: #242b32; font-weight: 650; }
 .first-task-steps [aria-current] strong { background: var(--highlight-color); color: var(--highlight-text-color); }
-.kb-health-summary { padding: 12px 14px; margin-bottom: 14px; border: 1px solid #52504a; background: #2d2b24; border-radius: 8px; color: #fcd34d; font-size: 13px; line-height: 1.5; }
-.kb-health-caption { display: block; margin-top: 4px; color: #bec4cc; font-size: 12px; }
-.kb-management { position: relative; font-size: 12px; color: #e5e5e5; }
-.kb-management summary { cursor: pointer; padding: 7px 12px; border: 1px solid #555; border-radius: 6px; }
+.kb-health-summary { padding: 12px 14px; margin-bottom: 14px; border: 1px solid var(--workspace-border); background: var(--workspace-warning-surface); border-radius: 8px; color: var(--workspace-warning); font-size: 13px; line-height: 1.5; }
+.kb-health-caption { display: block; margin-top: 4px; color: var(--workspace-muted); font-size: 12px; }
+.kb-management { position: relative; font-size: 12px; color: var(--workspace-text); }
+.kb-management summary { cursor: pointer; padding: 7px 12px; border: 1px solid var(--workspace-border); border-radius: 6px; }
 .kb-management-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 0 4px; }
-.kb-detail-tabs { display: flex; gap: 8px; margin: 8px 0 12px; border-bottom: 1px solid #454545; }
-.kb-detail-tabs button { padding: 12px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #bec4cc; font: inherit; font-size: 14px; cursor: pointer; }
-.kb-detail-tabs [aria-selected="true"] { color: #fff; border-bottom-color: var(--highlight-color); font-weight: 650; }
+.kb-detail-tabs { display: flex; gap: 8px; margin: 8px 0 12px; border-bottom: 1px solid var(--workspace-border); }
+.kb-detail-tabs button { padding: 12px 14px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: var(--workspace-muted); font: inherit; font-size: 14px; cursor: pointer; }
+.kb-detail-tabs [aria-selected="true"] { color: var(--workspace-text); border-bottom-color: var(--highlight-color); font-weight: 650; }
 
 @media (max-width: 767px) {
   .workspace-header { padding: 0 12px !important; gap: 8px; }
@@ -121,8 +121,8 @@
 .agent-approval dd { margin: 0; overflow-wrap: anywhere; }
 .agent-approval-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .agent-approval button:first-child { background: var(--highlight-color); color: var(--highlight-text-color); border-color: transparent; }
-.kb-health-summary { background: #252a2d; color: #e1e7eb; border-color: #465059; }
-.kb-health-summary[data-attention="true"] { background: #2d2b24; color: #fcd34d; border-color: #52504a; }
+.kb-health-summary { background: var(--workspace-canvas); color: var(--workspace-text); border-color: var(--workspace-border); }
+.kb-health-summary[data-attention="true"] { background: var(--workspace-warning-surface); color: var(--workspace-warning); border-color: var(--workspace-border); }
 
 @media (max-width: 600px) { .catalog-content { padding: 16px 12px !important; } }
 
@@ -131,7 +131,7 @@
 
 .file-browser p { color: #555e68; }
 
-.kb-refresh-settings { margin-bottom: 12px; color: #bec4cc; font-size: 12px; }
+.kb-refresh-settings { margin-bottom: 12px; color: var(--workspace-muted); font-size: 12px; }
 .kb-refresh-settings summary { cursor: pointer; padding: 8px 0; }
 .kb-management[open] { flex-basis: 100%; }
 
@@ -164,6 +164,15 @@
   --workspace-muted: #59616b;
   --workspace-border: #d1d5db;
   --workspace-hover: #f3f4f6;
+  --workspace-accent-ink: color-mix(in srgb, var(--highlight-color, #eab308) 25%, #202124);
+  --workspace-info: #1e40af;
+  --workspace-info-surface: #eff6ff;
+  --workspace-success: #14532d;
+  --workspace-success-surface: #f0fdf4;
+  --workspace-warning: #78350f;
+  --workspace-warning-surface: #fffbeb;
+  --workspace-danger: #991b1b;
+  --workspace-danger-surface: #fef2f2;
   --workspace-selected: color-mix(in srgb, var(--highlight-color, #eab308) 12%, white);
 }
 .automation-surface { color: var(--workspace-text); }
@@ -246,3 +255,4 @@
 @media (max-width: 767px) { .file-browser > .workspace-section-header { margin-inline: -12px; } }
 
 @media (max-width: 767px) { .project-context-label { display: none; } }
+.knowledge-surface { color: var(--workspace-text); }

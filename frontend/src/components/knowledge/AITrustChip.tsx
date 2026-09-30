@@ -37,7 +37,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
         title={composite
           ? 'Composite retrieval and answer quality on tested questions. This is not an answer-accuracy comparison with AI alone.'
           : 'Answer accuracy on tested questions; no AI-only comparison was recorded.'}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: `${padY}px ${padX}px`, borderRadius: 10, fontSize, fontWeight: 600, color: '#cbd5e1', backgroundColor: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: `${padY}px ${padX}px`, borderRadius: 10, fontSize, fontWeight: 600, color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)' }}
       >
         <Minus size={iconSize} style={{ flexShrink: 0 }} />
         {composite
@@ -55,7 +55,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: `${padY}px ${padX}px`, borderRadius: 999,
           fontSize, fontWeight: 600,
-          color: '#fbbf24',
+          color: 'var(--workspace-warning)',
           backgroundColor: 'rgba(251, 191, 36, 0.1)',
           border: '1px solid rgba(251, 191, 36, 0.3)',
         }}
@@ -78,7 +78,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
           display: 'inline-flex', alignItems: 'center', gap: 4,
           padding: `${padY}px ${padX}px`, borderRadius: 999,
           fontSize, fontWeight: 600,
-          color: '#22c55e',
+          color: 'var(--workspace-success)',
           backgroundColor: 'rgba(34, 197, 94, 0.12)',
           border: '1px solid rgba(34, 197, 94, 0.3)',
         }}
@@ -101,9 +101,9 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
         display: 'inline-flex', alignItems: 'center', gap: 4,
         padding: `${padY}px ${padX}px`, borderRadius: 999,
         fontSize, fontWeight: 600,
-        color: '#9ca3af',
-        backgroundColor: 'rgba(255,255,255,0.06)',
-        border: '1px solid rgba(255,255,255,0.1)',
+        color: 'var(--workspace-muted)',
+        backgroundColor: 'var(--workspace-canvas)',
+        border: '1px solid var(--workspace-border)',
       }}
     >
       <Minus size={iconSize} />

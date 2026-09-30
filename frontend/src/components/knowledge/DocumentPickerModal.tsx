@@ -279,8 +279,8 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         aria-label="Add Documents"
         style={{
           width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflow: 'hidden',
-          backgroundColor: '#1e1e1e', borderRadius: 12,
-          border: dragActive ? '1px dashed var(--highlight-color, #eab308)' : '1px solid #3a3a3a',
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 12,
+          border: dragActive ? '1px dashed var(--highlight-color, #eab308)' : '1px solid var(--workspace-border)',
           padding: 16,
           display: 'flex', flexDirection: 'column', gap: 14,
           position: 'relative',
@@ -297,7 +297,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             backgroundColor: 'rgba(234, 179, 8, 0.08)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2,
           }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--highlight-color, #eab308)' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-accent-ink)' }}>
               Drop files to upload
             </div>
           </div>
@@ -305,7 +305,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
 
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>Add Documents</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--workspace-text)' }}>Add Documents</span>
           <button
             type="button"
             aria-label="Close"
@@ -313,7 +313,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             disabled={submitting}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
-            <X size={18} style={{ color: '#888' }} aria-hidden="true" />
+            <X size={18} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
           </button>
         </div>
 
@@ -344,11 +344,11 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               <Upload size={14} aria-hidden="true" />
               Upload files
             </button>
-            <span style={{ fontSize: 12, color: '#888' }}>
+            <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
               or drag &amp; drop anywhere in this dialog
             </span>
           </div>
-          <span style={{ fontSize: 12, color: '#b8bec7', lineHeight: 1.6 }}>
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.6 }}>
             {uploadPolicy.description} Uploaded files are saved in Files; Add attaches the selected documents to this KB for indexing.
           </span>
         </div>
@@ -356,7 +356,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         {/* Folder filter + Search */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 0 }}>
-            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#666' }} aria-hidden="true" />
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--workspace-muted)' }} aria-hidden="true" />
             <input
               type="text"
               aria-label="Search documents by name or content"
@@ -365,22 +365,22 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               placeholder="Search by name or content..."
               style={{
                 width: '100%', padding: '10px 12px 10px 34px', fontSize: 13, fontFamily: 'inherit',
-                backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                border: '1px solid #3a3a3a', borderRadius: 8,
+                backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+                border: '1px solid var(--workspace-border)', borderRadius: 8,
                 boxSizing: 'border-box',
               }}
             />
           </div>
           <div style={{ position: 'relative', flex: '1 1 160px', minWidth: 0 }}>
-            <FolderIcon size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#666', pointerEvents: 'none' }} aria-hidden="true" />
+            <FolderIcon size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--workspace-muted)', pointerEvents: 'none' }} aria-hidden="true" />
             <select
               aria-label="Filter by folder"
               value={folderFilter}
               onChange={e => setFolderFilter(e.target.value)}
               style={{
                 width: '100%', padding: '10px 10px 10px 30px', fontSize: 13, fontFamily: 'inherit',
-                backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                border: '1px solid #3a3a3a', borderRadius: 8,
+                backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+                border: '1px solid var(--workspace-border)', borderRadius: 8,
                 appearance: 'none', boxSizing: 'border-box', cursor: 'pointer',
               }}
             >
@@ -397,15 +397,15 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         {onSubmitFolder && folderFilter && folderFilter !== '__root__' && (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8,
-            padding: '8px 12px', backgroundColor: '#252525',
-            border: '1px solid #333', borderRadius: 8,
+            padding: '8px 12px', backgroundColor: 'var(--workspace-surface)',
+            border: '1px solid var(--workspace-border)', borderRadius: 8,
           }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--workspace-muted)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={includeSubfolders}
                 onChange={e => setIncludeSubfolders(e.target.checked)}
-                style={{ accentColor: 'var(--highlight-color, #eab308)', cursor: 'pointer' }}
+                style={{ accentColor: 'var(--workspace-accent-ink)', cursor: 'pointer' }}
               />
               Include subfolders
             </label>
@@ -431,19 +431,19 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
           <div style={{
             display: 'flex', flexDirection: 'column', gap: 4,
             maxHeight: 100, overflowY: 'auto',
-            padding: 8, backgroundColor: '#252525', borderRadius: 6,
-            border: '1px solid #333',
+            padding: 8, backgroundColor: 'var(--workspace-surface)', borderRadius: 6,
+            border: '1px solid var(--workspace-border)',
           }}>
             {uploads.map(u => (
               <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                {u.status === 'uploading' && <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-hidden="true" />}
-                {u.status === 'done' && <Check size={12} style={{ color: '#6a9955' }} aria-hidden="true" />}
-                {u.status === 'error' && <X size={12} style={{ color: '#c75450' }} aria-hidden="true" />}
-                <span style={{ color: '#ccc', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {u.status === 'uploading' && <Loader2 size={12} style={{ color: 'var(--workspace-muted)', animation: 'spin 1s linear infinite' }} aria-hidden="true" />}
+                {u.status === 'done' && <Check size={12} style={{ color: 'var(--workspace-success)' }} aria-hidden="true" />}
+                {u.status === 'error' && <X size={12} style={{ color: 'var(--workspace-danger)' }} aria-hidden="true" />}
+                <span style={{ color: 'var(--workspace-text)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {u.name}
                 </span>
-                {u.status === 'error' && <span style={{ color: '#c75450', fontSize: 11 }}>{u.error}</span>}
-                {u.status === 'done' && <span style={{ color: '#6a9955', fontSize: 11 }}>uploaded &amp; selected</span>}
+                {u.status === 'error' && <span style={{ color: 'var(--workspace-danger)', fontSize: 11 }}>{u.error}</span>}
+                {u.status === 'done' && <span style={{ color: 'var(--workspace-success)', fontSize: 11 }}>uploaded &amp; selected</span>}
                 {u.status !== 'uploading' && (
                   <button
                     type="button"
@@ -452,7 +452,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                     title="Remove"
                     style={{
                       background: 'transparent', border: 'none', cursor: 'pointer',
-                      padding: 2, display: 'flex', color: '#888',
+                      padding: 2, display: 'flex', color: 'var(--workspace-muted)',
                     }}
                   >
                     <X size={12} aria-hidden="true" />
@@ -464,15 +464,15 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         )}
 
         {/* Results */}
-        {searchError && <div role="alert" style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.6 }}>{searchError} <button type="button" onClick={() => doSearch(query, folderFilter)} style={{ color: '#fff', background: '#333', border: '1px solid #666', borderRadius: 5, padding: '6px 10px' }}>Retry search</button></div>}
+        {searchError && <div role="alert" style={{ fontSize: 13, color: 'var(--workspace-danger)', lineHeight: 1.6 }}>{searchError} <button type="button" onClick={() => doSearch(query, folderFilter)} style={{ color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 5, padding: '6px 10px' }}>Retry search</button></div>}
         <div role="region" aria-label="Available documents" tabIndex={0} style={{ flex: 1, overflowY: 'auto', maxHeight: 360, minHeight: 120 }}>
           {loading ? (
-            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: '#888' }}>
+            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: 'var(--workspace-muted)' }}>
               <Loader2 style={{ width: 18, height: 18, margin: '0 auto', animation: 'spin 1s linear infinite' }} aria-hidden="true" />
               <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading documents…</span>
             </div>
           ) : results.length === 0 ? (
-            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: '#888', fontSize: 13 }}>
+            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: 'var(--workspace-muted)', fontSize: 13 }}>
               {query ? 'No documents found' : folderFilter ? 'No documents in this folder' : 'No documents available. Upload some above.'}
             </div>
           ) : (
@@ -490,8 +490,8 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
                       padding: '10px 12px', width: '100%', textAlign: 'left',
-                      backgroundColor: isSelected ? '#2a3a2a' : '#2a2a2a',
-                      border: isSelected ? '1px solid #4a7a4a' : '1px solid #3a3a3a',
+                      backgroundColor: isSelected ? 'var(--workspace-success-surface)' : 'var(--workspace-surface)',
+                      border: isSelected ? '1px solid #4a7a4a' : '1px solid var(--workspace-border)',
                       borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
                       transition: 'background-color 0.1s',
                     }}
@@ -499,29 +499,29 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                     <div
                       style={{
                         width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                        border: isSelected ? 'none' : '1px solid #555',
+                        border: isSelected ? 'none' : '1px solid var(--workspace-border)',
                         backgroundColor: isSelected ? 'var(--highlight-color, #eab308)' : 'transparent',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
                       {isSelected && <Check size={12} style={{ color: '#000' }} aria-hidden="true" />}
                     </div>
-                    <FileText size={14} style={{ color: '#888', flexShrink: 0 }} aria-hidden="true" />
+                    <FileText size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        fontSize: 13, color: '#e5e5e5', overflowWrap: 'anywhere',
+                        fontSize: 13, color: 'var(--workspace-text)', overflowWrap: 'anywhere',
                       }}>
                         {doc.title}
                       </div>
                       <div style={{
-                        fontSize: 12, color: '#b8bec7', marginTop: 2,
+                        fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2,
                         overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       }}>
                         {doc.extension.toUpperCase()}
                         {doc.num_pages > 0 ? ` · ${doc.num_pages} pages` : ''}
                         {folderPath ? ` · ${folderPath}` : ''}
                         {isLargeDoc(doc) && (
-                          <span style={{ color: '#fbbf24' }}> · Large — slower to index</span>
+                          <span style={{ color: 'var(--workspace-warning)' }}> · Large — slower to index</span>
                         )}
                       </div>
                     </div>
@@ -535,7 +535,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         {/* Heads-up before committing to a slow index */}
         {selectedLargeCount > 0 && (
           <div role="status" aria-live="polite" style={{
-            fontSize: 12, color: '#fbbf24', marginBottom: 10,
+            fontSize: 12, color: 'var(--workspace-warning)', marginBottom: 10,
             padding: '8px 12px', borderRadius: 6,
             backgroundColor: 'rgba(217, 119, 6, 0.1)',
             border: '1px solid rgba(217, 119, 6, 0.25)',
@@ -549,9 +549,9 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
 
         {/* Footer */}
         </div>
-        {submitError && <div role="alert" style={{ color: '#fca5a5', fontSize: 13, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{submitError}</div>}
+        {submitError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 13, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{submitError}</div>}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, flexShrink: 0 }}>
-          <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#888' }}>
+          <span role="status" aria-live="polite" style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
             {selected.size > 0 ? `${selected.size} selected` : ''}
             {uploadingCount > 0 ? `${selected.size > 0 ? ' · ' : ''}${uploadingCount} uploading` : ''}
           </span>
@@ -562,8 +562,8 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               disabled={submitting}
               style={{
                 padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-                color: '#ccc', backgroundColor: 'transparent',
-                border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
+                color: 'var(--workspace-text)', backgroundColor: 'transparent',
+                border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
               }}
             >
               Cancel

@@ -19,14 +19,14 @@ const RED = {
   border: '#fecaca',
   strong: '#991b1b',
   text: '#b91c1c',
-  icon: '#dc2626',
+  icon: 'var(--workspace-danger)',
 }
 
 const VIOLET = {
   surface: '#f5f3ff',
   border: '#ddd6fe',
   text: '#5b21b6',
-  icon: '#7c3aed',
+  icon: 'var(--workspace-info)',
 }
 
 const NEUTRAL = {
@@ -175,8 +175,8 @@ export function FailedBanner({
       )}
       <button onClick={onRunAgain} style={{
         padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-        color: '#fff', backgroundColor: '#7c3aed',
-        border: '1px solid #7c3aed', borderRadius: 6, cursor: 'pointer',
+        color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
+        border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
       }}>
         {retryLabel}
       </button>
@@ -206,8 +206,8 @@ export function CancelledBanner({ completedTrials, onRunAgain, title = 'Optimiza
       </div>
       <button onClick={onRunAgain} style={{
         padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-        color: '#fff', backgroundColor: '#7c3aed',
-        border: '1px solid #7c3aed', borderRadius: 6, cursor: 'pointer',
+        color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
+        border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
       }}>
         {retryLabel}
       </button>

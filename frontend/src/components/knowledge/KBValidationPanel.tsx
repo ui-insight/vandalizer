@@ -222,11 +222,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
 
   const latestScore = latestQuality?.score ?? null
   const scoreColor =
-    latestScore == null ? '#b8bec7'
-    : latestScore >= 90 ? '#22c55e'
+    latestScore == null ? 'var(--workspace-muted)'
+    : latestScore >= 90 ? 'var(--workspace-success)'
     : latestScore >= 70 ? '#3b82f6'
-    : latestScore >= 50 ? '#f59e0b'
-    : '#ef4444'
+    : latestScore >= 50 ? 'var(--workspace-warning)'
+    : 'var(--workspace-danger)'
 
   // Build the "source of this score" tooltip — answers the audit's #11 directly.
   // Leads with what the number IS (a composite) before who judged it, because
@@ -270,8 +270,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       style={{
         marginTop: 12,
         padding: 12,
-        backgroundColor: '#1f1f1f',
-        border: '1px solid #2e2e2e',
+        backgroundColor: 'var(--workspace-surface)',
+        border: '1px solid var(--workspace-border)',
         borderRadius: 8,
       }}
     >
@@ -290,11 +290,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       >
         {onToggleCollapsed && (
           collapsed
-            ? <ChevronRight size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
-            : <ChevronDown size={14} style={{ color: '#b8bec7', flexShrink: 0 }} />
+            ? <ChevronRight size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
+            : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
         )}
-        <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
-        <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
+        <ShieldCheck size={16} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
+        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
         {latestScore != null && (
           <span
             role="status"
@@ -303,8 +303,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
-              color: scoreColor, backgroundColor: 'rgba(255,255,255,0.05)',
-              border: `1px solid ${scoreColor}33`,
+              color: scoreColor, backgroundColor: 'var(--workspace-canvas)',
+              border: `1px solid color-mix(in srgb, ${scoreColor} 20.0%, transparent)`,
             }}
           >
             <span style={{
@@ -317,7 +317,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={tooltip}
             style={{
-              fontSize: 12, color: '#b8bec7',
+              fontSize: 12, color: 'var(--workspace-muted)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -328,7 +328,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={`The applied optimization pins ${latestQuality.answerModelFallback.configured}, which is no longer in System Config. This score was answered by ${latestQuality.answerModelFallback.used}. Re-run Autovalidate or revert the optimization to clear this.`}
             style={{
-              fontSize: 12, color: '#f59e0b',
+              fontSize: 12, color: 'var(--workspace-warning)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -336,9 +336,9 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           </span>
         )}
         {collapsed && running && (
-          <Loader2 size={12} style={{ color: '#b8bec7', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
+          <Loader2 size={12} style={{ color: 'var(--workspace-muted)', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: '#b8bec7' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--workspace-muted)' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
       </button>
@@ -348,18 +348,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           know what each tab is for without clicking through. */}
       <div
         style={{
-          fontSize: 13, color: '#b8bec7', marginBottom: 6, lineHeight: 1.5,
+          fontSize: 13, color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5,
         }}
       >
         Add test questions, check answer quality, then compare retrieval settings if needed.
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
+      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid var(--workspace-border)', marginBottom: 10 }}>
         {TAB_LABELS.map((t, idx) => {
           const active = tab === t.id
           const Icon = t.icon
-          const isAuto = t.id === 'autovalidate'
           return (
             <button
               key={t.id}
@@ -376,19 +375,19 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
                 fontFamily: 'inherit',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 background: 'transparent',
-                color: active ? '#fff' : '#b8bec7',
+                color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                 border: 'none',
                 padding: '6px 12px',
                 fontSize: 12,
                 fontWeight: 600,
                 cursor: 'pointer',
                 borderBottom: active
-                  ? `2px solid ${isAuto ? '#a78bfa' : '#2563eb'}`
+                  ? '2px solid var(--highlight-color, #eab308)'
                   : '2px solid transparent',
                 marginBottom: -1,
               }}
             >
-              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#b8bec7' }} aria-hidden="true" />}
+              {Icon && <Icon size={12} style={{ color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)' }} aria-hidden="true" />}
               {t.label}
             </button>
           )
@@ -396,16 +395,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       </div>
 
       {tab !== 'run' && progress && (
-        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 13, color: progress.phase === 'failed' ? '#fca5a5' : '#c5c9d0', lineHeight: 1.6 }}>
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 13, color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
           <div>{progress.message}</div>
           {progress.delayed && <div>This check is taking longer than usual; it remains active.</div>}
-          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 8, padding: '7px 12px', color: '#fff', background: '#333', border: '1px solid #666', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}
+          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 8, padding: '7px 12px', color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}
         </div>
       )}
       {/* Tab content */}
       <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
       {loading ? (
-        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#b8bec7' }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: 'var(--workspace-muted)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
           <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
         </div>

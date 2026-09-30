@@ -355,9 +355,9 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
 
   const extractionLabels = DOMAIN_LABELS.extraction.baselineTile
   const baselines: BaselinePoint[] = [
-    { id: 'no-tool', label: extractionLabels.noBaseline, score: displayedRun.baseline_no_tool_score, color: '#9ca3af' },
+    { id: 'no-tool', label: extractionLabels.noBaseline, score: displayedRun.baseline_no_tool_score, color: 'var(--workspace-muted)' },
     { id: 'default', label: extractionLabels.yourSettings, score: displayedRun.baseline_default_score, color: '#3b82f6' },
-    { id: 'optimized', label: extractionLabels.tuned, score: displayedRun.optimized_score, color: '#22c55e', emphasised: true },
+    { id: 'optimized', label: extractionLabels.tuned, score: displayedRun.optimized_score, color: 'var(--workspace-success)', emphasised: true },
   ]
   const isAlreadyApplied = displayedRun.previous_override !== null
 
@@ -382,7 +382,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 12,
       padding: 16, borderRadius: 8,
-      background: '#1a1a1a', border: '1px solid #2a2a2a',
+      background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
     }}>
       {isPast && (
         <PastRunBanner
@@ -391,7 +391,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
         />
       )}
       {viewingPastLoading && (
-        <div style={{ fontSize: 12, color: '#888', padding: 8 }}>Loading past run…</div>
+        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: 8 }}>Loading past run…</div>
       )}
       <QualityComparisonCard
         baselines={baselines}
@@ -410,7 +410,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
       {displayedRun.score_sample_size
         && displayedRun.score_sample_size.sample_size_factor < 1
         && displayedRun.score_sample_size.test_cases_needed > 0 && (
-        <div style={{ fontSize: 11, color: '#fbbf24', marginTop: -4 }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-warning)', marginTop: -4 }}>
           Scores are discounted for a small test set, measured on{' '}
           {displayedRun.score_sample_size.num_test_cases} test case
           {displayedRun.score_sample_size.num_test_cases === 1 ? '' : 's'}.
@@ -428,12 +428,12 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
             padding: '10px 14px', borderRadius: 6, fontSize: 13,
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
-            color: '#fbbf24',
+            color: 'var(--workspace-warning)',
             display: 'flex', flexDirection: 'column', gap: 4,
           }}
         >
           <div style={{ fontWeight: 600 }}>No significant improvement</div>
-          <div style={{ color: '#d1d5db' }}>
+          <div style={{ color: 'var(--workspace-muted)' }}>
             The best trial was within the <TermDef term="noise-floor">judge's measurement noise</TermDef> (±{((displayedRun.judge_score_se ?? 0.02) * 200).toFixed(1)} pts confidence interval)
             of your current settings. Apply is disabled: your settings already perform as well as anything we tried.
           </div>
@@ -508,9 +508,9 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              color: canManage ? '#a78bfa' : '#555',
+              color: canManage ? 'var(--workspace-info)' : 'var(--workspace-muted)',
               background: 'transparent',
-              border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : '#333'),
+              border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : 'var(--workspace-border)'),
               borderRadius: 6, cursor: canManage ? 'pointer' : 'not-allowed',
             }}
           >
@@ -548,7 +548,7 @@ function ExcludedModelsDisclosure({ count }: { count: number }) {
         padding: '8px 12px', borderRadius: 6, fontSize: 12,
         background: 'rgba(59, 130, 246, 0.06)',
         border: '1px solid rgba(59, 130, 246, 0.2)',
-        color: '#9ca3af',
+        color: 'var(--workspace-muted)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -561,7 +561,7 @@ function ExcludedModelsDisclosure({ count }: { count: number }) {
           aria-expanded={open}
           style={{
             background: 'transparent', border: 'none', padding: 0,
-            color: '#a78bfa', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            color: 'var(--workspace-info)', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
             cursor: 'pointer', textDecoration: 'underline dotted', textUnderlineOffset: 2,
           }}
         >
@@ -587,14 +587,14 @@ function IdleHero({
 }: { canManage: boolean; coldStart: boolean; onStart: () => void; error: string | null }) {
   return (
     <div style={{
-      padding: 18, background: 'linear-gradient(135deg, #1f1f2e 0%, #1a1a1a 100%)',
+      padding: 18, background: 'var(--workspace-canvas)',
       border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Sparkles size={18} style={{ color: '#a78bfa' }} />
-        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get an accuracy score for this extraction, and a one-click recipe to improve it</h3>
+        <Sparkles size={18} style={{ color: 'var(--workspace-info)' }} />
+        <h3 style={{ margin: 0, fontSize: 15, color: 'var(--workspace-text)' }}>Get an accuracy score for this extraction, and a one-click recipe to improve it</h3>
       </div>
-      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
         Typically <b>5–15 minutes</b> for small extractions; <b>up to 60–90 minutes</b> for
         large ones — you can close this tab, the run continues on the server. Uses roughly{' '}
         <b>$1–$5</b> worth of LLM tokens — an estimate of AI usage, not a charge to you.
@@ -608,13 +608,13 @@ function IdleHero({
           border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: 6,
         }}>
           <div style={{
-            fontSize: 10, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5,
+            fontSize: 10, color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5,
             marginBottom: 6, fontWeight: 600,
           }}>
             What happens next
           </div>
           <ol style={{
-            margin: 0, paddingLeft: 20, fontSize: 12, color: '#ccc', lineHeight: 1.6,
+            margin: 0, paddingLeft: 20, fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.6,
           }}>
             <li>We'll suggest expected values for a few documents</li>
             <li>You'll review them before anything else runs</li>
@@ -622,7 +622,7 @@ function IdleHero({
           </ol>
         </div>
       )}
-      <ul style={{ fontSize: 12, color: '#999', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
+      <ul style={{ fontSize: 12, color: 'var(--workspace-muted)', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li>See how much your custom settings actually help vs. defaults</li>
         <li>Get a recommended setup with one-click apply</li>
         <li>Spot which fields are pulling weight and which aren't</li>
@@ -636,9 +636,9 @@ function IdleHero({
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-          color: !canManage ? '#555' : '#fff',
-          background: !canManage ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-          border: '1px solid ' + (!canManage ? '#333' : '#7c3aed'),
+          color: !canManage ? 'var(--workspace-muted)' : 'var(--workspace-text)',
+          background: !canManage ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
+          border: '1px solid ' + (!canManage ? 'var(--workspace-border)' : 'var(--workspace-accent-ink)'),
           borderRadius: 6, cursor: !canManage ? 'not-allowed' : 'pointer',
         }}
       >
@@ -697,20 +697,20 @@ function BestConfigCard({
   ]
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 14, backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Sparkles size={14} style={{ color: '#a78bfa' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>Best configuration</span>
+        <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         {rows.map(r => (
           <div key={r.label} title={r.hint} style={{
-            padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4, cursor: 'help',
+            padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
           }}>
-            <div style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-            <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2 }}>{r.value}</div>
+            <div style={{ fontSize: 10, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+            <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginTop: 2 }}>{r.value}</div>
           </div>
         ))}
       </div>
@@ -728,9 +728,9 @@ function BestConfigCard({
               disabled={!canManage || reverting}
               style={{
                 padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
-                color: canManage && !reverting ? '#bbb' : '#555',
+                color: canManage && !reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
                 background: 'transparent',
-                border: '1px solid #3a3a3a',
+                border: '1px solid var(--workspace-border)',
                 borderRadius: 6,
                 cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
               }}
@@ -779,7 +779,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 8,
-      padding: '6px 10px', fontSize: 11, color: '#ddd',
+      padding: '6px 10px', fontSize: 11, color: 'var(--workspace-text)',
       backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
       borderRadius: 4,
     }}>
@@ -789,7 +789,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
       }} />
       <span style={{
         flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap', color: '#aaa',
+        whiteSpace: 'nowrap', color: 'var(--workspace-muted)',
       }}>
         {summariseExtractionConfig(trial.config)}
       </span>
@@ -798,7 +798,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
           title={`Cross-field rules: ${cf.pass} pass / ${cf.fail} fail${cf.unparseable ? ` / ${cf.unparseable} unparseable` : ''}`}
           style={{
             fontSize: 10, padding: '1px 6px', borderRadius: 4,
-            color: cf.fail === 0 ? '#22c55e' : cf.pass === 0 ? '#ef4444' : '#fbbf24',
+            color: cf.fail === 0 ? 'var(--workspace-success)' : cf.pass === 0 ? 'var(--workspace-danger)' : 'var(--workspace-warning)',
             background: cf.fail === 0
               ? 'rgba(34, 197, 94, 0.12)'
               : cf.pass === 0
@@ -817,8 +817,8 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
       {trial.lift_vs_default != null && (
         <span style={{
           fontSize: 10,
-          color: trial.lift_vs_default > 0 ? '#22c55e'
-            : trial.lift_vs_default < 0 ? '#ef4444' : '#666',
+          color: trial.lift_vs_default > 0 ? 'var(--workspace-success)'
+            : trial.lift_vs_default < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
         }}>
           {trial.lift_vs_default > 0 ? '+' : ''}{(trial.lift_vs_default * 100).toFixed(0)}pts
         </span>
@@ -827,7 +827,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
         title={unscored ? (trial.error || 'Not scored') : undefined}
         style={{
           width: 50, textAlign: 'right', fontWeight: 600,
-          color: unscored ? '#888' : '#e5e5e5',
+          color: unscored ? 'var(--workspace-muted)' : 'var(--workspace-text)',
         }}
       >
         {unscored ? '—' : `${(score * 100).toFixed(0)}%`}
@@ -859,10 +859,10 @@ function WinnerCrossFieldPanel({
     ? 'good'
     : passRate >= 0.7 ? 'warn' : 'bad'
   const palette = tone === 'good'
-    ? { fg: '#22c55e', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.25)' }
+    ? { fg: 'var(--workspace-success)', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.25)' }
     : tone === 'warn'
-      ? { fg: '#fbbf24', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.25)' }
-      : { fg: '#fca5a5', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.25)' }
+      ? { fg: 'var(--workspace-warning)', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.25)' }
+      : { fg: 'var(--workspace-danger)', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.25)' }
   return (
     <div style={{
       padding: 14, borderRadius: 8,
@@ -875,7 +875,7 @@ function WinnerCrossFieldPanel({
         }}>
           Cross-field rules on winning config
         </div>
-        <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 700, color: '#fff' }}>
+        <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 700, color: 'var(--workspace-text)' }}>
           {summary.pass}/{decisive} pass
           <span style={{ marginLeft: 8, fontSize: 12, color: palette.fg, fontWeight: 500 }}>
             ({passRatePct}%)
@@ -883,7 +883,7 @@ function WinnerCrossFieldPanel({
         </div>
       </div>
       {summary.unparseable > 0 && (
-        <div style={{ fontSize: 11, color: '#888', marginBottom: 10 }}>
+        <div style={{ fontSize: 11, color: 'var(--workspace-muted)', marginBottom: 10 }}>
           {summary.unparseable} rule evaluation{summary.unparseable === 1 ? '' : 's'} couldn't be parsed and are excluded from the pass rate.
         </div>
       )}
@@ -896,7 +896,7 @@ function WinnerCrossFieldPanel({
             return (
               <div key={r.rule_id} style={{
                 display: 'flex', alignItems: 'center', gap: 8,
-                padding: '5px 8px', fontSize: 11, color: '#ddd',
+                padding: '5px 8px', fontSize: 11, color: 'var(--workspace-text)',
                 background: 'rgba(0,0,0,0.2)', borderRadius: 4,
               }}>
                 <span style={{
@@ -905,17 +905,17 @@ function WinnerCrossFieldPanel({
                 }} />
                 <span style={{
                   flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  color: '#bbb',
+                  color: 'var(--workspace-muted)',
                 }}>
                   {r.label || r.type || r.rule_id}
                 </span>
-                <span style={{ fontSize: 10, color: '#888' }}>
+                <span style={{ fontSize: 10, color: 'var(--workspace-muted)' }}>
                   {r.pass}/{ruleDecisive}{r.unparseable ? ` (+${r.unparseable} unparseable)` : ''}
                 </span>
                 {rulePct != null && (
                   <span style={{
                     width: 40, textAlign: 'right', fontWeight: 600,
-                    color: r.fail === 0 ? '#22c55e' : failOnly ? '#ef4444' : '#fbbf24',
+                    color: r.fail === 0 ? 'var(--workspace-success)' : failOnly ? 'var(--workspace-danger)' : 'var(--workspace-warning)',
                   }}>
                     {rulePct}%
                   </span>
@@ -962,20 +962,20 @@ function PostApplyDelta({
       border: '1px solid rgba(59, 130, 246, 0.25)',
     }}>
       <div style={{
-        fontSize: 10, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: 0.5,
+        fontSize: 10, color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5,
         fontWeight: 600, marginBottom: 6,
       }}>
         Certified score · measured after apply
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
         {certifiedPct != null && (
-          <span style={{ fontSize: 12, color: '#aaa' }}>
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
             Quality score:{' '}
-            <b style={{ color: '#fff', fontSize: 16 }}>{certifiedPct}%</b>
+            <b style={{ color: 'var(--workspace-text)', fontSize: 16 }}>{certifiedPct}%</b>
             {after.quality_tier && (
               <span style={{
                 marginLeft: 6, fontSize: 10, textTransform: 'capitalize',
-                color: '#9ca3af', border: '1px solid #3a3a3a', borderRadius: 4, padding: '1px 5px',
+                color: 'var(--workspace-muted)', border: '1px solid var(--workspace-border)', borderRadius: 4, padding: '1px 5px',
               }}>
                 {after.quality_tier}
               </span>
@@ -983,20 +983,20 @@ function PostApplyDelta({
           </span>
         )}
         {beforePct != null && (
-          <span style={{ fontSize: 12, color: '#aaa' }}>
-            Optimizer estimate: <b style={{ color: '#e5e5e5' }}>{beforePct}%</b>
+          <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
+            Optimizer estimate: <b style={{ color: 'var(--workspace-text)' }}>{beforePct}%</b>
           </span>
         )}
         {delta != null && (
           <span style={{
             marginLeft: 'auto', fontSize: 12, fontWeight: 600,
-            color: delta >= 0 ? '#22c55e' : '#ef4444',
+            color: delta >= 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)',
           }}>
             {delta >= 0 ? '+' : ''}{delta}pp vs estimate
           </span>
         )}
       </div>
-      <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
+      <div style={{ marginTop: 6, fontSize: 11, color: 'var(--workspace-muted)' }}>
         This is the official quality score, no need to run validation separately.
         Measured on {after.test_case_count} test case{after.test_case_count === 1 ? '' : 's'}
         {after.num_runs ? ` × ${after.num_runs} runs` : ''} on{' '}
@@ -1004,7 +1004,7 @@ function PostApplyDelta({
         {after.source === 'apply_on_finish' && ' Triggered by "apply on finish".'}
       </div>
       {penalized && penalty && (
-        <div style={{ marginTop: 6, fontSize: 11, color: '#fbbf24' }}>
+        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--workspace-warning)' }}>
           Discounted for small sample size ({Math.round(penalty.raw_score)}% → {Math.round(penalty.final_score)}%).
           Add{penalty.test_cases_needed > 0 ? ` ${penalty.test_cases_needed} more test case${penalty.test_cases_needed === 1 ? '' : 's'}` : ''}
           {penalty.test_cases_needed > 0 && penalty.runs_needed > 0 ? ' and' : ''}
@@ -1047,12 +1047,12 @@ function WinnerExplanation({ run }: { run: ExtractionOptimizationRun }) {
   }
   return (
     <div style={{
-      padding: '10px 12px', borderRadius: 6, fontSize: 12, color: '#ccc',
+      padding: '10px 12px', borderRadius: 6, fontSize: 12, color: 'var(--workspace-text)',
       background: 'rgba(124, 58, 237, 0.05)', border: '1px solid rgba(124, 58, 237, 0.2)',
       lineHeight: 1.5,
     }}>
       <div style={{
-        fontSize: 10, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.5,
+        fontSize: 10, color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5,
         fontWeight: 600, marginBottom: 4,
       }}>
         Why this config won

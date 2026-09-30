@@ -32,15 +32,15 @@ export function BudgetTierPicker({
   description = 'Each setup costs LLM tokens to test. The smaller tiers confirm whether tuning helps at all; larger tiers find a more confident winner.',
 }: BudgetTierPickerProps) {
   return (
-    <div style={{ fontSize: 13, color: '#ccc' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>{title}</h4>
-      <p style={{ margin: '0 0 12px 0', color: '#bbb', lineHeight: 1.5 }}>{description}</p>
+    <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>{title}</h4>
+      <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>{description}</p>
       {recommendedTierId && recommendationReason && (
         <div style={{
           marginBottom: 10, padding: '8px 10px',
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
           border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
-          fontSize: 12, color: 'var(--highlight-color, #eab308)', lineHeight: 1.5,
+          fontSize: 12, color: 'var(--workspace-accent-ink)', lineHeight: 1.5,
         }}>
           {recommendationReason}
         </div>
@@ -57,9 +57,9 @@ export function BudgetTierPicker({
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 12px', textAlign: 'left',
-                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
-                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : '#333'),
-                borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+                backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+                border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
+                borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
               }}
             >
               <Radio active={active} />
@@ -70,14 +70,14 @@ export function BudgetTierPicker({
                     <span style={{
                       fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
                       padding: '2px 6px', borderRadius: 10,
-                      color: 'var(--highlight-color, #eab308)', backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent)',
+                      color: 'var(--workspace-accent-ink)', backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 45%, transparent)',
                     }}>
                       Recommended for you
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: '#b8bec7' }}>
+                <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
                   {rowTokens}
                   {rowCost && <> · {rowCost}</>}
                   {' · '}{t.trialsEstimate} · {t.timeEstimate}
@@ -91,9 +91,9 @@ export function BudgetTierPicker({
           style={{
             display: 'flex', alignItems: 'center', gap: 10,
             padding: '10px 12px', textAlign: 'left',
-            backgroundColor: selected === 'custom' ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : '#262626',
-            border: '1px solid ' + (selected === 'custom' ? 'var(--highlight-color, #eab308)' : '#333'),
-            borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+            backgroundColor: selected === 'custom' ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
+            border: '1px solid ' + (selected === 'custom' ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
+            borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
           }}
         >
           <Radio active={selected === 'custom'} />
@@ -107,7 +107,7 @@ export function BudgetTierPicker({
                 onClick={e => e.stopPropagation()}
                 style={{
                   marginTop: 4, width: 120,
-                  background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
+                  background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
                   borderRadius: 4, padding: '4px 6px', fontSize: 12,
                 }}
               />
@@ -117,12 +117,12 @@ export function BudgetTierPicker({
       </div>
       <div style={{
         marginTop: 12, padding: '8px 10px',
-        backgroundColor: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 6,
-        fontSize: 12, color: '#aaa',
+        backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+        fontSize: 12, color: 'var(--workspace-muted)',
       }}>
         Selected: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
       </div>
-      <p style={{ margin: '8px 0 0 0', fontSize: 12, color: '#b8bec7', lineHeight: 1.5 }}>
+      <p style={{ margin: '8px 0 0 0', fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
         Time estimates are approximate. Actual runtime scales with your test-set
         size and current model speed, so larger test sets can take noticeably longer.
       </p>

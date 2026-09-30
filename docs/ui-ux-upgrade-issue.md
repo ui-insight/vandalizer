@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Shared workspace theme — September 30
+
+**153/169 checklist items implemented locally.** VIS-01 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Knowledge lists, sources, question management, validation history/results and workflow/extraction tuning use the same neutral canvas, surfaces, borders and readable text as Files, Projects, Library and Automations. Navigation retains its dark treatment; selection and primary actions use the configured brand accent. Shared information, success, warning and error colors have readable foregrounds and soft backgrounds.
+- Removed decorative purple/blue treatment from validation chrome and controls. Contrast checks caught and corrected comparison labels, selected-budget descriptions, catalog usage metadata and the empty-history action. Existing status meanings, source/tool navigation and layout are preserved.
+- Direct screenshot inspection found the desktop pane divider could draw over the shared tuning wizard. The wizard now uses the retained-panel-aware overlay layer. The nested extraction test-generation dialog fits narrow screens, has a named close control and contains focus; Escape returns to its trigger without closing the parent wizard.
+- Verification: TypeScript, production build, touched-file ESLint and diff checks pass. All 172 focused tests across 29 files pass. The full suite has 1,191 passing tests and three Landing failures; the same three failures reproduce on committed HEAD before these changes. No unrelated Landing changes were made.
+- The 278 selected browser captures cover Knowledge availability/sharing, source intake, questions, short-screen tuning, apply/revert review, saved history, workflow/extraction setup, nested generation, catalog recovery and retained workspace context. Selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly. API responses are synthetic; live execution and assistive-technology devices remain unverified. Typography, controls, broader accessibility and final regrading remain open.
+
 ## More room for task content — September 30
 
 **152/169 checklist items implemented locally.** VIS-06 is complete for the reviewed task surfaces; changes are not deployed.
@@ -389,7 +399,7 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 
 ## 2. Shared visual system
 
-- [ ] **VIS-01 · P2 · Fix:** Reconcile the light file/project/editor surfaces, dark automation/KB surfaces, blue wizard controls and purple validation controls into a consistent theme hierarchy.
+- [x] **VIS-01 · P2 · Fix:** Reconcile the light file/project/editor surfaces, dark automation/KB surfaces, blue wizard controls and purple validation controls into a consistent theme hierarchy.
 - [ ] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
 - [ ] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
 - [ ] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.

@@ -64,26 +64,26 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         aria-label="Add URLs"
         style={{
           width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh',
-          backgroundColor: '#1e1e1e', borderRadius: 12,
-          border: '1px solid #3a3a3a', padding: 16,
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 12,
+          border: '1px solid var(--workspace-border)', padding: 16,
           display: 'flex', flexDirection: 'column', gap: 16,
           overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>Add URLs</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: 'var(--workspace-text)' }}>Add URLs</span>
           <button
             onClick={onClose}
             aria-label="Close"
             disabled={submitted}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
-            <X size={18} style={{ color: '#888' }} />
+            <X size={18} style={{ color: 'var(--workspace-muted)' }} />
           </button>
         </div>
         <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ fontSize: 13, color: '#aaa' }}>
+        <div style={{ fontSize: 13, color: 'var(--workspace-muted)' }}>
           Paste one website URL per line; addresses without a scheme use https://. Adding queues retrieval; each source becomes usable after its text is indexed. Existing URLs are skipped; use Refresh on their source rows to fetch them again.
         </div>
         <textarea
@@ -95,8 +95,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           rows={8}
           style={{
             width: '100%', padding: 12, fontSize: 13, fontFamily: 'inherit',
-            backgroundColor: '#2a2a2a', color: '#e5e5e5',
-            border: '1px solid #3a3a3a', borderRadius: 8,
+            backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+            border: '1px solid var(--workspace-border)', borderRadius: 8,
             resize: 'vertical', minHeight: 120, flexShrink: 0,
           }}
         />
@@ -108,18 +108,18 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
             disabled={submitted}
             checked={crawlEnabled}
             onChange={e => setCrawlEnabled(e.target.checked)}
-            style={{ accentColor: 'var(--highlight-color, #eab308)' }}
+            style={{ accentColor: 'var(--workspace-accent-ink)' }}
           />
-          <span style={{ fontSize: 13, color: '#e5e5e5' }}>Enable crawling</span>
+          <span style={{ fontSize: 13, color: 'var(--workspace-text)' }}>Enable crawling</span>
         </label>
 
         {crawlEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
-            <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
+              <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: 'var(--workspace-muted)', minWidth: 80 }}>Max pages</label>
               <input
                 id="add-urls-max-pages"
                 type="number"
@@ -130,13 +130,13 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 max={50}
                 style={{
                   width: 72, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
-                  backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 6,
                 }}
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 13, color: '#aaa' }}>Allowed domains (optional)</label>
+              <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 13, color: 'var(--workspace-muted)' }}>Allowed domains (optional)</label>
               <input
                 id="add-urls-allowed-domains"
                 type="text"
@@ -146,11 +146,11 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 placeholder="example.com, example.com/section"
                 style={{
                   width: '100%', padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
-                  backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
+                  border: '1px solid var(--workspace-border)', borderRadius: 6,
                 }}
               />
-              <div style={{ fontSize: 12, color: '#b8bec7' }}>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
                 Comma-separated. Include a path (e.g. example.com/irb) to limit the crawl
                 to that section of the site. Defaults to the same domain as the URL.
               </div>
@@ -159,15 +159,15 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         )}
 
         </div>
-        {error && <div role="alert" style={{ fontSize: 13, color: '#fca5a5', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{error}</div>}
+        {error && <div role="alert" style={{ fontSize: 13, color: 'var(--workspace-danger)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
           <button
             onClick={onClose}
             disabled={submitted}
             style={{
               padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-              color: '#ccc', backgroundColor: 'transparent',
-              border: '1px solid #3a3a3a', borderRadius: 6, cursor: 'pointer',
+              color: 'var(--workspace-text)', backgroundColor: 'transparent',
+              border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
             }}
           >
             Cancel

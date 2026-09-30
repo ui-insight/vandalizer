@@ -45,18 +45,18 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
 
   const positive = hasRun && liftPts != null && liftPts > 0
 
-  let accent = '#9ca3af'
-  let bg = 'rgba(255,255,255,0.04)'
-  let border = 'rgba(255,255,255,0.08)'
+  let accent = 'var(--workspace-muted)'
+  let bg = 'var(--workspace-canvas)'
+  let border = 'var(--workspace-border)'
   let Icon = Minus
 
   if (!hasRun) {
-    accent = '#fbbf24'
+    accent = 'var(--workspace-warning)'
     bg = 'rgba(251, 191, 36, 0.08)'
     border = 'rgba(251, 191, 36, 0.25)'
     Icon = ShieldQuestion
   } else if (positive) {
-    accent = '#22c55e'
+    accent = 'var(--workspace-success)'
     bg = 'rgba(34, 197, 94, 0.08)'
     border = 'rgba(34, 197, 94, 0.3)'
     Icon = TrendingUp
@@ -74,14 +74,14 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         width: 36, height: 36, borderRadius: 10,
-        backgroundColor: 'rgba(255,255,255,0.05)', color: accent, flexShrink: 0,
+        backgroundColor: 'var(--workspace-canvas)', color: accent, flexShrink: 0,
       }}>
         <Icon size={18} />
       </div>
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, fontWeight: 700, color: '#9ca3af',
+          fontSize: 12, fontWeight: 700, color: 'var(--workspace-muted)',
           textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2,
         }}>
           {composite ? 'Retrieval quality' : 'Answer quality'}
@@ -89,19 +89,19 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
 
         {!hasRun ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
               Answer quality not yet measured
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               Test representative questions with and without this knowledge base. Scores describe this test set; they do not guarantee future answers.
             </div>
           </>
         ) : composite ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', marginBottom: 4 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
               Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : 'Proposed settings'}
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
               {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
               {configState === 'reverted' && ' This score describes the tested settings, not the restored settings.'}
@@ -116,13 +116,13 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
                   {liftPts > 0 ? '+' : ''}{liftPts} pts
                 </span>
               )}
-              <span style={{ fontSize: 13, color: '#cbd5e1' }}>
+              <span style={{ fontSize: 13, color: 'var(--workspace-muted)' }}>
                 {liftPts == null ? 'Answer accuracy measured; no AI-only comparison yet' : positive
                   ? 'more accurate than asking the AI alone'
                   : 'no measured improvement over the AI alone'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               {scorePct != null && baselinePct != null ? (
                 <>
                   Average answer accuracy: {scorePct}% with this KB,
@@ -133,7 +133,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
               ) : null}
               <span> These results describe the tested questions, not a guarantee of future answers.</span>
               {relTime && (
-                <span style={{ color: '#aeb5bf' }}> · Last validated {relTime}</span>
+                <span style={{ color: 'var(--workspace-muted)' }}> · Last validated {relTime}</span>
               )}
             </div>
           </>

@@ -93,10 +93,10 @@ export function EvalSetCompositionStrip({
 type ChipTone = 'neutral' | 'good' | 'warn' | 'bad'
 
 const TONE_COLORS: Record<ChipTone, { fg: string; bg: string; border: string }> = {
-  neutral: { fg: '#aaa', bg: 'rgba(255,255,255,0.04)', border: '#2e2e2e' },
-  good: { fg: '#86efac', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.3)' },
-  warn: { fg: '#fbbf24', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.3)' },
-  bad: { fg: '#fca5a5', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.3)' },
+  neutral: { fg: 'var(--workspace-muted)', bg: 'var(--workspace-canvas)', border: 'var(--workspace-border)' },
+  good: { fg: 'var(--workspace-success)', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.3)' },
+  warn: { fg: 'var(--workspace-warning)', bg: 'rgba(245, 158, 11, 0.08)', border: 'rgba(245, 158, 11, 0.3)' },
+  bad: { fg: 'var(--workspace-danger)', bg: 'rgba(239, 68, 68, 0.08)', border: 'rgba(239, 68, 68, 0.3)' },
 }
 
 function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: string }) {
@@ -121,10 +121,10 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
 function SubChip({ label }: { label: string }) {
   return (
     <span style={{
-      fontSize: 9, color: '#888',
+      fontSize: 9, color: 'var(--workspace-muted)',
       padding: '1px 6px', borderRadius: 4,
-      backgroundColor: 'rgba(255,255,255,0.02)',
-      border: '1px solid #2a2a2a',
+      backgroundColor: 'var(--workspace-canvas)',
+      border: '1px solid var(--workspace-border)',
     }}>{label}</span>
   )
 }

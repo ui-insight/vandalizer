@@ -213,25 +213,25 @@ export function WorkflowAutovalidatePanel({
     <div
       style={{
         padding: 20,
-        border: '1px solid #2e2e2e',
+        border: '1px solid var(--workspace-border)',
         borderRadius: 8,
-        background: '#1f1f1f',
+        background: 'var(--workspace-surface)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Sparkles size={16} style={{ color: '#a78bfa' }} />
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
+            <Sparkles size={16} style={{ color: 'var(--workspace-info)' }} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--workspace-text)' }}>
               Validate & improve
             </div>
           </div>
-          <div style={{ fontSize: 13, color: '#bbb', marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 13, color: 'var(--workspace-muted)', marginTop: 4, lineHeight: 1.5 }}>
             Runs this workflow against your test data, scores the output, and tries better
             per-step model and prompt combinations. Apply the best configuration with one click.
           </div>
           {testDataSummary && (
-            <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 6 }}>
               Scores against {testDataSummary.expectedOutputs} expected{' '}
               {testDataSummary.expectedOutputs === 1 ? 'output' : 'outputs'} and{' '}
               {testDataSummary.checks} quality {testDataSummary.checks === 1 ? 'check' : 'checks'}.
@@ -241,7 +241,7 @@ export function WorkflowAutovalidatePanel({
                   onClick={onOpenTestData}
                   style={{
                     marginLeft: 6, background: 'none', border: 'none', padding: 0,
-                    color: '#a78bfa', fontSize: 12, cursor: 'pointer',
+                    color: 'var(--workspace-info)', fontSize: 12, cursor: 'pointer',
                     fontFamily: 'inherit', textDecoration: 'underline',
                   }}
                 >
@@ -263,9 +263,9 @@ export function WorkflowAutovalidatePanel({
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', borderRadius: 6,
-              background: canManage ? 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' : '#222',
-              color: canManage ? '#fff' : '#555',
-              border: '1px solid ' + (canManage ? '#7c3aed' : '#333'),
+              background: canManage ? 'var(--workspace-canvas)' : 'var(--workspace-surface)',
+              color: canManage ? 'var(--workspace-text)' : 'var(--workspace-muted)',
+              border: '1px solid ' + (canManage ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
               fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               cursor: canManage ? 'pointer' : 'not-allowed',
             }}
@@ -282,7 +282,7 @@ export function WorkflowAutovalidatePanel({
             marginTop: 12, padding: '8px 12px', borderRadius: 6,
             background: 'rgba(239, 68, 68, 0.08)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
-            color: '#fca5a5', fontSize: 13,
+            color: 'var(--workspace-danger)', fontSize: 13,
           }}
         >
           {error}
@@ -305,13 +305,13 @@ export function WorkflowAutovalidatePanel({
       )}
 
       {isIdle && run && run.status === 'failed' && (
-        <div style={{ marginTop: 12, color: '#fca5a5', fontSize: 13 }}>
+        <div style={{ marginTop: 12, color: 'var(--workspace-danger)', fontSize: 13 }}>
           Optimization failed: {run.error_message || 'unknown error'}
         </div>
       )}
 
       {isIdle && run && run.status === 'cancelled' && (
-        <div style={{ marginTop: 12, color: '#9ca3af', fontSize: 13 }}>
+        <div style={{ marginTop: 12, color: 'var(--workspace-muted)', fontSize: 13 }}>
           Cancelled. {run.trials.length > 0
             ? `Best so far: ${formatScore(run.best_score_so_far)}.`
             : 'No trial results.'}
@@ -380,7 +380,7 @@ function CompletedView({
         id: 'no-workflow',
         label: workflowLabels.noBaseline,
         score: run.baseline_no_workflow_score,
-        color: '#94a3b8',
+        color: 'var(--workspace-muted)',
       })
     }
     out.push({
@@ -393,7 +393,7 @@ function CompletedView({
       id: 'optimized',
       label: workflowLabels.tuned,
       score: run.optimized_score,
-      color: '#22c55e',
+      color: 'var(--workspace-success)',
       emphasised: true,
     })
     return out
@@ -433,7 +433,7 @@ function CompletedView({
 
       {run.step_breakdown.length > 0 && (
         <details style={{ marginTop: 12 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#e5e5e5' }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--workspace-text)' }}>
             Per-step breakdown ({run.step_breakdown.length} steps)
           </summary>
           <div style={{ marginTop: 8 }}>
@@ -442,8 +442,8 @@ function CompletedView({
                 key={s.step}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 12 }}
               >
-                <span style={{ width: 140, color: '#bbb' }}>{s.step}</span>
-                <div style={{ flex: 1, height: 6, background: '#2e2e2e', borderRadius: 3, overflow: 'hidden' }}>
+                <span style={{ width: 140, color: 'var(--workspace-muted)' }}>{s.step}</span>
+                <div style={{ flex: 1, height: 6, background: 'var(--workspace-surface)', borderRadius: 3, overflow: 'hidden' }}>
                   <div
                     style={{
                       width: `${Math.max(0, Math.min(100, s.score))}%`,
@@ -452,7 +452,7 @@ function CompletedView({
                     }}
                   />
                 </div>
-                <span style={{ width: 50, textAlign: 'right', color: '#888' }}>
+                <span style={{ width: 50, textAlign: 'right', color: 'var(--workspace-muted)' }}>
                   {s.score.toFixed(0)}%
                 </span>
               </div>
@@ -489,24 +489,24 @@ function CompletedView({
 
       {Object.keys(run.best_per_step_config || {}).length > 0 && (
         <details style={{ marginTop: 12 }} open={selectedStepIds !== undefined}>
-          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: '#e5e5e5' }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 500, color: 'var(--workspace-text)' }}>
             Best configuration
             {selectedStepIds && selectedStepIds.length > 0 && (
-              <span style={{ marginLeft: 8, color: '#a78bfa', fontWeight: 400 }}>
+              <span style={{ marginLeft: 8, color: 'var(--workspace-info)', fontWeight: 400 }}>
                 · applying {selectedStepIds.length} of {Object.keys(run.best_per_step_config).length}
               </span>
             )}
           </summary>
-          <div style={{ marginTop: 8, fontSize: 12, color: '#ccc', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ marginTop: 8, fontSize: 12, color: 'var(--workspace-text)', display: 'flex', flexDirection: 'column', gap: 4 }}>
             <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
               <button
                 type="button"
                 onClick={() => onSelectionChange(undefined)}
                 style={{
                   padding: '2px 8px', fontSize: 11, fontWeight: 500, fontFamily: 'inherit',
-                  color: selectedStepIds === undefined ? '#a78bfa' : '#888',
+                  color: selectedStepIds === undefined ? 'var(--workspace-info)' : 'var(--workspace-muted)',
                   background: 'transparent',
-                  border: '1px solid ' + (selectedStepIds === undefined ? 'rgba(124, 58, 237, 0.45)' : '#3a3a3a'),
+                  border: '1px solid ' + (selectedStepIds === undefined ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
                   borderRadius: 4, cursor: 'pointer',
                 }}
               >
@@ -517,9 +517,9 @@ function CompletedView({
                 onClick={() => onSelectionChange([])}
                 style={{
                   padding: '2px 8px', fontSize: 11, fontWeight: 500, fontFamily: 'inherit',
-                  color: selectedStepIds !== undefined ? '#a78bfa' : '#888',
+                  color: selectedStepIds !== undefined ? 'var(--workspace-info)' : 'var(--workspace-muted)',
                   background: 'transparent',
-                  border: '1px solid ' + (selectedStepIds !== undefined ? 'rgba(124, 58, 237, 0.45)' : '#3a3a3a'),
+                  border: '1px solid ' + (selectedStepIds !== undefined ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
                   borderRadius: 4, cursor: 'pointer',
                 }}
               >
@@ -552,9 +552,9 @@ function CompletedView({
                       }}
                     />
                   )}
-                  <strong style={{ color: '#e5e5e5' }}>{step}:</strong> {ov.model ?? '-'}
+                  <strong style={{ color: 'var(--workspace-text)' }}>{step}:</strong> {ov.model ?? '-'}
                   {ov.prompt_variant && ov.prompt_variant !== 'default' && (
-                    <span style={{ color: '#888' }}> · {ov.prompt_variant}</span>
+                    <span style={{ color: 'var(--workspace-muted)' }}> · {ov.prompt_variant}</span>
                   )}
                 </label>
               )
@@ -584,8 +584,8 @@ function CompletedView({
             disabled={reverting}
             style={{
               padding: '6px 12px', borderRadius: 6,
-              background: 'transparent', color: reverting ? '#555' : '#bbb',
-              border: '1px solid #3a3a3a',
+              background: 'transparent', color: reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
+              border: '1px solid var(--workspace-border)',
               fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
               cursor: reverting ? 'wait' : 'pointer',
             }}

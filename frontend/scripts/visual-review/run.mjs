@@ -71,7 +71,7 @@ try {
  });
  await scene('chat-upload',async()=>{
   await go('/');await page.getByRole('main').getByRole('button',{name:'Add',exact:true}).click();await shot('chat-add-menu');
-  const chooserPromise=page.waitForEvent('filechooser');await page.getByRole('menuitem',{name:'Add Document',exact:true}).click();const chooser=await chooserPromise;
+  const chooserPromise=page.waitForEvent('filechooser');await page.getByRole('menuitem',{name:/^Add Document(?: |$)/}).click();const chooser=await chooserPromise;
   await chooser.setFiles({name:'Review sample.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic review fixture. Proposal due October 15. Budget justification required.')});
   await page.getByText('Review sample.txt',{exact:false}).first().waitFor(); await shot('chat-file-attached','Synthetic upload and processing response; no backend ingestion.');
   state.chatChunks=[{kind:'text',content:'Synthetic harness response. Check the recorded request for attachment scope.'}];
@@ -97,6 +97,6 @@ try {
  for (const [id,path] of [['files','/?mode=files'],['projects','/?mode=projects'],['automations','/?mode=automations'],['knowledge','/?mode=knowledge'],['library','/?tab=library']]) await scene(id+'-empty',async()=>{await go(path);await shot(id+'-empty')});
  state.empty=false;
  await page.setViewportSize({width:390,height:844});
- await scene('automation-editor-mobile',async()=>{await go('/?mode=automations');await page.getByRole('button',{name:'Open automation: Review incoming proposals',exact:true}).click();await shot('automation-editor-mobile');await page.getByRole('button',{name:'Close automation',exact:true}).click();await page.getByRole('button',{name:'New',exact:true}).waitFor()});
+ await scene('automation-editor-mobile',async()=>{await go('/?mode=automations');await page.getByRole('button',{name:'Open automation: Review incoming proposals',exact:true}).click();await shot('automation-editor-mobile');await page.getByRole('button',{name:'Close automation',exact:true}).click();await page.getByRole('button',{name:'Close automation',exact:true}).waitFor({state:'hidden'});await page.getByRole('button',{name:'Automations panel',exact:true}).click();await page.getByRole('button',{name:'New',exact:true}).waitFor()});
  for (const [id,path] of [['chat','/'],['files','/?mode=files'],['projects','/?mode=projects'],['automations','/?mode=automations'],['knowledge','/?mode=knowledge'],['library','/?tab=library']]) await scene(id+'-mobile',async()=>{await go(path);await shot(id+'-mobile')});
 } finally {await review.flush();await review.browser.close();if(review.unmatched.size||review.errors.length)process.exitCode=1;console.log(JSON.stringify({captures:review.captures.length,unmatched:[...review.unmatched],errors:review.errors,observations:review.observations},null,2))}

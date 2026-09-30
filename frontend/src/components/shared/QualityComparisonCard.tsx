@@ -128,12 +128,12 @@ export function QualityComparisonCard({
 
   return (
     <div style={{
-      padding: 16, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 16, backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <CheckCircle2 size={16} style={{ color: '#22c55e' }} />
-        <h3 style={{ margin: 0, fontSize: 14, color: '#fff' }}>{title}</h3>
+        <CheckCircle2 size={16} style={{ color: 'var(--workspace-success)' }} />
+        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--workspace-text)' }}>{title}</h3>
         {scoreFormulaHint && (
           <InfoHint content={scoreFormulaHint} label="How this score is computed" />
         )}
@@ -143,7 +143,7 @@ export function QualityComparisonCard({
             title={`Paired bootstrap on ${liftCI.n_queries} queries, ${liftCI.n_iterations} resamples`}
             style={{
               marginLeft: 'auto', fontSize: 10,
-              color: liftSignificant ? '#86efac' : '#fbbf24',
+              color: liftSignificant ? 'var(--workspace-success)' : 'var(--workspace-warning)',
               fontFamily: 'inherit',
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
               textDecoration: 'underline dotted', textUnderlineOffset: 2,
@@ -155,7 +155,7 @@ export function QualityComparisonCard({
           <button
             onClick={() => setCiExpanded(v => !v)}
             style={{
-              marginLeft: 'auto', fontSize: 10, color: '#888', fontFamily: 'inherit',
+              marginLeft: 'auto', fontSize: 10, color: 'var(--workspace-muted)', fontFamily: 'inherit',
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
               textDecoration: 'underline dotted', textUnderlineOffset: 2,
             }}
@@ -167,8 +167,8 @@ export function QualityComparisonCard({
 
       {ciExpanded && (
         <div style={{
-          marginBottom: 12, padding: '8px 10px', fontSize: 11, color: '#aaa', lineHeight: 1.5,
-          backgroundColor: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a2a', borderRadius: 6,
+          marginBottom: 12, padding: '8px 10px', fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
         }}>
           {liftCI ? (
             <>
@@ -211,7 +211,7 @@ export function QualityComparisonCard({
       </div>
 
       {measurementNote && (
-        <div style={{ marginTop: 8, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {measurementNote}
         </div>
       )}
@@ -230,12 +230,12 @@ export function QualityComparisonCard({
           {liftIsNoise ? (
             <>
               <div style={{
-                fontSize: 14, fontWeight: 600, color: nTooSmall ? '#bbb' : '#f59e0b',
+                fontSize: 14, fontWeight: 600, color: nTooSmall ? 'var(--workspace-muted)' : 'var(--workspace-warning)',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 {nTooSmall ? 'Not enough queries for a significance call' : '⚠ No significant change'}
               </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
                 {liftCI && nTooSmall
                   ? `Only n=${liftCI.n_queries} paired ${liftCI.n_queries === 1 ? 'query was' : 'queries were'} available for the statistical test — at least ${MIN_N_FOR_SIGNIFICANCE} are needed for a reliable call. The bars are real measurements, but we can't yet tell how much of the difference would repeat on new questions. Add more test queries and re-run for a trustworthy verdict.`
                   : liftCI
@@ -250,15 +250,15 @@ export function QualityComparisonCard({
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
               <span style={{
                 fontSize: 18, fontWeight: 700,
-                color: liftVsDefault > 0 ? '#22c55e' : '#ef4444',
+                color: liftVsDefault > 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)',
               }}>
                 {liftVsDefault > 0 ? '+' : ''}{liftVsDefault.toFixed(0)}pts
               </span>
-              <span style={{ fontSize: 12, color: '#aaa' }}>over {defaultBaseline?.label ?? 'default'}</span>
+              <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>over {defaultBaseline?.label ?? 'default'}</span>
               {liftVsSecondary != null && secondaryBaseline && (
                 <>
-                  <span style={{ fontSize: 12, color: '#666' }}>·</span>
-                  <span style={{ fontSize: 12, color: '#aaa' }}>
+                  <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>·</span>
+                  <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
                     +{liftVsSecondary.toFixed(0)}pts over {secondaryBaseline.label}
                   </span>
                 </>
@@ -292,21 +292,21 @@ function SignificanceBadge({
     label = `n too small (${liftCI.n_queries})`
     bg = 'rgba(120,120,120,0.18)'
     border = 'rgba(160,160,160,0.35)'
-    color = '#bbb'
+    color = 'var(--workspace-muted)'
     tip = `Paired-bootstrap CI needs at least ${MIN_N_FOR_SIGNIFICANCE} judged queries to be reliable. Add more test questions to get a trustworthy significance call.`
   } else if (liftSignificant) {
     const pTxt = liftCI.p_value < 0.001 ? 'p<0.001' : `p=${liftCI.p_value.toFixed(3)}`
     label = `✓ significant (${pTxt})`
     bg = 'rgba(34, 197, 94, 0.14)'
     border = 'rgba(34, 197, 94, 0.40)'
-    color = '#86efac'
+    color = 'var(--workspace-success)'
     tip = `95% CI excludes zero and permutation p-value < 0.05 across n=${liftCI.n_queries} paired queries.`
   } else {
     const pTxt = liftCI.p_value < 0.001 ? 'p<0.001' : `p=${liftCI.p_value.toFixed(3)}`
     label = `not significant (${pTxt})`
     bg = 'rgba(245, 158, 11, 0.12)'
     border = 'rgba(245, 158, 11, 0.35)'
-    color = '#fbbf24'
+    color = 'var(--workspace-warning)'
     tip = `95% CI on the per-query lift includes zero, so we can't tell the optimized config apart from default at this sample size (n=${liftCI.n_queries}).`
   }
   return (

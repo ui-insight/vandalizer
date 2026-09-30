@@ -1,5 +1,5 @@
 .optimization-diff-row { grid-template-columns: minmax(120px, .8fr) minmax(0, 1fr) minmax(0, 1fr); line-height: 1.5; }
-.optimization-value-label { display: block; color: #bfc5cc; font-size: 12px; }
+.optimization-value-label { display: block; color: var(--workspace-muted); font-size: 12px; }
 @container (max-width: 620px) {
   .optimization-diff-row { grid-template-columns: minmax(0, 1fr); }
 }

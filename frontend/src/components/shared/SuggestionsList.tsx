@@ -18,8 +18,8 @@ const DEFAULT_ICONS: Record<SuggestionSeverity, ReactNode> = {
 }
 
 const COLORS: Record<SuggestionSeverity, string> = {
-  critical: '#ef4444',
-  warning: '#f59e0b',
+  critical: 'var(--workspace-danger)',
+  warning: 'var(--workspace-warning)',
   info: '#3b82f6',
 }
 
@@ -48,15 +48,15 @@ export function SuggestionsList({
             style={{
               display: 'flex', alignItems: 'flex-start', gap: 8,
               padding: '8px 10px',
-              backgroundColor: `${color}0e`,
-              border: `1px solid ${color}33`,
+              backgroundColor: `color-mix(in srgb, ${color} 5.49%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${color} 20.0%, transparent)`,
               borderRadius: 6,
             }}
           >
             <span style={{ color, flexShrink: 0, marginTop: 2, display: 'flex' }}>
               {icon}
             </span>
-            <div style={{ flex: 1, fontSize: 12, color: '#ddd', lineHeight: 1.5 }}>
+            <div style={{ flex: 1, fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
               {s.message}
             </div>
             {s.onAction && s.actionLabel && (
@@ -65,7 +65,7 @@ export function SuggestionsList({
                 style={{
                   padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
                   color, background: 'transparent',
-                  border: `1px solid ${color}66`, borderRadius: 4,
+                  border: `1px solid color-mix(in srgb, ${color} 40.0%, transparent)`, borderRadius: 4,
                   cursor: 'pointer', flexShrink: 0,
                 }}
               >
@@ -82,10 +82,10 @@ export function SuggestionsList({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      padding: 14, backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#fff', marginBottom: 10 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 10 }}>
         {title}
       </div>
       {rows}

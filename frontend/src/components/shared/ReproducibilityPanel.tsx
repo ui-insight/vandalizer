@@ -89,8 +89,8 @@ export function ReproducibilityPanel({ run }: Props) {
 
   return (
     <div style={{
-      backgroundColor: '#1f1f1f',
-      border: '1px solid #2e2e2e', borderRadius: 8,
+      backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 8,
       overflow: 'hidden',
     }}>
       <button
@@ -98,14 +98,14 @@ export function ReproducibilityPanel({ run }: Props) {
         style={{
           display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
-          fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
+          fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#aeb5bf' }} /> : <ChevronRight size={14} style={{ color: '#aeb5bf' }} />}
-        <ShieldCheck size={14} style={{ color: '#aeb5bf' }} />
+        {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
+        <ShieldCheck size={14} style={{ color: 'var(--workspace-muted)' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Reproducibility</span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aeb5bf' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>
           {run.judge_model || 'unknown judge'}{run.rng_seed != null ? ` · seed ${run.rng_seed}` : ''}
         </span>
       </button>
@@ -121,11 +121,11 @@ export function ReproducibilityPanel({ run }: Props) {
               key={r.label}
               title={r.title}
               style={{
-                padding: '6px 10px', backgroundColor: '#262626', borderRadius: 4,
+                padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
               }}
             >
-              <div style={{ fontSize: 12, color: '#aeb5bf', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 12, color: '#e5e5e5', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
             </div>
           ))}
         </div>

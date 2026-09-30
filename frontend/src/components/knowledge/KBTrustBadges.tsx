@@ -89,7 +89,7 @@ export function OptimizedBadge({ kb, withTime = false }: {
     if (kb.can_manage === false) return null
     return (
       <span title={title} style={{
-        ...chip, color: '#9ca3af', backgroundColor: 'rgba(156, 163, 175, 0.12)',
+        ...chip, color: 'var(--workspace-muted)', backgroundColor: 'rgba(156, 163, 175, 0.12)',
         border: '1px dashed rgba(156, 163, 175, 0.4)',
       }}>
         <Sparkles size={10} />
@@ -100,7 +100,7 @@ export function OptimizedBadge({ kb, withTime = false }: {
   if (opt.state === 'stale') {
     return (
       <span title={title} style={{
-        ...chip, color: '#fbbf24', backgroundColor: 'rgba(245, 158, 11, 0.12)',
+        ...chip, color: 'var(--workspace-warning)', backgroundColor: 'rgba(245, 158, 11, 0.12)',
         border: '1px solid rgba(245, 158, 11, 0.35)',
       }}>
         <AlertTriangle size={10} />
@@ -110,7 +110,7 @@ export function OptimizedBadge({ kb, withTime = false }: {
   }
   return (
     <span title={title} style={{
-      ...chip, color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+      ...chip, color: 'var(--workspace-info)', backgroundColor: 'var(--workspace-info-surface)',
       border: '1px solid rgba(124, 58, 237, 0.3)',
     }}>
       <Sparkles size={10} />
