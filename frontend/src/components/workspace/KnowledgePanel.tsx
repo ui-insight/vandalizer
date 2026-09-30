@@ -1,3 +1,4 @@
+import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
@@ -35,7 +36,7 @@ import { OptimizedBadge, VerifiedBadge } from '../knowledge/KBTrustBadges'
 
 type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
-  { key: 'mine', label: 'My KBs' },
+  { key: 'mine', label: 'Mine' },
   { key: 'team', label: 'Team' },
   { key: 'explore', label: 'Explore' },
 ]
@@ -325,7 +326,7 @@ export function KnowledgePanel() {
     }
   }
 
-  // Clone lands an owned, editable copy in My KBs (sources re-ingest in the
+  // Clone lands an owned, editable copy in My Knowledge Bases (sources re-ingest in the
   // background, so it opens in 'building' status).
   const handleClone = async (uuid: string) => {
     if (cloning) return
@@ -1898,7 +1899,7 @@ export function KnowledgePanel() {
   // List view
   return (
     <>
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', overflowY: 'auto' }}>
       {/* Header */}
       <div
         style={{
@@ -1918,7 +1919,7 @@ export function KnowledgePanel() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge</span>
           <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
         </div>
         {activeTab === 'mine' && (
@@ -2025,6 +2026,7 @@ export function KnowledgePanel() {
         ))}
       </div>
 
+      <SavedScopeHint scope={activeTab} kind="knowledge bases" dark />
       {/* Project scope bar — flip between KBs pinned to this project and all of
           them. Only meaningful on the My/Team grids (Explore is the catalog). */}
       {activeProjectUuid && activeTab !== 'explore' && (
@@ -2075,12 +2077,12 @@ export function KnowledgePanel() {
         role="tabpanel"
         id="kb-tabpanel"
         aria-labelledby={`kb-tab-${activeTab}`}
-        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+        style={{ flex: '1 0 0', display: 'flex', flexDirection: 'column', minHeight: 'min(240px, 100%)' }}
       >
       {activeTab === 'explore' ? (
         <KBExploreTab onAdopted={refresh} />
       ) : (
-        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 84px', position: 'relative' }}>
+        <div role="region" aria-label="Knowledge items" tabIndex={0} style={{ flex: 1, overflowY: 'auto', padding: '12px 12px 84px', position: 'relative' }}>
           {isProjectScoped && projectPins.error ? (
             <div role="alert" style={{ color: '#991b1b', background: '#fef2f2', padding: 12, borderRadius: 8 }}>Could not load this project's knowledge bases. <button type="button" onClick={() => void projectPins.refresh()}>Retry project knowledge bases</button></div>
           ) : isProjectScoped && projectPins.loading ? (
@@ -2098,11 +2100,11 @@ export function KnowledgePanel() {
               ? async (uuid) => {
                   try {
                     await scopedMine.adopt(uuid)
-                    toast('Added to My KBs', 'success')
+                    toast('Added to My Knowledge Bases', 'success')
                     refresh()
                   } catch (err) {
                     console.error('Failed to adopt KB:', err)
-                    toast(err instanceof Error ? err.message : 'Failed to add to My KBs', 'error')
+                    toast(err instanceof Error ? err.message : 'Failed to add to My Knowledge Bases', 'error')
                   }
                 }
               : undefined}
@@ -2110,10 +2112,10 @@ export function KnowledgePanel() {
               ? async (refUuid) => {
                   const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.reference_uuid === refUuid)
                   const ok = await confirm({
-                    title: 'Remove from My KBs?',
+                    title: 'Remove from My Knowledge Bases?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from Explore.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My Knowledge Bases? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from Explore.
                       </>
                     ),
                     confirmLabel: 'Remove',
@@ -2121,7 +2123,7 @@ export function KnowledgePanel() {
                   if (!ok) return
                   try {
                     await scopedMine.removeRef(refUuid)
-                    toast('Removed from My KBs', 'success')
+                    toast('Removed from My Knowledge Bases', 'success')
                     refresh()
                   } catch (err) {
                     console.error('Failed to remove KB reference:', err)

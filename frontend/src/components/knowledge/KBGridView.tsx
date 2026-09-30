@@ -274,7 +274,7 @@ function KBGridCard({
             }}
           >
             <Bookmark size={11} />
-            Add to My KBs
+            Add to My Knowledge Bases
           </button>
         )}
         {onClone && !isUnavailable && (

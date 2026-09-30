@@ -17,6 +17,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
 
   return (
     <div
+      role="region" aria-label="Active project"
       className="project-context-bar"
       style={{
         display: 'flex',
@@ -45,7 +46,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
             type="button"
             onClick={onOpenManage}
             title="View details, share, rename, leave, or delete this project"
-            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 12, fontWeight: 600 }}
+            style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 12, fontWeight: 600 }}
           >
             <Settings size={14} />
             Manage project
@@ -55,7 +56,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
           type="button"
           onClick={deactivateProject}
           title="Exit project scope"
-          style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
+          style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
         >
           Exit
           <X size={14} />

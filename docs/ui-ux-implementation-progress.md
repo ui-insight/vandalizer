@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**148/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**150/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Workspace location and saved scopes — September 30
+
+**150/169 checklist items implemented locally.** SYS-05 and SYS-07 are complete for the reviewed workspace flows; changes are not deployed.
+
+- Open workflow, extraction and automation editors identify their type and offer an explicit return to Library or Assistant. The active project is a named region with its full title and reachable management/exit actions; opening a project from the picker correctly marks Chat active.
+- Knowledge and Library use Mine, Team and Explore consistently, with explanations separating saved/owned items, team scope and discovery. Sharing actions use “Share with everyone” and point to Explore. Existing permissions and sharing behavior are unchanged.
+- Long project names exposed a short-screen list collapse. Library and Knowledge now preserve useful list space and let their controls scroll when needed; the Knowledge list is keyboard-scrollable even when empty. Long-list scroll retention remains intact.
+- Verification: 49 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and four pre-existing dependency warnings. The 95 selected captures cover context/scope and tool return (30), retained navigation state (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-context-release`, `2026-09-30-context-retention-final`, and `2026-09-30-context-file-library-final`. Browser APIs/results are synthetic; live execution, permissions and assistive-technology devices are not certified. Broader visual/accessibility acceptance remains open.
 
 ## Retained navigation state — September 30
 

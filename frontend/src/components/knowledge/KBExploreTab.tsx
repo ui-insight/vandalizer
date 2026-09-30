@@ -425,7 +425,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       Browse shared knowledge bases. Review their sources and measured quality before adding one.
                     </p>
                     <p style={{ fontSize: 12, color: C.textFaint, margin: '4px 0 0' }}>
-                      Built one that works for you? Share it from My KBs — it doesn't need to be finished.
+                      Built one that works for you? Share it from Mine — it doesn't need to be finished.
                     </p>
                   </div>
                 </div>

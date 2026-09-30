@@ -42,7 +42,7 @@ async function shot(id, locator) {
   assert.deepEqual(JSON.parse(await readFile(resolve(review.out, id + '.axe.json'), 'utf8')), [], id + ': accessibility')
   console.log('Captured ' + id)
 }
-async function open() { await page.goto(review.baseURL + '/?mode=knowledge'); await page.getByRole('tab', { name: 'My KBs', exact: true }).waitFor() }
+async function open() { await page.goto(review.baseURL + '/?mode=knowledge'); await page.getByRole('tab', { name: 'Mine', exact: true }).waitFor() }
 const back = () => page.getByRole('button', { name: 'Back to knowledge bases', exact: true }).click()
 try {
   for (const [width, height] of [[320,568],[768,700],[1440,900]]) {
@@ -94,7 +94,7 @@ try {
     assert.equal(detailReads.at(-1), 'canonical')
     assert.equal(await page.getByRole('button', { name: 'Edit title', exact: true }).count(), 0)
     await shot('knowledge-readonly-detail-' + width, page.locator('.kb-health-summary'))
-    await back(); await page.getByRole('tabpanel', { name: 'My KBs' }).getByRole('button', { name: 'Chat', exact: true }).click()
+    await back(); await page.getByRole('tabpanel', { name: 'Mine' }).getByRole('button', { name: 'Chat', exact: true }).click()
     await page.getByRole('textbox', { name: 'Message input' }).fill('Use this knowledge base')
     await page.getByRole('button', { name: 'Send message', exact: true }).click()
     await page.getByRole('button', { name: 'Copy message', exact: true }).first().waitFor()

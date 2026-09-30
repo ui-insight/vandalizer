@@ -12,6 +12,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
   const { workspaceMode, setWorkspaceMode, activeProjectRole, activeProjectUuid, deactivateProject, chatSplitOpen, setChatSplitOpen } = useWorkspace()
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
+  const activeMode = workspaceMode === 'projects' && activeProjectUuid ? 'chat' : workspaceMode
   const projectsActive = workspaceMode === 'projects' && !activeProjectUuid
   // A shared-in viewer (e.g. a PI) gets chat only — no files/automations/knowledge.
   const modes = activeProjectRole === 'viewer' ? MODES.filter(m => m.mode === 'chat') : MODES
@@ -57,7 +58,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
       <div style={{ width: 24, height: 1, background: '#333', margin: '2px 0 4px' }} />
 
       {modes.map(({ mode, icon: Icon, label }) => {
-        const active = workspaceMode === mode
+        const active = activeMode === mode
         const isAutomations = mode === 'automations'
         const showPulse = isAutomations && hasActiveAutomation && active
         const showDot = isAutomations && hasActiveAutomation && !active

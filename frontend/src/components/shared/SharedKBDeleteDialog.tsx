@@ -86,7 +86,7 @@ export function SharedKBDeleteDialog({ open, kbTitle, onCancel, onChoose }: Prop
             <div className="flex-1">
               <div className="text-sm font-semibold text-gray-900">Move to Team Library only</div>
               <div className="text-xs text-gray-600">
-                Removes the knowledge base from My KBs but keeps it available to your team.
+                Removes the knowledge base from My Knowledge Bases but keeps it available to your team.
               </div>
             </div>
           </button>

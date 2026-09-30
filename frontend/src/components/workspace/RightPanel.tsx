@@ -1,5 +1,5 @@
 import { RetainedPanel } from '../shared/PanelVisibility'
-import { MessageSquare, BookOpen } from 'lucide-react'
+import { MessageSquare, BookOpen, ChevronRight, ArrowLeft } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { AssistantTab } from './AssistantTab'
 import { LibraryTab } from './LibraryTab'
@@ -11,7 +11,7 @@ import { cn } from '../../lib/cn'
 const TABS = ['assistant', 'library'] as const
 
 export function RightPanel() {
-  const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId, openAutomationId } = useWorkspace()
+  const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId, openAutomationId, closeWorkflow, closeExtraction, closeAutomation } = useWorkspace()
 
   // An open editor replaces the tab view visually, but everything underneath
   // stays mounted (hidden): the live conversation (messages, in-flight
@@ -25,9 +25,20 @@ export function RightPanel() {
     : openWorkflowId ? <WorkflowEditorPanel key={openWorkflowId} />
     : null
 
+  const closeEditor = openAutomationId ? closeAutomation : openExtractionId ? closeExtraction : closeWorkflow
+  const editorType = openAutomationId ? 'Automation' : openExtractionId ? 'Extraction' : 'Workflow'
+  const origin = activeRightTab === 'library' ? 'Library' : 'Assistant'
+
   return (
     <div className="flex h-full flex-col" style={{ boxShadow: '-7px 20px 25px -16px rgb(211, 211, 211)' }}>
-      {editor && <div className="flex min-h-0 flex-1 flex-col">{editor}</div>}
+      {editor && <div className="flex min-h-0 flex-1 flex-col">
+        <nav aria-label="Tool location" className="tool-location">
+          <button type="button" onClick={closeEditor} aria-label={`Back to ${origin}`}><ArrowLeft size={14} aria-hidden="true" />{origin}</button>
+          <ChevronRight size={14} aria-hidden="true" />
+          <span aria-current="page">{editorType}</span>
+        </nav>
+        <div className="min-h-0 flex-1">{editor}</div>
+      </div>}
       <div className={cn('flex min-h-0 flex-1 flex-col', editor && 'hidden')}>
         {/* Tab bar - matches Flask .tab-menu */}
         <div className="flex bg-panel-dark border-b border-[#cccccc48]">

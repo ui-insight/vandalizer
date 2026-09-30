@@ -1,3 +1,4 @@
+import { SHARE_LABEL } from '../../lib/catalogLabels'
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -8533,7 +8534,7 @@ function ValidateTab({
                 }}>
                   <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
                   <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
-                    <strong>Great results!</strong> This workflow scored {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
+                    <strong>Great results!</strong> This workflow scored {Math.round(displayScore)}%. Consider sharing it with Explore so others can benefit.
                   </div>
                   {submitLibraryResult === 'success' ? (
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
@@ -8547,7 +8548,7 @@ function ValidateTab({
                         color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
-                      Submit to Public Library
+                      {SHARE_LABEL}
                     </button>
                   )}
                   {showSubmitDialog && workflowId && (

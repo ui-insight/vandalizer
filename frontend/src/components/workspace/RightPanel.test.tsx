@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { RightPanel } from './RightPanel'
 
 // Mutable workspace state the mocked context reads from.
@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   workflowId: null as string | null,
   extractionId: null as string | null,
   automationId: null as string | null,
+  closeWorkflow: vi.fn(), closeExtraction: vi.fn(), closeAutomation: vi.fn(),
 }))
 
 vi.mock('../../contexts/WorkspaceContext', () => ({
@@ -17,6 +18,7 @@ vi.mock('../../contexts/WorkspaceContext', () => ({
     openWorkflowId: h.workflowId,
     openExtractionId: h.extractionId,
     openAutomationId: h.automationId,
+    closeWorkflow: h.closeWorkflow, closeExtraction: h.closeExtraction, closeAutomation: h.closeAutomation,
   }),
 }))
 
@@ -78,7 +80,7 @@ describe('RightPanel tab switching', () => {
     expect(assistant.closest('div.hidden')).not.toBeNull()
     // The tab view (bar + content) stays mounted underneath, hidden, so the
     // Library's filters/search/scroll also survive editor open/close.
-    const assistantTabButton = screen.getByRole('button', { name: /assistant/i })
+    const assistantTabButton = screen.getByRole('button', { name: 'Assistant' })
     expect(assistantTabButton.closest('div.hidden')).not.toBeNull()
   })
 
@@ -126,6 +128,17 @@ describe('RightPanel tab switching', () => {
     h.workflowId = null; rerender(<RightPanel />)
     expect(screen.getByTestId('library-marker')).toBe(library)
     expect(library).toBeVisible()
+  })
+
+  it.each(['Workflow', 'Extraction', 'Automation'] as const)('identifies %s and returns through the correct close action', type => {
+    h.tab = 'library'
+    if (type === 'Workflow') h.workflowId = 'item'
+    if (type === 'Extraction') h.extractionId = 'item'
+    if (type === 'Automation') h.automationId = 'item'
+    render(<RightPanel />)
+    expect(screen.getByRole('navigation', { name: 'Tool location' })).toHaveTextContent(type)
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Library' }))
+    expect(h[`close${type}`]).toHaveBeenCalled()
   })
 
 })

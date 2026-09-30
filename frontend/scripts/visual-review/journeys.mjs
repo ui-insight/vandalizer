@@ -85,7 +85,7 @@ try {
   await capture('library-favorites-mobile')
 
   await go('/?mode=knowledge')
-  await page.getByRole('tabpanel', { name: 'My KBs' }).getByRole('button', { name: 'Chat', exact: true }).click()
+  await page.getByRole('tabpanel', { name: 'Mine' }).getByRole('button', { name: 'Chat', exact: true }).click()
   const preview = 'Proposal due October 15. Include a budget justification.'
   state.chatChunks = [{ kind: 'sources', content: '', sources: [{ document_title: 'Proposal narrative.pdf', document_uuid: 'doc-0', chunk_id: 'chunk-1', page: 2, kb_uuid: 'kb-1', kb_title: 'Research administration policies', content_preview: preview }] }, { kind: 'text', content: 'The proposal is due October 15. Include a budget justification.' }]
   await send('When is the proposal due?')

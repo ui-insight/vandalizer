@@ -1,3 +1,4 @@
+import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from '../shared/panelPortal'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -691,7 +692,7 @@ export function LibraryTab() {
 
   return (
     <div
-      className="library-workspace flex flex-col h-full"
+      className="library-workspace flex flex-col h-full overflow-y-auto"
       style={{
         position: 'relative',
         backgroundColor: '#fff',
@@ -812,8 +813,8 @@ export function LibraryTab() {
           </div>
         </div>
 
-        {/* Row 2: Scope tabs */}
-        <div className="library-scope-tabs" style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
+        {/* Saved ownership views and shared discovery. */}
+        <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
@@ -823,6 +824,7 @@ export function LibraryTab() {
             return (
               <button
                 key={key}
+                aria-pressed={active}
                 onClick={() => {
                   setScope(key)
                   setViewFilter('all')
@@ -853,6 +855,7 @@ export function LibraryTab() {
           })}
         </div>
 
+        <SavedScopeHint scope={scope} kind="tools" />
         {/* Row 3: Filter chips + sort (Explore has its own) */}
         <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
@@ -924,11 +927,11 @@ export function LibraryTab() {
 
       {/* ── Body: Explore has its own view; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (
-        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: '1 0 0', minHeight: 'min(320px, 100%)', overflow: 'hidden' }}>
           <ExploreTab />
         </div>
       ) : (
-      <div className="library-body" style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+      <div className="library-body" style={{ display: 'flex', flex: '1 0 0', minHeight: 'min(240px, 100%)', overflow: 'hidden' }}>
         <button type="button" className="library-views-toggle" aria-expanded={mobileViewsOpen} aria-controls="library-saved-views" onClick={() => setMobileViewsOpen(open => !open)}>{mobileViewsOpen ? 'Close views & folders' : `View: ${viewFilter === 'all' ? 'All items' : viewFilter === 'favorites' ? 'Favorites' : viewFilter === 'pinned' ? 'Pinned' : 'Folder'} · Change`}</button>
         {/* Sidebar */}
         <div

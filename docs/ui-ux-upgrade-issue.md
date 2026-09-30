@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Workspace location and saved scopes — September 30
+
+**150/169 checklist items implemented locally.** SYS-05 and SYS-07 are complete for the reviewed workspace flows; changes are not deployed.
+
+- Open workflow, extraction and automation editors identify their type and offer an explicit return to Library or Assistant. The active project is a named region with its full title and reachable management/exit actions; opening a project from the picker correctly marks Chat active.
+- Knowledge and Library use Mine, Team and Explore consistently, with explanations separating saved/owned items, team scope and discovery. Sharing actions use “Share with everyone” and point to Explore. Existing permissions and sharing behavior are unchanged.
+- Long project names exposed a short-screen list collapse. Library and Knowledge now preserve useful list space and let their controls scroll when needed; the Knowledge list is keyboard-scrollable even when empty. Long-list scroll retention remains intact.
+- Verification: 49 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and four pre-existing dependency warnings. The 95 selected captures cover context/scope and tool return (30), retained navigation state (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-context-release`, `2026-09-30-context-retention-final`, and `2026-09-30-context-file-library-final`. Browser APIs/results are synthetic; live execution, permissions and assistive-technology devices are not certified. Broader visual/accessibility acceptance remains open.
+
 ## Retained navigation state — September 30
 
 **148/169 checklist items implemented locally.** SYS-08 is complete for the reviewed workspace navigation flows; changes are not deployed.
@@ -351,9 +361,9 @@ Unchecked items remain open; checked items refer to local implementation, not a 
 - [x] **SYS-02 · P2 · Improve:** Make the assistant a compact, clearly labeled contextual panel that users can open and expand without losing their current task.
 - [x] **SYS-03 · P2 · Fix:** Collapse an empty Activity rail by default; keep an obvious way to open activity, notifications and run history.
 - [x] **SYS-04 · P2 · Improve:** Preserve useful panel choices during a session without restoring layouts that do not fit the current viewport.
-- [ ] **SYS-05 · P2 · Improve:** Make the active section and current project context unmistakable, including when opening an item from chat or the Library.
+- [x] **SYS-05 · P2 · Improve:** Make the active section and current project context unmistakable, including when opening an item from chat or the Library.
 - [ ] **SYS-06 · P2 · Improve:** Use consistent placement for the page title, description, primary action, search, filters and secondary actions.
-- [ ] **SYS-07 · P2 · Improve:** Establish one coherent vocabulary for Files, Projects, Automations, Knowledge, Library and Explore; distinguish location from ownership/sharing scope.
+- [x] **SYS-07 · P2 · Improve:** Establish one coherent vocabulary for Files, Projects, Automations, Knowledge, Library and Explore; distinguish location from ownership/sharing scope.
 - [x] **SYS-08 · P2 · Verify:** Back navigation, section switches and opening/closing contextual panels preserve the intended selection, draft and scroll position.
 
 Acceptance: the active task owns the visual hierarchy; supporting panels are discoverable without dominating; navigation never silently discards work.

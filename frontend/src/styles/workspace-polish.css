@@ -218,3 +218,10 @@
   .explore-collections { display: none; }
   .explore-collections[data-open="true"] { display: block; width: 100%; max-height: 180px; border-right: 0; border-bottom: 1px solid #dfe3e6; }
 }
+
+.tool-location { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex-shrink: 0; padding: 2px 12px; border-bottom: 1px solid var(--workspace-border); background: var(--workspace-canvas); color: var(--workspace-muted); font-size: 12px; }
+.tool-location button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 4px 6px; border: 0; border-radius: 4px; background: transparent; color: var(--workspace-text); font: inherit; cursor: pointer; }
+.tool-location button:hover { background: var(--workspace-hover); }
+.tool-location [aria-current] { font-weight: 600; color: var(--workspace-text); }
+.saved-scope-hint { flex-shrink: 0; margin: 0; padding: 8px 12px; color: var(--workspace-muted); background: var(--workspace-canvas); font-size: 12px; line-height: 1.5; }
+.saved-scope-hint[data-dark="true"] { color: #c7cdd6; background: #252525; }

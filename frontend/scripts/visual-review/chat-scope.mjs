@@ -40,7 +40,7 @@ try {
     assert.deepEqual(state.lastChat.document_uuids,['doc-0'])
     await shot(`chat-kb-detached-${width}`)
     await page.getByRole('navigation',{name:'Workspace navigation'}).getByRole('button',{name:'Knowledge',exact:true}).click()
-    await page.getByRole('tabpanel',{name:'My KBs'}).getByRole('button',{name:'Chat',exact:true}).first().click()
+    await page.getByRole('tabpanel',{name:'Mine'}).getByRole('button',{name:'Chat',exact:true}).first().click()
     await send('Start with the original knowledge base',['kb-1'])
     assert.deepEqual(state.lastChat.document_uuids,[])
     await shot(`chat-kb-replaced-${width}`)

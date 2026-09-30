@@ -81,7 +81,7 @@ try {
   state.uploadError=true;await page.getByLabel('Attach files').setInputFiles({name:'Oversized sample.txt',mimeType:'text/plain',buffer:Buffer.from('Synthetic upload error scenario.')});await page.getByRole('button',{name:'Retry upload: Oversized sample.txt'}).waitFor();await shot('chat-upload-error');state.uploadError=false;await page.getByRole('button',{name:'Retry upload: Oversized sample.txt'}).click();await page.getByRole('button',{name:'Dismiss upload: Oversized sample.txt'}).waitFor({state:'hidden'});await shot('chat-upload-retried');
  });
  await scene('chat-kb',async()=>{
-  await go('/?mode=knowledge'); await page.getByRole('tabpanel',{name:'My KBs'}).getByRole('button',{name:'Chat',exact:true}).click(); await shot('chat-kb-attached');
+  await go('/?mode=knowledge'); await page.getByRole('tabpanel',{name:'Mine'}).getByRole('button',{name:'Chat',exact:true}).click(); await shot('chat-kb-attached');
   state.chatChunks=[{kind:'sources',content:'',sources:[{document_title:'Institutional research policies',kb_title:'Research administration policies',kb_uuid:'kb-1',content_preview:'Proposal due October 15. Budget requires justification.',url:'https://example.org/policies'}]},{kind:'text',content:'The proposal is due **October 15**. Include a budget justification. [1]'}];
   await page.getByRole('textbox',{name:'Message input'}).fill('When is the proposal due, and what must I include?');await page.getByRole('button',{name:'Send message'}).click();await page.getByText('The proposal is due', {exact:false}).waitFor();await shot('chat-kb-answer','Synthetic response and citations; does not evaluate model accuracy.');
  });
