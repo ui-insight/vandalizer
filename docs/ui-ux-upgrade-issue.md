@@ -4,6 +4,15 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Consistent section headers — September 30
+
+**151/169 checklist items implemented locally.** SYS-06 is complete for the reviewed workspace sections; changes are not deployed.
+
+- Files, Projects, Automations, Knowledge and Library share a heading/action component with consistent title sizing, spacing and wrapping. Primary actions sit in the header, with the project name/Create form kept together; scope, search and filters follow the heading. About controls retain their descriptive accessible names without using a full question in the header.
+- Files puts Add next to its title and opens search beneath it. The document toolbar keeps the full wrapping filename and reachable source actions. Folder breadcrumbs wrap long project/folder names. Explore retains its purpose guidance while removing the decorative gradient icon and repeated sharing promotion that crowded narrow panes.
+- Verification: 47 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing LeftPanel dependency warning. The 92 selected captures cover section headers/search/menus (27), retained navigation (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Mobile, tablet and desktop screenshots inspected directly.
+- Evidence: `2026-09-30-headers-evidence`, `2026-09-30-headers-retention`, and `2026-09-30-headers-file-library`. Browser APIs/results are synthetic. Theme, broader density, keyboard and final regrading acceptance remain open; this is not a claim that the remaining visual items are complete.
+
 ## Workspace location and saved scopes — September 30
 
 **150/169 checklist items implemented locally.** SYS-05 and SYS-07 are complete for the reviewed workspace flows; changes are not deployed.
@@ -362,7 +371,7 @@ Unchecked items remain open; checked items refer to local implementation, not a 
 - [x] **SYS-03 · P2 · Fix:** Collapse an empty Activity rail by default; keep an obvious way to open activity, notifications and run history.
 - [x] **SYS-04 · P2 · Improve:** Preserve useful panel choices during a session without restoring layouts that do not fit the current viewport.
 - [x] **SYS-05 · P2 · Improve:** Make the active section and current project context unmistakable, including when opening an item from chat or the Library.
-- [ ] **SYS-06 · P2 · Improve:** Use consistent placement for the page title, description, primary action, search, filters and secondary actions.
+- [x] **SYS-06 · P2 · Improve:** Use consistent placement for the page title, description, primary action, search, filters and secondary actions.
 - [x] **SYS-07 · P2 · Improve:** Establish one coherent vocabulary for Files, Projects, Automations, Knowledge, Library and Explore; distinguish location from ownership/sharing scope.
 - [x] **SYS-08 · P2 · Verify:** Back navigation, section switches and opening/closing contextual panels preserve the intended selection, draft and scroll position.
 

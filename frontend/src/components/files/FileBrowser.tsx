@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, useRef, useEffect, type DragEvent } from 'react'
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
+import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode, type DragEvent } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
@@ -51,6 +52,8 @@ export interface ContentMatch {
 }
 
 interface FileBrowserProps {
+  searchAction?: ReactNode
+  searchField?: ReactNode
   selectedDocumentUuids?: string[]
   selectedFolderUuids?: string[]
   onDocClick?: (doc: Document) => void
@@ -109,7 +112,7 @@ function keptKnowledgeBasesMessage(results: DeleteFileResult[]): string | null {
 // The delete confirmation names what it deletes; past this many, "and N more".
 const DELETE_NAME_CAP = 8
 
-export function FileBrowser({ selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, selectedFolderUuids, onDocClick, searchQuery = '', contentMatches, contentSearchState, onRetryContentSearch, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onFolderNamesChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
   const { toast } = useToast()
@@ -629,11 +632,8 @@ export function FileBrowser({ selectedDocumentUuids, selectedFolderUuids, onDocC
       onDragLeave={handlePanelDragLeave}
       onDrop={handlePanelDrop}
     >
-      <UploadZone onFilesSelected={(files) => upload(files)} highlighted={panelDragOver} />
-      <UploadProgress uploads={uploads} onDismiss={dismissUpload} />
-
-      {/* + Add button with dropdown menu - matches Flask _add_button.html */}
-      <div ref={addMenuRef} className="relative inline-block mt-4">
+      <WorkspaceSectionHeader title="Files" actions={<>{searchAction}
+      <div ref={addMenuRef} className="relative inline-block">
         <button
           type="button"
           onClick={() => setAddMenuOpen(!addMenuOpen)}
@@ -651,7 +651,7 @@ export function FileBrowser({ selectedDocumentUuids, selectedFolderUuids, onDocC
             role="menu"
             aria-label="Add"
             onKeyDown={(e) => { if (e.key === 'Escape') setAddMenuOpen(false) }}
-            className="absolute left-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
+            className="absolute right-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
             style={{
               borderColor: 'rgba(0,0,0,.15)',
               boxShadow: '0 8px 24px rgba(0,0,0,.12)',
@@ -710,6 +710,9 @@ export function FileBrowser({ selectedDocumentUuids, selectedFolderUuids, onDocC
           }}
         />
       </div>
+      </>}>{searchField}</WorkspaceSectionHeader>
+      <UploadZone onFilesSelected={(files) => upload(files)} highlighted={panelDragOver} />
+      <UploadProgress uploads={uploads} onDismiss={dismissUpload} />
 
       {/* Breadcrumbs - matches Flask _breadcrumbs.html */}
       <Breadcrumbs

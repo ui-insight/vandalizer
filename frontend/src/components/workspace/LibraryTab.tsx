@@ -1,3 +1,4 @@
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from '../shared/panelPortal'
@@ -702,70 +703,8 @@ export function LibraryTab() {
         ['--library-highlight-muted' as string]: 'color-mix(in srgb, var(--library-highlight) 10%, #f8f9fa)',
       }}
     >
-      {/* ── Header ── */}
-      <div className="library-header"
-        style={{
-          flexShrink: 0,
-          borderBottom: '1px solid #e0e0e0',
-          backgroundColor: '#fff',
-          padding: '14px 24px 6px 24px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}
-      >
-        {/* Row 1: Title + Search + New */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', color: '#202124', whiteSpace: 'nowrap' }}>
-            Library
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, justifyContent: 'flex-end', minWidth: 0 }}>
-            {/* Search */}
-            {scope !== 'explore' && <div style={{ position: 'relative', flex: 1, maxWidth: 400, minWidth: 0 }}>
-              <Search
-                style={{
-                  position: 'absolute',
-                  left: 12,
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: 16,
-                  height: 16,
-                  color: '#5f6368',
-                  pointerEvents: 'none',
-                }}
-              />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                aria-label="Search library"
-                placeholder="Search library…"
-                style={{
-                  width: '100%',
-                  background: '#f1f3f4',
-                  border: '1px solid transparent',
-                  borderRadius: 8,
-                  padding: '8px 16px 8px 38px',
-                  fontSize: 14,
-                  outline: 'none',
-                  transition: 'all 0.2s',
-                  fontFamily: 'inherit',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.background = '#fff'
-                  e.currentTarget.style.borderColor = '#dadce0'
-                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)'
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.background = '#f1f3f4'
-                  e.currentTarget.style.borderColor = 'transparent'
-                  e.currentTarget.style.boxShadow = 'none'
-                }}
-              />
-            </div>}
-
-            {/* + New button with dropdown */}
-            <div ref={newMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
+      <WorkspaceSectionHeader title="Library" actions={
+<div ref={newMenuRef} style={{ position: 'relative', flexShrink: 0 }}>
               <button
                 onClick={() => setNewMenuOpen(!newMenuOpen)}
                 style={{
@@ -810,9 +749,7 @@ export function LibraryTab() {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
+      }>
         {/* Saved ownership views and shared discovery. */}
         <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
           {([
@@ -856,6 +793,48 @@ export function LibraryTab() {
         </div>
 
         <SavedScopeHint scope={scope} kind="tools" />
+        {scope !== 'explore' && <div style={{ position: 'relative', minWidth: 0 }}>
+              <Search
+                style={{
+                  position: 'absolute',
+                  left: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  width: 16,
+                  height: 16,
+                  color: '#5f6368',
+                  pointerEvents: 'none',
+                }}
+              />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search library"
+                placeholder="Search library…"
+                style={{
+                  width: '100%',
+                  background: '#f1f3f4',
+                  border: '1px solid transparent',
+                  borderRadius: 8,
+                  padding: '8px 16px 8px 38px',
+                  fontSize: 14,
+                  outline: 'none',
+                  transition: 'all 0.2s',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.background = '#fff'
+                  e.currentTarget.style.borderColor = '#dadce0'
+                  e.currentTarget.style.boxShadow = '0 1px 2px rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15)'
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.background = '#f1f3f4'
+                  e.currentTarget.style.borderColor = 'transparent'
+                  e.currentTarget.style.boxShadow = 'none'
+                }}
+              />
+            </div>}
         {/* Row 3: Filter chips + sort (Explore has its own) */}
         <div className="library-filters" style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <select className="library-kind-select" aria-label="Filter library by type" value={kindFilter} onChange={event => setKindFilter(event.target.value as KindFilter)}>
@@ -923,7 +902,7 @@ export function LibraryTab() {
             </select>
           </div>
         </div>
-      </div>
+      </WorkspaceSectionHeader>
 
       {/* ── Body: Explore has its own view; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (

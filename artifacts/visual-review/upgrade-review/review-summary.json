@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 150,
+  "completed_items": 151,
   "total_items": 169,
-  "unique_states": 1159,
-  "capture_executions": 1529,
+  "unique_states": 1186,
+  "capture_executions": 1621,
   "mobile_grade": 8,
   "areas": [
     {
@@ -17686,6 +17686,1073 @@
       "buildMode": "production",
       "workingTree": "M frontend/scripts/visual-review/chat-reading.mjs\n M frontend/scripts/visual-review/chat-scope.mjs\n M frontend/scripts/visual-review/journeys.mjs\n M frontend/scripts/visual-review/knowledge-sharing.mjs\n M frontend/scripts/visual-review/panel-preferences.mjs\n M frontend/scripts/visual-review/run.mjs\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/shared/SharedKBDeleteDialog.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/UtilityBar.test.tsx\n M frontend/src/components/workspace/UtilityBar.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/workspace-context.mjs\n?? frontend/src/components/shared/SavedScopeHint.tsx",
       "commit": "331e542a154871df31b6251a9e4f3453697bc9ca",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-30-headers-evidence",
+      "capturedAt": "2026-09-30T18:49:37.617Z",
+      "sourceFingerprint": "a05978b14868eeea4ead9ad59b050bf9adaba11988527923aac848fee637ad7d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/files/Breadcrumbs.tsx\n M frontend/src/components/files/FileBrowser.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/workspace-headers.mjs\n?? frontend/src/components/shared/WorkspaceSectionHeader.tsx",
+      "commit": "8ccb197acf7e14bf8420779ca32b535230075763",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "headers-files-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "headers-file-add-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "headers-files-search-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "headers-projects-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "headers-automations-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "headers-file-add-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "headers-files-search-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "headers-projects-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "headers-automations-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-file-add-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-search-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-projects-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "headers-automations-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Shared section headings, primary actions, search/filter placement, file Add and Library New menus at 320/768/1440px. Existing task behavior is covered by companion file/Library and navigation-retention regressions. No live API writes."
+      ]
+    },
+    {
+      "directory": "2026-09-30-headers-retention",
+      "capturedAt": "2026-09-30T18:48:23.610Z",
+      "sourceFingerprint": "f06157b3de87e4413c97a793b1fe1559e9c38703e9c96578da18f845ea568e38",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/files/Breadcrumbs.tsx\n M frontend/src/components/files/FileBrowser.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/workspace-headers.mjs\n?? frontend/src/components/shared/WorkspaceSectionHeader.tsx",
+      "commit": "8ccb197acf7e14bf8420779ca32b535230075763",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "navigation-library-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-browser-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-project-draft-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-collections-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-pane-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-hidden-library-portal-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-restored-library-portal-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-library-browser-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-project-draft-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-explore-collections-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-explore-pane-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-hidden-library-portal-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-restored-library-portal-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-library-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-browser-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-project-draft-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-collections-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-pane-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-hidden-library-portal-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-restored-library-portal-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-background-project-create-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-created-project-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Retained Library filters/80-row scroll/editor Back+Forward; project draft/search/sort/scroll; Knowledge selected questions and unsaved answer/modal; automation filters; file selection and chat draft at 320/768/1440px. Hidden modal releases keyboard focus. Synthetic APIs, no real writes or executions."
+      ]
+    },
+    {
+      "directory": "2026-09-30-headers-file-library",
+      "capturedAt": "2026-09-30T18:48:06.633Z",
+      "sourceFingerprint": "f06157b3de87e4413c97a793b1fe1559e9c38703e9c96578da18f845ea568e38",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/files/Breadcrumbs.tsx\n M frontend/src/components/files/FileBrowser.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LeftPanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/workspace-headers.mjs\n?? frontend/src/components/shared/WorkspaceSectionHeader.tsx",
+      "commit": "8ccb197acf7e14bf8420779ca32b535230075763",
       "baseURL": "http://127.0.0.1:4173",
       "browserVersion": "148.0.7778.96",
       "mode": "synthetic API fixtures; current source served locally; no backend or model execution",

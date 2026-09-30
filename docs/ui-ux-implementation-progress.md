@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**150/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**151/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,15 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Consistent section headers — September 30
+
+**151/169 checklist items implemented locally.** SYS-06 is complete for the reviewed workspace sections; changes are not deployed.
+
+- Files, Projects, Automations, Knowledge and Library share a heading/action component with consistent title sizing, spacing and wrapping. Primary actions sit in the header, with the project name/Create form kept together; scope, search and filters follow the heading. About controls retain their descriptive accessible names without using a full question in the header.
+- Files puts Add next to its title and opens search beneath it. The document toolbar keeps the full wrapping filename and reachable source actions. Folder breadcrumbs wrap long project/folder names. Explore retains its purpose guidance while removing the decorative gradient icon and repeated sharing promotion that crowded narrow panes.
+- Verification: 47 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing LeftPanel dependency warning. The 92 selected captures cover section headers/search/menus (27), retained navigation (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Mobile, tablet and desktop screenshots inspected directly.
+- Evidence: `2026-09-30-headers-evidence`, `2026-09-30-headers-retention`, and `2026-09-30-headers-file-library`. Browser APIs/results are synthetic. Theme, broader density, keyboard and final regrading acceptance remain open; this is not a claim that the remaining visual items are complete.
 
 ## Workspace location and saved scopes — September 30
 

@@ -1,3 +1,4 @@
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { useEffect, useMemo, useState } from 'react'
 import { CalendarClock, FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
@@ -103,27 +104,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
   return (
     <div className="automations-panel automation-surface" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--workspace-canvas)' }}>
-      {/* Header */}
-      <div
-        style={{
-          minHeight: 54,
-          gap: 8,
-          flexWrap: 'wrap',
-          backgroundColor: 'var(--workspace-surface)',
-          borderBottom: '1px solid var(--workspace-border)',
-          padding: '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexShrink: 0,
-          zIndex: 300,
-          position: 'relative',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 18, fontWeight: 600, color: 'var(--workspace-text)' }}>Automations</span>
-          <ExplainerPill tone="light" label="What are automations?" onClick={() => setShowExplainer(true)} />
-        </div>
+      <WorkspaceSectionHeader title="Automations" help={<ExplainerPill tone="light" label="What are automations?" onClick={() => setShowExplainer(true)} />} actions={
         <button
           onClick={() => setShowWizard(true)}
           style={{
@@ -143,8 +124,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         >
           <Plus style={{ width: 14, height: 14 }} />
           New
-        </button>
-      </div>
+        </button>      } />
 
       {/* Project scope bar — only inside a project. Lets you flip between the
           automations pinned to this project and the whole workspace. */}
@@ -193,18 +173,18 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <div style={{ flex: 1 }} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,
-            padding: '0 8px', height: 26,
+            padding: '0 10px', minHeight: 36, order: -1, flexBasis: '100%',
             backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 5,
-            maxWidth: 160,
+            minWidth: 0,
           }}>
-            <Search size={11} style={{ color: '#555', flexShrink: 0 }} />
+            <Search size={16} style={{ color: '#555', flexShrink: 0 }} />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter..."
               aria-label="Filter automations"
               style={{
-                flex: 1, width: 60, padding: 0, fontSize: 12, fontFamily: 'inherit',
+                flex: 1, minWidth: 0, padding: 0, fontSize: 14, fontFamily: 'inherit',
                 color: 'var(--workspace-text)', backgroundColor: 'transparent',
                 border: 'none', outline: 'none',
               }}
@@ -413,6 +393,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 export function ExplainerPill({ label, onClick, tone = 'dark' }: { label: string; onClick: () => void; tone?: 'light' | 'dark' }) {
   return (
     <button
+      aria-label={label} title={label}
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -425,7 +406,7 @@ export function ExplainerPill({ label, onClick, tone = 'dark' }: { label: string
       onMouseLeave={e => { e.currentTarget.style.color = tone === 'light' ? '#59616b' : '#b5bbc3'; e.currentTarget.style.borderColor = '#3a3a3a' }}
     >
       <HelpCircle size={12} />
-      {label}
+      About
     </button>
   )
 }

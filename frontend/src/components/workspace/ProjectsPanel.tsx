@@ -1,7 +1,8 @@
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
+import { Plus, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { useToast } from '../../contexts/ToastContext'
 import type { Project } from '../../types/project'
@@ -99,22 +100,15 @@ export function ProjectsPanel() {
 
   return (
     <div role="region" aria-label="Projects list" className="relative h-full overflow-auto bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-5 py-4">
-        <FolderKanban className="h-5 w-5 text-gray-400" />
-        <h2 className="text-base font-semibold text-gray-900">Projects</h2>
-        <button
+      <WorkspaceSectionHeader title="Projects" help={<button
+          aria-label="What are Projects?" title="What are Projects?"
           onClick={() => setShowExplainer(true)}
           className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
         >
           <HelpCircle size={12} />
-          What are Projects?
-        </button>
-        <span className="ml-auto text-xs text-gray-600">{loading ? 'Loading…' : error ? 'Unavailable' : `${projects.length} projects`}</span>
-      </div>
+          About
+        </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : `${projects.length} projects`}>
 
-      {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
-
-      <div className="p-5 pb-24">
         <div className="flex gap-2">
           <input
             type="text"
@@ -141,6 +135,9 @@ export function ProjectsPanel() {
           <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
           <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value); setVisibleLimit(40) }}><option value="updated">Recently updated</option><option value="name">Name A–Z</option></select>
         </div>}
+      </WorkspaceSectionHeader>
+      {showExplainer && <ProjectsExplainer onClose={() => setShowExplainer(false)} />}
+      <div className="p-5 pb-24">
         <div className="mt-4 space-y-2">
           {loading ? (
             <div role="status" className="text-sm text-gray-600">Loading projects…</div>

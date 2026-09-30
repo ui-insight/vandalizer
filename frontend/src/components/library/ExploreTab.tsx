@@ -6,7 +6,7 @@ import { marked } from 'marked'
 import {
   Search, ShieldCheck, BookOpen, Workflow, FileSearch, MessageSquare,
   FolderOpen, Star, X, Plus, ArrowUpDown,
-  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2, Users,
+  Bookmark, ArrowLeft, Loader2, Tag, ExternalLink, Link2, Users,
   Pin, PinOff,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
@@ -689,15 +689,11 @@ export function ExploreTab() {
           <div className="explore-content p-6 max-w-5xl mx-auto">
             {/* Hero header (no filters active) */}
             {showHero && !activeCollection && (
-              <div className="mb-8">
+              <div className="mb-4">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                    <Sparkles className="h-5 w-5" />
-                  </div>
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Explore shared tools</h2>
                     <p className="text-sm text-gray-500">Browse workflows, extractions, and knowledge bases. Review details and measured quality before adding one.</p>
-                    <p className="text-xs text-gray-500 mt-1">Have something that works for you? Share it from its ⋯ menu in Mine — it doesn't need to be finished.</p>
                   </div>
                 </div>
               </div>

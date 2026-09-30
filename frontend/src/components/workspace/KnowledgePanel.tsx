@@ -1,3 +1,4 @@
+import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { SavedScopeHint } from '../shared/SavedScopeHint'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, AlertTriangle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight, RefreshCw, RotateCcw, Copy } from 'lucide-react'
@@ -1900,29 +1901,8 @@ export function KnowledgePanel() {
   return (
     <>
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', overflowY: 'auto' }}>
-      {/* Header */}
-      <div
-        style={{
-          minHeight: 50,
-          backgroundColor: 'var(--color-panel-dark)',
-          boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-          padding: '8px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          columnGap: 12,
-          rowGap: 8,
-          flexShrink: 0,
-          zIndex: 300,
-          position: 'relative',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
-          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge</span>
-          <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
-        </div>
-        {activeTab === 'mine' && (
+      <WorkspaceSectionHeader title="Knowledge" dark help={<ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />} actions={
+activeTab === 'mine' && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input
               ref={importInputRef}
@@ -1981,8 +1961,7 @@ export function KnowledgePanel() {
               New
             </button>
           </div>
-        )}
-      </div>
+        )      } />
 
       {/* Tabs */}
       <div

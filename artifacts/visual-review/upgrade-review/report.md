@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 150/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 151/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,15 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Consistent section headers — September 30
+
+**151/169 checklist items implemented locally.** SYS-06 is complete for the reviewed workspace sections; changes are not deployed.
+
+- Files, Projects, Automations, Knowledge and Library share a heading/action component with consistent title sizing, spacing and wrapping. Primary actions sit in the header, with the project name/Create form kept together; scope, search and filters follow the heading. About controls retain their descriptive accessible names without using a full question in the header.
+- Files puts Add next to its title and opens search beneath it. The document toolbar keeps the full wrapping filename and reachable source actions. Folder breadcrumbs wrap long project/folder names. Explore retains its purpose guidance while removing the decorative gradient icon and repeated sharing promotion that crowded narrow panes.
+- Verification: 47 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing LeftPanel dependency warning. The 92 selected captures cover section headers/search/menus (27), retained navigation (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Mobile, tablet and desktop screenshots inspected directly.
+- Evidence: `2026-09-30-headers-evidence`, `2026-09-30-headers-retention`, and `2026-09-30-headers-file-library`. Browser APIs/results are synthetic. Theme, broader density, keyboard and final regrading acceptance remain open; this is not a claim that the remaining visual items are complete.
 
 ## Workspace location and saved scopes — September 30
 
@@ -234,7 +243,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 1159 distinct states / 1529 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 1186 distinct states / 1621 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -353,6 +362,9 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-30-context-release](../2026-09-30-context-release/manifest.json): 30 states; source `9e7fcd52703211626580619a4d08d2a892a861d39a43b254abe9ce00b806cc9d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-context-retention-final](../2026-09-30-context-retention-final/manifest.json): 35 states; source `62bda97eaa998626e15b4fca70da378b3bed99d3bea64321c6a334a5447d58cf`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-context-file-library-final](../2026-09-30-context-file-library-final/manifest.json): 30 states; source `62bda97eaa998626e15b4fca70da378b3bed99d3bea64321c6a334a5447d58cf`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-headers-evidence](../2026-09-30-headers-evidence/manifest.json): 27 states; source `a05978b14868eeea4ead9ad59b050bf9adaba11988527923aac848fee637ad7d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-headers-retention](../2026-09-30-headers-retention/manifest.json): 35 states; source `f06157b3de87e4413c97a793b1fe1559e9c38703e9c96578da18f845ea568e38`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-headers-file-library](../2026-09-30-headers-file-library/manifest.json): 30 states; source `f06157b3de87e4413c97a793b1fe1559e9c38703e9c96578da18f845ea568e38`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

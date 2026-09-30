@@ -296,112 +296,22 @@ export function LeftPanel() {
   }
 
   return (
-    <aside aria-label="Documents" className="h-full overflow-hidden bg-panel-bg relative">
-      {/* Black header bar - matches Flask .main-panel .header */}
-      <div
-        className="relative z-[300] flex items-center"
-        style={{
-          height: 50,
-          backgroundColor: 'var(--color-panel-dark)',
-          boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-          padding: '0 15px',
-        }}
-      >
-        {/* Back button */}
-        <div style={{ paddingLeft: 15, width: 50, flexShrink: 0 }}>
-          {viewingDoc && (
-            <button
-              type="button"
-              aria-label="Close document"
-              onClick={() => { setViewingDoc(null); if (!viewingDoc.preserveChatScope) { setSelectedDocUuids(viewingDoc.previousSelection?.uuids ?? []); setSelectedDocNames(viewingDoc.previousSelection?.names ?? {}) } setHighlightTerms([]) }}
-              className="bg-transparent border-0 p-0 cursor-pointer"
-            >
-              <ArrowLeft className="h-6 w-6 text-white" />
-            </button>
-          )}
+    <aside aria-label="Documents" className="flex h-full min-h-0 flex-col overflow-hidden bg-panel-bg relative">
+      {viewingDoc && <header className="workspace-document-header">
+        <button type="button" aria-label="Close document" className="workspace-header-icon"
+          onClick={() => { setViewingDoc(null); if (!viewingDoc.preserveChatScope) { setSelectedDocUuids(viewingDoc.previousSelection?.uuids ?? []); setSelectedDocNames(viewingDoc.previousSelection?.names ?? {}) } setHighlightTerms([]) }}>
+          <ArrowLeft size={20} />
+        </button>
+        <h2>{viewingDoc.title}</h2>
+        <div className="workspace-section-actions">
+          <button type="button" onClick={() => setShowUsage(true)} className="workspace-header-icon" title="Where is this used?" aria-label="Where is this used?"><Link2 size={20} /></button>
+          <button type="button" onClick={() => setShowRawText(true)} className="workspace-header-icon" title="View extracted text" aria-label="View extracted text"><FileText size={20} /></button>
         </div>
-
-        {/* Title or search input - centered */}
-        <div className="flex-1 text-center" style={{ minWidth: 0 }}>
-          {searchOpen && !viewingDoc ? (
-            <div className="flex items-center gap-2 mx-auto" style={{ maxWidth: 'calc(100% - 60px)' }}>
-              <Search className="h-4 w-4 text-gray-400 shrink-0" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search files and content..."
-                style={{
-                  flex: 1, border: 'none', background: 'none', outline: 'none',
-                  fontSize: 15, color: '#fff',
-                }}
-              />
-              <button
-                type="button"
-                aria-label="Close search"
-                onClick={handleCloseSearch}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-              >
-                <X className="h-4 w-4 text-gray-400 hover:text-white" />
-              </button>
-            </div>
-          ) : (
-            <h1
-              className="m-0 truncate text-white"
-              title={viewingDoc ? viewingDoc.title : undefined}
-              style={{
-                fontSize: 18,
-                fontWeight: 600,
-                margin: '0 auto',
-                paddingLeft: 8,
-                paddingRight: 8,
-              }}
-            >
-              {viewingDoc ? viewingDoc.title : 'Files'}
-            </h1>
-          )}
-        </div>
-
-        {/* Right controls */}
-        <div style={{ paddingRight: 15, minWidth: 50, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'flex-end' }}>
-          {viewingDoc ? (
-            <>
-              <button
-                onClick={() => setShowUsage(true)}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-                title="Where is this used?"
-                aria-label="Where is this used?"
-              >
-                <Link2 className="h-5 w-5 text-white" />
-              </button>
-              <button
-                onClick={() => setShowRawText(true)}
-                className="bg-transparent border-0 p-0 cursor-pointer"
-                title="View extracted text"
-              >
-                <FileText className="h-5 w-5 text-white" />
-              </button>
-            </>
-          ) : !searchOpen ? (
-            <button
-              onClick={() => setSearchOpen(true)}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 32, height: 32, borderRadius: 6, border: 'none',
-                background: 'none', cursor: 'pointer', color: '#fff',
-              }}
-              title="Search files"
-            >
-              <Search size={16} />
-            </button>
-          ) : null}
-        </div>
-      </div>
+      </header>}
 
       {/* Content area */}
       {viewingDoc && (
-        <div style={{ height: 'calc(100% - 50px)', position: 'relative' }}>
+        <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
@@ -454,8 +364,14 @@ export function LeftPanel() {
           )}
         </div>
       )}
-        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
+        <div ref={listScroller} onScroll={event => { if (!viewingDoc) listPosition.current = event.currentTarget.scrollTop }} className="overflow-auto hide-scrollbar" style={{ display: viewingDoc ? 'none' : undefined, flex: 1, minHeight: 0, paddingBottom: 60 }}>
           <FileBrowser
+            searchAction={!searchOpen && <button type="button" title="Search files" aria-label="Search files" onClick={() => setSearchOpen(true)} className="workspace-header-icon"><Search size={18} /></button>}
+            searchField={searchOpen && <div className="workspace-file-search">
+              <Search size={16} aria-hidden="true" />
+              <input ref={searchInputRef} type="search" aria-label="Search files and content" placeholder="Search files and content..." value={searchQuery} onChange={event => setSearchQuery(event.target.value)} />
+              <button type="button" aria-label="Close search" className="workspace-header-icon" onClick={handleCloseSearch}><X size={18} /></button>
+            </div>}
             selectedDocumentUuids={selectedDocUuids}
             selectedFolderUuids={selectedFolderUuids}
             searchQuery={searchQuery}
