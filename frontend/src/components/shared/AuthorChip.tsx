@@ -26,7 +26,7 @@ export function AuthorChip({ author, size = 'sm', label, tone = 'default', class
 
   const base = author.name || author.email || author.user_id
   const display = author.org ? `${base} at ${author.org}` : base
-  const fontSize = size === 'sm' ? 11 : 12
+  const fontSize = 'var(--workspace-font-meta)'
   const iconSize = size === 'sm' ? 10 : 12
 
   const subject = encodeURIComponent('Question about your workflow')

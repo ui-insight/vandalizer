@@ -126,7 +126,7 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
         aria-expanded={open}
         aria-label={label}
         style={{
-          fontSize: 11, color: isDark ? 'var(--workspace-muted)' : '#6b7280',
+          fontSize: 'var(--workspace-font-meta)', color: isDark ? 'var(--workspace-muted)' : '#6b7280',
           cursor: 'help', userSelect: 'none',
           background: 'transparent',
           border: `1px solid ${isDark ? 'var(--workspace-border)' : 'var(--workspace-border)'}`,
@@ -158,7 +158,7 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: tipText,
             fontWeight: 400,

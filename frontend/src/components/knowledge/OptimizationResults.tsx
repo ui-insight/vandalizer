@@ -143,7 +143,7 @@ export function OptimizationResults({
                     above uses the holdout slice — without this caption the two
                     read as contradictory counts over the same queries. */}
                 {holdoutHeadline && (
-                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5 }}>
                     Per-query outcomes below are from the {trainCount ?? ''} training
                     quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
                     the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
@@ -157,7 +157,7 @@ export function OptimizationResults({
       />
 
       {run.baseline_no_kb_score != null && (
-        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
+        <p style={{ margin: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
           AI-only answer accuracy: {Math.round(run.baseline_no_kb_score * 100)}% on the training questions.
           {' '}This is a separate metric from composite quality above; the two scores cannot be subtracted to measure improvement.
         </p>
@@ -183,7 +183,7 @@ export function OptimizationResults({
         <div
           role="status"
           style={{
-            padding: '10px 14px', borderRadius: 6, fontSize: 13,
+            padding: '10px 14px', borderRadius: 6, fontSize: 'var(--workspace-font-control)',
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
             color: 'var(--workspace-warning)',
@@ -280,7 +280,7 @@ export function OptimizationResults({
           disabled={!canManage}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: canManage ? 'var(--workspace-info)' : 'var(--workspace-muted)',
             background: 'transparent',
             border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : 'var(--workspace-border)'),
@@ -343,9 +343,9 @@ function BestConfigCard({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
         {hasDefault && (
-          <span style={{ fontSize: 12, color: 'var(--workspace-muted)', marginLeft: 8 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginLeft: 8 }}>
             {changed.length === 0
               ? 'identical to default, no settings changed'
               : `${changed.length} setting${changed.length === 1 ? '' : 's'} changed vs default`}
@@ -361,14 +361,14 @@ function BestConfigCard({
             <div key={r.key} title={r.hint} style={{
               padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
             }}>
-              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginTop: 2 }}>{r.winner}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 2 }}>{r.winner}</div>
             </div>
           ))}
         </div>
       ) : changed.length === 0 ? (
         <div style={{
-          padding: '8px 12px', fontSize: 12, color: 'var(--workspace-muted)',
+          padding: '8px 12px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
           backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
           borderRadius: 6,
         }}>
@@ -384,11 +384,11 @@ function BestConfigCard({
               alignItems: 'center', gap: 8,
             }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textDecoration: 'line-through' }}>{r.def}</div>
-              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textAlign: 'center' }}>→</div>
-              <div style={{ fontSize: 13, color: 'var(--workspace-success)', fontWeight: 600 }}>{r.winner}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textDecoration: 'line-through' }}>{r.def}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textAlign: 'center' }}>→</div>
+              <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-success)', fontWeight: 600 }}>{r.winner}</div>
               <div />
             </div>
           ))}
@@ -397,7 +397,7 @@ function BestConfigCard({
               onClick={() => setShowUnchanged(v => !v)}
               style={{
                 marginTop: 4, padding: '4px 8px',
-                fontSize: 12, fontFamily: 'inherit', color: 'var(--workspace-muted)',
+                fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', color: 'var(--workspace-muted)',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 textAlign: 'left',
               }}
@@ -411,8 +411,8 @@ function BestConfigCard({
                 <div key={r.key} title={r.hint} style={{
                   padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
                 }}>
-                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-                  <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>{r.winner}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{r.winner}</div>
                 </div>
               ))}
             </div>
@@ -432,7 +432,7 @@ function BestConfigCard({
             onClick={onRevert}
             disabled={!canManage || reverting}
             style={{
-              padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+              padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
               color: canManage && !reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
               background: 'transparent',
               border: '1px solid var(--workspace-border)',

@@ -87,7 +87,7 @@ export function AutovalidateWizard<TOptions>({
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexShrink: 0 }}>
           <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--workspace-accent-ink)' }} />
-          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: 'var(--workspace-text)' }}>{title}</h3>
+          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>{title}</h3>
           <button
             type="button"
             aria-label="Close"
@@ -131,7 +131,7 @@ export function AutovalidateWizard<TOptions>({
 function btn(enabled: boolean = true, color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+    padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     color: enabled ? color ? 'var(--highlight-text-color, #000)' : 'var(--workspace-text)' : 'var(--workspace-muted)',
     backgroundColor: color ? color : 'var(--workspace-surface)',
     border: `1px solid ${color || 'var(--workspace-border)'}`,

@@ -56,14 +56,14 @@ export function SuggestionsList({
             <span style={{ color, flexShrink: 0, marginTop: 2, display: 'flex' }}>
               {icon}
             </span>
-            <div style={{ flex: 1, fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+            <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
               {s.message}
             </div>
             {s.onAction && s.actionLabel && (
               <button
                 onClick={s.onAction}
                 style={{
-                  padding: '3px 8px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  padding: '3px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   color, background: 'transparent',
                   border: `1px solid color-mix(in srgb, ${color} 40.0%, transparent)`, borderRadius: 4,
                   cursor: 'pointer', flexShrink: 0,
@@ -85,7 +85,7 @@ export function SuggestionsList({
       padding: 14, backgroundColor: 'var(--workspace-surface)',
       border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 10 }}>
         {title}
       </div>
       {rows}

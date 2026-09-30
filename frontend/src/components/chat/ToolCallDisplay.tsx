@@ -635,7 +635,7 @@ function FieldSourceChip({ src, actions }: { src?: FieldSource; actions?: KBSour
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter') handleOpen() } : undefined}
       title={tooltip}
       style={{
-        flexShrink: 0, fontSize: 10, lineHeight: '14px', padding: '0 5px',
+        flexShrink: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: '14px', padding: '0 5px',
         borderRadius: 7, whiteSpace: 'nowrap',
         cursor: clickable ? 'pointer' : 'help',
         color: verified ? '#1d4ed8' : '#b45309',
@@ -659,7 +659,7 @@ function SourceCoverageLine({ content }: { content: Record<string, unknown> }) {
   const total = traced + untraced
   if (total === 0) return null
   return (
-    <span style={{ fontSize: 10, color: untraced > 0 ? '#b45309' : '#6b7280' }}>
+    <span style={{ fontSize: 'var(--workspace-font-meta)', color: untraced > 0 ? '#b45309' : '#6b7280' }}>
       {traced} of {total} values traced to a source passage
       {untraced > 0 && ' \u2014 double-check the untraced ones'}
     </span>
@@ -696,7 +696,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
     const remaining = fields.length - shown.length
 
     return (
-      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 12, lineHeight: 1.7 }}>
+      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.7 }}>
         {shown.map((f) => {
           const empty = isEmptyValue(entity[f])
           return (
@@ -723,7 +723,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
               onClick={() => setShowAll(true)}
               style={{
                 background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
-                color: '#3b82f6', fontSize: 11,
+                color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
               }}
             >
               +{remaining} more fields
@@ -734,7 +734,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
               onClick={() => setShowAll(false)}
               style={{
                 background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
-                color: '#3b82f6', fontSize: 11,
+                color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
               }}
             >
               Show less
@@ -759,7 +759,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
   return (
     <div style={{ overflowX: 'auto', marginTop: 4, marginLeft: 20 }}>
       <table style={{
-        width: '100%', borderCollapse: 'collapse', fontSize: 11, lineHeight: 1.4,
+        width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
       }}>
         <thead>
           <tr>
@@ -804,13 +804,13 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           })}
         </tbody>
       </table>
-      <div style={{ color: '#c4c9d1', fontSize: 10, marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ color: '#c4c9d1', fontSize: 'var(--workspace-font-meta)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
         {!showAll && (hiddenRows > 0 || hiddenCols > 0) && (
           <button
             onClick={() => setShowAll(true)}
             style={{
               background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
-              color: '#3b82f6', fontSize: 10,
+              color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
             }}
           >
             {[hiddenRows > 0 && `+${hiddenRows} rows`, hiddenCols > 0 && `+${hiddenCols} cols`].filter(Boolean).join(', ')} - show all
@@ -821,7 +821,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
             onClick={() => setShowAll(false)}
             style={{
               background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
-              color: '#3b82f6', fontSize: 10,
+              color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
             }}
           >
             Show less
@@ -892,7 +892,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
 
         return (
           <div key={i} style={{
-            fontSize: 11, lineHeight: 1.5, color: '#6b7280',
+            fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280',
             padding: '4px 8px', borderLeft: '2px solid #e5e7eb',
             background: '#fafafa', borderRadius: '0 4px 4px 0',
           }}>
@@ -902,7 +902,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
               onClick={isClickable ? handleClick : undefined}
               onKeyDown={isClickable ? (e) => { if (e.key === 'Enter') handleClick() } : undefined}
               style={{
-                fontWeight: 500, fontSize: 10,
+                fontWeight: 500, fontSize: 'var(--workspace-font-meta)',
                 color: isClickable ? '#3b82f6' : '#9ca3af',
                 cursor: isClickable ? 'pointer' : 'default',
                 display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -944,7 +944,7 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
         <div
           className="chat-markdown select-text"
           style={{
-            fontSize: 13, lineHeight: 1.6,
+            fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
             color: '#374151', wordBreak: 'break-word',
             maxHeight: 480, overflow: 'auto', padding: '8px 12px',
             background: '#fafafa', borderRadius: 6, border: '1px solid #f3f4f6',
@@ -1072,7 +1072,7 @@ function VerificationLauncher({
         background: '#fffbeb',
         borderRadius: 8,
         padding: '10px 12px',
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         color: '#374151',
       }}>
         <div style={{ fontWeight: 600, marginBottom: 4, color: '#92400e' }}>
@@ -1086,7 +1086,7 @@ function VerificationLauncher({
         <button
           onClick={handleStart}
           className="chat-action-btn"
-          style={{ fontSize: 12, padding: '6px 16px' }}
+          style={{ fontSize: 'var(--workspace-font-meta)', padding: '6px 16px' }}
         >
           Open document to verify
         </button>
@@ -1199,7 +1199,7 @@ export function ToolStatusLine({
       {/* Status line */}
       <div style={{
         display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
-        fontSize: 13, lineHeight: '20px', minHeight: 22,
+        fontSize: 'var(--workspace-font-control)', lineHeight: '20px', minHeight: 22,
       }}>
         {/* Activity indicator */}
         {isActive ? (
@@ -1255,7 +1255,7 @@ export function ToolStatusLine({
             {qualityHint && (
               <>
                 <span style={{ color: '#d1d5db' }}>&middot;</span>
-                <span style={{ color: '#9ca3af', fontSize: 12 }}>
+                <span style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)' }}>
                   {qualityHint}
                 </span>
               </>
@@ -1441,20 +1441,20 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
     return (
       <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {(content as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
-          <div key={i} style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: '#d1d5db' }}>&middot;</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {String(item.title || item.name || item.uuid || 'Untitled')}
             </span>
             {typeof item.extension === 'string' && (
-              <span style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' }}>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', textTransform: 'uppercase' }}>
                 {item.extension.replace('.', '')}
               </span>
             )}
           </div>
         ))}
         {content.length > 10 && (
-          <div style={{ fontSize: 10, color: '#9ca3af', marginLeft: 10 }}>+{content.length - 10} more</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 10 }}>+{content.length - 10} more</div>
         )}
       </div>
     )
@@ -1466,7 +1466,7 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
     return (
       <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {(docs as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
-          <div key={i} style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ color: '#d1d5db' }}>&middot;</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {String(item.title || item.name || 'Untitled')}
@@ -1479,7 +1479,7 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
 
   return (
     <pre style={{
-      marginTop: 2, marginLeft: 20, fontSize: 10, lineHeight: 1.4,
+      marginTop: 2, marginLeft: 20, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
       color: '#9ca3af', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       maxHeight: 150, overflow: 'auto',
     }}>

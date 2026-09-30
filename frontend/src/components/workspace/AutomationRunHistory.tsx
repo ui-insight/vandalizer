@@ -3,7 +3,7 @@ import { getAutomationHistory, getAutomationRun, type AutomationHistoryCursor } 
 import type { AutomationRunStatus } from '../../types/automation'
 
 const ACTIVE = new Set(['pending', 'queued', 'running'])
-const buttonStyle = { border: '1px solid #9ca3af', borderRadius: 6, padding: '6px 10px', font: 'inherit', fontSize: 13, background: '#fff', color: '#374151', cursor: 'pointer' }
+const buttonStyle = { border: '1px solid #9ca3af', borderRadius: 6, padding: '6px 10px', font: 'inherit', fontSize: 'var(--workspace-font-control)', background: '#fff', color: '#374151', cursor: 'pointer' }
 const timestamp = (value: string | null) => value ? new Date(value).toLocaleString() : 'Time unavailable'
 
 interface Props { automationId: string; open: boolean; canRun: boolean; onPrepareRun: () => void }
@@ -46,7 +46,7 @@ function HistorySession({ automationId, open, canRun, onPrepareRun }: Props) {
     return () => { requestVersion.current += 1; busy.current = false }
   }, [open, load])
 
-  return <div aria-label="Automation run history" role="region" style={{ fontSize: 13, color: '#374151', overflowWrap: 'anywhere' }}>
+  return <div aria-label="Automation run history" role="region" style={{ fontSize: 'var(--workspace-font-control)', color: '#374151', overflowWrap: 'anywhere' }}>
     <p style={{ margin: '8px 0' }}>Recorded runs for this automation, newest first. Opening a run checks its status without starting another.</p>
     <button type="button" style={buttonStyle} disabled={loading} onClick={() => void load()}>Refresh history</button>
     {loading && <p role="status">Loading run history…</p>}
@@ -62,7 +62,7 @@ function HistorySession({ automationId, open, canRun, onPrepareRun }: Props) {
           <span>{row.action_type === 'extraction' ? 'Extraction' : 'Workflow / task'}</span>
           <time dateTime={row.created_at ?? undefined}>{timestamp(row.created_at)}</time>
         </div>
-        <p style={{ margin: '6px 0', fontSize: 12 }}>Run {row.trigger_event_id}</p>
+        <p style={{ margin: '6px 0', fontSize: 'var(--workspace-font-meta)' }}>Run {row.trigger_event_id}</p>
         {row.error && <p style={{ color: '#b91c1c', margin: '6px 0' }}>{row.error}</p>}
         <button type="button" style={buttonStyle} aria-label={`Open run ${row.trigger_event_id}`} aria-pressed={selected?.trigger_event_id === row.trigger_event_id} onClick={event => { selectedTrigger.current = event.currentTarget; setSelected(row) }}>
           {ACTIVE.has(row.status) ? 'Watch run' : 'View result'}
@@ -101,14 +101,14 @@ function RunDetails({ automationId, event, open, canRun, onPrepareRun, onClose }
   }, [automationId, event.trigger_event_id, open, attempt])
   const current = run ?? event
   return <section aria-label={`Run details ${event.trigger_event_id}`} style={{ marginTop: 16, padding: 12, border: '1px solid #9ca3af', borderRadius: 8 }}>
-    <h3 ref={heading} tabIndex={-1} style={{ fontSize: 15, margin: '0 0 8px' }}>Run details</h3>
+    <h3 ref={heading} tabIndex={-1} style={{ fontSize: 'var(--workspace-font-card-title)', margin: '0 0 8px' }}>Run details</h3>
     <p>Run {event.trigger_event_id}</p>
     <p role="status" style={{ margin: '8px 0' }}>{checking && !run ? 'Checking recorded run…' : `${error ? 'Last recorded status' : 'Status'}: ${current.status}`}</p>
     <p>Started: {timestamp(current.started_at)}</p>
     <p>Finished: {timestamp(current.completed_at)}</p>
     {current.error && <p style={{ color: '#b91c1c', marginTop: 8 }}>{current.error}</p>}
     {error && <div role="alert" style={{ marginTop: 8, color: '#b91c1c' }}><p>{error} The run may still finish. Checking again does not launch it again.</p><button type="button" style={buttonStyle} onClick={() => setAttempt(n => n + 1)}>Retry run details</button></div>}
-    {run?.output != null && run.output !== '' && <pre role="region" tabIndex={0} aria-label="Recorded run output" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto', fontSize: 12, background: '#f9fafb', padding: 10, marginTop: 12 }}>{typeof run.output === 'string' ? run.output : JSON.stringify(run.output, null, 2)}</pre>}
+    {run?.output != null && run.output !== '' && <pre role="region" tabIndex={0} aria-label="Recorded run output" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto', fontSize: 'var(--workspace-font-meta)', background: '#f9fafb', padding: 10, marginTop: 12 }}>{typeof run.output === 'string' ? run.output : JSON.stringify(run.output, null, 2)}</pre>}
     {run && !ACTIVE.has(run.status) && run.output == null && <p style={{ marginTop: 8 }}>No output was recorded for this run.</p>}
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
       {run && !ACTIVE.has(run.status) && canRun && <button type="button" style={buttonStyle} onClick={onPrepareRun}>Prepare another run</button>}

@@ -103,7 +103,7 @@ export function ProjectsPanel() {
       <WorkspaceSectionHeader title="Projects" help={<button
           aria-label="What are Projects?" title="What are Projects?"
           onClick={() => setShowExplainer(true)}
-          className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+          className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2.5 py-1 text-xs font-semibold text-gray-500 hover:bg-gray-50 hover:text-gray-700"
         >
           <HelpCircle size={12} />
           About

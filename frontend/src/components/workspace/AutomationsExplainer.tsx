@@ -86,7 +86,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
               borderRadius: 999,
               background: 'rgba(234, 179, 8, 0.12)',
               border: '1px solid rgba(234, 179, 8, 0.3)',
-              fontSize: 11, fontWeight: 700, color: '#fbbf24',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#fbbf24',
               textTransform: 'uppercase', letterSpacing: '0.1em',
               marginBottom: 18,
             }}>
@@ -99,7 +99,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
               Work that runs<br />while you don't have to.
             </h1>
             <p style={{
-              fontSize: 15, color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
+              fontSize: 'var(--workspace-font-card-title)', color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               Automations watch for new files, run the right workflow on them, and put the
               results wherever you need. Set one up once, then forget it exists.
@@ -172,7 +172,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
               <button
                 onClick={onClose}
                 style={{
-                  padding: '11px 26px', fontSize: 14, fontWeight: 600,
+                  padding: '11px 26px', fontSize: 'var(--workspace-font-body)', fontWeight: 600,
                   color: '#1a1f2e',
                   background: 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)',
                   border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
@@ -197,13 +197,13 @@ function Section({
   return (
     <div className="explainer-section" style={{ animationDelay: delay, marginBottom: 36 }}>
       <h2 style={{
-        fontSize: 20, fontWeight: 700, color: '#fff', margin: '0 0 4px',
+        fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#fff', margin: '0 0 4px',
         letterSpacing: '-0.01em',
       }}>
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 13, color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: subtitle ? 0 : 14 }}>
         {children}
@@ -229,10 +229,10 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
         <Icon size={18} style={{ color: '#fbbf24' }} />
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )
@@ -249,15 +249,15 @@ function UseCase({ trigger, action, accent }: { trigger: string; action: string;
       <div style={{
         display: 'inline-block', padding: '2px 8px', borderRadius: 6,
         background: `${accent}22`, color: accent,
-        fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
         marginBottom: 8,
       }}>
         When
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: '#e5e7eb', marginBottom: 8, lineHeight: 1.45 }}>
+      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 8, lineHeight: 1.45 }}>
         {trigger}
       </div>
-      <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>
         <span style={{ color: accent, fontWeight: 600 }}>→ </span>{action}
       </div>
     </div>
@@ -276,16 +276,16 @@ function Step({ num, title, body }: { num: string; title: string; body: string }
         width: 28, height: 28, borderRadius: '50%',
         background: 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        fontSize: 13, fontWeight: 700, color: '#1a1f2e',
+        fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: '#1a1f2e',
         boxShadow: '0 2px 10px -2px rgba(234, 179, 8, 0.4)',
       }}>
         {num}
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#e5e7eb', marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 2 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )

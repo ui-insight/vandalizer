@@ -46,7 +46,7 @@ function ActivityRow({ item, onOpenActivity }: { item: RecentActivityItem; onOpe
       <Icon size={14} style={{ flexShrink: 0, color: '#9ca3af' }} />
       <span style={{
         flex: 1,
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         color: '#374151',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -54,7 +54,7 @@ function ActivityRow({ item, onOpenActivity }: { item: RecentActivityItem; onOpe
       }}>
         {item.title}
       </span>
-      <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>
+      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', flexShrink: 0 }}>
         {item.relative_time}
       </span>
       <StatusIcon
@@ -105,7 +105,7 @@ function AlertRow({ alert, onSendMessage }: { alert: ActiveAlertItem; onSendMess
       <AlertTriangle size={13} style={{ flexShrink: 0, color: style.text }} />
       <span style={{
         flex: 1,
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         color: style.text,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -165,7 +165,7 @@ function NextStepNudge({ stage, unprocessedDocCount, onSendMessage }: { stage: M
       }}
     >
       <ArrowRight size={13} style={{ flexShrink: 0, color: 'var(--highlight-color, #eab308)' }} />
-      <span style={{ fontSize: 12, color: '#4b5563', lineHeight: 1.4 }}>
+      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', lineHeight: 1.4 }}>
         {nudge.label}
       </span>
     </button>
@@ -249,7 +249,7 @@ export function WorkspaceBriefing({
             e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 25%, #e5e7eb)'
           }}
         >
-          <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.4 }}>
+          <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151', lineHeight: 1.4 }}>
             {dailyGuidance}
           </span>
           <ArrowRight size={14} style={{ flexShrink: 0, color: 'var(--highlight-color, #eab308)', opacity: 0.6 }} />
@@ -259,7 +259,7 @@ export function WorkspaceBriefing({
       {/* Since last visit — delta summary */}
       {sinceLastVisit && (
         <div style={{
-          fontSize: 11,
+          fontSize: 'var(--workspace-font-meta)',
           color: '#9ca3af',
           paddingLeft: 10,
           lineHeight: 1.5,
@@ -293,7 +293,7 @@ export function WorkspaceBriefing({
             e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)'
           }}
         >
-          <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.4 }}>
+          <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151', lineHeight: 1.4 }}>
             You've seen the demo. Now upload one of your own documents and I'll help you build a custom template.
           </span>
           <ArrowRight size={14} style={{ flexShrink: 0, color: 'var(--highlight-color, #eab308)', opacity: 0.6 }} />
@@ -304,7 +304,7 @@ export function WorkspaceBriefing({
       {recentActivity.length > 0 && !hasOnlyOnboardingDocs && (
         <div>
           <div style={{
-            fontSize: 11,
+            fontSize: 'var(--workspace-font-meta)',
             fontWeight: 600,
             color: '#9ca3af',
             textTransform: 'uppercase' as const,
@@ -324,7 +324,7 @@ export function WorkspaceBriefing({
       {activeAlerts.length > 0 && (
         <div>
           <div style={{
-            fontSize: 11,
+            fontSize: 'var(--workspace-font-meta)',
             fontWeight: 600,
             color: '#9ca3af',
             textTransform: 'uppercase' as const,

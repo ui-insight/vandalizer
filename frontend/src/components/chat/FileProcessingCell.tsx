@@ -59,8 +59,8 @@ export function FileProcessingCell({ docs }: Props) {
               : <Check className="h-5 w-5" style={{ color: '#15803d' }} />}
         </div>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#191919' }}>{headline}</div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>{subtitle}</div>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#191919' }}>{headline}</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 1 }}>{subtitle}</div>
         </div>
       </div>
 
@@ -77,8 +77,8 @@ export function FileProcessingCell({ docs }: Props) {
                     ? <AlertCircle className="h-3.5 w-3.5 shrink-0" style={{ color: '#d97706' }} />
                     : <Check className="h-3.5 w-3.5 shrink-0" style={{ color: '#15803d' }} />}
                 <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: '#374151' }} className="truncate">{d.name}</span>
-                <span style={{ fontSize: 12, color: d.phase === 'error' ? '#d97706' : d.phase === 'ready' ? '#15803d' : '#6b7280' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--workspace-font-control)', color: '#374151' }} className="truncate">{d.name}</span>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: d.phase === 'error' ? '#d97706' : d.phase === 'ready' ? '#15803d' : '#6b7280' }}>
                   {d.phase === 'processing' ? copy.short : d.phase === 'error' ? 'Couldn’t process' : 'Ready'}
                 </span>
               </div>

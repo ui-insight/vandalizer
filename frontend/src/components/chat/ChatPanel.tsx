@@ -69,7 +69,7 @@ function StreamingLabel() {
         style={{
           opacity: fade ? 1 : 0,
           transition: 'opacity 0.2s ease',
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
           color: '#6b7280',
         }}
       >
@@ -843,10 +843,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           }}
         >
           <Upload size={32} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--highlight-on-light, #806600)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--highlight-on-light, #806600)' }}>
             Drop files to add to chat &amp; files
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
             pdf, doc, docx, xls, xlsx, csv, txt, md
           </div>
         </div>
@@ -981,7 +981,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   )}
                 </div>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, lineHeight: 1.3 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? `Preparing ${processingCount} documents…`
@@ -996,7 +996,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                               ? 'Welcome back'
                               : 'What would you like to work on?'}
                   </div>
-                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-control)', opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? "We'll be ready as soon as each document finishes processing."
@@ -1077,7 +1077,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   alignItems: 'center',
                   gap: 5,
                   padding: '8px 14px',
-                  fontSize: 13,
+                  fontSize: 'var(--workspace-font-control)',
                   fontWeight: 500,
                   fontFamily: 'inherit',
                   border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 40%, #e5e7eb)',
@@ -1129,7 +1129,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   }}
                   style={{
                     padding: '8px 14px',
-                    fontSize: 13,
+                    fontSize: 'var(--workspace-font-control)',
                     fontWeight: 500,
                     fontFamily: 'inherit',
                     border: '1px solid #e5e7eb',
@@ -1191,7 +1191,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     alignItems: 'center',
                     gap: 12,
                     margin: '12px 0',
-                    fontSize: 11,
+                    fontSize: 'var(--workspace-font-meta)',
                     color: '#6b7280',
                     userSelect: 'none',
                   }}>
@@ -1247,7 +1247,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
           <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               <ChevronRight size={14} />
               <span className="thinking-shimmer"><StreamingLabel /></span>
             </div>
@@ -1268,7 +1268,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               opacity: 0.85,
             }}>
               <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{heldMessage.message}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: '#d1d5db' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: '#d1d5db' }}>
                 <Loader2 size={13} className="animate-spin" style={{ color: 'var(--highlight-color, #f1b300)' }} />
                 <span style={{ flex: 1 }}>Waiting for {joined || 'your file'} to finish processing…</span>
                 <button
@@ -1361,7 +1361,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             <div className="mt-2">
               <button
                 onClick={() => { setShowContextNudge(false); setShowContextDialog(true) }}
-                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-gray-950 hover:bg-amber-400"
               >
                 Manage memory
               </button>
@@ -1432,7 +1432,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <div className="mt-2">
                     <button
                       onClick={retry}
-                      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
+                      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-gray-950 hover:bg-amber-400"
                     >
                       Resend now
                     </button>

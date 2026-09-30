@@ -64,9 +64,9 @@ export function ColdStartHero({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Sparkles size={18} style={{ color: accent }} />
-        <h3 style={{ margin: 0, fontSize: 15, color: titleColor }}>{headline}</h3>
+        <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: titleColor }}>{headline}</h3>
       </div>
-      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: bodyColor, lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: 'var(--workspace-font-control)', color: bodyColor, lineHeight: 1.5 }}>
         {body}
       </p>
       {whatHappensNext && whatHappensNext.length > 0 && (
@@ -78,7 +78,7 @@ export function ColdStartHero({
           borderRadius: 6,
         }}>
           <div style={{
-            fontSize: 10,
+            fontSize: 'var(--workspace-font-meta)',
             color: accent,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
@@ -90,7 +90,7 @@ export function ColdStartHero({
           <ol style={{
             margin: 0,
             paddingLeft: 20,
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             color: stepsText,
             lineHeight: 1.6,
           }}>
@@ -100,7 +100,7 @@ export function ColdStartHero({
       )}
       {benefits && benefits.length > 0 && (
         <ul style={{
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           color: subtleColor,
           margin: '0 0 10px 0',
           paddingLeft: 18,
@@ -119,7 +119,7 @@ export function ColdStartHero({
           alignItems: 'center',
           gap: 6,
           padding: '8px 16px',
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
           fontWeight: 600,
           fontFamily: 'inherit',
           color: disabled ? (isDark ? '#555' : '#6b7280') : '#fff',

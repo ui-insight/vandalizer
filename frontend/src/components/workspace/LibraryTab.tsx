@@ -662,7 +662,7 @@ export function LibraryTab() {
 
   if (libLoading && !libraries.length) {
     return (
-      <div className="flex items-center justify-center h-full" style={{ fontSize: 13, color: '#666' }}>
+      <div className="flex items-center justify-center h-full" style={{ fontSize: 'var(--workspace-font-control)', color: '#666' }}>
         Loading...
       </div>
     )
@@ -670,7 +670,7 @@ export function LibraryTab() {
 
   if (error && !libraries.length) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 13, color: '#666' }}>
+      <div className="flex flex-col items-center justify-center h-full p-4 gap-3" style={{ fontSize: 'var(--workspace-font-control)', color: '#666' }}>
         <p>{error}</p>
         <button
           onClick={refresh}
@@ -679,7 +679,7 @@ export function LibraryTab() {
             background: 'var(--highlight-color, #eab308)',
             color: 'var(--highlight-text-color, #000)',
             padding: '6px 12px',
-            fontSize: 13,
+            fontSize: 'var(--workspace-font-control)',
             fontWeight: 700,
             border: 'none',
             cursor: 'pointer',
@@ -715,7 +715,7 @@ export function LibraryTab() {
                   backgroundColor: 'var(--highlight-color, #eab308)',
                   border: 'none',
                   padding: '6px 14px',
-                  fontSize: 13,
+                  fontSize: 'var(--workspace-font-control)',
                   fontWeight: 700,
                   color: 'var(--highlight-text-color, #000)',
                   cursor: 'pointer',
@@ -772,7 +772,7 @@ export function LibraryTab() {
                 style={{
                   padding: '0 14px',
                   fontWeight: 500,
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 0,
                   lineHeight: '1.2',
@@ -818,7 +818,7 @@ export function LibraryTab() {
                   border: '1px solid transparent',
                   borderRadius: 8,
                   padding: '8px 16px 8px 38px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   outline: 'none',
                   transition: 'all 0.2s',
                   fontFamily: 'inherit',
@@ -857,7 +857,7 @@ export function LibraryTab() {
                     borderRadius: 16,
                     border: active ? '1px solid var(--library-highlight-soft)' : '1px solid #dadce0',
                     backgroundColor: active ? 'var(--library-highlight-soft)' : '#fff',
-                    fontSize: 13,
+                    fontSize: 'var(--workspace-font-control)',
                     fontFamily: 'inherit',
                     color: active ? 'var(--library-highlight-ink)' : '#3c4043',
                     cursor: 'pointer',
@@ -868,7 +868,7 @@ export function LibraryTab() {
                   <span>{label}</span>
                   <span
                     style={{
-                      fontSize: 11,
+                      fontSize: 'var(--workspace-font-meta)',
                       fontWeight: 500,
                       color: active ? 'var(--library-highlight-ink)' : '#666',
                       opacity: active ? 0.85 : 1,
@@ -887,7 +887,7 @@ export function LibraryTab() {
               onChange={(e) => setSortOption(e.target.value as SortOption)}
               style={{
                 borderRadius: 999,
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
                 padding: '0 32px 0 12px',
                 height: 32,
@@ -933,7 +933,7 @@ export function LibraryTab() {
             style={{
               padding: '0 12px',
               marginBottom: 6,
-              fontSize: 10,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 700,
               textTransform: 'uppercase',
               color: '#666',
@@ -967,7 +967,7 @@ export function LibraryTab() {
                   width: '100%', border: 0, textAlign: 'left', fontFamily: 'inherit',
                   padding: '10px 10px 10px 12px',
                   cursor: 'pointer',
-                  fontSize: 12,
+                  fontSize: 'var(--workspace-font-meta)',
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
                   backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
@@ -978,7 +978,7 @@ export function LibraryTab() {
                 <Icon style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{label}</span>
                 {count > 0 && (
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{count}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>{count}</span>
                 )}
               </button>
             )
@@ -998,7 +998,7 @@ export function LibraryTab() {
                   justifyContent: 'space-between',
                 }}
               >
-                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', color: '#666', letterSpacing: '0.5px' }}>
                   Folders
                 </span>
                 <button
@@ -1025,9 +1025,9 @@ export function LibraryTab() {
                 </button>
               </div>
 
-              {foldersError && <div role="alert" style={{ padding: 12, fontSize: 12, color: '#b91c1c' }}>Folders unavailable. {foldersError} <button type="button" onClick={() => void refreshFolders()}>Retry folders</button></div>}
-              {folderSaveError && <p role="alert" style={{ padding: '0 12px', fontSize: 12, color: '#b91c1c' }}>{folderSaveError}</p>}
-              {foldersLoading && <p role="status" style={{ padding: '0 12px', fontSize: 12 }}>Loading folders…</p>}
+              {foldersError && <div role="alert" style={{ padding: 12, fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>Folders unavailable. {foldersError} <button type="button" onClick={() => void refreshFolders()}>Retry folders</button></div>}
+              {folderSaveError && <p role="alert" style={{ padding: '0 12px', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>{folderSaveError}</p>}
+              {foldersLoading && <p role="status" style={{ padding: '0 12px', fontSize: 'var(--workspace-font-meta)' }}>Loading folders…</p>}
               {/* New folder input */}
               {newFolderMode && (
                 <div style={{ padding: '4px 8px 4px 12px' }}>
@@ -1051,7 +1051,7 @@ export function LibraryTab() {
                     }}
                     style={{
                       width: '100%',
-                      fontSize: 12,
+                      fontSize: 'var(--workspace-font-meta)',
                       padding: '4px 6px',
                       border: '1px solid #dadce0',
                       borderRadius: 5,
@@ -1066,7 +1066,7 @@ export function LibraryTab() {
 
               {/* Folder list */}
               {folders.length === 0 && !newFolderMode && !foldersLoading && !foldersError && (
-                <div style={{ padding: '4px 12px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
+                <div style={{ padding: '4px 12px', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic' }}>
                   No folders yet
                 </div>
               )}
@@ -1099,7 +1099,7 @@ export function LibraryTab() {
                           }}
                           style={{
                             width: '100%',
-                            fontSize: 12,
+                            fontSize: 'var(--workspace-font-meta)',
                             padding: '4px 6px',
                             border: '1px solid #dadce0',
                             borderRadius: 5,
@@ -1117,7 +1117,7 @@ export function LibraryTab() {
                           alignItems: 'center',
                           padding: '7px 6px 7px 12px',
                           cursor: 'pointer',
-                          fontSize: 12,
+                          fontSize: 'var(--workspace-font-meta)',
                           fontWeight: isActive ? 600 : 500,
                           color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
                           backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
@@ -1146,7 +1146,7 @@ export function LibraryTab() {
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {folder.name}
                         </span>
-                        <span style={{ fontSize: 12, color: '#59616b', marginRight: 4, flexShrink: 0 }}>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginRight: 4, flexShrink: 0 }}>
                           {folder.item_count}
                         </span>
                         </button>
@@ -1221,7 +1221,7 @@ export function LibraryTab() {
                             background: 'none',
                             border: 'none',
                             padding: '8px 10px',
-                            fontSize: 12,
+                            fontSize: 'var(--workspace-font-meta)',
                             color: '#1f2937',
                             cursor: 'pointer',
                             borderRadius: 5,
@@ -1272,7 +1272,7 @@ export function LibraryTab() {
                             background: 'none',
                             border: 'none',
                             padding: '8px 10px',
-                            fontSize: 12,
+                            fontSize: 'var(--workspace-font-meta)',
                             color: '#dc2626',
                             cursor: 'pointer',
                             borderRadius: 5,
@@ -1321,9 +1321,9 @@ export function LibraryTab() {
           {selectedCollection && (
             <div style={{ padding: '12px 24px', background: '#f8f9fa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{selectedCollection.title}</div>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{selectedCollection.title}</div>
                 {selectedCollection.description && (
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{selectedCollection.description}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#666', marginTop: 2 }}>{selectedCollection.description}</div>
                 )}
               </div>
               <button
@@ -1356,7 +1356,7 @@ export function LibraryTab() {
               padding: '10px 24px',
               backgroundColor: '#fff',
               borderBottom: '1px solid #f0f0f0',
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 500,
               color: '#5f6368',
               textTransform: 'uppercase',
@@ -1376,13 +1376,13 @@ export function LibraryTab() {
             {itemsLoading && items.length > 0 && <div role="status" className="library-feedback">Refreshing items…</div>}
             </div>
             {itemsLoading && !items.length ? (
-              <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 13 }}>Loading...</div>
+              <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 'var(--workspace-font-control)' }}>Loading...</div>
             ) : itemsError && !items.length ? null : sorted.length === 0 ? (
               <div style={{ maxWidth: 360, margin: '0 auto', padding: '64px 32px', textAlign: 'center' }}>
-                <h2 style={{ margin: 0, color: '#303030', fontSize: 16, fontWeight: 700 }}>
+                <h2 style={{ margin: 0, color: '#303030', fontSize: 'var(--workspace-font-card-title)', fontWeight: 700 }}>
                   {selectedFolder && !search.trim() && kindFilter === 'all' ? 'This folder is empty' : hasActiveFilters ? 'No items match these filters' : 'Your library is ready for its first tool'}
                 </h2>
-                <p style={{ margin: '10px 0 18px', color: '#5f6368', fontSize: 13, lineHeight: 1.55 }}>
+                <p style={{ margin: '10px 0 18px', color: '#5f6368', fontSize: 'var(--workspace-font-control)', lineHeight: 1.55 }}>
                   {hasActiveFilters
                     ? selectedFolder && !search.trim() && kindFilter === 'all' ? 'Move tools here from their item actions, or return to all items.' : 'Try clearing a filter or searching with a different term.'
                     : 'Create a workflow, extraction, prompt, or formatter to reuse reliable work, or start from a ready-made one in the catalog.'}
@@ -1395,7 +1395,7 @@ export function LibraryTab() {
                       setViewFilter('all')
                       setKindFilter('all')
                     }}
-                    style={{ border: '1px solid #dadce0', borderRadius: 8, padding: '8px 12px', background: '#fff', color: '#303030', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                    style={{ border: '1px solid #dadce0', borderRadius: 8, padding: '8px 12px', background: '#fff', color: '#303030', fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: 'pointer' }}
                   >
                     Clear filters
                   </button>
@@ -1404,7 +1404,7 @@ export function LibraryTab() {
                     <button
                       type="button"
                       onClick={() => openCreateModal('workflow')}
-                      style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+                      style={{ border: 0, borderRadius: 8, padding: '8px 12px', background: 'var(--library-highlight, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 'var(--workspace-font-control)', fontWeight: 700, cursor: 'pointer' }}
                     >
                       Create a workflow
                     </button>
@@ -1412,7 +1412,7 @@ export function LibraryTab() {
                     <button
                       type="button"
                       onClick={() => setScope('explore')}
-                      style={{ border: 0, padding: 0, background: 'none', color: '#303030', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
+                      style={{ border: 0, padding: 0, background: 'none', color: '#303030', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }}
                     >
                       Browse the catalog →
                     </button>
@@ -1488,10 +1488,10 @@ export function LibraryTab() {
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
-            <h2 style={{ margin: '0 0 12px', fontSize: 20, fontWeight: 600, color: '#202124', textAlign: 'left' }}>
+            <h2 style={{ margin: '0 0 12px', fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', textAlign: 'left' }}>
               Delete {itemKindLabel(deleteTarget)}?
             </h2>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#5f6368', lineHeight: 1.5 }}>
+            <p style={{ margin: '0 0 20px', fontSize: 'var(--workspace-font-body)', color: '#5f6368', lineHeight: 1.5 }}>
               <strong style={{ color: '#202124' }}>{deleteTarget.name}</strong> can be removed from
               this library only — it still exists, keeps its name, and can be added back later.
               Or delete it permanently, which removes the {itemKindLabel(deleteTarget)} and its run
@@ -1503,7 +1503,7 @@ export function LibraryTab() {
                 disabled={deleting}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
                   borderRadius: 8,
@@ -1521,7 +1521,7 @@ export function LibraryTab() {
                 disabled={deleting}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 8,
                   border: '1px solid #dadce0',
@@ -1538,7 +1538,7 @@ export function LibraryTab() {
                 disabled={deleting}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 8,
                   border: 'none',
@@ -1580,7 +1580,7 @@ export function LibraryTab() {
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
-            <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124', textAlign: 'left' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', textAlign: 'left' }}>
               {modalConfig[createModalType].title}
             </h2>
             <div style={{ marginBottom: 16 }}>
@@ -1594,7 +1594,7 @@ export function LibraryTab() {
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   border: '1px solid #dadce0',
                   borderRadius: 8,
@@ -1603,7 +1603,7 @@ export function LibraryTab() {
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && !modalConfig[createModalType].showDesc && handleCreate()}
               />
-              <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: createName.length >= MAX_NAME_LENGTH ? '#dc2626' : '#9aa0a6' }}>
+              <div style={{ marginTop: 4, textAlign: 'right', fontSize: 'var(--workspace-font-meta)', color: createName.length >= MAX_NAME_LENGTH ? '#dc2626' : '#9aa0a6' }}>
                 {createName.length}/{MAX_NAME_LENGTH}
               </div>
             </div>
@@ -1617,7 +1617,7 @@ export function LibraryTab() {
                   style={{
                     width: '100%',
                     padding: '10px 14px',
-                    fontSize: 14,
+                    fontSize: 'var(--workspace-font-body)',
                     fontFamily: 'inherit',
                     border: '1px solid #dadce0',
                     borderRadius: 8,
@@ -1629,7 +1629,7 @@ export function LibraryTab() {
               </div>
             )}
             {createError && (
-              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 'var(--workspace-font-control)', color: '#dc2626' }}>
                 {createError}
               </div>
             )}
@@ -1639,7 +1639,7 @@ export function LibraryTab() {
                 disabled={creating || uploading || !createName.trim()}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
                   borderRadius: 8,
@@ -1661,7 +1661,7 @@ export function LibraryTab() {
                 onClick={closeCreateModal}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 8,
                   border: '1px solid #dadce0',
@@ -1684,7 +1684,7 @@ export function LibraryTab() {
                       alignItems: 'center',
                       gap: 6,
                       padding: '6px 10px',
-                      fontSize: 12,
+                      fontSize: 'var(--workspace-font-meta)',
                       fontFamily: 'inherit',
                       borderRadius: 6,
                       border: '1px solid #dadce0',
@@ -1747,10 +1747,10 @@ export function LibraryTab() {
             {editLoadError && <div role="alert" className="library-feedback">{editLoadError} <button type="button" onClick={() => void openPromptModal(editingItem, editMode)}>Retry item content</button></div>}
             {editMode === 'preview' ? (
               <>
-                <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
+                <h2 style={{ margin: '0 0 4px', fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
                   {editingItem.name}
                 </h2>
-                <div style={{ fontSize: 12, color: '#70757a', marginBottom: 16 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#70757a', marginBottom: 16 }}>
                   {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
                 </div>
                 <div
@@ -1760,7 +1760,7 @@ export function LibraryTab() {
                   style={{
                     marginBottom: 20,
                     padding: '12px 14px',
-                    fontSize: 14,
+                    fontSize: 'var(--workspace-font-body)',
                     lineHeight: 1.5,
                     color: '#3c4043',
                     backgroundColor: '#f8f9fa',
@@ -1784,7 +1784,7 @@ export function LibraryTab() {
                     disabled={editLoading || !!editLoadError || !editContent.trim()}
                     style={{
                       padding: '10px 20px',
-                      fontSize: 14,
+                      fontSize: 'var(--workspace-font-body)',
                       fontWeight: 700,
                       fontFamily: 'inherit',
                       borderRadius: 8,
@@ -1802,7 +1802,7 @@ export function LibraryTab() {
                     onClick={() => setEditMode('edit')}
                     style={{
                       padding: '10px 20px',
-                      fontSize: 14,
+                      fontSize: 'var(--workspace-font-body)',
                       fontFamily: 'inherit',
                       borderRadius: 8,
                       border: '1px solid #dadce0',
@@ -1817,7 +1817,7 @@ export function LibraryTab() {
                     onClick={closeEditModal}
                     style={{
                       padding: '10px 20px',
-                      fontSize: 14,
+                      fontSize: 'var(--workspace-font-body)',
                       fontFamily: 'inherit',
                       borderRadius: 8,
                       border: '1px solid #dadce0',
@@ -1832,7 +1832,7 @@ export function LibraryTab() {
               </>
             ) : (
               <>
-            <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124' }}>
+            <h2 style={{ margin: '0 0 20px', fontSize: 'var(--workspace-font-page-title)', fontWeight: 600, color: '#202124' }}>
               Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
             </h2>
             <div style={{ marginBottom: 16 }}>
@@ -1848,7 +1848,7 @@ export function LibraryTab() {
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   border: '1px solid #dadce0',
                   borderRadius: 8,
@@ -1868,7 +1868,7 @@ export function LibraryTab() {
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   border: '1px solid #dadce0',
                   borderRadius: 8,
@@ -1879,7 +1879,7 @@ export function LibraryTab() {
               />
             </div>
             {editError && (
-              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 'var(--workspace-font-control)', color: '#dc2626' }}>
                 {editError}
               </div>
             )}
@@ -1889,7 +1889,7 @@ export function LibraryTab() {
                 disabled={editLoading || !!editLoadError || editSaving || !editTitle.trim()}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontWeight: 700,
                   fontFamily: 'inherit',
                   borderRadius: 8,
@@ -1906,7 +1906,7 @@ export function LibraryTab() {
                 onClick={closeEditModal}
                 style={{
                   padding: '10px 20px',
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   fontFamily: 'inherit',
                   borderRadius: 8,
                   border: '1px solid #dadce0',
@@ -1952,7 +1952,7 @@ function NewMenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: s
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        fontSize: 14,
+        fontSize: 'var(--workspace-font-body)',
         color: '#1f2937',
         textAlign: 'left',
         minHeight: 40,

@@ -26,7 +26,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
   const hasRun = lift != null || score != null
   const measuredLift = composite ? null : lift ?? (score != null && baseline != null ? score - baseline : null)
   const liftPts = measuredLift != null ? Math.round(measuredLift * 100) : null
-  const fontSize = size === 'sm' ? 12 : 13
+  const fontSize = size === 'sm' ? 'var(--workspace-font-meta)' : 'var(--workspace-font-control)'
   const iconSize = size === 'sm' ? 12 : 14
   const padY = size === 'sm' ? 2 : 4
   const padX = size === 'sm' ? 8 : 10

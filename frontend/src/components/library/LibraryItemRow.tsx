@@ -123,7 +123,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
           style={{
             padding: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
             fontWeight: 500,
-            fontSize: 14,
+            fontSize: 'var(--workspace-font-body)',
             color: '#202124',
             whiteSpace: 'normal',
             overflowWrap: 'anywhere',
@@ -154,7 +154,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
           <div
             title={item.description}
             style={{
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               color: '#5f6368',
               marginTop: 2,
               whiteSpace: 'nowrap',
@@ -165,7 +165,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             {item.description}
           </div>
         )}
-        <div style={{ fontSize: 12, color: '#5f6368', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{kindLabel}</span>
           {item.verified && (
             <span style={{ color: '#b45309', fontWeight: 500 }}>Shared with everyone</span>
@@ -187,7 +187,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
               <span
                 key={tag}
                 style={{
-                  fontSize: 12,
+                  fontSize: 'var(--workspace-font-meta)',
                   color: 'var(--library-highlight-ink, #78640c)',
                   background: 'color-mix(in srgb, var(--library-highlight, #eab308) 12%, #ffffff)',
                   padding: '2px 6px',
@@ -198,7 +198,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
               </span>
             ))}
             {item.tags.length > 3 && (
-              <span style={{ fontSize: 12, color: '#5f6368', alignSelf: 'center' }}>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', alignSelf: 'center' }}>
                 +{item.tags.length - 3}
               </span>
             )}
@@ -207,7 +207,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
       </div>
 
       {/* Last used column — right-aligned */}
-      <div style={{ fontSize: 12, color: '#5f6368', whiteSpace: 'nowrap', textAlign: 'right' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', whiteSpace: 'nowrap', textAlign: 'right' }}>
         {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
@@ -458,7 +458,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                             background: 'none',
                             border: 'none',
                             cursor: 'default',
-                            fontSize: 13,
+                            fontSize: 'var(--workspace-font-control)',
                             color: '#1f2937',
                             textAlign: 'left',
                           }}
@@ -502,7 +502,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: 13,
+                                  fontSize: 'var(--workspace-font-control)',
                                   color: '#6b7280',
                                   textAlign: 'left',
                                   fontStyle: 'italic',
@@ -531,7 +531,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
-                                  fontSize: 13,
+                                  fontSize: 'var(--workspace-font-control)',
                                   color: '#1f2937',
                                   textAlign: 'left',
                                 }}
@@ -616,7 +616,7 @@ function MenuItem({
         background: 'none',
         border: 'none',
         cursor: 'pointer',
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         color: danger ? '#d93025' : '#1f2937',
         textAlign: 'left',
         transition: 'background 0.1s',

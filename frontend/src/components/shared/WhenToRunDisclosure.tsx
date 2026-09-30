@@ -44,7 +44,7 @@ export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
           background: 'transparent', border: 'none', padding: 0,
-          fontSize: 11, color: triggerColor, fontFamily: 'inherit', cursor: 'pointer',
+          fontSize: 'var(--workspace-font-meta)', color: triggerColor, fontFamily: 'inherit', cursor: 'pointer',
         }}
       >
         {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
@@ -52,7 +52,7 @@ export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
       </button>
       {open && (
         <ul style={{
-          margin: '8px 0 0 0', paddingLeft: 18, fontSize: 12, color: bodyColor, lineHeight: 1.7,
+          margin: '8px 0 0 0', paddingLeft: 18, fontSize: 'var(--workspace-font-meta)', color: bodyColor, lineHeight: 1.7,
         }}>
           {bullets.map(b => (
             <li key={b.when}>

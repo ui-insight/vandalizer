@@ -52,7 +52,7 @@ export function TrialQueryDeltas({
   if (!optimized || optimized.length === 0) {
     return (
       <div style={{
-        padding: 12, fontSize: 12, color: 'var(--workspace-muted)',
+        padding: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
         backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 8,
       }}>
         Per-query data isn't available for this run.
@@ -70,17 +70,17 @@ export function TrialQueryDeltas({
       border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({rows.length})
         </span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>Sort by:</span>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>Sort by:</span>
         <select
           aria-label="Sort question changes"
           value={sortKey}
           onChange={e => setSortKey(e.target.value as SortKey)}
           style={{
             background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-            borderRadius: 4, padding: '4px 6px', fontSize: 12, minHeight: 36, maxWidth: '100%', fontFamily: 'inherit',
+            borderRadius: 4, padding: '4px 6px', fontSize: 'var(--workspace-font-meta)', minHeight: 36, maxWidth: '100%', fontFamily: 'inherit',
           }}
         >
           <option value="delta-desc">Biggest wins</option>
@@ -139,7 +139,7 @@ function Row({
       style={{
         display: 'flex', flexDirection: 'column',
         gap: 6, padding: '6px 8px',
-        fontSize: 12, color: 'var(--workspace-text)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
         backgroundColor: 'var(--workspace-canvas)',
         border: '1px solid var(--workspace-border)',
         borderRadius: 4, cursor: 'pointer',

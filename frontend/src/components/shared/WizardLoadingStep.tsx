@@ -26,9 +26,9 @@ export function WizardLoadingStep({ message, sub, error, onRetry, onSkip, skipLa
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <AlertCircle size={16} style={{ color: 'var(--workspace-danger)' }} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-danger)' }}>{message}</div>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-danger)' }}>{message}</div>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>{error}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>{error}</div>
         <div style={{ display: 'flex', gap: 8 }}>
           {onRetry && (
             <button
@@ -57,8 +57,8 @@ export function WizardLoadingStep({ message, sub, error, onRetry, onSkip, skipLa
       justifyContent: 'center', padding: '40px 16px', gap: 10,
     }}>
       <Loader2 aria-hidden="true" size={22} style={{ color: 'var(--workspace-info)', animation: 'spin 1s linear infinite' }} />
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>{message}</div>
-      {sub && <div style={{ fontSize: 11, color: 'var(--workspace-muted)' }}>{sub}</div>}
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>{message}</div>
+      {sub && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{sub}</div>}
     </div>
   )
 }
@@ -66,7 +66,7 @@ export function WizardLoadingStep({ message, sub, error, onRetry, onSkip, skipLa
 function btn(color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+    padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     color: 'var(--workspace-text)',
     backgroundColor: color ?? 'var(--workspace-surface)',
     border: `1px solid ${color ?? 'var(--workspace-border)'}`,

@@ -21,13 +21,13 @@ interface CheckRow { description: string; target_step: string }
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px',
   border: '1px solid #d1d5db', borderRadius: 6,
-  fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box',
+  fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 3,
+  display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 3,
 }
 const sectionTitle: React.CSSProperties = {
-  fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 8,
+  fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#111827', marginBottom: 8,
   textTransform: 'uppercase', letterSpacing: '0.04em',
 }
 
@@ -184,8 +184,8 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
         }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Validation workshop</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 700, color: '#111' }}>Validation workshop</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
               Curate examiner-side validation baseline for this {itemKindLabel}. Additions are merged into the official baseline at approval.
             </div>
           </div>
@@ -201,7 +201,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           <div style={{
             margin: '12px 20px 0', padding: '8px 12px',
             background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 6,
-            fontSize: 12, color: '#78350f', display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <AlertTriangle size={14} />
             Currently held by another reviewer. Your edits may collide.
@@ -214,7 +214,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
             style={{
             margin: '12px 20px 0', padding: '8px 12px',
             background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6,
-            fontSize: 12, color: '#991b1b',
+            fontSize: 'var(--workspace-font-meta)', color: '#991b1b',
           }}>
             {claimError}
           </div>
@@ -226,7 +226,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
             style={{
             margin: '12px 20px 0', padding: '6px 10px',
             background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6,
-            fontSize: 11, color: '#065f46',
+            fontSize: 'var(--workspace-font-meta)', color: '#065f46',
           }}>
             Claimed by you. Other reviewers will see this as in-progress.
           </div>
@@ -238,11 +238,11 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           <section>
             <div style={sectionTitle}>Submitter validation</div>
             {request.validation_origin === 'pending_admin_validation' ? (
-              <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
                 Submitter requested admin validation. No baseline data was provided.
               </div>
             ) : submitterSnapshot ? (
-              <div style={{ fontSize: 12, color: '#374151', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {submitterScore != null && (
                   <div>Submitter score: <strong>{Math.round(submitterScore)}%</strong></div>
                 )}
@@ -255,12 +255,12 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                 {request.item_kind === 'workflow' && (
                   <div>Submitter checks: <strong>{Array.isArray((submitterSnapshot as Record<string, unknown>).checks) ? ((submitterSnapshot as Record<string, unknown>).checks as unknown[]).length : 0}</strong></div>
                 )}
-                <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>
+                <div style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)', marginTop: 4 }}>
                   Your additions extend this set, they don't replace it. Edits to submitter cases require a return-for-rework instead.
                 </div>
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: '#6b7280' }}>No submitter validation attached.</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>No submitter validation attached.</div>
             )}
           </section>
 
@@ -290,13 +290,13 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                       }} placeholder="Why this case is important" style={inputStyle} />
                     </div>
                     <button onClick={() => setExtractionRows(extractionRows.filter((_, j) => j !== i))}
-                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ))}
                 <button onClick={() => setExtractionRows([...extractionRows, { document_uuid: '', expected_json: '', note: '' }])}
-                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                   <Plus size={12} /> Add test case
                 </button>
               </div>
@@ -328,13 +328,13 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                       }} placeholder="Why this query is institutionally important" style={inputStyle} />
                     </div>
                     <button onClick={() => setKbRows(kbRows.filter((_, j) => j !== i))}
-                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ))}
                 <button onClick={() => setKbRows([...kbRows, { query: '', expected_answer: '', note: '' }])}
-                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                   <Plus size={12} /> Add query
                 </button>
               </div>
@@ -367,13 +367,13 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                         }} placeholder="Why this regression input matters" style={inputStyle} />
                       </div>
                       <button onClick={() => setWorkflowRows(workflowRows.filter((_, j) => j !== i))}
-                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                         <Trash2 size={12} /> Remove
                       </button>
                     </div>
                   ))}
                   <button onClick={() => setWorkflowRows([...workflowRows, { input: '', expected_output: '', note: '' }])}
-                    style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                    style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                     <Plus size={12} /> Add regression input
                   </button>
                 </div>
@@ -397,13 +397,13 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                         }} placeholder="Step ID or name" style={inputStyle} />
                       </div>
                       <button onClick={() => setCheckRows(checkRows.filter((_, j) => j !== i))}
-                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                        style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                         <Trash2 size={12} /> Remove
                       </button>
                     </div>
                   ))}
                   <button onClick={() => setCheckRows([...checkRows, { description: '', target_step: '' }])}
-                    style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                    style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                     <Plus size={12} /> Add check
                   </button>
                 </div>
@@ -411,7 +411,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
             </>
           )}
 
-          <div style={{ fontSize: 11, color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <ExternalLink size={12} style={{ marginTop: 2, flexShrink: 0 }} />
             <span>
               To run validation against your additions before approving, open the item directly (external-link icon on the queue row) and use its Validate tab. Saved additions will be merged into the pinned baseline at approval time.
@@ -419,7 +419,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           </div>
 
           {error && (
-            <div role="status" aria-live="polite" style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 12, color: '#991b1b' }}>
+            <div role="status" aria-live="polite" style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 'var(--workspace-font-meta)', color: '#991b1b' }}>
               {error}
             </div>
           )}
@@ -432,14 +432,14 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
         }}>
           <button onClick={onClose} style={{
             padding: '7px 16px', borderRadius: 6, border: '1px solid #d1d5db',
-            background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151',
+            background: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: 'pointer', color: '#374151',
           }}>
             Close
           </button>
           <button onClick={handleSave} disabled={saving} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '7px 18px', borderRadius: 6, border: 'none',
-            background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600,
+            background: '#111827', color: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
           }}>
             <Save size={14} />

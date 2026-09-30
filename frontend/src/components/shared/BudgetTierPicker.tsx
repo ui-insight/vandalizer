@@ -32,15 +32,15 @@ export function BudgetTierPicker({
   description = 'Each setup costs LLM tokens to test. The smaller tiers confirm whether tuning helps at all; larger tiers find a more confident winner.',
 }: BudgetTierPickerProps) {
   return (
-    <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>{title}</h4>
+    <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>{title}</h4>
       <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>{description}</p>
       {recommendedTierId && recommendationReason && (
         <div style={{
           marginBottom: 10, padding: '8px 10px',
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
           border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
-          fontSize: 12, color: 'var(--workspace-accent-ink)', lineHeight: 1.5,
+          fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', lineHeight: 1.5,
         }}>
           {recommendationReason}
         </div>
@@ -65,10 +65,10 @@ export function BudgetTierPicker({
               <Radio active={active} />
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>{t.label}</div>
                   {recommended && (
                     <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
                       padding: '2px 6px', borderRadius: 10,
                       color: 'var(--workspace-accent-ink)', backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent)',
                       border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 45%, transparent)',
@@ -77,7 +77,7 @@ export function BudgetTierPicker({
                     </span>
                   )}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                   {rowTokens}
                   {rowCost && <> · {rowCost}</>}
                   {' · '}{t.trialsEstimate} · {t.timeEstimate}
@@ -98,7 +98,7 @@ export function BudgetTierPicker({
         >
           <Radio active={selected === 'custom'} />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600 }}>Custom</div>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Custom</div>
             {selected === 'custom' && (
               <input
                 type="number"
@@ -108,7 +108,7 @@ export function BudgetTierPicker({
                 style={{
                   marginTop: 4, width: 120,
                   background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-                  borderRadius: 4, padding: '4px 6px', fontSize: 12,
+                  borderRadius: 4, padding: '4px 6px', fontSize: 'var(--workspace-font-meta)',
                 }}
               />
             )}
@@ -118,11 +118,11 @@ export function BudgetTierPicker({
       <div style={{
         marginTop: 12, padding: '8px 10px',
         backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
-        fontSize: 12, color: 'var(--workspace-muted)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       }}>
         Selected: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
       </div>
-      <p style={{ margin: '8px 0 0 0', fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+      <p style={{ margin: '8px 0 0 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
         Time estimates are approximate. Actual runtime scales with your test-set
         size and current model speed, so larger test sets can take noticeably longer.
       </p>

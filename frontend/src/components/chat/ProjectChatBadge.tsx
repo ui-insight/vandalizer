@@ -32,7 +32,7 @@ export function ProjectChatBadge({
         alignItems: 'center',
         gap: 8,
         padding: '6px 16px',
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         fontWeight: 600,
         color: '#424a55',
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',

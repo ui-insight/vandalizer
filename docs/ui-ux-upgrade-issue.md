@@ -4,6 +4,15 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Readable task typography — September 30
+
+**154/169 checklist items implemented locally.** VIS-02 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Workspace typography now uses shared rem-based sizes: 12px metadata, 13px controls, 14px body copy and 16/18/20px title levels at the default browser size. Essential 9–11px labels, counts, timestamps, provenance and trial explanations use the metadata size. Existing large tutorial/illustration text is separate from task typography.
+- Document text keeps its own zoom multiplier using the shared body size. Context usage percentages now fit in a 44px control, including 100%; warning and error text use readable semantic colors. The new context-state review also corrected white text on amber memory/retry actions.
+- Verification: TypeScript, production build and diff checks pass; touched-file ESLint has zero errors and 11 existing hook-dependency warnings. Eight document-recovery/context-meter tests across two files pass. The 306 selected captures cover all 55 baseline states, workflow/extraction validation (39), questions (23), file/Library tasks (30), section headers (27), project/tool context (33), saved history (18), short dialogs (36), source reading/recovery (33), and all four context-meter states (12). All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- The small-text metric now excludes zero-size text deliberately replaced by a named compact-table sort icon. Citation return still asserts the prior reading position, allowing only the physical scroll-limit clamp when a closed preview shortens content; observed returns preserve the exact prior position. Fixtures are synthetic. Broader spacing, action, form, accessibility and final regrading acceptance remain open.
+
 ## Shared workspace theme — September 30
 
 **153/169 checklist items implemented locally.** VIS-01 is complete for the reviewed task surfaces; changes are not deployed.
@@ -400,7 +409,7 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 ## 2. Shared visual system
 
 - [x] **VIS-01 · P2 · Fix:** Reconcile the light file/project/editor surfaces, dark automation/KB surfaces, blue wizard controls and purple validation controls into a consistent theme hierarchy.
-- [ ] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
+- [x] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
 - [ ] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
 - [ ] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
 - [ ] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.

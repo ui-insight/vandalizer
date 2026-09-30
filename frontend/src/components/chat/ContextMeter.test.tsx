@@ -36,7 +36,7 @@ describe('ContextMeter', () => {
       />,
     )
     const label = screen.getByText('10%')
-    expect(label).toHaveStyle({ color: '#d97706' })
+    expect(label).toHaveStyle({ color: 'var(--workspace-warning)' })
     expect(screen.getByRole('button').title).toContain(
       '22% until compaction is recommended',
     )
@@ -52,7 +52,7 @@ describe('ContextMeter', () => {
         onClick={noop}
       />,
     )
-    expect(screen.getByText('98%')).toHaveStyle({ color: '#ef4444' })
+    expect(screen.getByText('98%')).toHaveStyle({ color: 'var(--workspace-danger)' })
     expect(screen.getByRole('button').title).toContain('context full')
   })
 
@@ -61,6 +61,6 @@ describe('ContextMeter', () => {
       <ContextMeter tokensUsed={120000} contextWindow={128000} onClick={noop} />,
     )
     // 94% of window → red under the legacy >=90% rule.
-    expect(screen.getByText('94%')).toHaveStyle({ color: '#ef4444' })
+    expect(screen.getByText('94%')).toHaveStyle({ color: 'var(--workspace-danger)' })
   })
 })

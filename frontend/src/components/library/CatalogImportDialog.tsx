@@ -11,7 +11,7 @@ function KindBadge({ kind }: { kind: string }) {
   return (
     <span
       style={{
-        fontSize: 11,
+        fontSize: 'var(--workspace-font-meta)',
         padding: '1px 6px',
         borderRadius: 4,
         border: `1px solid ${isWorkflow ? '#e9d5ff' : '#ccfbf1'}`,
@@ -108,7 +108,7 @@ export function CatalogImportDialog({
       >
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>Import from Catalog</span>
+          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>Import from Catalog</span>
           <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
@@ -125,7 +125,7 @@ export function CatalogImportDialog({
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter items..."
               style={{
-                width: '100%', fontSize: 13, fontFamily: 'inherit',
+                width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
                 boxSizing: 'border-box',
               }}
@@ -138,7 +138,7 @@ export function CatalogImportDialog({
           {/* Select all */}
           <label style={{
             display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
-            borderBottom: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 12, color: '#6b7280', fontWeight: 500,
+            borderBottom: '1px solid #e5e7eb', cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500,
           }}>
             <input
               type="checkbox"
@@ -163,18 +163,18 @@ export function CatalogImportDialog({
               />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.name}
                   </span>
                   <KindBadge kind={item.item_kind} />
                   {item.quality_tier && (
-                    <span style={{ fontSize: 10, color: '#6b7280', textTransform: 'capitalize' }}>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textTransform: 'capitalize' }}>
                       {item.quality_tier}
                     </span>
                   )}
                 </div>
                 {item.description && (
-                  <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {item.description}
                   </div>
                 )}
@@ -182,7 +182,7 @@ export function CatalogImportDialog({
             </label>
           ))}
           {filteredItems.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
               No items match your search.
             </div>
           )}
@@ -193,7 +193,7 @@ export function CatalogImportDialog({
           <button
             onClick={onClose}
             style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
               borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
               color: '#374151', cursor: 'pointer',
             }}
@@ -204,7 +204,7 @@ export function CatalogImportDialog({
             onClick={handleImport}
             disabled={selected.size === 0 || importing}
             style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
               backgroundColor: selected.size > 0 && !importing ? 'var(--color-panel-dark)' : '#e5e7eb',
               color: selected.size > 0 && !importing ? '#fff' : '#6b7280',

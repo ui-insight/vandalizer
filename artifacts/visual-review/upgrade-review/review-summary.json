@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 153,
+  "completed_items": 154,
   "total_items": 169,
-  "unique_states": 1228,
-  "capture_executions": 2057,
+  "unique_states": 1240,
+  "capture_executions": 2363,
   "mobile_grade": 8,
   "areas": [
     {
@@ -113,7 +113,7 @@
       "baseline_ux": 3,
       "ui": 8,
       "ux": 8,
-      "evidence": "../upgrade-final/chat-upload-error.png",
+      "evidence": "../2026-09-30-typography-baseline/chat-upload-error.png",
       "note": "Successful siblings survive failures, transfer retry/cancel are explicit, and scope preservation is asserted. Live ingestion and all supported intake paths remain unverified."
     },
     {
@@ -24146,6 +24146,3595 @@
       "errors": [],
       "observations": [
         "Library/Assistant tool origin and return, active section, full project context with tool open and scope exit; consistent Mine/Team/Explore explanations at 320/768/1440px. Synthetic data and tool responses; no workflow creation/execution or sharing performed."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-baseline",
+      "capturedAt": "2026-09-30T19:32:35.795Z",
+      "sourceFingerprint": "e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "chat-home",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automations",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-selected",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-context-menu",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "project-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-1-name",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-2-trigger",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-3-folder",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-4-action",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-action-picker",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-5-activation",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-description-before-enter",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "wizard-description-enter",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-validation",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-queries",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-run",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-history",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-wizard-questions",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-wizard-preview",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-wizard-baseline",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-wizard-budget",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-results",
+          "note": "Synthetic scored results; summary refreshed from KB detail endpoint, no model grading performed.",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-populated",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "catalog-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-catalog",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-add-menu",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-file-attached",
+          "note": "Synthetic upload and processing response; no backend ingestion.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-file-request",
+          "note": "Inspect manifest observation upload-chat-scope for the document UUIDs actually submitted.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-upload-error",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-upload-retried",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-kb-attached",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-kb-answer",
+          "note": "Synthetic response and citations; does not evaluate model accuracy.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-agent-confirmation",
+          "note": "Synthetic tool stream; backend execution is not exercised.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-agent-complete",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-agent-error",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-onboarding",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "files-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automations-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "library-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "automation-editor-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "chat-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "files-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "projects-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "automations-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "knowledge-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "library-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        {
+          "id": "wizard-description-enter",
+          "expected": "Advance to the next step without dismissing the wizard",
+          "actual": "New Automation\nStep 2 of 5 \u00b7 Trigger\nWhat will trigger this automation?\nFolder Watch\nTrigger when files are added to a folder\nAPI Endpoint\nTrigger via HTTP POST request\nSchedule\nRun daily, weekly or monthly at a set time\n\nEach trigger keeps its settings while you edit. Only the selected trigger is used when you create.\n\nBack\nNext"
+        },
+        {
+          "id": "upload-chat-scope",
+          "expected": [
+            "doc-upload"
+          ],
+          "actual": [
+            "doc-upload"
+          ],
+          "uploadPresentInFixture": true
+        },
+        {
+          "id": "agent-confirm",
+          "actual": "Yes, go ahead"
+        }
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-domains",
+      "capturedAt": "2026-09-30T19:32:02.714Z",
+      "sourceFingerprint": "e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "theme-workflow-validation-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-concept-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-test-cases-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-budget-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-advanced-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-validation-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-history-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-concept-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-test-cases-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-generation-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-baseline-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-budget-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-advanced-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-validation-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-workflow-concept-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-workflow-test-cases-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-workflow-budget-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-workflow-advanced-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-validation-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-history-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-concept-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-test-cases-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-generation-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-baseline-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-budget-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-extraction-advanced-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "theme-workflow-validation-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-concept-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-test-cases-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-budget-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-workflow-advanced-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-validation-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-history-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-concept-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-test-cases-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-generation-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-baseline-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-budget-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "theme-extraction-advanced-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&extraction=item-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Workflow and extraction validation setup and every wizard step use synthetic test data and baseline scores. No optimization start or execution is performed."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-questions",
+      "capturedAt": "2026-09-30T19:31:51.625Z",
+      "sourceFingerprint": "e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-question-add-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-add-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-add-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-large-set-selection-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-large-set-preview-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Question add/edit/delete failures preserve drafts/selection, successful creation clears stale search, selected-run preview preserves exact edited scope. Import rejects unsupported extension, retries preserved file and displays row errors plus unmatched source labels; completed import cannot be resubmitted. 320/768/1440px; fixtures only."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-file-library",
+      "capturedAt": "2026-09-30T19:33:52.084Z",
+      "sourceFingerprint": "ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-30-typography-headers",
+      "capturedAt": "2026-09-30T19:33:47.852Z",
+      "sourceFingerprint": "ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "headers-files-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-file-add-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-search-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-projects-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-automations-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-file-add-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-search-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-projects-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-automations-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-file-add-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-files-search-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-projects-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-automations-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-knowledge-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-library-new-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "headers-explore-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Shared section headings, primary actions, search/filter placement, file Add and Library New menus at 320/768/1440px. Existing task behavior is covered by companion file/Library and navigation-retention regressions. No live API writes."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-context",
+      "capturedAt": "2026-09-30T19:33:53.584Z",
+      "sourceFingerprint": "ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "workspace-project-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-mine-scope-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-team-scope-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-explore-location-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-mine-scope-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-knowledge-open-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-team-scope-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-explore-location-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-chat-context-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-tool-location-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-mine-scope-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-team-scope-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-explore-location-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-mine-scope-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-knowledge-open-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-team-scope-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-explore-location-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-chat-context-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-tool-location-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-mine-scope-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-team-scope-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-library-explore-location-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-mine-scope-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-knowledge-open-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-team-scope-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-knowledge-explore-location-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-project-chat-context-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-tool-location-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "workspace-assistant-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Library/Assistant tool origin and return, active section, full project context with tool open and scope exit; consistent Mine/Team/Explore explanations at 320/768/1440px. Synthetic data and tool responses; no workflow creation/execution or sharing performed."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-history",
+      "capturedAt": "2026-09-30T19:33:45.879Z",
+      "sourceFingerprint": "ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-history-comparison-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-run-card-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-oldest-export-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-export-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-opened-result-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-comparison-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-run-card-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-oldest-export-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-export-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-opened-result-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-comparison-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-run-card-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-oldest-export-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-export-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-opened-result-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-load-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-load-recovered-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-empty-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "30 saved runs remain available at 320/768/1440px. Oldest saved run opened by keyboard and exported as CSV, Excel and JSON using its exact UUID; no validation POST. History and export 503 errors recover explicitly. All responses synthetic; delayed/failed task lifecycle remains unverified."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-dialogs",
+      "capturedAt": "2026-09-30T19:35:29.281Z",
+      "sourceFingerprint": "636847e9847226ae8e533ed8da536fe19f4ab0c15fbf7f18e38244abe2da10b7",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/ContextMeter.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-generation-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-optimization-history-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-recovered-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-deltas-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-retry-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-optimization-history-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-recovered-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-deltas-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-retry-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-trace-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-optimization-history-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-recovered-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-comparison-deltas-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-apply-retry-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "320\u00d7480, 768\u00d7500 and 1440\u00d7600: generation choices and payload, trial details, full comparison values/deltas with retry, apply acknowledgement/failure/retry and revert. Dialog actions fit; Escape restores generation/trial/comparison focus. Synthetic responses; no backend/model execution."
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-chat-reading-final",
+      "capturedAt": "2026-09-30T19:37:54.046Z",
+      "sourceFingerprint": "b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/chat-reading.mjs\n M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/ContextMeter.test.tsx\n M frontend/src/components/chat/ContextMeter.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/typography.mjs",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "chat-source-preview-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-missing-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-inaccessible-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-failed-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-retry-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-recovered-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-unlinked-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-reading-position-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-table-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-code-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-copy-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-preview-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-missing-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-inaccessible-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-failed-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-retry-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-recovered-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-unlinked-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-reading-position-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-table-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-code-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-copy-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-preview-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-missing-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-inaccessible-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-failed-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-extraction-retry-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-recovered-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-source-unlinked-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-reading-position-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-table-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-long-code-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "chat-copy-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        {
+          "id": "source-return-320",
+          "before": 223,
+          "after": 223,
+          "maximum": 417
+        },
+        {
+          "id": "source-return-768",
+          "before": 0,
+          "after": 0,
+          "maximum": 92
+        },
+        {
+          "id": "source-return-1440",
+          "before": 0,
+          "after": 0,
+          "maximum": 0
+        }
+      ]
+    },
+    {
+      "directory": "2026-09-30-typography-context-meter-final",
+      "capturedAt": "2026-09-30T19:37:24.757Z",
+      "sourceFingerprint": "b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/chat-reading.mjs\n M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/admin/shared/primitives.tsx\n M frontend/src/components/chat/CertificationCards.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ChatPanel.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/chat/ContextMeter.test.tsx\n M frontend/src/components/chat/ContextMeter.tsx\n M frontend/src/components/chat/FileProcessingCell.tsx\n M frontend/src/components/chat/HomeExperience.tsx\n M frontend/src/components/chat/MemoryPanel.tsx\n M frontend/src/components/chat/ProjectChatBadge.tsx\n M frontend/src/components/chat/QualityBadge.tsx\n M frontend/src/components/chat/ToolCallDisplay.tsx\n M frontend/src/components/chat/WelcomeExperience.tsx\n M frontend/src/components/chat/WorkspaceBriefing.tsx\n M frontend/src/components/extractions/CrossFieldRulesSection.tsx\n M frontend/src/components/extractions/CrossFieldViolationsPanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidatePanel.tsx\n M frontend/src/components/extractions/ExtractionAutovalidateWizard.tsx\n M frontend/src/components/extractions/ExtractionNeedsFieldsNotice.tsx\n M frontend/src/components/extractions/ExtractionOptimizationHistoryPanel.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/DocumentViewer.tsx\n M frontend/src/components/files/FileRow.tsx\n M frontend/src/components/files/FolderRow.tsx\n M frontend/src/components/files/GlobalSearch.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/SpreadsheetViewer.tsx\n M frontend/src/components/files/UploadZone.tsx\n M frontend/src/components/files/VerificationNavBar.tsx\n M frontend/src/components/knowledge/AITrustChip.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/AutovalidateModal.tsx\n M frontend/src/components/knowledge/AutovalidateTab.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBExploreTab.tsx\n M frontend/src/components/knowledge/KBGridView.tsx\n M frontend/src/components/knowledge/KBSearchBar.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/KBTestQueriesTab.tsx\n M frontend/src/components/knowledge/KBTrustBadges.tsx\n M frontend/src/components/knowledge/KBTrustBanner.tsx\n M frontend/src/components/knowledge/KBValidationPanel.tsx\n M frontend/src/components/knowledge/KBValidationRunTab.tsx\n M frontend/src/components/knowledge/OptimizationHistoryPanel.tsx\n M frontend/src/components/knowledge/OptimizationResults.tsx\n M frontend/src/components/knowledge/QuestionExpectations.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/knowledge/WebSourceRefreshBar.tsx\n M frontend/src/components/layout/NotificationBell.tsx\n M frontend/src/components/layout/TeamsDropdown.tsx\n M frontend/src/components/library/CatalogCoverageTab.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/CatalogUsage.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/QualityContractBadge.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/VerificationQueue.tsx\n M frontend/src/components/projects/ProjectSuggestedActions.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyBackButton.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AuthorChip.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/BarRow.tsx\n M frontend/src/components/shared/BudgetTierPicker.tsx\n M frontend/src/components/shared/ColdStartHero.tsx\n M frontend/src/components/shared/CollapsibleSection.tsx\n M frontend/src/components/shared/CrossJudgeNote.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/EvalSetCompositionStrip.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/OptimizationProgressCard.tsx\n M frontend/src/components/shared/OptimizerInbox.tsx\n M frontend/src/components/shared/ProgressRow.tsx\n M frontend/src/components/shared/QualityComparisonCard.tsx\n M frontend/src/components/shared/QualityTimeline.tsx\n M frontend/src/components/shared/ReproducibilityPanel.tsx\n M frontend/src/components/shared/RunBanners.tsx\n M frontend/src/components/shared/SuggestionsList.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/Toggle.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TriCounter.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx\n M frontend/src/components/shared/WhenToRunDisclosure.tsx\n M frontend/src/components/shared/WizardLoadingStep.tsx\n M frontend/src/components/shared/WizardSteps.tsx\n M frontend/src/components/workspace/ActivityRail.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationEditorPanel.tsx\n M frontend/src/components/workspace/AutomationRunHistory.tsx\n M frontend/src/components/workspace/AutomationRunNowPanel.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/AutomationsPanel.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/ExtractionEditorPanel.tsx\n M frontend/src/components/workspace/FileOutputCard.tsx\n M frontend/src/components/workspace/FixedDocumentsZone.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/KnowledgePanel.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectContextBar.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RunHistoryTab.tsx\n M frontend/src/components/workspace/ScheduleConfigFields.tsx\n M frontend/src/components/workspace/StalePlanBanner.tsx\n M frontend/src/components/workspace/StepInputSources.tsx\n M frontend/src/components/workspace/WorkflowAutovalidatePanel.tsx\n M frontend/src/components/workspace/WorkflowAutovalidateWizard.tsx\n M frontend/src/components/workspace/WorkflowEditorPanel.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/typography.mjs",
+      "commit": "905b9332f56eebd3e9dc20b17038364c7d01ed6b",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "typography-context-ok-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-warning-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-compact-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-blocked-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-ok-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-warning-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-compact-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-blocked-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-ok-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-warning-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-compact-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "typography-context-blocked-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Context utilization percentages remain legible within a 44px control at 50%, 75%, 94% and 100%; backend warning states retain their meaning. Chat responses and usage are synthetic."
       ]
     }
   ]

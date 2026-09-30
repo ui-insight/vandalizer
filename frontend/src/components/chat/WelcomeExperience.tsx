@@ -22,7 +22,7 @@ function Step({ label, done, number }: StepProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 11,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 600,
           ...(done
             ? {
@@ -40,7 +40,7 @@ function Step({ label, done, number }: StepProps) {
       </div>
       <span
         style={{
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
           color: done ? '#6b7280' : '#374151',
           textDecoration: done ? 'line-through' : 'none',
         }}
@@ -75,7 +75,7 @@ export function OnboardingStepper({ status, hasChatAboutDocs }: OnboardingSteppe
     >
       <div
         style={{
-          fontSize: 11,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 600,
           color: '#6b7280',
           textTransform: 'uppercase',

@@ -263,8 +263,8 @@ export function WorkflowAutovalidateWizard({ workflowId, canApply = true, onClos
 
 function ConceptStep() {
   return (
-    <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>What happens when you run this?</h4>
+    <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What happens when you run this?</h4>
       <p style={{ margin: '0 0 10px 0' }}>
         First we run your workflow as-is and score it against your{' '}
         <TermDef term="test-set">expected outputs</TermDef>. That's your validation score.
@@ -273,18 +273,18 @@ function ConceptStep() {
         scores best. Another AI, the <TermDef term="judge">judge</TermDef>, grades each
         result so wording differences don't unfairly penalize a good answer.
       </p>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--workspace-text)' }}>What it changes</h4>
+      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it changes</h4>
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
         <li>Per-step LLM model</li>
         <li>Per-step prompt style (when the step is prompt-driven)</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--workspace-text)' }}>What it doesn't change</h4>
+      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it doesn't change</h4>
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
         <li>The workflow's structure (steps, order)</li>
         <li>Your expected outputs</li>
         <li>Your live config, until you click Apply</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: 'var(--workspace-text)' }}>Caveats</h4>
+      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Caveats</h4>
       <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--workspace-muted)' }}>
         <li>Costs LLM tokens (you'll set the budget shortly)</li>
         <li>Each trial runs the full workflow once per expected output</li>
@@ -311,14 +311,14 @@ function TestCasesStep({
   const [labelEdits, setLabelEdits] = useState<Record<string, string>>({})
 
   if (expectedOutputs === null) {
-    return <div style={{ fontSize: 13, color: '#6b7280' }}>Loading test cases…</div>
+    return <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>Loading test cases…</div>
   }
 
   // If proposals are showing, render the review view.
   if (proposals && proposals.length > 0) {
     return (
-      <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
           {proposals.length} candidate{proposals.length === 1 ? '' : 's'} from past runs
         </h4>
         <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
@@ -339,7 +339,7 @@ function TestCasesStep({
                 style={{
                   display: 'flex', alignItems: 'flex-start', gap: 8,
                   padding: '8px 10px', backgroundColor: checked ? '#22c55e22' : 'var(--workspace-surface)',
-                  borderRadius: 4, fontSize: 12, color: 'var(--workspace-text)',
+                  borderRadius: 4, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
                   cursor: 'pointer',
                 }}
               >
@@ -363,11 +363,11 @@ function TestCasesStep({
                       style={{
                         flex: 1, background: 'var(--workspace-canvas)', color: 'var(--workspace-text)',
                         border: '1px solid var(--workspace-border)', borderRadius: 4, padding: '3px 6px',
-                        fontSize: 12, fontFamily: 'inherit',
+                        fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                       }}
                     />
                     <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+                      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
                       padding: '2px 6px', borderRadius: 4,
                       background: p.confidence >= 0.7 ? '#22c55e33' : p.confidence >= 0.4 ? '#f59e0b33' : '#ef444433',
                       color: p.confidence >= 0.7 ? 'var(--workspace-success)' : p.confidence >= 0.4 ? 'var(--workspace-warning)' : 'var(--workspace-danger)',
@@ -376,7 +376,7 @@ function TestCasesStep({
                     </span>
                   </div>
                   {p.why && (
-                    <div style={{ fontSize: 11, color: 'var(--workspace-muted)', fontStyle: 'italic', marginTop: 3 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontStyle: 'italic', marginTop: 3 }}>
                       {p.why}
                     </div>
                   )}
@@ -395,7 +395,7 @@ function TestCasesStep({
             )}
             disabled={proposing || selectedSessions.size === 0}
             style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               border: 'none', borderRadius: 6, cursor: proposing || selectedSessions.size === 0 ? 'not-allowed' : 'pointer',
               background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
               opacity: proposing || selectedSessions.size === 0 ? 0.5 : 1,
@@ -413,8 +413,8 @@ function TestCasesStep({
   // Default view — list existing + offer to propose or synthesize.
   if (expectedOutputs.length === 0) {
     return (
-      <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>You don't have expected outputs yet</h4>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
+        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>You don't have expected outputs yet</h4>
         <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)' }}>
           The optimizer scores trial configurations against past results. We'll suggest
           candidates from your run history, or synthesize a seed input you can run first.
@@ -425,7 +425,7 @@ function TestCasesStep({
             disabled={proposing}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-text)',
               background: 'var(--workspace-canvas)',
               border: '1px solid var(--workspace-accent-ink)',
@@ -441,7 +441,7 @@ function TestCasesStep({
             disabled={synthesizing}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-info)', background: 'transparent',
               border: '1px solid var(--workspace-border)',
               borderRadius: 6, cursor: synthesizing ? 'wait' : 'pointer',
@@ -452,7 +452,7 @@ function TestCasesStep({
             Synthesize seed input
           </button>
         </div>
-        <p style={{ marginTop: 12, fontSize: 11, color: 'var(--workspace-muted)' }}>
+        <p style={{ marginTop: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Once at least one expected output is saved, the Next button will unlock.
         </p>
       </div>
@@ -463,8 +463,8 @@ function TestCasesStep({
   const hidden = Math.max(0, expectedOutputs.length - visible.length)
 
   return (
-    <div style={{ fontSize: 13, color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>
+    <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
         {expectedOutputs.length} expected output{expectedOutputs.length === 1 ? '' : 's'} ready
       </h4>
       <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
@@ -479,21 +479,21 @@ function TestCasesStep({
         {visible.map((eo, i) => (
           <div key={eo.id} style={{
             padding: '6px 8px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
-            fontSize: 12, color: 'var(--workspace-text)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
           }}>
             <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
-              <span style={{ color: 'var(--workspace-muted)', fontSize: 11 }}>{i + 1}.</span>
+              <span style={{ color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-meta)' }}>{i + 1}.</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {eo.label || `Test ${eo.id.slice(0, 8)}`}
               </span>
               {eo.source === 'test_case_generator' && (
-                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.05em', color: 'var(--workspace-success)' }}>AUTO</span>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--workspace-success)' }}>AUTO</span>
               )}
             </div>
           </div>
         ))}
         {hidden > 0 && (
-          <div style={{ fontSize: 11, color: 'var(--workspace-muted)', padding: '4px 8px' }}>…and {hidden} more</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '4px 8px' }}>…and {hidden} more</div>
         )}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -502,7 +502,7 @@ function TestCasesStep({
           disabled={proposing}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
             color: 'var(--workspace-info)', background: 'transparent',
             border: '1px solid var(--workspace-border)',
             borderRadius: 6, cursor: proposing ? 'wait' : 'pointer',
@@ -567,8 +567,8 @@ function AdvancedStep({
   onIncludeJudge: (b: boolean) => void
 }) {
   return (
-    <div style={{ fontSize: 13, color: 'var(--workspace-text)' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: 'var(--workspace-text)' }}>Advanced options</h4>
+    <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
       <Toggle
         label="Score by meaning, not exact text (recommended)"
         description="The judge LLM grades each output for content match instead of strict string equality. Costs extra tokens; turn off only for deterministic workflows where you want exact-match scoring."
@@ -588,10 +588,10 @@ function AdvancedStep({
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
         border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
       }}>
-        <div style={{ fontSize: 11, color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
           Ready to tune
         </div>
-        <div style={{ fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
           <b>{candidates}</b> configuration{candidates === 1 ? '' : 's'} against{' '}
           <b>{testCaseCount}</b> expected output{testCaseCount === 1 ? '' : 's'}
           {includeJudge ? ' · meaning-based scoring' : ' · strict-text scoring'}

@@ -60,11 +60,11 @@ export function CollapsibleSection({
           }}
         >
           <Chevron aria-hidden="true" style={{ width: 16, height: 16, color: '#6b7280', flexShrink: 0 }} />
-          <span style={{ fontSize: 14, fontWeight: 600 }}>{title}</span>
+          <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>{title}</span>
           {summary && (
             <span
               style={{
-                fontSize: 12, color: '#6b7280', fontWeight: 400, marginLeft: 4,
+                fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400, marginLeft: 4,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}
             >

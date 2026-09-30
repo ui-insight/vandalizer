@@ -134,13 +134,13 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
     background: '#fff', cursor: 'pointer', color: '#374151',
-    fontSize: 13, fontWeight: 500,
+    fontSize: 'var(--workspace-font-control)', fontWeight: 500,
   }
 
   if (loading) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="status" aria-live="polite" style={{ color: '#6b7280', fontSize: 14 }}>Loading spreadsheet...</div>
+        <div role="status" aria-live="polite" style={{ color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>Loading spreadsheet...</div>
       </div>
     )
   }
@@ -148,7 +148,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   if (error) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div role="alert" style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>
+        <div role="alert" style={{ color: '#dc2626', fontSize: 'var(--workspace-font-body)' }}>{error}</div>
       </div>
     )
   }
@@ -169,8 +169,8 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>Processing Your Document...</div>
-                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>Please wait while we prepare your document.</div>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Processing Your Document...</div>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 3 }}>Please wait while we prepare your document.</div>
               </div>
             </div>
           </div>
@@ -213,7 +213,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
               type="button"
               onClick={() => handleSheetChange(i)}
               style={{
-                padding: '6px 16px', fontSize: 12, fontWeight: i === activeSheet ? 600 : 400,
+                padding: '6px 16px', fontSize: 'var(--workspace-font-meta)', fontWeight: i === activeSheet ? 600 : 400,
                 color: i === activeSheet ? '#111827' : '#6b7280',
                 backgroundColor: i === activeSheet ? '#fff' : 'transparent',
                 borderBottom: i === activeSheet ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
@@ -248,18 +248,18 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
           width: `${100 / zoomLevel}%`,
         }}>
           {headers.length === 0 && rows.length === 0 ? (
-            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>
               This sheet is empty
             </div>
           ) : (
             <table style={{
-              width: '100%', borderCollapse: 'collapse', fontSize: 13,
+              width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-control)',
             }}>
               {headers.length > 0 && (
                 <thead>
                   <tr>
                     <th scope="col" style={{
-                      padding: '8px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600,
+                      padding: '8px 12px', textAlign: 'center', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                       color: '#6b7280', backgroundColor: '#f9fafb',
                       borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb',
                       position: 'sticky', top: 0, zIndex: 2, width: 44,
@@ -296,7 +296,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                 {rows.map((row, ri) => (
                   <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
                     <td style={{
-                      padding: '6px 12px', textAlign: 'center', fontSize: 11,
+                      padding: '6px 12px', textAlign: 'center', fontSize: 'var(--workspace-font-meta)',
                       color: '#6b7280', borderBottom: '1px solid #f3f4f6',
                       borderRight: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
                     }}>

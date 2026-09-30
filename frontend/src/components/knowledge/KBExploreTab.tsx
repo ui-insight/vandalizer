@@ -40,7 +40,7 @@ const C = {
 function DarkAuthorChip({ author, size = 'sm' }: { author: AuthorRef | null | undefined; size?: 'sm' | 'md' }) {
   if (!author) return null
   const display = author.name || author.email || author.user_id
-  const fontSize = size === 'sm' ? 11 : 12
+  const fontSize = 'var(--workspace-font-meta)'
   const iconSize = size === 'sm' ? 10 : 12
   const mailto = author.email ? `mailto:${author.email}?subject=${encodeURIComponent('Question about your knowledge base')}` : null
 
@@ -119,16 +119,16 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
         }}>
           <Star size={16} fill="currentColor" />
         </div>
-        <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3 }}>
+        <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, flex: 1, minWidth: 0, margin: 0, lineHeight: 1.3 }}>
           {collection.title}
         </h3>
       </div>
       {collection.description && (
-        <p style={{ fontSize: 12, color: C.textDim, margin: '0 0 10px 0', lineHeight: 1.4 }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textDim, margin: '0 0 10px 0', lineHeight: 1.4 }}>
           {collection.description}
         </p>
       )}
-      <span style={{ marginTop: 'auto', fontSize: 12, fontWeight: 500, color: C.textFaint }}>
+      <span style={{ marginTop: 'auto', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, color: C.textFaint }}>
         {(collection.visible_count ?? collection.item_ids.length)} item{(collection.visible_count ?? collection.item_ids.length) !== 1 ? 's' : ''}
       </span>
     </button>
@@ -171,7 +171,7 @@ function KBCatalogCard({
     >
       <div style={{ display: 'flex', alignItems: 'start', gap: 6, marginBottom: 6 }}>
         <ShieldCheck size={14} style={{ color: tierIconColor, flexShrink: 0, marginTop: 2 }} />
-        <button type="button" onClick={onClick} style={{ minHeight: 36, fontSize: 16, fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
+        <button type="button" onClick={onClick} style={{ minHeight: 36, fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
           {item.display_name || item.name}
         </button>
       </div>
@@ -179,7 +179,7 @@ function KBCatalogCard({
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 12, padding: '1px 6px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: '1px 6px', borderRadius: 4,
           backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
           border: '1px solid rgba(56, 189, 248, 0.25)',
         }}>
@@ -194,10 +194,10 @@ function KBCatalogCard({
           regressionPending={item.regression_pending_review}
           variant="catalog"
         />
-        <CatalogSignals item={item} style={{ fontSize: 12, color: C.textFaint }} />
+        <CatalogSignals item={item} style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint }} />
       </div>
 
-      <p style={{ fontSize: 13, color: 'var(--workspace-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
+      <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
       <CatalogUsage item={item} compact />
 
       {item.created_by && (
@@ -207,7 +207,7 @@ function KBCatalogCard({
       )}
 
       {(item.total_sources != null || item.total_chunks != null) && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 8 }}>
           {item.total_sources != null && (
             <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
           )}
@@ -224,7 +224,7 @@ function KBCatalogCard({
               key={i}
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
               style={{
-                fontSize: 12, padding: '1px 6px', borderRadius: 999,
+                fontSize: 'var(--workspace-font-meta)', padding: '1px 6px', borderRadius: 999,
                 backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
                 cursor: 'pointer', transition: 'background-color 0.15s',
               }}
@@ -233,7 +233,7 @@ function KBCatalogCard({
             </button>
           ))}
           {item.tags.length > 4 && (
-            <span style={{ fontSize: 12, color: C.textFaint }}>+{item.tags.length - 4}</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint }}>+{item.tags.length - 4}</span>
           )}
         </div>
       )}
@@ -258,7 +258,7 @@ function CollectionLink({
       onClick={onClick}
       style={{
         width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
-        fontSize: 13, fontFamily: 'inherit',
+        fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
         backgroundColor: active ? 'var(--workspace-canvas)' : 'transparent',
         color: active ? 'var(--workspace-text)' : C.textMuted,
         border: 'none', cursor: 'pointer',
@@ -273,7 +273,7 @@ function CollectionLink({
       {collection.featured && (
         <Star size={11} fill="currentColor" style={{ color: active ? 'var(--workspace-warning)' : 'var(--workspace-warning)', flexShrink: 0, marginTop: 3 }} />
       )}
-      <span style={{ fontSize: 12, color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
+      <span style={{ fontSize: 'var(--workspace-font-meta)', color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
         {collection.visible_count ?? collection.item_ids.length}
       </span>
     </button>
@@ -350,7 +350,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             onClick={() => setSelectedCollectionId(null)}
             style={{
               width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
-              fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               backgroundColor: !selectedCollectionId ? 'var(--workspace-canvas)' : 'transparent',
               color: !selectedCollectionId ? 'var(--workspace-text)' : C.textMuted,
               border: 'none', cursor: 'pointer', marginBottom: 4,
@@ -358,14 +358,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             }}
           >
             <span>All Knowledge Bases</span>
-            <span style={{ fontSize: 12, color: !selectedCollectionId ? 'var(--workspace-muted)' : C.textFaint }}>{allTotal ?? total}</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: !selectedCollectionId ? 'var(--workspace-muted)' : C.textFaint }}>{allTotal ?? total}</span>
           </button>
 
           {featuredCollections.length > 0 && (
             <div style={{ marginTop: 16, marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px', marginBottom: 6 }}>
                 <Star size={10} fill="currentColor" style={{ color: 'var(--workspace-warning)' }} />
-                <span style={{ fontSize: 12, fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Featured
                 </span>
               </div>
@@ -383,7 +383,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           {regularCollections.length > 0 && (
             <div style={{ marginTop: 16, marginBottom: 8 }}>
               <span style={{
-                fontSize: 12, fontWeight: 700, color: C.textFaint,
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: C.textFaint,
                 textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 10px',
               }}>
                 Collections
@@ -418,13 +418,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <Sparkles size={20} />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
+                    <h2 style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                       Explore knowledge bases
                     </h2>
-                    <p style={{ fontSize: 13, color: C.textDim, margin: '2px 0 0' }}>
+                    <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, margin: '2px 0 0' }}>
                       Browse shared knowledge bases. Review their sources and measured quality before adding one.
                     </p>
-                    <p style={{ fontSize: 12, color: C.textFaint, margin: '4px 0 0' }}>
+                    <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, margin: '4px 0 0' }}>
                       Built one that works for you? Share it from Mine — it doesn't need to be finished.
                     </p>
                   </div>
@@ -439,7 +439,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   onClick={() => setSelectedCollectionId(null)}
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    fontSize: 12, color: C.textDim, background: 'transparent',
+                    fontSize: 'var(--workspace-font-meta)', color: C.textDim, background: 'transparent',
                     border: 'none', cursor: 'pointer', marginBottom: 6, fontFamily: 'inherit',
                   }}
                 >
@@ -447,7 +447,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 </button>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <FolderOpen size={18} style={{ color: C.textDim }} />
-                  <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
+                  <h2 style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                     {activeCollection.title}
                   </h2>
                   {activeCollection.featured && (
@@ -455,7 +455,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   )}
                 </div>
                 {activeCollection.description && (
-                  <p style={{ fontSize: 13, color: C.textDim, marginTop: 4, marginLeft: 26 }}>
+                  <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, marginTop: 4, marginLeft: 26 }}>
                     {activeCollection.description}
                   </p>
                 )}
@@ -477,7 +477,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   placeholder="Search knowledge bases..."
                   style={{
                     width: '100%', padding: '7px 10px 7px 32px',
-                    fontSize: 13, fontFamily: 'inherit',
+                    fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                     backgroundColor: C.card, color: C.text,
                     border: `1px solid ${C.border}`, borderRadius: 8,
                     boxSizing: 'border-box',
@@ -490,7 +490,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 value={qualityFilter}
                 onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
                 style={{
-                  padding: '6px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                  padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                   border: `1px solid ${C.border}`, borderRadius: 8,
                   backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                 }}
@@ -507,7 +507,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
                   style={{
-                    padding: '6px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                    padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                     border: `1px solid ${C.border}`, borderRadius: 8,
                     backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                   }}
@@ -525,7 +525,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {tagFilter && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 12,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
                     backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}>
@@ -543,7 +543,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {selectedCollectionId && activeCollection && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 12,
+                    padding: '3px 10px', borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
                     backgroundColor: 'var(--workspace-canvas)', color: C.text,
                   }}>
                     <FolderOpen size={10} aria-hidden="true" /> {activeCollection.title}
@@ -560,13 +560,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 <button
                   onClick={clearFilters}
                   style={{
-                    fontSize: 12, color: C.textDim, background: 'transparent',
+                    fontSize: 'var(--workspace-font-meta)', color: C.textDim, background: 'transparent',
                     border: 'none', cursor: 'pointer', textDecoration: 'underline', fontFamily: 'inherit',
                   }}
                 >
                   Clear all
                 </button>
-                <span role="status" aria-live="polite" style={{ fontSize: 12, color: C.textFaint, marginLeft: 'auto' }}>
+                <span role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginLeft: 'auto' }}>
                   {loading ? 'Loading…' : error ? 'Results unavailable' : `${total} result${total !== 1 ? 's' : ''}`}
                 </span>
               </div>
@@ -576,7 +576,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             {/* Error state */}
             {error && (
               <div role="alert" style={{
-                borderRadius: 8, padding: '10px 14px', fontSize: 13,
+                borderRadius: 8, padding: '10px 14px', fontSize: 'var(--workspace-font-control)',
                 color: 'var(--workspace-danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 border: '1px solid rgba(239, 68, 68, 0.25)', marginBottom: 14,
               }}>
@@ -601,15 +601,15 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 justifyContent: 'center', padding: '80px 0', color: C.textFaint,
               }}>
                 <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} aria-hidden="true" />
-                <p style={{ fontSize: 13, margin: 0 }}>Loading knowledge bases...</p>
+                <p style={{ fontSize: 'var(--workspace-font-control)', margin: 0 }}>Loading knowledge bases...</p>
               </div>
             ) : error ? null : items.length === 0 ? (
               <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '80px 16px' }}>
                 <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} aria-hidden="true" />
-                <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 4 }}>
+                <h3 style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, marginBottom: 4 }}>
                   {hasActiveFilters ? 'No matching knowledge bases' : 'No knowledge bases shared yet'}
                 </h3>
-                <p style={{ fontSize: 13, color: C.textDim, maxWidth: 340, margin: '0 auto' }}>
+                <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, maxWidth: 340, margin: '0 auto' }}>
                   {hasActiveFilters
                     ? 'Try broadening your search or removing some filters.'
                     : 'Knowledge bases that have been reviewed and approved by examiners will appear here.'}
@@ -619,7 +619,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     type="button"
                     onClick={clearFilters}
                     style={{
-                      marginTop: 16, padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                      marginTop: 16, padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                       color: C.text, backgroundColor: C.card,
                       border: `1px solid ${C.border}`, borderRadius: 8, cursor: 'pointer',
                     }}
@@ -633,7 +633,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {/* Featured collections (hero landing only) */}
                 {showHero && !activeCollection && featuredCollections.length > 0 && (
                   <div style={{ marginBottom: 28 }}>
-                    <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>
+                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 10 }}>
                       Featured Collections
                     </h3>
                     <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
@@ -656,10 +656,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                         height: 14, width: 14, borderRadius: 999,
                         background: 'var(--workspace-canvas)',
                       }} />
-                      <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, margin: 0 }}>
+                      <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, margin: 0 }}>
                         Top Rated
                       </h3>
-                      <span style={{ fontSize: 12, color: C.textFaint }}>
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint }}>
                         {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
                       </span>
                     </div>
@@ -679,10 +679,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {/* Main grid */}
                 <div style={{ marginBottom: 6 }}>
                   {showHero && !activeCollection && topItems.length > 0 && (
-                    <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
+                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
                   )}
                   {!showHero && !loading && (
-                    <div role="status" aria-live="polite" style={{ fontSize: 12, color: C.textFaint, marginBottom: 10 }}>
+                    <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 10 }}>
                       {total} item{total !== 1 ? 's' : ''}
                     </div>
                   )}
@@ -707,7 +707,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       disabled={loadingMore}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 8,
-                        padding: '8px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                        padding: '8px 20px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                         color: C.text, backgroundColor: C.card,
                         border: `1px solid ${C.border}`, borderRadius: 8,
                         cursor: loadingMore ? 'default' : 'pointer',

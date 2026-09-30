@@ -64,7 +64,7 @@ export function TrialRow<TConfig>({
   return (
     <div style={{
       display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-      padding: '8px 10px', fontSize: 12, color: 'var(--workspace-text)',
+      padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
       backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
       borderRadius: 4,
     }}>
@@ -79,7 +79,7 @@ export function TrialRow<TConfig>({
       </span>
       {trial.lift_vs_default != null && (
         <span style={{
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           color: trial.lift_vs_default > 0 ? 'var(--workspace-success)'
             : trial.lift_vs_default < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
         }}>
@@ -144,19 +144,19 @@ export function TrialsTable<TTrial>({
       border: '1px solid var(--workspace-border)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--workspace-text)' }}>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({trials.length})
         </span>
         {sortOptions.length > 1 && (
           <>
-            <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>Sort by:</span>
+            <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>Sort by:</span>
             <select
           aria-label="Sort trials"
               value={sortKey}
               onChange={e => setSortKey(e.target.value)}
               style={{
                 background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-                borderRadius: 4, padding: '4px 6px', minHeight: 36, maxWidth: '100%', fontSize: 12, fontFamily: 'inherit',
+                borderRadius: 4, padding: '4px 6px', minHeight: 36, maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               }}
             >
               {sortOptions.map(o => (
@@ -167,7 +167,7 @@ export function TrialsTable<TTrial>({
         )}
       </div>
       {caption && (
-        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {caption}
         </div>
       )}

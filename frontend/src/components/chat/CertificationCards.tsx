@@ -49,7 +49,7 @@ function CardShell({ children }: { children: React.ReactNode }) {
           background: 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)',
           borderRadius: 10,
           padding: '12px 14px',
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           color: '#374151',
         }}
       >
@@ -71,12 +71,12 @@ function CardButton({ label, icon, onClick, subtle }: {
       className={subtle ? undefined : 'chat-action-btn'}
       style={subtle ? {
         display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '5px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+        padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
         borderRadius: 8, border: '1px solid #d1d5db',
         background: '#fff', color: '#374151', cursor: 'pointer',
       } : {
         display: 'inline-flex', alignItems: 'center', gap: 5,
-        fontSize: 12, padding: '6px 14px',
+        fontSize: 'var(--workspace-font-meta)', padding: '6px 14px',
       }}
     >
       {icon}
@@ -129,7 +129,7 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
     <CardShell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
-        <span style={{ fontWeight: 700, fontSize: 13 }}>Vandal Workflow Architect</span>
+        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>Vandal Workflow Architect</span>
         <span style={{ flex: 1 }} />
         <span style={{ color: '#6b7280', textTransform: 'capitalize' }}>
           {level} · {xp.toLocaleString()} XP
@@ -139,7 +139,7 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
       <div style={{ height: 5, borderRadius: 4, background: '#e5e7eb', overflow: 'hidden', marginBottom: 4 }}>
         <div style={{ width: `${pct}%`, height: '100%', background: ACCENT, transition: 'width 0.4s ease' }} />
       </div>
-      <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 10 }}>
         {completed}/{total} modules complete
       </div>
 
@@ -157,7 +157,7 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
             </span>
             <Stars count={m.completed ? m.stars : 0} />
             <span style={{ flex: 1 }} />
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>{m.xp} XP</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>{m.xp} XP</span>
           </div>
         ))}
       </div>
@@ -203,15 +203,15 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
     <CardShell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
-        <span style={{ fontWeight: 700, fontSize: 13 }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         {completed && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 11, fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>
             <Check size={11} /> Completed <Stars count={stars} />
           </span>
         )}
         <span style={{ flex: 1 }} />
         <span style={{
-          fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
           background: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, white)',
           color: '#806600',
         }}>
@@ -233,13 +233,13 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
 
       {expectedFields.length > 0 && (
         <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
             Expected fields
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
             {expectedFields.map((f) => (
               <span key={f} style={{
-                fontSize: 10, padding: '2px 7px', borderRadius: 999,
+                fontSize: 'var(--workspace-font-meta)', padding: '2px 7px', borderRadius: 999,
                 background: '#fff', border: '1px solid #e5e7eb', color: '#4b5563',
               }}>
                 {f}
@@ -252,7 +252,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
       {Object.keys(starCriteria).length > 0 && (
         <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {Object.entries(starCriteria).sort(([a], [b]) => a.localeCompare(b)).map(([n, crit]) => (
-            <div key={n} style={{ display: 'flex', alignItems: 'flex-start', gap: 5, fontSize: 11, color: '#6b7280' }}>
+            <div key={n} style={{ display: 'flex', alignItems: 'flex-start', gap: 5, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               <Stars count={Number(n) || 1} />
               <span style={{ lineHeight: 1.45 }}>{crit}</span>
             </div>
@@ -316,9 +316,9 @@ export function CertLessonCard({ content }: { content: Record<string, unknown> }
     <CardShell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <BookOpen size={15} style={{ color: ACCENT, flexShrink: 0 }} />
-        <span style={{ fontWeight: 700, fontSize: 13 }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', whiteSpace: 'nowrap' }}>
           Lesson {number}/{total} · {moduleTitle}
         </span>
       </div>
@@ -364,10 +364,10 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
   return (
     <CardShell>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-        <span style={{ fontWeight: 700, fontSize: 13 }}>{title}</span>
+        <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         <span style={{
           display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 11, fontWeight: 600,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
           color: passed ? '#16a34a' : '#b45309',
         }}>
           {passed ? <><Check size={12} /> All checks passed <Stars count={stars} /></> : 'Not there yet'}
@@ -421,12 +421,12 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
         background: '#f0fdf4',
         borderRadius: 10,
         padding: '12px 14px',
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         color: '#374151',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <Sparkles size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
-          <span style={{ fontWeight: 700, fontSize: 13, color: '#166534' }}>
+          <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)', color: '#166534' }}>
             {title} complete
           </span>
           <Stars count={stars} />

@@ -31,7 +31,8 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
   await page.screenshot({path:resolve(out,`${id}.png`),fullPage:true,animations:'disabled'});
   const snapshot=await page.locator('body').ariaSnapshot();
   await writeFile(resolve(out,`${id}.txt`),snapshot);
-  const metrics=await page.evaluate(()=>({viewport:{width:innerWidth,height:innerHeight},pageWidth:document.documentElement.scrollWidth,smallText:[...document.querySelectorAll('button,input,label,p,span')].filter(e=>e.getBoundingClientRect().width&&parseFloat(getComputedStyle(e).fontSize)<12).length}));
+  // Zero-size text is intentionally replaced by a named sort icon on compact tables.
+  const metrics=await page.evaluate(()=>({viewport:{width:innerWidth,height:innerHeight},pageWidth:document.documentElement.scrollWidth,smallText:[...document.querySelectorAll('button,input,label,p,span')].filter(e=>e.getBoundingClientRect().width&&parseFloat(getComputedStyle(e).fontSize)>0&&parseFloat(getComputedStyle(e).fontSize)<12).length}));
   await page.addScriptTag({path:createRequire(import.meta.url).resolve('axe-core/axe.min.js')});
   const a11y=await page.evaluate(async()=>{const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return r.violations.map(v=>({id:v.id,impact:v.impact,description:v.description,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))});
   await writeFile(resolve(out,`${id}.axe.json`),JSON.stringify(a11y,null,2));

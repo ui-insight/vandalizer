@@ -34,10 +34,10 @@ export function StalePlanBanner({
     >
       <AlertTriangle style={{ width: 15, height: 15, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#92400e' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#92400e' }}>
           This plan may be out of sync with the workflow
         </div>
-        <div style={{ fontSize: 11, color: '#a16207', marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#a16207', marginTop: 2, lineHeight: 1.4 }}>
           {orphanedCount > 0
             ? `${orphanedCount} check${orphanedCount === 1 ? '' : 's'} target${orphanedCount === 1 ? 's' : ''} a step that no longer exists. `
             : 'The workflow was edited after this plan was created. '}
@@ -50,7 +50,7 @@ export function StalePlanBanner({
               disabled={generating}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                 borderRadius: 5, border: 'none', backgroundColor: '#d97706', color: '#fff',
                 cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.6 : 1,
               }}
@@ -63,7 +63,7 @@ export function StalePlanBanner({
               title="Keep the plan as-is and stop warning until the workflow changes again"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                 borderRadius: 5, border: '1px solid #fcd34d', backgroundColor: '#fff',
                 color: '#92400e', cursor: confirming ? 'wait' : 'pointer',
                 opacity: confirming ? 0.6 : 1,

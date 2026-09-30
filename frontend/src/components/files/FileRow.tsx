@@ -153,7 +153,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               </span>
               {doc.classification && doc.classification !== 'unrestricted' && (
                 <span
-                  className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                  className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase"
                   style={{
                     backgroundColor: CLASSIFICATION_STYLES[doc.classification]?.bg || '#f3f4f6',
                     color: CLASSIFICATION_STYLES[doc.classification]?.text || '#374151',

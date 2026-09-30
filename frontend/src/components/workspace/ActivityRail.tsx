@@ -208,7 +208,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               <SquarePen className="h-4 w-4" />
             </div>
             {!visualDocked && (
-              <div className="text-[11px] leading-[1.4] text-[#111]">New chat</div>
+              <div className="text-xs leading-[1.4] text-[#111]">New chat</div>
             )}
           </button>
 
@@ -237,11 +237,11 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
               </div>
               {!visualDocked && (
                 <>
-                  <div className="min-w-0 flex-1 text-[11px] leading-[1.4] text-[#111]">
+                  <div className="min-w-0 flex-1 text-xs leading-[1.4] text-[#111]">
                     Reviews
                   </div>
                   <span
-                    className="shrink-0 rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
+                    className="shrink-0 rounded-full px-1.5 text-xs font-semibold text-[#111]"
                     style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
                   >
                     {pendingReviews}
@@ -329,7 +329,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
                     <div className="min-w-0 flex-1">
                       <div
                         className={cn(
-                          'text-[11px] leading-[1.4] break-words line-clamp-2',
+                          'text-xs leading-[1.4] break-words line-clamp-2',
                           running ? 'text-white' : 'text-[#111]',
                           // Shimmer when the AI title just arrived (one-shot)
                           // or while we're waiting for it to generate (loops
@@ -342,7 +342,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
                         {displayTitle}
                       </div>
                       {awaitingReview && (
-                        <div className="text-[10px] leading-[1.4] font-semibold text-[#806600]">
+                        <div className="text-xs leading-[1.4] font-semibold text-[#806600]">
                           Awaiting approval →
                         </div>
                       )}
@@ -408,16 +408,16 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
           />
           {!visualDocked && (
             certCertified ? (
-              <span className="text-[11px] font-semibold text-yellow-400 title-shimmer">
+              <span className="text-xs font-semibold text-yellow-400 title-shimmer">
                 Vandal Workflow Architect
               </span>
             ) : certStarted ? (
               <>
-                <span className="text-[11px] font-semibold text-[#111]">{certConfig.label}</span>
-                <span className="text-[10px] text-[#999]">{certXp} XP</span>
+                <span className="text-xs font-semibold text-[#111]">{certConfig.label}</span>
+                <span className="text-xs text-[#999]">{certXp} XP</span>
               </>
             ) : (
-              <span className="text-[11px] font-semibold text-[#444]">Get Certified</span>
+              <span className="text-xs font-semibold text-[#444]">Get Certified</span>
             )
           )}
         </div>

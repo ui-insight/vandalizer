@@ -312,7 +312,7 @@ export function KBTestQueriesTab({
 
   return (
     <div>
-      {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 13, lineHeight: 1.6, marginBottom: 12, overflowWrap: 'anywhere' }}>{actionError}</div>}
+      {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, marginBottom: 12, overflowWrap: 'anywhere' }}>{actionError}</div>}
       {/* Action bar */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
         <button
@@ -374,7 +374,7 @@ export function KBTestQueriesTab({
           {canManage && (
             <label style={{
               display: 'inline-flex', alignItems: 'center', gap: 5,
-              fontSize: 12, color: 'var(--workspace-muted)', cursor: visible.length ? 'pointer' : 'default',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', cursor: visible.length ? 'pointer' : 'default',
             }}>
               <input
                 type="checkbox"
@@ -399,7 +399,7 @@ export function KBTestQueriesTab({
                   onClick={() => { setFilter(f); setDisplayLimit(50) }}
                   aria-pressed={active}
                   style={{
-                    padding: '3px 8px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                    padding: '3px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                     color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                     backgroundColor: active ? 'var(--workspace-surface)' : 'transparent',
                     border: `1px solid ${active ? 'var(--workspace-border)' : 'transparent'}`,
@@ -421,7 +421,7 @@ export function KBTestQueriesTab({
               placeholder="Search ID, question, source…"
               aria-label="Search test queries by ID, question, category, source or notes"
               style={{
-                width: 190, padding: '3px 6px', fontSize: 12, fontFamily: 'inherit',
+                width: 190, padding: '3px 6px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                 color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
                 border: '1px solid var(--workspace-border)', borderRadius: 5,
               }}
@@ -430,7 +430,7 @@ export function KBTestQueriesTab({
 
           {canManage && selectedCount > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }} role="status">
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }} role="status">
                 {selectedCount} selected
               </span>
               <button
@@ -438,7 +438,7 @@ export function KBTestQueriesTab({
                 onClick={() => setSelected(new Set())}
                 style={{
                   background: 'transparent', border: 'none', padding: 0,
-                  fontSize: 12, fontFamily: 'inherit', color: 'var(--workspace-muted)',
+                  fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', color: 'var(--workspace-muted)',
                   textDecoration: 'underline', cursor: 'pointer',
                 }}
               >
@@ -480,16 +480,16 @@ export function KBTestQueriesTab({
 
       {/* Queries list */}
       {queries.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
           No test queries yet. Add some manually or auto-generate from KB content.
         </div>
       ) : visible.length === 0 ? (
-        <div role="status" style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
           No {FILTER_LABELS[filter].toLowerCase()} test queries{search.trim() ? ` match “${search.trim()}”` : ''}.
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {visible.length > 50 && <p style={{ fontSize: 12, color: 'var(--workspace-muted)', margin: '4px 0' }}>Showing {Math.min(displayLimit, visible.length)} of {visible.length} matching questions. Select all includes every matching question.</p>}
+          {visible.length > 50 && <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '4px 0' }}>Showing {Math.min(displayLimit, visible.length)} of {visible.length} matching questions. Select all includes every matching question.</p>}
           {visible.slice(0, displayLimit).map(q => (
             <div
               key={q.uuid}
@@ -527,12 +527,12 @@ export function KBTestQueriesTab({
                     <User size={13} style={{ color: 'var(--workspace-muted)', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginBottom: 4 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginBottom: 4 }}>
                       {q.external_id && (
                         <code
                           title="Question ID — assigned once and kept across validation runs and exports; regenerating creates new IDs"
                           style={{
-                            fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            fontSize: 'var(--workspace-font-meta)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
                             color: 'var(--workspace-info)', backgroundColor: 'var(--workspace-info-surface)',
                             padding: '1px 5px', borderRadius: 4, marginRight: 8, whiteSpace: 'nowrap',
                           }}
@@ -543,16 +543,16 @@ export function KBTestQueriesTab({
                       {q.query}
                     </div>
                     {q.expected_answer && (
-                      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 2 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 2 }}>
                         <span style={{ color: 'var(--workspace-muted)' }}>Expected: </span>{q.expected_answer}
                       </div>
                     )}
                     {q.notes && (
-                      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 2, fontStyle: 'italic' }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 2, fontStyle: 'italic' }}>
                         <span style={{ color: 'var(--workspace-muted)', fontStyle: 'normal' }}>Notes: </span>{q.notes}
                       </div>
                     )}
-                    <div style={{ display: 'flex', gap: 8, fontSize: 12, color: 'var(--workspace-muted)', marginTop: 4, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 4, flexWrap: 'wrap' }}>
                       {q.category && <span>· {q.category}</span>}
                       {q.import_batch_label && (
                         <span title={q.import_batch_at ? `Imported ${new Date(q.import_batch_at).toLocaleString()}` : undefined}>
@@ -685,7 +685,7 @@ function scoreColor(score: number) {
 function btn(enabled: boolean, color?: string): React.CSSProperties {
   return {
     display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+    padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     color: enabled ? 'var(--workspace-text)' : 'var(--workspace-muted)',
     backgroundColor: color ? `color-mix(in srgb, ${color} 10.2%, transparent)` : 'var(--workspace-surface)',
     border: `1px solid ${color ? `color-mix(in srgb, ${color} 33.33%, transparent)` : 'var(--workspace-border)'}`,
@@ -699,6 +699,6 @@ function input(): React.CSSProperties {
   return {
     background: 'var(--workspace-canvas)', color: 'var(--workspace-text)',
     border: '1px solid var(--workspace-border)', borderRadius: 4,
-    padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
+    padding: '6px 8px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
   }
 }

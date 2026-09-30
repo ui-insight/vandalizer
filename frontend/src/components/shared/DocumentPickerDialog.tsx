@@ -75,7 +75,7 @@ export function DocumentPickerDialog({
         display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>{title}</span>
+          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>{title}</span>
           <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
@@ -89,7 +89,7 @@ export function DocumentPickerDialog({
               onChange={e => setQuery(e.target.value)}
               placeholder="Search documents..."
               style={{
-                width: '100%', fontSize: 13, fontFamily: 'inherit',
+                width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
                 boxSizing: 'border-box',
               }}
@@ -98,11 +98,11 @@ export function DocumentPickerDialog({
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px', minHeight: 200, maxHeight: 400 }}>
           {searching ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
               <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite', display: 'inline-block' }} />
             </div>
           ) : searchResults.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
               {query ? 'No documents found.' : 'Type to search documents...'}
             </div>
           ) : (
@@ -117,7 +117,7 @@ export function DocumentPickerDialog({
                   onChange={() => toggleDoc(doc.uuid)}
                 />
                 <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {doc.title}
                 </span>
               </label>
@@ -128,7 +128,7 @@ export function DocumentPickerDialog({
           <button
             onClick={onClose}
             style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
               borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
               color: '#374151', cursor: 'pointer',
             }}
@@ -139,7 +139,7 @@ export function DocumentPickerDialog({
             onClick={handleAdd}
             disabled={selected.size === 0}
             style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
               backgroundColor: selected.size > 0 ? 'var(--color-panel-dark)' : '#e5e7eb',
               color: selected.size > 0 ? '#fff' : '#6b7280',

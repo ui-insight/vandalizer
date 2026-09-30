@@ -134,7 +134,7 @@ export function TeamsDropdown() {
                 <Users className="h-4 w-4 shrink-0" style={{ width: 18 }} />
                 <span>{team.name}</span>
                 {isActive && (
-                  <span className="text-[11px] text-[#36c] ml-2">(current)</span>
+                  <span className="text-xs text-[#36c] ml-2">(current)</span>
                 )}
               </button>
             )
@@ -195,7 +195,7 @@ export function TeamsDropdown() {
             {pendingReviews > 0 && (
               <span
                 aria-label={`${pendingReviews} pending`}
-                className="ml-auto rounded-full px-1.5 text-[10px] font-semibold text-[#111]"
+                className="ml-auto rounded-full px-1.5 text-xs font-semibold text-[#111]"
                 style={{ backgroundColor: 'var(--highlight-color, #eab308)' }}
               >
                 {pendingReviews}

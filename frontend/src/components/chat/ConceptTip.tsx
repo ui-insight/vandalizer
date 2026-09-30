@@ -56,7 +56,7 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
           gap: 4,
           padding: '4px 9px',
           borderRadius: 9999,
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 500,
           fontFamily: 'inherit',
           border: '1px solid #e5e7eb',
@@ -97,14 +97,14 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             padding: 12,
             zIndex: 100,
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: '#374151',
             textAlign: 'left',
             whiteSpace: 'normal',
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 13 }}>{term}</div>
+          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 'var(--workspace-font-control)' }}>{term}</div>
           <div>{children}</div>
         </div>
       )}
@@ -140,7 +140,7 @@ export function ConceptStrip({ heading = 'New here? Tap a term to see what it me
   return (
     <div>
       {heading && (
-        <div style={{ fontSize: 12, color: '#626a75', marginBottom: 8, fontWeight: 500 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#626a75', marginBottom: 8, fontWeight: 500 }}>
           {heading}
         </div>
       )}

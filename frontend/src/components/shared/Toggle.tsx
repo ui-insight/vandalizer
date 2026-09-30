@@ -30,11 +30,11 @@ export function Toggle({ label, description, checked, onChange, disabled = false
         flexShrink: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
-        {checked && <span style={{ color: 'var(--highlight-text-color, #000)', fontSize: 11 }}>✓</span>}
+        {checked && <span style={{ color: 'var(--highlight-text-color, #000)', fontSize: 'var(--workspace-font-meta)' }}>✓</span>}
       </span>
       <div>
-        <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
-        {description && <div style={{ fontSize: 11, color: 'var(--workspace-muted)', marginTop: 2 }}>{description}</div>}
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}>{label}</div>
+        {description && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{description}</div>}
       </div>
     </button>
   )

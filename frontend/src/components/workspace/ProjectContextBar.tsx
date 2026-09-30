@@ -26,7 +26,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
         gap: 8,
         padding: '6px 16px',
         marginRight: railWidth,
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         background: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
         borderBottom: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, white)',
         flexShrink: 0,
@@ -37,7 +37,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
         <span className="project-context-label" style={{ color: '#59616b', fontWeight: 500 }}>Project</span>
         <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{activeProjectTitle}</span>
         {activeProjectRole === 'viewer' && (
-          <span style={{ color: '#59616b', fontSize: 12 }}>Read only</span>
+          <span style={{ color: '#59616b', fontSize: 'var(--workspace-font-meta)' }}>Read only</span>
         )}
       </div>
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
@@ -46,7 +46,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
             type="button"
             onClick={onOpenManage}
             title="View details, share, rename, leave, or delete this project"
-            style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 12, fontWeight: 600 }}
+            style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}
           >
             <Settings size={14} />
             Manage project
@@ -56,7 +56,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
           type="button"
           onClick={deactivateProject}
           title="Exit project scope"
-          style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
+          style={{ minHeight: 36, display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}
         >
           Exit
           <X size={14} />

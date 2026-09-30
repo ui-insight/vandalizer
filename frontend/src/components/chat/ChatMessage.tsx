@@ -63,7 +63,7 @@ function CitationMenuItem({ icon, label, onClick }: {
         display: 'flex', alignItems: 'center', gap: 6, width: '100%',
         padding: '5px 8px', border: 'none', borderRadius: 5,
         background: 'transparent', color: '#374151',
-        fontSize: 12, fontFamily: 'inherit', textAlign: 'left',
+        fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', textAlign: 'left',
         cursor: 'pointer', transition: 'background-color 0.15s',
       }}
       onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
@@ -408,7 +408,7 @@ export function ChatMessage({
                   border: 'none',
                   cursor: 'pointer',
                   padding: '2px 0',
-                  fontSize: 12,
+                  fontSize: 'var(--workspace-font-meta)',
                   color: '#6b7280',
                   fontFamily: 'inherit',
                   transition: 'color 0.15s',
@@ -434,7 +434,7 @@ export function ChatMessage({
                       marginTop: 6, padding: '10px 12px',
                       backgroundColor: '#f9fafb',
                       borderLeft: '3px solid var(--highlight-color, #eab308)',
-                      borderRadius: 4, fontSize: 13, lineHeight: 1.6,
+                      borderRadius: 4, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
                       color: '#6b7280', fontStyle: 'italic',
                       maxHeight: 400, overflowY: 'auto',
                       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -460,7 +460,7 @@ export function ChatMessage({
                     <div
                       key={i}
                       className="select-text chat-markdown"
-                      style={{ fontSize: 14, lineHeight: 1.6 }}
+                      style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
                       dangerouslySetInnerHTML={{ __html: html }}
                     />
                   )
@@ -510,7 +510,7 @@ export function ChatMessage({
                   ref={contentRef}
                   onClick={handleActionClick}
                   className="select-text chat-markdown"
-                  style={{ fontSize: 14, lineHeight: 1.6 }}
+                  style={{ fontSize: 'var(--workspace-font-body)', lineHeight: 1.6 }}
                   dangerouslySetInnerHTML={{ __html: renderedHtml! }}
                 />
               )}
@@ -537,7 +537,7 @@ export function ChatMessage({
             return (
               <div style={{ marginTop: 8 }} ref={citationsRef}>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ fontSize: 12, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
                     Sources:
                   </span>
                   {message.citations.map((c, i) => {
@@ -550,7 +550,7 @@ export function ChatMessage({
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
                     const chipBase = {
                       display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '6px 10px', fontSize: 12, fontWeight: 500,
+                      padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                       maxWidth: '100%', overflowWrap: 'anywhere', textAlign: 'left', borderRadius: 12, transition: 'all 0.15s',
                     } as const
                     // URL-backed KB source: link straight out to the origin.
@@ -596,7 +596,7 @@ export function ChatMessage({
                             : toggleCitationPreview(i)}
                           style={{
                             display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '6px 10px', fontSize: 12, fontWeight: 500,
+                            padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                             backgroundColor: active ? '#e0e7ff' : '#f3f4f6',
                             color: active ? '#3730a3' : '#374151',
                             border: `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
@@ -646,12 +646,12 @@ export function ChatMessage({
                 </div>
                 {open && (
                   <div style={{
-                    marginTop: 6, padding: '8px 10px', fontSize: 12, lineHeight: 1.5,
+                    marginTop: 6, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5,
                     color: '#374151', backgroundColor: '#f9fafb',
                     border: '1px solid #e5e7eb', borderRadius: 8,
                     whiteSpace: 'pre-wrap' as const,
                   }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
                       {open.document_title}
                       {(() => {
                         const loc = formatPageLocator(open.page, open.page_approximate, open.page_end) ?? open.sheet
@@ -661,7 +661,7 @@ export function ChatMessage({
                     {openPreview || 'No preview was saved for this source.'}
                     {!open.document_uuid && !open.document_id && <p style={{ marginTop: 8 }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 6 }}>
                         Source: {open.source_reference}
                       </div>
                     )}
@@ -671,7 +671,7 @@ export function ChatMessage({
                         onClick={() => handleCitationClick(open)}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
-                          marginTop: 8, padding: '4px 10px', fontSize: 12, fontWeight: 600,
+                          marginTop: 8, padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                           fontFamily: 'inherit', backgroundColor: '#fff', color: '#374151',
                           border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
                         }}
@@ -685,7 +685,7 @@ export function ChatMessage({
             )
           })()}
 
-          {message.interruption && <p role="status" style={{ marginTop: 10, padding: '10px 12px', background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 8, fontSize: 13, color: '#785411', lineHeight: 1.5 }}>
+          {message.interruption && <p role="status" style={{ marginTop: 10, padding: '10px 12px', background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 8, fontSize: 'var(--workspace-font-control)', color: '#785411', lineHeight: 1.5 }}>
             {message.interruption === 'stopped' ? 'Response stopped.' : 'Connection interrupted.'} Partial output is preserved. An action already started may still finish; check its result before retrying.
           </p>}
           {/* Feedback bar - hidden during streaming */}
@@ -754,7 +754,7 @@ export function ChatMessage({
                 aria-label={feedback === 'up' ? 'What worked well? (optional)' : 'What went wrong? (optional)'}
                 style={{
                   flex: 1, padding: '6px 10px', borderRadius: 6,
-                  border: '1px solid #d1d5db', fontSize: 13,
+                  border: '1px solid #d1d5db', fontSize: 'var(--workspace-font-control)',
                 }}
               />
               <button
@@ -762,7 +762,7 @@ export function ChatMessage({
                 onClick={handleSubmitComment}
                 style={{
                   padding: '6px 12px', borderRadius: 6, border: 'none',
-                  background: '#374151', color: '#fff', fontSize: 12,
+                  background: '#374151', color: '#fff', fontSize: 'var(--workspace-font-meta)',
                   fontWeight: 600, cursor: 'pointer',
                 }}
               >
@@ -773,7 +773,7 @@ export function ChatMessage({
                 onClick={() => setShowComment(false)}
                 style={{
                   padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
-                  background: '#fff', fontSize: 12, cursor: 'pointer',
+                  background: '#fff', fontSize: 'var(--workspace-font-meta)', cursor: 'pointer',
                 }}
               >
                 Skip

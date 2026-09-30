@@ -60,10 +60,11 @@ try {
     await shot(`chat-source-recovered-${width}`, page.getByText('Synthetic review document.', {exact:false}))
     await page.getByRole('navigation', { name: 'Workspace navigation' }).getByRole('button', { name: 'Chat', exact: true }).click()
     assert.equal(await draft.inputValue(), 'Keep this follow-up draft')
-    // Closing the citation menu can remove a few pixels from the scroll extent.
-    // Allow less than half a text line, while rejecting a jump to another passage.
-    const restoredPosition=await page.getByRole('region',{name:'Conversation',exact:true}).evaluate(e=>e.scrollTop)
-    assert.ok(Math.abs(restoredPosition-beforeDocument)<=8, `Source return position changed: ${beforeDocument} to ${restoredPosition}`)
+    // Closing the citation preview can shorten the scroll extent. A position
+    // beyond the new end must clamp there; otherwise preserve the exact passage.
+    const restored=await page.getByRole('region',{name:'Conversation',exact:true}).evaluate(e=>({top:e.scrollTop,max:e.scrollHeight-e.clientHeight}))
+    review.observations.push({id:`source-return-${width}`,before:beforeDocument,after:restored.top,maximum:restored.max})
+    assert.ok(Math.abs(restored.top-Math.min(beforeDocument,restored.max))<=8, `Source return position changed: ${beforeDocument} to ${restored.top}; maximum ${restored.max}`)
     const link=page.getByRole('link',{name:'Published policy',exact:true})
     assert.equal(await link.getAttribute('href'),'https://example.org/published-policy')
     const [external]=await Promise.all([review.context.waitForEvent('page'),link.click()])

@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 153/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 154/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,15 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Readable task typography — September 30
+
+**154/169 checklist items implemented locally.** VIS-02 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Workspace typography now uses shared rem-based sizes: 12px metadata, 13px controls, 14px body copy and 16/18/20px title levels at the default browser size. Essential 9–11px labels, counts, timestamps, provenance and trial explanations use the metadata size. Existing large tutorial/illustration text is separate from task typography.
+- Document text keeps its own zoom multiplier using the shared body size. Context usage percentages now fit in a 44px control, including 100%; warning and error text use readable semantic colors. The new context-state review also corrected white text on amber memory/retry actions.
+- Verification: TypeScript, production build and diff checks pass; touched-file ESLint has zero errors and 11 existing hook-dependency warnings. Eight document-recovery/context-meter tests across two files pass. The 306 selected captures cover all 55 baseline states, workflow/extraction validation (39), questions (23), file/Library tasks (30), section headers (27), project/tool context (33), saved history (18), short dialogs (36), source reading/recovery (33), and all four context-meter states (12). All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- The small-text metric now excludes zero-size text deliberately replaced by a named compact-table sort icon. Citation return still asserts the prior reading position, allowing only the physical scroll-limit clamp when a closed preview shortens content; observed returns preserve the exact prior position. Fixtures are synthetic. Broader spacing, action, form, accessibility and final regrading acceptance remain open.
 
 ## Shared workspace theme — September 30
 
@@ -246,7 +255,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | Library | 5.5/5.5 | 8/8 | [library-mixed-types-return-1440](../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png) |
 | Chat workspace | 6.5/6 | 8/8 | [composer-queue-error-draft-768](../2026-09-29-chat-composer-evidence/composer-queue-error-draft-768.png) |
 | Basic chat onboarding | 7/6.5 | 8/8 | [onboarding-evidence-checked-mobile](../upgrade-polish-final-journeys/onboarding-evidence-checked-mobile.png) |
-| Chat uploads | 6/3 | 8/8 | [chat-upload-error](../upgrade-final/chat-upload-error.png) |
+| Chat uploads | 6/3 | 8/8 | [chat-upload-error](../2026-09-30-typography-baseline/chat-upload-error.png) |
 | Chat knowledge-base interactions | 7/7 | 8/8 | [chat-citation-preview-mobile](../upgrade-polish-final-journeys/chat-citation-preview-mobile.png) |
 | Agentic chat UI | 7/6.5 | 8/8 | [agent-partial-completion-mobile](../2026-09-26-recovery-verified/agent-partial-completion-mobile.png) |
 
@@ -263,7 +272,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 1228 distinct states / 2057 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 1240 distinct states / 2363 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -399,6 +408,16 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-30-theme-domains-verified](../2026-09-30-theme-domains-verified/manifest.json): 39 states; source `5798a0e17f6e97033b6dfaf87129e6fb6821bc2cc5a2ce9dbf823b9e96746cb0`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-theme-catalog-release](../2026-09-30-theme-catalog-release/manifest.json): 36 states; source `6a0fa632f97a315a2a33b2a0d005f90407c7e16267570a901f6a541325cc138c`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-theme-context-release](../2026-09-30-theme-context-release/manifest.json): 33 states; source `6a0fa632f97a315a2a33b2a0d005f90407c7e16267570a901f6a541325cc138c`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-baseline](../2026-09-30-typography-baseline/manifest.json): 55 states; source `e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-domains](../2026-09-30-typography-domains/manifest.json): 39 states; source `e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-questions](../2026-09-30-typography-questions/manifest.json): 23 states; source `e0d7f23bf87cca0ecc52917430329802fa322ea2cff980715e5f4af09f37364a`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-file-library](../2026-09-30-typography-file-library/manifest.json): 30 states; source `ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-headers](../2026-09-30-typography-headers/manifest.json): 27 states; source `ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-context](../2026-09-30-typography-context/manifest.json): 33 states; source `ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-history](../2026-09-30-typography-history/manifest.json): 18 states; source `ad0754212995717f142a89797cb7d2b5eaf734df90bc9fed3d1a17fecdfb274d`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-dialogs](../2026-09-30-typography-dialogs/manifest.json): 36 states; source `636847e9847226ae8e533ed8da536fe19f4ab0c15fbf7f18e38244abe2da10b7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-chat-reading-final](../2026-09-30-typography-chat-reading-final/manifest.json): 33 states; source `b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-typography-context-meter-final](../2026-09-30-typography-context-meter-final/manifest.json): 12 states; source `b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

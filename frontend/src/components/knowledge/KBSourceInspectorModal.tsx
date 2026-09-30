@@ -167,12 +167,12 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
             : <Globe size={18} style={{ color: 'var(--workspace-info)', flexShrink: 0 }} aria-hidden="true" />}
           <div style={{ flex: '1 1 140px', minWidth: 0 }}>
             <div style={{
-              fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)',
+              fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)',
               overflowWrap: 'anywhere',
             }}>
               {displayTitle}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>
               {isDoc ? 'Document source' : 'URL source'}
               {source.chunk_count > 0 && <> · {source.chunk_count} chunks</>}
               {source.status !== 'ready' && <> · {source.status}</>}
@@ -197,7 +197,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                   aria-pressed={docView === mode}
                   onClick={() => setDocView(mode)}
                   style={{
-                    fontSize: 12, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer',
+                    fontSize: 'var(--workspace-font-meta)', padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer',
                     border: 'none',
                     backgroundColor: docView === mode ? 'var(--workspace-surface)' : 'transparent',
                     color: docView === mode ? 'var(--workspace-text)' : 'var(--workspace-muted)',
@@ -216,7 +216,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               title="Open URL in new tab"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 12, color: 'var(--workspace-info)', textDecoration: 'none',
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textDecoration: 'none',
                 padding: '4px 8px', border: '1px solid var(--workspace-border)', borderRadius: 5,
               }}
             >
@@ -240,7 +240,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
           display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
           padding: '8px 18px', borderBottom: '1px solid var(--workspace-border)', flexShrink: 0,
         }}>
-          <span id="kb-source-ref-label" style={{ fontSize: 12, color: 'var(--workspace-muted)', flexShrink: 0 }}>Source</span>
+          <span id="kb-source-ref-label" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', flexShrink: 0 }}>Source</span>
           <input
             aria-labelledby="kb-source-ref-label"
             value={sourceDraft}
@@ -251,7 +251,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
             disabled={savingSource}
             readOnly={!canManage}
             style={{
-              flex: '1 1 160px', minWidth: 0, maxWidth: '100%', fontSize: 12, color: 'var(--workspace-text)',
+              flex: '1 1 160px', minWidth: 0, maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
               backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
               borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit',
             }}
@@ -265,7 +265,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
               title="Save source"
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                fontSize: 12, color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
                 border: 'none', borderRadius: 5, padding: '5px 10px',
                 cursor: savingSource ? 'default' : 'pointer', flexShrink: 0,
               }}
@@ -288,7 +288,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
           }}>
             <span
               id="kb-source-amends-label"
-              style={{ fontSize: 12, color: 'var(--workspace-muted)', flexShrink: 0 }}
+              style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', flexShrink: 0 }}
               title="Mark this source as a supplement, notice or revision of other sources. Questions that retrieve those sources will also search this one, and answers will treat it as the current rule."
             >
               Amends
@@ -298,7 +298,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                 key={uuid}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  fontSize: 12, color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-surface)',
                   border: '1px solid var(--workspace-border)', borderRadius: 12, padding: '2px 4px 2px 8px',
                 }}
               >
@@ -321,7 +321,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
                 onChange={e => { if (e.target.value) saveAmends([...amends, e.target.value]) }}
                 disabled={savingAmends}
                 style={{
-                  fontSize: 12, color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)',
                   border: '1px solid var(--workspace-border)', borderRadius: 5, padding: '3px 6px', fontFamily: 'inherit',
                   maxWidth: '100%', minWidth: 0,
                 }}
@@ -336,7 +336,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
           </div>
         )}
 
-        {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', padding: '8px 18px', fontSize: 13, lineHeight: 1.6, overflowWrap: 'anywhere' }}>{actionError} Your source text is preserved; retry the change.</div>}
+        {actionError && <div role="alert" style={{ color: 'var(--workspace-danger)', padding: '8px 18px', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{actionError} Your source text is preserved; retry the change.</div>}
 
         {/* Body */}
         <div style={{ flex: 1, minHeight: 180, overflow: 'auto', display: 'flex' }}>
@@ -370,7 +370,7 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div style={{
       flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: 13, color: 'var(--workspace-muted)',
+      fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)',
     }}>
       {message}
     </div>
@@ -404,7 +404,7 @@ function SourceContentInspector({
     return (
       <div role="alert" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 8, color: 'var(--workspace-danger)', fontSize: 13, flexWrap: 'wrap', padding: 16, overflowWrap: 'anywhere',
+        gap: 8, color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)', flexWrap: 'wrap', padding: 16, overflowWrap: 'anywhere',
       }}>
         <AlertCircle size={16} aria-hidden="true" />
         {error}
@@ -425,7 +425,7 @@ function SourceContentInspector({
       {/* Meta block */}
       <div style={{
         display: 'grid', gridTemplateColumns: '120px 1fr', gap: '4px 12px',
-        fontSize: 12, color: 'var(--workspace-muted)', marginBottom: 16,
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 16,
       }}>
         {!isDoc && (
           <>
@@ -472,7 +472,7 @@ function SourceContentInspector({
         {detail.parent_source_uuid && (
           <>
             <div style={{ color: 'var(--workspace-muted)' }}>Crawled from</div>
-            <div style={{ fontFamily: 'monospace', fontSize: 11 }}>{detail.parent_source_uuid}</div>
+            <div style={{ fontFamily: 'monospace', fontSize: 'var(--workspace-font-meta)' }}>{detail.parent_source_uuid}</div>
           </>
         )}
         {detail.processed_at && !detail.currency && (
@@ -489,7 +489,7 @@ function SourceContentInspector({
           const row = (label: string, value: string | null | undefined, opts?: { mono?: boolean; color?: string }) => value ? (
             <>
               <div style={{ color: 'var(--workspace-muted)' }}>{label}</div>
-              <div style={{ fontFamily: opts?.mono ? 'monospace' : undefined, fontSize: opts?.mono ? 11 : undefined, wordBreak: 'break-all', color: opts?.color }}>{value}</div>
+              <div style={{ fontFamily: opts?.mono ? 'monospace' : undefined, fontSize: opts?.mono ? 'var(--workspace-font-meta)' : undefined, wordBreak: 'break-all', color: opts?.color }}>{value}</div>
             </>
           ) : null
           const toneColor = desc?.tone === 'warn' ? 'var(--workspace-warning)' : desc?.tone === 'error' ? 'var(--workspace-danger)' : undefined
@@ -514,7 +514,7 @@ function SourceContentInspector({
       {/* Crawled children list */}
       {childCount > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 6 }}>
             Crawled pages ({childCount})
           </div>
           <div style={{
@@ -530,7 +530,7 @@ function SourceContentInspector({
                 rel="noopener noreferrer"
                 title={c.url}
                 style={{
-                  fontSize: 11, color: 'var(--workspace-muted)', textDecoration: 'none',
+                  fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textDecoration: 'none',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}
               >
@@ -547,7 +547,7 @@ function SourceContentInspector({
       {detail.truncated && (
         <div style={{
           marginBottom: 10, padding: '8px 10px',
-          fontSize: 12, lineHeight: 1.5, color: 'var(--workspace-warning)',
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-warning)',
           backgroundColor: 'rgba(217, 119, 6, 0.12)',
           border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
         }}>
@@ -563,7 +563,7 @@ function SourceContentInspector({
       {partialText && (
         <div style={{
           marginBottom: 10, padding: '8px 10px',
-          fontSize: 12, lineHeight: 1.5, color: 'var(--workspace-warning)',
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-warning)',
           backgroundColor: 'rgba(217, 119, 6, 0.12)',
           border: '1px solid rgba(217, 119, 6, 0.4)', borderRadius: 6,
         }}>
@@ -575,13 +575,13 @@ function SourceContentInspector({
       )}
 
       {/* Cached content */}
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 6 }}>
         Extracted text
       </div>
       {hasContent ? (
         <pre tabIndex={0} aria-label="Extracted text" style={{
           margin: 0, padding: 12, flex: 1,
-          fontSize: 12, lineHeight: 1.55,
+          fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55,
           color: 'var(--workspace-muted)',
           backgroundColor: 'var(--workspace-canvas)',
           border: '1px solid var(--workspace-border)', borderRadius: 6,
@@ -592,7 +592,7 @@ function SourceContentInspector({
           {detail.content}
         </pre>
       ) : (
-        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', fontStyle: 'italic' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontStyle: 'italic' }}>
           No cached text available for this source.
         </div>
       )}

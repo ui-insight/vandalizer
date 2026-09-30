@@ -117,7 +117,7 @@ function KBGridCard({
         )}
         <button type="button" onClick={() => onSelect(canonicalUuid)} disabled={isUnavailable} style={{
           background: 'transparent', border: 0, padding: 0, textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer',
-          fontSize: 15, fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
+          fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, flex: 1, minWidth: 0,
           lineHeight: 1.3,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
@@ -139,8 +139,8 @@ function KBGridCard({
         )}
       </div>
 
-      <p style={{ fontSize: 12, lineHeight: 1.5, color: kb.sources_failed > 0 ? 'var(--workspace-warning)' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
-      <p style={{ fontSize: 12, lineHeight: 1.5, color: C.textMuted, margin: '0 0 12px' }}>{describeKBAvailability(kb)}</p>
+      <p style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: kb.sources_failed > 0 ? 'var(--workspace-warning)' : C.textMuted, margin: '0 0 12px' }}>{kb.sources_ready} of {kb.total_sources} sources ready{kb.sources_failed > 0 ? ` · ${kb.sources_failed} need attention` : ''}</p>
+      <p style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: C.textMuted, margin: '0 0 12px' }}>{describeKBAvailability(kb)}</p>
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
       <div style={{ marginBottom: 8 }}>
         <AITrustChip
@@ -155,21 +155,21 @@ function KBGridCard({
       {/* Badges row */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
         <span style={{
-          fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px', borderRadius: 10,
           color: badge.color, backgroundColor: badge.bg,
         }}>
           {badge.label}
         </span>
         {kb.shared_with_team && (
           <span style={{
-            fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
             color: 'var(--workspace-success)', backgroundColor: 'var(--workspace-success-surface)',
           }}>
             Team
           </span>
         )}
-        {kb.can_manage === false && <span style={{ fontSize: 12, color: C.textMuted }}>Read only</span>}
-        {kb.team_owned && <span style={{ fontSize: 12, color: C.textMuted }}>Team owned</span>}
+        {kb.can_manage === false && <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textMuted }}>Read only</span>}
+        {kb.team_owned && <span style={{ fontSize: 'var(--workspace-font-meta)', color: C.textMuted }}>Team owned</span>}
         {kb.verified && <VerifiedBadge />}
         <OptimizedBadge kb={kb} />
       </div>
@@ -177,7 +177,7 @@ function KBGridCard({
       {/* Description */}
       {kb.description ? (
         <p style={{
-          fontSize: 12, color: 'var(--workspace-muted)', margin: '0 0 8px', lineHeight: 1.4,
+          fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '0 0 8px', lineHeight: 1.4,
           overflow: 'hidden', textOverflow: 'ellipsis',
           display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
         }}>
@@ -185,7 +185,7 @@ function KBGridCard({
         </p>
       ) : (
         <p style={{
-          fontSize: 12, color: C.textFaint, margin: '0 0 8px', fontStyle: 'italic',
+          fontSize: 'var(--workspace-font-meta)', color: C.textFaint, margin: '0 0 8px', fontStyle: 'italic',
         }}>
           No description yet
         </p>
@@ -193,7 +193,7 @@ function KBGridCard({
 
       {/* Stats (meaningless for a broken bookmark — the source KB is gone) */}
       {!isUnavailable && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 12, color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 12, fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 8 }}>
           <span>{kb.total_sources} source{kb.total_sources !== 1 ? 's' : ''}</span>
           <span>{kb.total_chunks.toLocaleString()} chunk{kb.total_chunks !== 1 ? 's' : ''}</span>
         </div>
@@ -207,7 +207,7 @@ function KBGridCard({
             return (
               <span key={gid} style={{
                 display: 'inline-flex', alignItems: 'center', gap: 3,
-                fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
                 color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.12)',
               }}>
                 <Tag size={9} />
@@ -223,7 +223,7 @@ function KBGridCard({
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 8 }}>
           {kb.tags.map(t => (
             <span key={t} style={{
-              fontSize: 12, padding: '1px 6px', borderRadius: 999,
+              fontSize: 'var(--workspace-font-meta)', padding: '1px 6px', borderRadius: 999,
               backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
             }}>
               {t}
@@ -239,7 +239,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onChat(canonicalUuid, kb.title) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)',
               backgroundColor: 'var(--highlight-color, #eab308)',
               border: 'none', borderRadius: 4, cursor: 'pointer',
@@ -254,7 +254,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onEdit(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-text)', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
             }}
@@ -268,7 +268,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onAdopt(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-info)', backgroundColor: 'rgba(37, 99, 235, 0.1)',
               border: '1px solid rgba(37, 99, 235, 0.25)', borderRadius: 4, cursor: 'pointer',
             }}
@@ -286,7 +286,7 @@ function KBGridCard({
               : 'This knowledge base has no sources to copy yet'}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: canClone ? 'var(--workspace-text)' : 'var(--workspace-muted)', backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4,
               cursor: canClone ? 'pointer' : 'default',
@@ -302,7 +302,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onRemoveRef(kb.reference_uuid!) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
+              padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
             }}
@@ -318,7 +318,7 @@ function KBGridCard({
             onClick={(e) => { e.stopPropagation(); onDelete(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,
-              padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
+              padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               color: C.textDim, backgroundColor: 'transparent',
               border: `1px solid ${C.border}`, borderRadius: 4, cursor: 'pointer',
               marginLeft: 'auto',
@@ -382,7 +382,7 @@ export function KBGridView({
         justifyContent: 'center', padding: '60px 0', color: C.textFaint,
       }}>
         <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 8 }} />
-        <p style={{ fontSize: 12, margin: 0 }}>Loading knowledge bases...</p>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', margin: 0 }}>Loading knowledge bases...</p>
       </div>
     )
   }
@@ -400,7 +400,7 @@ export function KBGridView({
     return (
       <div style={{ textAlign: 'center', padding: '60px 16px' }}>
         <BookOpen size={42} style={{ color: '#404040', margin: '0 auto 12px' }} />
-        <p style={{ fontSize: 13, color: C.textDim, margin: 0 }}>{emptyMessage}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, margin: 0 }}>{emptyMessage}</p>
       </div>
     )
   }
@@ -416,7 +416,7 @@ export function KBGridView({
           value={sort}
           onChange={(e) => setSort(e.target.value as SortOption)}
           style={{
-            padding: '4px 8px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+            padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
             border: `1px solid ${C.border}`, borderRadius: 6,
             backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
           }}

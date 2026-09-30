@@ -294,7 +294,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             : <ChevronDown size={14} style={{ color: 'var(--workspace-muted)', flexShrink: 0 }} />
         )}
         <ShieldCheck size={16} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
+        <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>Validation</span>
         {latestScore != null && (
           <span
             role="status"
@@ -302,7 +302,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             title={tooltip}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 12, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px', borderRadius: 8,
               color: scoreColor, backgroundColor: 'var(--workspace-canvas)',
               border: `1px solid color-mix(in srgb, ${scoreColor} 20.0%, transparent)`,
             }}
@@ -317,7 +317,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={tooltip}
             style={{
-              fontSize: 12, color: 'var(--workspace-muted)',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -328,7 +328,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           <span
             title={`The applied optimization pins ${latestQuality.answerModelFallback.configured}, which is no longer in System Config. This score was answered by ${latestQuality.answerModelFallback.used}. Re-run Autovalidate or revert the optimization to clear this.`}
             style={{
-              fontSize: 12, color: 'var(--workspace-warning)',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)',
               maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }}
           >
@@ -338,7 +338,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
         {collapsed && running && (
           <Loader2 size={12} style={{ color: 'var(--workspace-muted)', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--workspace-muted)' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
       </button>
@@ -348,7 +348,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           know what each tab is for without clicking through. */}
       <div
         style={{
-          fontSize: 13, color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5,
+          fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5,
         }}
       >
         Add test questions, check answer quality, then compare retrieval settings if needed.
@@ -378,7 +378,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
                 color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                 border: 'none',
                 padding: '6px 12px',
-                fontSize: 12,
+                fontSize: 'var(--workspace-font-meta)',
                 fontWeight: 600,
                 cursor: 'pointer',
                 borderBottom: active
@@ -395,7 +395,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       </div>
 
       {tab !== 'run' && progress && (
-        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 13, color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 'var(--workspace-font-control)', color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
           <div>{progress.message}</div>
           {progress.delayed && <div>This check is taking longer than usual; it remains active.</div>}
           {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 8, padding: '7px 12px', color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}

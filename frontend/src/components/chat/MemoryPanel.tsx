@@ -24,16 +24,16 @@ function MemoryGroup({ heading, items }: { heading: string; items: MemoryItem[] 
   if (!items.length) return null
   return (
     <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: '#9ca3af', marginBottom: 4 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: '#9ca3af', marginBottom: 4 }}>
         {heading}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
         {items.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 12 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 'var(--workspace-font-meta)' }}>
             <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {item.title}
             </span>
-            <span style={{ color: '#9ca3af', fontSize: 11, flexShrink: 0 }}>
+            <span style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', flexShrink: 0 }}>
               {item.count}&times;{item.last_used ? ` · ${relativeAge(item.last_used)}` : ''}
             </span>
           </div>
@@ -118,19 +118,19 @@ export function MemoryPanel() {
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#1f2937' }}>What the assistant remembers</div>
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1f2937' }}>What the assistant remembers</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 2 }}>
               Habits it references to tailor suggestions. Scoped to your current team.
             </div>
           </div>
 
           <div style={{ padding: '12px 14px', maxHeight: 320, overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: 12, padding: '8px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', padding: '8px 0' }}>
                 <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading&hellip;
               </div>
             ) : isEmpty ? (
-              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
                 Nothing remembered yet. As you run extractions, workflows, and query knowledge bases,
                 the assistant notes what you use most so it can suggest the right tools.
               </div>
@@ -150,7 +150,7 @@ export function MemoryPanel() {
                 disabled={clearing}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontSize: 12, fontWeight: 500, padding: '5px 12px',
+                  fontSize: 'var(--workspace-font-meta)', fontWeight: 500, padding: '5px 12px',
                   borderRadius: 8, border: '1px solid #fecaca',
                   background: '#fff', color: '#b91c1c',
                   cursor: clearing ? 'default' : 'pointer', opacity: clearing ? 0.6 : 1,

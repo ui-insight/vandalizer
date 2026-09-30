@@ -82,7 +82,7 @@ export function WebSourceRefreshBar({
       style={{
         display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8,
         padding: '6px 8px', marginBottom: 8, borderRadius: 6,
-        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', fontSize: 11, color: 'var(--workspace-muted)',
+        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       }}
     >
       <span style={{ flex: 1, minWidth: 140 }}>
@@ -96,7 +96,7 @@ export function WebSourceRefreshBar({
           disabled={!canManage}
           onChange={e => setInterval_(e.target.value)}
           style={{
-            fontSize: 11, fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
+            fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: '2px 4px', borderRadius: 4,
             backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}
         >
@@ -112,7 +112,7 @@ export function WebSourceRefreshBar({
           onClick={refreshAll}
           disabled={busy}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontFamily: 'inherit',
+            display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
             padding: '3px 8px', borderRadius: 4, cursor: busy ? 'default' : 'pointer',
             backgroundColor: 'transparent', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
           }}

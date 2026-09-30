@@ -366,7 +366,7 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
         margin: '8px 0 12px 0', padding: '8px 10px',
         backgroundColor: 'rgba(34, 197, 94, 0.06)',
         border: '1px solid rgba(34, 197, 94, 0.22)', borderRadius: 6,
-        fontSize: 12, color: 'var(--workspace-success)',
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)',
       }}>
         Since you tuned this KB, <b>{(after * 100).toFixed(0)}%</b> of chats grounded in it
         got a thumbs-up <span style={{ color: 'var(--workspace-muted)' }}>(n={impact.n_after} ratings)</span>.
@@ -380,7 +380,7 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
       margin: '8px 0 12px 0', padding: '8px 10px',
       backgroundColor: positive ? 'rgba(34, 197, 94, 0.06)' : 'rgba(245, 158, 11, 0.06)',
       border: '1px solid ' + (positive ? 'rgba(34, 197, 94, 0.22)' : 'rgba(245, 158, 11, 0.25)'),
-      borderRadius: 6, fontSize: 12, color: positive ? 'var(--workspace-success)' : 'var(--workspace-warning)',
+      borderRadius: 6, fontSize: 'var(--workspace-font-meta)', color: positive ? 'var(--workspace-success)' : 'var(--workspace-warning)',
     }}>
       Since you tuned this KB, chat thumbs-up rate is{' '}
       <b>{positive ? '+' : ''}{deltaPts.toFixed(0)}pts</b>
@@ -436,10 +436,10 @@ function IdleHero({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Sparkles size={18} style={{ color: 'var(--workspace-accent-ink)' }} aria-hidden="true" />
-        <h3 style={{ margin: 0, fontSize: 15, color: 'var(--workspace-text)' }}>Compare retrieval settings against your test questions</h3>
+        <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>Compare retrieval settings against your test questions</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
-      <p style={{ margin: '0 0 12px 0', fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 12px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
         Review the test questions, measure a baseline, and choose a token budget.
         This experiment uses model tokens; cost and duration depend on your model and test set.
         Review the results before applying changes. Automatic application is optional in the wizard.
@@ -451,13 +451,13 @@ function IdleHero({
           border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, transparent)', borderRadius: 6,
         }}>
           <div style={{
-            fontSize: 12, color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5,
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5,
             marginBottom: 6, fontWeight: 600,
           }}>
             What happens next
           </div>
           <ol style={{
-            margin: 0, paddingLeft: 20, fontSize: 12, color: 'var(--workspace-text)', lineHeight: 1.6,
+            margin: 0, paddingLeft: 20, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6,
           }}>
             <li>We'll write test questions from your documents</li>
             <li>You'll review them before anything else runs</li>
@@ -465,7 +465,7 @@ function IdleHero({
           </ol>
         </div>
       )}
-      <ul style={{ fontSize: 12, color: 'var(--workspace-muted)', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
+      <ul style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
         <li>See how much your knowledge base actually helps vs. asking the model directly</li>
         <li>Get a recommended setup with one-click apply</li>
         <li>Find out which documents are pulling weight and which aren't</li>
@@ -473,13 +473,13 @@ function IdleHero({
       <WhenToRunDisclosure kind="kb" />
       {blockedByManage ? (
         <div>
-          <p style={{ margin: '0 0 10px 0', fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+          <p style={{ margin: '0 0 10px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
             This is a shared catalog knowledge base, so you can't change it
             directly. Make your own copy to validate &amp; improve it — the
             original stays untouched.
           </p>
           {cloneError && (
-            <p role="alert" style={{ margin: '0 0 10px 0', fontSize: 12, color: 'var(--workspace-danger)' }}>{cloneError}</p>
+            <p role="alert" style={{ margin: '0 0 10px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{cloneError}</p>
           )}
           <button
             type="button"
@@ -488,7 +488,7 @@ function IdleHero({
             title={!onCloned ? 'Cloning is unavailable here' : ''}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: cloning ? 'var(--workspace-muted)' : 'var(--workspace-text)',
               background: cloning ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
               border: '1px solid ' + (cloning ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
@@ -509,7 +509,7 @@ function IdleHero({
           title={reason || ''}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+            padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
             color: disabled ? 'var(--workspace-muted)' : 'var(--workspace-text)',
             background: disabled ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
             border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),

@@ -122,7 +122,7 @@ export function ScheduleConfigFields({
             </label>
           </div>
           {value.frequency === 'monthly' && (
-            <div style={{ fontSize: 12, color: '#6b7280' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               Days 1–28 only, so the schedule runs in every month.
             </div>
           )}
@@ -145,7 +145,7 @@ export function ScheduleConfigFields({
           {value.source === 'folder' ? (
             <>
               {foldersLoading ? (
-                <div style={{ fontSize: 13, color: '#6b7280' }}>Loading folders...</div>
+                <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>Loading folders...</div>
               ) : (
                 <select
                   aria-label="Folder"
@@ -161,7 +161,7 @@ export function ScheduleConfigFields({
                 </select>
               )}
               <p id="schedule-folder-help" className="wizard-field-help">Required. Choose the folder this schedule will run on.</p>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 'var(--workspace-font-control)', color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={!!value.only_new}
@@ -171,7 +171,7 @@ export function ScheduleConfigFields({
                 />
                 <span>
                   <span style={{ fontWeight: 500 }}>Only documents added since the last run</span>
-                  <span style={{ display: 'block', fontSize: 12, color: '#6b7280' }}>
+                  <span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
                     The first run takes the whole folder; after that, each run takes only what is new. A run with nothing new is skipped.
                   </span>
                 </span>
@@ -180,7 +180,7 @@ export function ScheduleConfigFields({
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {docUuids.map(uuid => (
-                <div key={uuid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151' }}>
+                <div key={uuid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                   <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {docTitles[uuid] || uuid}
@@ -261,7 +261,7 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
       backgroundColor: error ? '#fef2f2' : '#f0f9ff', border: `1px solid ${error ? '#fecaca' : '#bae6fd'}`,
     }}>
       <CalendarClock aria-hidden="true" style={{ width: 16, height: 16, color: error ? '#b91c1c' : '#0369a1', flexShrink: 0, marginTop: 2 }} />
-      <div style={{ fontSize: 13, color: '#0f172a', minWidth: 0 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: '#0f172a', minWidth: 0 }}>
         {error ? (
           <div>
             <p style={{ color: '#b91c1c', margin: '0 0 8px' }}>Could not preview this schedule: {error}</p>
@@ -279,7 +279,7 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
               {otherZone && <span style={{ color: '#6b7280' }}> · {formatRunTime(runs[0], ownZone)} your time</span>}
             </div>
             {runs.length > 1 && (
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                 Then {runs.slice(1).map(r => formatRunTime(r, config.timezone)).join(', ')}
               </div>
             )}
@@ -292,22 +292,22 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
 
 const fieldLabel: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 4,
-  fontSize: 12, fontWeight: 600, color: '#6b7280',
+  fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
 }
 
 const controlStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 13, fontFamily: 'inherit', fontWeight: 400,
+  padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit', fontWeight: 400,
   border: '1px solid #d1d5db', borderRadius: 8, backgroundColor: '#fff', color: '#202124', minWidth: 0, maxWidth: '100%',
 }
 
 const addButtonStyle: React.CSSProperties = {
-  alignSelf: 'flex-start', padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+  alignSelf: 'flex-start', padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
   border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
 }
 
 function segmentStyle(selected: boolean): React.CSSProperties {
   return {
-    padding: '6px 14px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit', borderRadius: 6, cursor: 'pointer',
+    padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit', borderRadius: 6, cursor: 'pointer',
     border: selected ? '1.5px solid var(--highlight-on-light, #806600)' : '1px solid #d1d5db',
     backgroundColor: selected ? '#f7f4e8' : '#fff',
     color: selected ? '#554400' : '#374151',

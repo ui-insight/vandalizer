@@ -163,7 +163,7 @@ export function CatalogCoverageTab() {
                       {it.official_baseline_score != null ? (
                         <div>
                           <div>{Math.round(it.official_baseline_score)}% pinned</div>
-                          <div className="text-[10px] text-gray-500">{it.official_baseline_test_case_count} case(s)</div>
+                          <div className="text-xs text-gray-500">{it.official_baseline_test_case_count} case(s)</div>
                         </div>
                       ) : '-'}
                     </td>
@@ -172,7 +172,7 @@ export function CatalogCoverageTab() {
                         <div>
                           <div>{new Date(it.last_drift_check_at).toLocaleDateString()}</div>
                           {driftDelta != null && (
-                            <div className={`text-[10px] ${driftDelta >= 10 ? 'text-red-600' : driftDelta >= 5 ? 'text-amber-600' : 'text-gray-500'}`}>
+                            <div className={`text-xs ${driftDelta >= 10 ? 'text-red-600' : driftDelta >= 5 ? 'text-amber-600' : 'text-gray-500'}`}>
                               {driftDelta > 0 ? `-${driftDelta.toFixed(1)} pts` : 'stable'}
                               {it.last_drift_basis !== 'baseline_reexecution' && (
                                 <span

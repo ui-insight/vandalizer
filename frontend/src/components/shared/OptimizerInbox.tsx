@@ -238,7 +238,7 @@ export function OptimizerInbox() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: 16,
         background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8,
-        color: '#991b1b', fontSize: 13,
+        color: '#991b1b', fontSize: 'var(--workspace-font-control)',
       }}>
         <AlertTriangle style={{ width: 16, height: 16, flexShrink: 0 }} />
         <span style={{ flex: 1 }}>{error}</span>
@@ -265,7 +265,7 @@ export function OptimizerInbox() {
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 12, color: '#4b5563', cursor: 'pointer',
+            fontSize: 'var(--workspace-font-meta)', color: '#4b5563', cursor: 'pointer',
           }}>
             <input
               type="checkbox"
@@ -276,7 +276,7 @@ export function OptimizerInbox() {
           </label>
           {loadedAt && !loading && (
             <span style={{
-              fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 'var(--workspace-font-meta)', display: 'inline-flex', alignItems: 'center', gap: 4,
               color: justRefreshed ? '#166534' : '#9ca3af',
             }}>
               {justRefreshed && <CheckCircle2 style={{ width: 11, height: 11 }} />}
@@ -300,10 +300,10 @@ export function OptimizerInbox() {
           borderRadius: 8, textAlign: 'center',
         }}>
           <Inbox style={{ width: 20, height: 20, color: '#9ca3af', margin: '0 auto 8px' }} />
-          <div style={{ fontSize: 14, color: '#374151', fontWeight: 600 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', color: '#374151', fontWeight: 600 }}>
             Nothing waiting for review
           </div>
-          <div style={{ marginTop: 4, fontSize: 12, color: '#6b7280', maxWidth: 460, margin: '4px auto 0' }}>
+          <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#6b7280', maxWidth: 460, margin: '4px auto 0' }}>
             When quality slips on a workflow, extraction set, or knowledge base, the
             system tunes it in the background and the candidate fix shows up here.
             Failed tuning runs show up here too.
@@ -317,13 +317,13 @@ export function OptimizerInbox() {
           return (
             <section key={category} style={{ marginBottom: 24 }}>
               <h2 style={{
-                fontSize: 13, fontWeight: 700, color: '#111827',
+                fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: '#111827',
                 margin: '0 0 2px', display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 {meta.title}
                 <span style={{ fontWeight: 500, color: '#6b7280' }}>({items.length})</span>
               </h2>
-              <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>{meta.blurb}</p>
+              <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', margin: '0 0 8px' }}>{meta.blurb}</p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {items.map(item => (
                   <Row
@@ -342,7 +342,7 @@ export function OptimizerInbox() {
       )}
 
       {data && (
-        <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 4 }}>
           Showing the last {data.lookback_days} days. Older runs stay in each item's
           Validate &amp; improve history.
         </p>
@@ -402,23 +402,23 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#111827' }}>
               {item.item_name}
             </span>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>{meta.label}</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>{meta.label}</span>
             {when && (
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>· {relativeTime(when)}</span>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>· {relativeTime(when)}</span>
             )}
           </div>
 
-          <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563', marginTop: 3 }}>
             {triggerSentence(item)}
           </div>
 
           {isFailed ? (
             <div style={{
               marginTop: 8, padding: '8px 10px', background: '#fef2f2',
-              borderRadius: 6, fontSize: 12, color: '#991b1b',
+              borderRadius: 6, fontSize: 'var(--workspace-font-meta)', color: '#991b1b',
             }}>
               <strong style={{ fontWeight: 600 }}>
                 {item.error_code ? item.error_code.replace(/_/g, ' ') : 'Run failed'}
@@ -430,20 +430,20 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
               )}
             </div>
           ) : item.category === 'in_flight' ? (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#0050d7', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: '#0050d7', display: 'flex', alignItems: 'center', gap: 6 }}>
               <Loader2 className="animate-spin" style={{ width: 12, height: 12 }} />
               {item.progress_message || item.phase || 'Running'}
             </div>
           ) : (
             <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <span style={{
-                fontSize: 12, color: '#374151', fontVariantNumeric: 'tabular-nums',
+                fontSize: 'var(--workspace-font-meta)', color: '#374151', fontVariantNumeric: 'tabular-nums',
               }}>
                 Score {pct(item.baseline_score)} → <strong>{pct(item.score)}</strong>
               </span>
               {lift != null && (
                 <span style={{
-                  fontSize: 12, fontWeight: 600,
+                  fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                   color: lift > 0 ? '#166534' : lift < 0 ? '#b3261e' : '#6b7280',
                   fontVariantNumeric: 'tabular-nums',
                 }}>
@@ -451,7 +451,7 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
                 </span>
               )}
               {preview && (
-                <span style={{ fontSize: 12, color: '#4b5563' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#4b5563' }}>
                   {preview.will_change} of {preview.total} {meta.itemNounPlural} change
                   {preview.regressions > 0 && (
                     <span style={{ color: '#9a3412' }}>
@@ -464,7 +464,7 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
               {item.overfitting_warning && (
                 <span
                   title="Too few test items to hold any back, so the score is measured on the same data the tuner optimized against."
-                  style={{ fontSize: 11, color: '#9a3412', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  style={{ fontSize: 'var(--workspace-font-meta)', color: '#9a3412', display: 'inline-flex', alignItems: 'center', gap: 4 }}
                 >
                   <AlertTriangle style={{ width: 11, height: 11 }} />
                   in-sample score
@@ -474,14 +474,14 @@ function Row({ item, busy, onApply, onDismiss, onRestore }: {
           )}
 
           {item.category === 'applied' && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: '#166534', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <CheckCircle2 style={{ width: 12, height: 12 }} />
               Live on this item{item.applied_at ? ` since ${relativeTime(item.applied_at)}` : ''}
             </div>
           )}
 
           {item.category === 'no_change' && (
-            <div style={{ marginTop: 6, fontSize: 12, color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <MinusCircle style={{ width: 12, height: 12 }} />
               Statistically tied with the current settings — nothing to apply.
             </div>
@@ -547,7 +547,7 @@ function Stat({ label, value, tone }: {
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 6,
       padding: '4px 10px', borderRadius: 999,
-      background: c.bg, color: c.fg, fontSize: 12, fontWeight: 600,
+      background: c.bg, color: c.fg, fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
     }}>
       <span style={{ fontVariantNumeric: 'tabular-nums' }}>{value}</span>
       <span style={{ fontWeight: 500 }}>{label}</span>
@@ -557,7 +557,7 @@ function Stat({ label, value, tone }: {
 
 const baseButton: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5,
-  padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 600,
+  padding: '5px 10px', borderRadius: 6, fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
   cursor: 'pointer', whiteSpace: 'nowrap',
 }
 

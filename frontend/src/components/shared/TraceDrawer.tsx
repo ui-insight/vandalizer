@@ -53,7 +53,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
-          <h3 style={{ margin: 0, fontSize: 14, color: 'var(--workspace-text)', flex: 1 }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)', flex: 1 }}>
             Trace
           </h3>
           <button
@@ -94,7 +94,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
 
         {(optimized.retrieved_sources?.length ?? 0) > 0 && (
           <Section label="Retrieved sources">
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
               {(optimized.retrieved_sources || []).join(', ')}
             </div>
           </Section>
@@ -104,7 +104,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           <Section label="Default-config answer" muted>
             <Body body={baseline.actual_answer} muted />
             {baseline.reasoning && (
-              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--workspace-muted)' }}>
+              <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                 <em>Judge:</em> {baseline.reasoning}
               </div>
             )}
@@ -149,12 +149,12 @@ function ScoreCell({
       backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : 'var(--workspace-surface)',
       border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : 'var(--workspace-border)'}`,
     }}>
-      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color, marginTop: 2 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color, marginTop: 2 }}>
         {(score * 100).toFixed(0)}%
       </div>
       {verdict && (
-        <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>{verdict}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{verdict}</div>
       )}
     </div>
   )
@@ -166,7 +166,7 @@ function Section({ label, muted = false, children }: {
   return (
     <div>
       <div style={{
-        fontSize: 12, color: muted ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
+        fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
         textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
       }}>{label}</div>
       {children}
@@ -177,7 +177,7 @@ function Section({ label, muted = false, children }: {
 function Body({ body, muted = false }: { body: string; muted?: boolean }) {
   return (
     <div style={{
-      fontSize: 12, color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)',
+      fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)',
       whiteSpace: 'pre-wrap' as const, lineHeight: 1.5,
       padding: 10, borderRadius: 6,
       backgroundColor: 'var(--workspace-canvas)',
@@ -194,7 +194,7 @@ function FactList({
   const color = tone === 'bad' ? 'var(--workspace-danger)' : 'var(--workspace-warning)'
   return (
     <Section label={label}>
-      <ul style={{ margin: 0, paddingLeft: 18, color, fontSize: 12, lineHeight: 1.5 }}>
+      <ul style={{ margin: 0, paddingLeft: 18, color, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5 }}>
         {items.map((it, i) => <li key={i}>{it}</li>)}
       </ul>
     </Section>

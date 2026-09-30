@@ -95,7 +95,7 @@ export function CompareRunsView({
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 16, flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
           <ArrowLeftRight size={16} style={{ color: 'var(--workspace-info)' }} aria-hidden="true" />
-          <h3 style={{ margin: 0, fontSize: 14, color: 'var(--workspace-text)' }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)' }}>
             Compare optimization runs
           </h3>
           <button
@@ -118,7 +118,7 @@ export function CompareRunsView({
             <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading runs…</span>
           </div>
         ) : error ? (
-          <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 12 }}>{error}<button type="button" onClick={() => setAttempt(value => value + 1)} style={{ display: 'block', minHeight: 36, marginTop: 8, padding: '6px 12px', color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6 }}>Retry comparison</button></div>
+          <div role="alert" style={{ color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-meta)' }}>{error}<button type="button" onClick={() => setAttempt(value => value + 1)} style={{ display: 'block', minHeight: 36, marginTop: 8, padding: '6px 12px', color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6 }}>Retry comparison</button></div>
         ) : current && other ? (
           <DiffBody left={other} right={current} />
         ) : null}
@@ -170,14 +170,14 @@ function RunHeader({ label, run, subtitle }: { label: string; run: KBOptimizatio
       padding: 12, backgroundColor: 'var(--workspace-canvas)',
       border: '1px solid var(--workspace-border)', borderRadius: 6,
     }}>
-      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>{subtitle}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{subtitle}</div>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: scoreColor((score ?? 0) * 100) }}>
           {score != null ? `${(score * 100).toFixed(0)}%` : '-'}
         </span>
         {lift != null && (
-          <span style={{ fontSize: 12, color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)' }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)' }}>
             {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts vs default
           </span>
         )}
@@ -190,7 +190,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   return (
     <div>
       <div style={{
-        fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
+        fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6,
       }}>{title}</div>
       {children}
     </div>
@@ -221,7 +221,7 @@ function EvalSetDrift({ left, right }: { left: KBOptimizationRun; right: KBOptim
     <div style={{
       padding: 10, backgroundColor: drifted ? 'rgba(245, 158, 11, 0.06)' : 'var(--workspace-canvas)',
       border: `1px solid ${drifted ? 'rgba(245, 158, 11, 0.3)' : 'var(--workspace-border)'}`,
-      borderRadius: 6, fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.6,
+      borderRadius: 6, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6,
     }}>
       <div>
         <strong>Common:</strong> {ls.query_uuids.length - removed.length} ·{' '}
@@ -320,14 +320,14 @@ function DeltaGroup({
   const fg = tone === 'good' ? 'var(--workspace-success)' : 'var(--workspace-danger)'
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: fg, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: fg, marginBottom: 4 }}>{label}</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {rows.map(({ q, left }) => {
           const delta = (q.score - left.score) * 100
           return (
             <div
               key={q.query_uuid}
-              style={{ padding: '8px 10px', fontSize: 12, color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 4 }}
+              style={{ padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 4 }}
             >
               <p style={{ margin: '0 0 8px', overflowWrap: 'anywhere' }}>{q.query}</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 16px' }}>
@@ -349,7 +349,7 @@ function DiffRow({ label, left, right }: { label: string; left: string; right: s
     <div className="optimization-diff-row" style={{
       display: 'grid',
       gap: 8, padding: '4px 8px',
-      fontSize: 12, color: 'var(--workspace-text)',
+      fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
       backgroundColor: changed ? 'rgba(245, 158, 11, 0.06)' : 'var(--workspace-canvas)',
       border: `1px solid ${changed ? 'rgba(245, 158, 11, 0.25)' : 'var(--workspace-border)'}`,
       borderRadius: 4,
@@ -364,7 +364,7 @@ function DiffRow({ label, left, right }: { label: string; left: string; right: s
 function Note({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      padding: 8, fontSize: 12, color: 'var(--workspace-muted)',
+      padding: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
       borderRadius: 4,
     }}>{children}</div>

@@ -75,7 +75,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               borderRadius: 999,
               background: 'rgba(96, 165, 250, 0.12)',
               border: '1px solid rgba(96, 165, 250, 0.3)',
-              fontSize: 11, fontWeight: 700, color: 'var(--workspace-info)',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--workspace-info)',
               textTransform: 'uppercase', letterSpacing: '0.1em',
               marginBottom: 18,
             }}>
@@ -88,7 +88,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               Ask anything.<br />Get answers from your sources.
             </h1>
             <p style={{
-              fontSize: 15, color: 'var(--workspace-muted)', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
+              fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-muted)', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               A knowledge base turns a folder of documents, a stack of policies, or a website
               into something you can talk to, with citations back to the exact source.
@@ -161,7 +161,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               <button
                 onClick={onClose}
                 style={{
-                  padding: '11px 26px', fontSize: 14, fontWeight: 600,
+                  padding: '11px 26px', fontSize: 'var(--workspace-font-body)', fontWeight: 600,
                   color: '#0c1020',
                   background: 'var(--workspace-canvas)',
                   border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
@@ -186,13 +186,13 @@ function Section({
   return (
     <div className="kb-explainer-section" style={{ animationDelay: delay, marginBottom: 36 }}>
       <h2 style={{
-        fontSize: 20, fontWeight: 700, color: 'var(--workspace-text)', margin: '0 0 4px',
+        fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: '0 0 4px',
         letterSpacing: '-0.01em',
       }}>
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 13, color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: subtitle ? 0 : 14 }}>
         {children}
@@ -218,10 +218,10 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
         <Icon size={18} style={{ color: 'var(--workspace-info)' }} />
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )
@@ -238,15 +238,15 @@ function UseCase({ question, answer, accent }: { question: string; answer: strin
       <div style={{
         display: 'inline-block', padding: '2px 8px', borderRadius: 6,
         background: `color-mix(in srgb, ${accent} 13.33%, transparent)`, color: accent,
-        fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
         marginBottom: 8,
       }}>
         Ask
       </div>
-      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 8, lineHeight: 1.45, fontStyle: 'italic' }}>
+      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 8, lineHeight: 1.45, fontStyle: 'italic' }}>
         "{question}"
       </div>
-      <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
         <span style={{ color: accent, fontWeight: 600 }}>→ </span>{answer}
       </div>
     </div>
@@ -265,16 +265,16 @@ function Step({ num, title, body }: { num: string; title: string; body: string }
         width: 28, height: 28, borderRadius: '50%',
         background: 'var(--workspace-canvas)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        fontSize: 13, fontWeight: 700, color: '#0c1020',
+        fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: '#0c1020',
         boxShadow: '0 2px 10px -2px rgba(96, 165, 250, 0.4)',
       }}>
         {num}
       </div>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 2 }}>
           {title}
         </div>
-        <div style={{ fontSize: 13, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>{body}</div>
       </div>
     </div>
   )

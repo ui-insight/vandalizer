@@ -88,7 +88,7 @@ function UploadPrimaryButton({
           background: 'var(--highlight-color, #eab308)',
           color: '#111827',
           fontFamily: 'inherit',
-          fontSize: 14,
+          fontSize: 'var(--workspace-font-body)',
           fontWeight: 800,
           cursor: disabled ? 'default' : 'pointer',
           boxShadow: '0 12px 28px rgba(0,0,0,0.16)',
@@ -147,7 +147,7 @@ function UploadPillButton({
           background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
           color: inverse ? '#ffffff' : '#374151',
           fontFamily: 'inherit',
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
           fontWeight: 700,
           cursor: disabled ? 'default' : 'pointer',
           opacity: disabled ? 0.55 : 1,
@@ -197,7 +197,7 @@ function ActionPillButton({
         background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
         color: inverse ? '#ffffff' : '#374151',
         fontFamily: 'inherit',
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         fontWeight: 700,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.55 : 1,
@@ -232,7 +232,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
         <div>
           <div
             style={{
-              fontSize: 11,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 800,
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
@@ -251,7 +251,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
             borderRadius: 999,
             background: inverse ? 'rgba(255,255,255,0.12)' : '#ffffff',
             color: inverse ? '#ffffff' : '#334155',
-            fontSize: 11,
+            fontSize: 'var(--workspace-font-meta)',
             fontWeight: 700,
             border: inverse ? '1px solid rgba(255,255,255,0.16)' : '1px solid #e5e7eb',
           }}
@@ -268,7 +268,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           borderRadius: 10,
           background: inverse ? 'rgba(255,255,255,0.08)' : '#ffffff',
           border: inverse ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e5e7eb',
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           lineHeight: 1.5,
           color: inverse ? 'rgba(255,255,255,0.82)' : '#475569',
         }}
@@ -286,7 +286,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
         }}
       >
         <div>
-          <div style={{ fontSize: 12, color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Answer</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Answer</div>
           <div
             style={{
               marginTop: 3,
@@ -300,11 +300,11 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 12, color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Source</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Source</div>
           <div
             style={{
               marginTop: 3,
-              fontSize: 13,
+              fontSize: 'var(--workspace-font-control)',
               fontWeight: 700,
               color: inverse ? '#ffffff' : '#334155',
             }}
@@ -329,7 +329,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
             alignItems: 'center',
             gap: 7,
             marginBottom: 6,
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             fontWeight: 800,
             color: inverse ? '#ffffff' : '#374151',
           }}
@@ -339,7 +339,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
         </div>
         <div
           style={{
-            fontSize: 13,
+            fontSize: 'var(--workspace-font-control)',
             lineHeight: 1.55,
             color: inverse ? 'rgba(255,255,255,0.88)' : '#4b5563',
           }}
@@ -364,7 +364,7 @@ function GlossaryDisclosure() {
       <summary
         style={{
           cursor: 'pointer',
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 700,
           color: '#64748b',
           listStyle: 'none',
@@ -398,8 +398,8 @@ function SurfaceCard({
         boxShadow: '0 12px 28px rgba(0,0,0,0.04)',
       }}
     >
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>{title}</div>
-      <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
+      <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#111827' }}>{title}</div>
+      <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-control)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
       <div style={{ marginTop: 14 }}>{children}</div>
     </div>
   )
@@ -429,7 +429,7 @@ function PromptButton({
         color: '#374151',
         cursor: 'pointer',
         fontFamily: 'inherit',
-        fontSize: 13,
+        fontSize: 'var(--workspace-font-control)',
         fontWeight: 600,
         textAlign: 'left',
         transition: 'border-color 0.15s ease, background-color 0.15s ease',
@@ -666,7 +666,7 @@ function FocusNowCard({
           padding: '5px 9px',
           borderRadius: 999,
           background: '#edf0f2',
-          fontSize: 11,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 650,
           letterSpacing: '0.05em',
           textTransform: 'uppercase',
@@ -692,10 +692,10 @@ function FocusNowCard({
           <Icon size={18} />
         </div>
         <div>
-          <div style={{ fontSize: 18, lineHeight: 1.15, fontWeight: 650, color: '#242b32' }}>
+          <div style={{ fontSize: 'var(--workspace-font-section-title)', lineHeight: 1.15, fontWeight: 650, color: '#242b32' }}>
             {action.title}
           </div>
-          <div style={{ marginTop: 7, fontSize: 13, lineHeight: 1.55, color: '#59616b' }}>
+          <div style={{ marginTop: 7, fontSize: 'var(--workspace-font-control)', lineHeight: 1.55, color: '#59616b' }}>
             {action.description}
           </div>
         </div>
@@ -724,7 +724,7 @@ function FocusNowCard({
               background: 'var(--highlight-color, #eab308)',
               color: '#111827',
               fontFamily: 'inherit',
-              fontSize: 14,
+              fontSize: 'var(--workspace-font-body)',
               fontWeight: 650,
               cursor: disabled ? 'default' : 'pointer',
               opacity: disabled ? 0.55 : 1,
@@ -810,8 +810,8 @@ function QueueItemButton({
         <Icon size={16} />
       </div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', lineHeight: 1.35 }}>{title}</div>
-        <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 700, color: '#111827', lineHeight: 1.35 }}>{title}</div>
+        <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
       </div>
       <ArrowRight size={14} style={{ marginTop: 2, flexShrink: 0, color: 'var(--highlight-on-light, #806600)' }} />
     </button>
@@ -862,7 +862,7 @@ function ResumeQueue({
             borderRadius: 10,
             background: '#f8fafc',
             border: '1px solid #e5e7eb',
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: '#64748b',
           }}
@@ -960,7 +960,7 @@ function ReadyAssetBadge({ label }: { label: string }) {
         borderRadius: 999,
         border: '1px solid #e5e7eb',
         background: '#ffffff',
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         fontWeight: 700,
         color: '#374151',
       }}

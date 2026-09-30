@@ -23,7 +23,7 @@ export function DeletedDocumentBadge() {
       role="status"
       title="This document was deleted from Files. Runs will fail until it is removed here or replaced."
       style={{
-        fontSize: 10, fontWeight: 700, color: '#b91c1c', backgroundColor: '#fee2e2',
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#b91c1c', backgroundColor: '#fee2e2',
         border: '1px solid #fecaca', borderRadius: 999, padding: '1px 6px', whiteSpace: 'nowrap',
       }}
     >
@@ -115,7 +115,7 @@ export function FixedDocumentsZone({
 
   const actionButton: React.CSSProperties = {
     display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px',
-    fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
     color: '#374151', cursor: uploading ? 'wait' : 'pointer', opacity: uploading ? 0.6 : 1,
   }
@@ -133,7 +133,7 @@ export function FixedDocumentsZone({
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
                 borderBottom: idx < fixedDocs.length - 1 ? '1px solid #f3f4f6' : 'none',
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 backgroundColor: doc.missing ? '#fef2f2' : undefined,
               }}
             >
@@ -165,7 +165,7 @@ export function FixedDocumentsZone({
       )}
 
       {readOnly && fixedDocs.length === 0 && (
-        <div style={{ fontSize: 12, color: '#9ca3af' }}>No fixed documents.</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>No fixed documents.</div>
       )}
 
       {!readOnly && (
@@ -232,7 +232,7 @@ export function FixedDocumentsZone({
             style={{
               border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
               borderRadius: 8, padding: '16px', textAlign: 'center',
-              color: '#6b7280', fontSize: 12,
+              color: '#6b7280', fontSize: 'var(--workspace-font-meta)',
               backgroundColor: dragOver ? '#fefce8' : '#fff',
               transition: 'all 0.15s ease',
             }}
@@ -261,7 +261,7 @@ export function FixedDocumentsZone({
           }}
           style={{
             marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+            padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
             borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
             color: '#1d4ed8', cursor: 'pointer',
           }}

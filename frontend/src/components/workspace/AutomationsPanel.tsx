@@ -112,7 +112,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             alignItems: 'center',
             gap: 6,
             padding: '6px 14px',
-            fontSize: 13,
+            fontSize: 'var(--workspace-font-control)',
             fontWeight: 600,
             fontFamily: 'inherit',
             color: 'var(--highlight-text-color, #000)',
@@ -137,7 +137,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           flexShrink: 0,
         }}>
           <FolderKanban size={13} style={{ color: 'var(--highlight-on-light)', flexShrink: 0 }} />
-          <span style={{ fontSize: 12, color: 'var(--workspace-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal' }}>
             {projectScoped
               ? <>Pinned to <strong style={{ color: 'var(--workspace-text)' }}>{activeProjectTitle}</strong></>
               : <>All automations</>}
@@ -146,7 +146,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             onClick={() => setProjectScoped(s => !s)}
             style={{
               marginLeft: 'auto', flexShrink: 0,
-              padding: '3px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              padding: '3px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-text)', backgroundColor: 'transparent',
               border: '1px solid var(--workspace-border)', borderRadius: 12, cursor: 'pointer',
             }}
@@ -184,7 +184,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               placeholder="Filter..."
               aria-label="Filter automations"
               style={{
-                flex: 1, minWidth: 0, padding: 0, fontSize: 14, fontFamily: 'inherit',
+                flex: 1, minWidth: 0, padding: 0, fontSize: 'var(--workspace-font-body)', fontFamily: 'inherit',
                 color: 'var(--workspace-text)', backgroundColor: 'transparent',
                 border: 'none', outline: 'none',
               }}
@@ -204,7 +204,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       )}
 
       {(search || filter !== 'all') && (
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 12px', fontSize: 12, color: 'var(--workspace-muted)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, padding: '8px 12px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           {!loading && !scopeLoading && !listError && <span role="status">{filtered.length} of {base.length} automations</span>}
           <button type="button" onClick={clearFilters} style={{ color: 'var(--workspace-text)', border: '1px solid #6b7280', borderRadius: 6, padding: '5px 10px' }}>Clear filters</button>
         </div>
@@ -213,7 +213,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
       {listError && (
-        <div role="alert" style={{ margin: 12, padding: 12, border: '1px solid #fca5a5', borderRadius: 8, color: '#b91c1c', fontSize: 13 }}>
+        <div role="alert" style={{ margin: 12, padding: 12, border: '1px solid #fca5a5', borderRadius: 8, color: '#b91c1c', fontSize: 'var(--workspace-font-control)' }}>
           <p>{listError}</p>
           <p>{base.length ? 'Showing the previously loaded list. Your filters are preserved.' : 'The list is unavailable. Your filters are preserved.'}</p>
           <button type="button" onClick={() => { void refresh(); if (isProjectScoped) void projectPins.refresh() }} style={{ marginTop: 8, color: 'var(--workspace-text)', border: '1px solid #9ca3af', borderRadius: 6, padding: '6px 10px' }}>Retry automations</button>
@@ -225,14 +225,14 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : listError && base.length === 0 ? null : base.length === 0 && isProjectScoped && automations.length > 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--workspace-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)' }}>
             <FolderKanban size={28} style={{ color: '#444', margin: '0 auto 12px' }} />
             <div style={{ color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 4 }}>No automations pinned to this project</div>
             <div style={{ marginBottom: 14 }}>Pin an automation to it from the list, or browse them all.</div>
             <button
               onClick={() => setProjectScoped(false)}
               style={{
-                padding: '5px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                padding: '5px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                 color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
                 border: 'none', borderRadius: 6, cursor: 'pointer',
               }}
@@ -247,7 +247,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             <button type="button" onClick={() => setShowWizard(true)} className="automation-primary">Create an automation</button>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--workspace-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)' }}>
             No matching automations
           </div>
         ) : (
@@ -286,7 +286,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                         animation: isRunning ? 'automationPulseDot 1.5s ease-in-out infinite' : undefined,
                       }}
                     />
-                    <button type="button" aria-label={`Open automation: ${auto.name}`} onClick={e => { e.stopPropagation(); openAutomation(auto.id) }} style={{ fontFamily: 'inherit', textAlign: 'left', background: 'transparent', border: 0, padding: 0, fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal', cursor: 'pointer' }}>
+                    <button type="button" aria-label={`Open automation: ${auto.name}`} onClick={e => { e.stopPropagation(); openAutomation(auto.id) }} style={{ fontFamily: 'inherit', textAlign: 'left', background: 'transparent', border: 0, padding: 0, fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', flex: 1, minWidth: 0, overflowWrap: 'anywhere', whiteSpace: 'normal', cursor: 'pointer' }}>
                       {auto.name}
                     </button>
                     {canPin && (() => {
@@ -313,7 +313,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: 'var(--workspace-font-meta)',
                         fontWeight: 600,
                         padding: '2px 8px',
                         borderRadius: 10,
@@ -323,10 +323,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                     >
                       {badge.label}
                     </span>
-                    <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>{isRunning ? 'Running' : auto.enabled ? 'Enabled' : 'Disabled'}</span>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{isRunning ? 'Running' : auto.enabled ? 'Enabled' : 'Disabled'}</span>
                     {auto.shared_with_team && (
                       <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
                         color: '#0f5f5f', backgroundColor: '#e6f4f1',
                       }}>
                         Team
@@ -334,11 +334,11 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                     )}
                   </div>
                   <AutomationSummary automation={auto} names={folderNames} actionName={getActionName(auto)} compact />
-                  <div style={{ marginTop: 8, fontSize: 12, color: auto.last_event_status === 'failed' ? '#b91c1c' : 'var(--workspace-muted)' }}>
+                  <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: auto.last_event_status === 'failed' ? '#b91c1c' : 'var(--workspace-muted)' }}>
                     {auto.last_event_status ? `Last run: ${{ completed: 'Succeeded', failed: 'Failed', pending: 'Pending', queued: 'Queued', running: 'Running', skipped: 'Skipped' }[auto.last_event_status] || auto.last_event_status}${auto.last_event_at ? ` · ${formatRunTime(auto.last_event_at, String(auto.trigger_config?.timezone || 'UTC'))}` : ''}` : auto.last_event_status === null ? 'No runs yet' : 'Run history not reported'}
                   </div>
                   {auto.trigger_type === 'schedule'  && (auto.next_run_at || !auto.enabled) && !isRunning && (
-                    <div style={{ fontSize: 12, color: 'var(--workspace-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>
                       {auto.enabled
                         ? `Next run ${formatRunTime(auto.next_run_at!, String(auto.trigger_config?.timezone || 'UTC'))}`
                         : 'Paused'}
@@ -397,7 +397,7 @@ export function ExplainerPill({ label, onClick, tone = 'dark' }: { label: string
       onClick={onClick}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
         color: tone === 'light' ? 'var(--workspace-muted)' : '#b5bbc3', backgroundColor: 'transparent',
         border: tone === 'light' ? '1px solid var(--workspace-border)' : '1px solid #3a3a3a', borderRadius: 999, cursor: 'pointer',
         transition: 'all 0.15s', whiteSpace: 'normal',
@@ -425,7 +425,7 @@ function FilterPill({ label, count, active, onClick, icon }: {
       aria-label={`${label}: ${count} automations`}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: '3px 10px', fontSize: 12, fontWeight: 600,
+        padding: '3px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         fontFamily: 'inherit', borderRadius: 12,
         color: 'var(--workspace-text)',
         backgroundColor: active ? 'var(--workspace-selected)' : 'transparent',
@@ -437,7 +437,7 @@ function FilterPill({ label, count, active, onClick, icon }: {
       {icon}
       {label}
       <span style={{
-        fontSize: 12, fontWeight: 600,
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         color: 'var(--workspace-muted)',
         marginLeft: 1,
       }}>

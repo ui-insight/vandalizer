@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**153/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**154/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,15 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Readable task typography — September 30
+
+**154/169 checklist items implemented locally.** VIS-02 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Workspace typography now uses shared rem-based sizes: 12px metadata, 13px controls, 14px body copy and 16/18/20px title levels at the default browser size. Essential 9–11px labels, counts, timestamps, provenance and trial explanations use the metadata size. Existing large tutorial/illustration text is separate from task typography.
+- Document text keeps its own zoom multiplier using the shared body size. Context usage percentages now fit in a 44px control, including 100%; warning and error text use readable semantic colors. The new context-state review also corrected white text on amber memory/retry actions.
+- Verification: TypeScript, production build and diff checks pass; touched-file ESLint has zero errors and 11 existing hook-dependency warnings. Eight document-recovery/context-meter tests across two files pass. The 306 selected captures cover all 55 baseline states, workflow/extraction validation (39), questions (23), file/Library tasks (30), section headers (27), project/tool context (33), saved history (18), short dialogs (36), source reading/recovery (33), and all four context-meter states (12). All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
+- The small-text metric now excludes zero-size text deliberately replaced by a named compact-table sort icon. Citation return still asserts the prior reading position, allowing only the physical scroll-limit clamp when a closed preview shortens content; observed returns preserve the exact prior position. Fixtures are synthetic. Broader spacing, action, form, accessibility and final regrading acceptance remain open.
 
 ## Shared workspace theme — September 30
 

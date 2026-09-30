@@ -59,13 +59,13 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         style={{ color: active ? 'var(--highlight-color, #eab308)' : '#17181abb' }}
       />
       <div style={{
-        fontSize: 14, fontWeight: 500, padding: '0 15px', textAlign: 'center',
+        fontSize: 'var(--workspace-font-body)', fontWeight: 500, padding: '0 15px', textAlign: 'center',
         color: active ? 'var(--highlight-color, #eab308)' : '#17181abb',
         transition: 'color 0.2s',
       }}>
         {active ? 'Drop files here' : 'Upload files or drop them here'}
       </div>
-      <div style={{ fontSize: 12, fontWeight: 400, color: '#58616d', textAlign: 'center', lineHeight: 1.6 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 400, color: '#58616d', textAlign: 'center', lineHeight: 1.6 }}>
         {description}
       </div>
       <input

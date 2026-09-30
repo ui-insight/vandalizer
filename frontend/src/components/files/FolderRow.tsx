@@ -114,7 +114,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           </span>
           {isTeam && (
             <span className="shrink-0" style={{
-              fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
               color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
               marginLeft: 6, whiteSpace: 'nowrap',
             }}>
@@ -123,7 +123,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           )}
           {isWatched && (
             <span className="shrink-0" style={{
-              fontSize: 12, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
               color: '#1e40af', backgroundColor: 'rgba(37, 99, 235, 0.1)',
               marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
             }}>

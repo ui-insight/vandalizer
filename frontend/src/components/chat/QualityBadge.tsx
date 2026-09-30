@@ -71,7 +71,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           gap: 4,
           padding: '2px 8px',
           borderRadius: 9999,
-          fontSize: 11,
+          fontSize: 'var(--workspace-font-meta)',
           fontWeight: 500,
           lineHeight: '18px',
           background: config.bg,
@@ -112,7 +112,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             padding: 12,
             zIndex: 100,
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             color: '#374151',
             lineHeight: 1.5,
           }}
@@ -120,7 +120,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           {/* Header */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid #f3f4f6' }}>
             <IconComponent size={16} style={{ color: config.text }} />
-            <span style={{ fontWeight: 600, fontSize: 13 }}>
+            <span style={{ fontWeight: 600, fontSize: 'var(--workspace-font-control)' }}>
               {quality.score != null ? `Quality Score: ${Math.round(quality.score)}/100` : 'No Score'}
             </span>
           </div>
@@ -162,14 +162,14 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           )}
 
           {/* Last validated */}
-          <div style={{ color: '#9ca3af', fontSize: 11 }}>
+          <div style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)' }}>
             Last validated: {formatDate(quality.last_validated_at)}
           </div>
 
           {/* A high tier on a tiny test set is provisional, not proven — the
               docs' own FAQ says so; the badge should too. */}
           {quality.num_test_cases != null && quality.num_test_cases < 5 && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', fontSize: 11, color: '#d97706' }}>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', fontSize: 'var(--workspace-font-meta)', color: '#d97706' }}>
               Scored on only {quality.num_test_cases} test case{quality.num_test_cases === 1 ? '' : 's'} —
               treat as provisional and add more before relying on it for high-stakes work.
             </div>
@@ -177,7 +177,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
 
           {/* Stale validation plan (workflows) */}
           {quality.plan_stale && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: '#d97706' }}>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 'var(--workspace-font-meta)', color: '#d97706' }}>
               <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
               <span>Validation plan is out of date with the workflow. Regenerate it before trusting this score.</span>
             </div>
@@ -185,7 +185,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
 
           {/* Pending optimization recommendation */}
           {quality.optimization?.pending_recommendation && (
-            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: '#7c3aed' }}>
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 'var(--workspace-font-meta)', color: '#7c3aed' }}>
               <Sparkles size={12} style={{ flexShrink: 0, marginTop: 1 }} />
               <span>
                 Autovalidate found a better config
@@ -208,7 +208,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
                     alignItems: 'flex-start',
                     gap: 6,
                     padding: '4px 0',
-                    fontSize: 11,
+                    fontSize: 'var(--workspace-font-meta)',
                     color: alert.severity === 'critical' ? '#dc2626' : '#d97706',
                   }}
                 >

@@ -61,7 +61,7 @@ export function optimizedBadgeTitle(opt: KBOptimizationStatus, withTime = false)
 
 const chip = {
   display: 'inline-flex', alignItems: 'center', gap: 3,
-  fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+  fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
 } as const
 
 export function VerifiedBadge() {

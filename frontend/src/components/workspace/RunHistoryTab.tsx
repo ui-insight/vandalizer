@@ -51,7 +51,7 @@ function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; 
     if (!normalized || Object.keys(normalized).length === 0) return null
     const entries = Object.entries(normalized)
     return (
-      <div style={{ marginTop: 8, fontSize: 12, color: '#374151' }}>
+      <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: '#374151' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             {entries.map(([key, val]) => (
@@ -70,7 +70,7 @@ function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; 
   const keys = Object.keys(snapshot)
   if (keys.length === 0) return null
   return (
-    <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+    <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
       {keys.length} result field{keys.length !== 1 ? 's' : ''}
     </div>
   )
@@ -127,7 +127,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
 
   if (loading) {
     return (
-      <div role="status" aria-label="Loading run output" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+      <div role="status" aria-label="Loading run output" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
         Loading output...
       </div>
@@ -136,7 +136,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
 
   if (unavailable || output == null) {
     return (
-      <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+      <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>
         Output is no longer available for this run.
       </div>
     )
@@ -152,7 +152,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
           className="chat-markdown"
           style={{
             backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-            padding: 12, fontSize: 13, lineHeight: 1.6,
+            padding: 12, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
             maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
             color: '#374151', wordBreak: 'break-word',
           }}
@@ -165,7 +165,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
           aria-expanded={showDownload}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-            fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             border: '1px solid #d1d5db', borderRadius: 6,
             backgroundColor: '#fff', cursor: 'pointer', color: '#374151',
           }}
@@ -187,7 +187,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
                 onClick={() => setShowDownload(false)}
                 style={{
                   display: 'flex', flexDirection: 'column', gap: 1,
-                  padding: '8px 14px', fontSize: 13, fontWeight: 500,
+                  padding: '8px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                   color: '#374151', textDecoration: 'none',
                   transition: 'background-color 0.1s',
                 }}
@@ -195,7 +195,7 @@ function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
                 onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff' }}
               >
                 <span>{label}</span>
-                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{desc}</span>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>{desc}</span>
               </a>
             ))}
           </div>
@@ -248,11 +248,11 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: '#202124' }}>
               {run.started_at ? relativeTime(run.started_at) : 'Unknown'}
             </span>
             <span style={{
-              fontSize: 11,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 500,
               padding: '1px 6px',
               borderRadius: 4,
@@ -263,7 +263,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 11, color: '#6b7280' }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
             {run.duration_ms != null && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                 <Clock style={{ width: 11, height: 11 }} />
@@ -290,7 +290,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           </div>
 
           {run.error && (
-            <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginTop: 4 }}>
               {run.error.length > 120 ? run.error.slice(0, 120) + '...' : run.error}
             </div>
           )}
@@ -311,7 +311,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
           params={{ uuid: reviewUuid } as never}
           style={{
             display: 'inline-block', margin: '-6px 0 12px 48px',
-            fontSize: 12, fontWeight: 600, color: '#0ea5e9', textDecoration: 'none',
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#0ea5e9', textDecoration: 'none',
           }}
         >
           Open review →
@@ -363,7 +363,7 @@ export function RunHistoryTab({
 
   if (runs.length === 0) {
     return (
-      <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9ca3af', fontSize: 13 }}>
+      <div style={{ padding: '48px 24px', textAlign: 'center', color: '#9ca3af', fontSize: 'var(--workspace-font-control)' }}>
         No runs yet. Results will appear here after you run this {type}.
       </div>
     )
@@ -371,7 +371,7 @@ export function RunHistoryTab({
 
   return (
     <div>
-      <div role="status" aria-live="polite" style={{ padding: '12px 24px 8px', fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+      <div role="status" aria-live="polite" style={{ padding: '12px 24px 8px', fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
         {runs.length} run{runs.length !== 1 ? 's' : ''}
       </div>
       {runs.map(run => (

@@ -69,11 +69,11 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Cross-Field Rules</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Cross-Field Rules</div>
         {passRate != null && (
           <div
             style={{
-              fontSize: 12,
+              fontSize: 'var(--workspace-font-meta)',
               fontWeight: 600,
               color: passRate >= 90 ? '#059669' : passRate >= 70 ? '#d97706' : '#dc2626',
             }}
@@ -83,7 +83,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, fontSize: 12, marginBottom: failures.length > 0 || unparseables.length > 0 ? 12 : 0 }}>
+      <div style={{ display: 'flex', gap: 12, fontSize: 'var(--workspace-font-meta)', marginBottom: failures.length > 0 || unparseables.length > 0 ? 12 : 0 }}>
         <Stat icon={<CheckCircle size={12} color="#059669" />} label="Pass" value={summary.pass} color="#059669" />
         <Stat icon={<AlertTriangle size={12} color="#dc2626" />} label="Fail" value={summary.fail} color="#dc2626" />
         {summary.unparseable > 0 && (
@@ -99,7 +99,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
 
       {failures.length > 0 && (
         <div style={{ marginBottom: unparseables.length > 0 ? 12 : 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase' }}>
             Violations
           </div>
           <ul style={{ display: 'flex', flexDirection: 'column', gap: 4, listStyle: 'none', padding: 0, margin: 0 }}>
@@ -114,7 +114,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                     alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     gap: 8,
-                    fontSize: 12,
+                    fontSize: 'var(--workspace-font-meta)',
                     padding: '6px 8px',
                     backgroundColor: '#fef2f2',
                     border: '1px solid #fecaca',
@@ -125,9 +125,9 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                     <div style={{ fontFamily: 'ui-monospace, monospace', color: '#991b1b', wordBreak: 'break-word' }}>
                       {describeRule(r.rule)}
                     </div>
-                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{r.message}</div>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>{r.message}</div>
                     {(r.test_case_label || r.source_label) && (
-                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                         on {r.test_case_label || r.source_label}
                       </div>
                     )}
@@ -138,7 +138,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                       disabled={busyId === ruleId || marked}
                       style={{
                         padding: '3px 8px',
-                        fontSize: 11,
+                        fontSize: 'var(--workspace-font-meta)',
                         fontWeight: 600,
                         backgroundColor: marked ? '#e5e7eb' : '#fff',
                         color: marked ? '#6b7280' : '#dc2626',
@@ -160,7 +160,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
       )}
 
       {unparseables.length > 0 && (
-        <details style={{ fontSize: 12, color: '#6b7280' }}>
+        <details style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
           <summary style={{ cursor: 'pointer', fontWeight: 600 }}>
             {unparseables.length} rule{unparseables.length === 1 ? '' : 's'} couldn't be evaluated
           </summary>

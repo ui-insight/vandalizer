@@ -104,8 +104,8 @@ export function ReproducibilityPanel({ run }: Props) {
       >
         {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
         <ShieldCheck size={14} style={{ color: 'var(--workspace-muted)' }} />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Reproducibility</span>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Reproducibility</span>
+        <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           {run.judge_model || 'unknown judge'}{run.rng_seed != null ? ` · seed ${run.rng_seed}` : ''}
         </span>
       </button>
@@ -124,8 +124,8 @@ export function ReproducibilityPanel({ run }: Props) {
                 padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
               }}
             >
-              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 12, color: 'var(--workspace-text)', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
             </div>
           ))}
         </div>

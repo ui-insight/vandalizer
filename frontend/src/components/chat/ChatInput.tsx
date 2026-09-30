@@ -216,7 +216,7 @@ export function ChatInput({
             rows={1}
             wrap="soft"
             className="block min-w-0 w-full resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#626a75] placeholder:font-medium focus:outline-none focus-visible:outline-none"
-            style={{ fontSize: 16, lineHeight: 1.5, minHeight: `${MIN_COMPOSER_TEXT_HEIGHT}px`, maxHeight: '25vh' }}
+            style={{ fontSize: 'var(--workspace-font-card-title)', lineHeight: 1.5, minHeight: `${MIN_COMPOSER_TEXT_HEIGHT}px`, maxHeight: '25vh' }}
             disabled={disabled}
           />
         </div>
@@ -252,7 +252,7 @@ export function ChatInput({
                   style={{ minHeight: 40 }}
                 >
                   <FileUp className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                  <span>Add Document<span style={{ display: 'block', fontSize: 12, color: '#58616d', lineHeight: 1.5 }}>{uploadPolicy.description}</span></span>
+                  <span>Add Document<span style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', color: '#58616d', lineHeight: 1.5 }}>{uploadPolicy.description}</span></span>
                 </button>
                 <button
                   role="menuitem"

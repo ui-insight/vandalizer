@@ -187,7 +187,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: tipText,
             fontWeight: 400,
@@ -197,7 +197,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
         >
           <div>{def.short}</div>
           {def.example && (
-            <div style={{ marginTop: 6, fontSize: 11, color: tipMeta }}>
+            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: tipMeta }}>
               {def.example}
             </div>
           )}

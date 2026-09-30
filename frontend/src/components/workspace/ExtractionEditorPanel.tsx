@@ -646,7 +646,7 @@ export function ExtractionEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Loading..." onClose={closeExtraction} />
-        <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 13 }}>
+        <div role="status" style={{ padding: 40, textAlign: 'center', color: '#59616b', fontSize: 'var(--workspace-font-control)' }}>
           Loading extraction...
         </div>
       </div>
@@ -657,7 +657,7 @@ export function ExtractionEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Extraction" onClose={closeExtraction} />
-        <div role="alert" style={{ padding: 24, textAlign: 'center', color: '#b91c1c', fontSize: 13 }}><p>{loadError || 'Extraction unavailable.'}</p><button type="button" onClick={async () => { setLoading(true); await refresh(); setLoading(false) }} style={{ marginTop: 12 }}>Retry extraction</button><p style={{ marginTop: 12, color: '#59616b' }}>Close this panel to return to your Library.</p></div>
+        <div role="alert" style={{ padding: 24, textAlign: 'center', color: '#b91c1c', fontSize: 'var(--workspace-font-control)' }}><p>{loadError || 'Extraction unavailable.'}</p><button type="button" onClick={async () => { setLoading(true); await refresh(); setLoading(false) }} style={{ marginTop: 12 }}>Retry extraction</button><p style={{ marginTop: 12, color: '#59616b' }}>Close this panel to return to your Library.</p></div>
       </div>
     )
   }
@@ -688,7 +688,7 @@ export function ExtractionEditorPanel() {
               onBlur={saveTitle}
               onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
               style={{
-                fontSize: 18,
+                fontSize: 'var(--workspace-font-section-title)',
                 fontWeight: 600,
                 color: '#202124',
                 border: '1px solid #dadce0',
@@ -703,7 +703,7 @@ export function ExtractionEditorPanel() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span
                 style={{
-                  fontSize: 18,
+                  fontSize: 'var(--workspace-font-section-title)',
                   fontWeight: 600,
                   color: '#202124',
                   letterSpacing: '-0.01em',
@@ -742,13 +742,13 @@ export function ExtractionEditorPanel() {
                 </>
               )}
               {searchSet.last_validated_at && (
-                <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', whiteSpace: 'nowrap' }}>
                   Validated {relativeTime(searchSet.last_validated_at)}
                 </span>
               )}
             </div>
           )}
-          <div style={{ fontSize: 12, color: '#5f6368', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 2 }}>
             {selectedDocUuids.length > 0
               ? `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`
               : activeProjectUuid
@@ -797,7 +797,7 @@ export function ExtractionEditorPanel() {
       {/* Verified extraction notice */}
       {searchSet.verified && (
         <div style={{
-          margin: '0 24px 8px', padding: '8px 12px', fontSize: 12, color: '#78350f',
+          margin: '0 24px 8px', padding: '8px 12px', fontSize: 'var(--workspace-font-meta)', color: '#78350f',
           backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
           border: '1px solid #fde68a',
         }}>
@@ -809,7 +809,7 @@ export function ExtractionEditorPanel() {
             onClick={handleClone}
             disabled={cloning}
             style={{
-              padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 4, border: '1px solid #b45309',
               backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
               whiteSpace: 'nowrap', opacity: cloning ? 0.6 : 1,
@@ -868,7 +868,7 @@ export function ExtractionEditorPanel() {
               title={label}
               style={{
                 padding: tabsCompact ? '10px 12px' : '10px 16px',
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 fontWeight: isActive ? 600 : 400,
                 fontFamily: 'inherit',
                 color: isActive ? '#202124' : '#5f6368',
@@ -1023,14 +1023,14 @@ export function ExtractionEditorPanel() {
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
           <Shield style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} aria-hidden="true" />
-          <span style={{ fontSize: 12, color: '#1e40af', flex: 1 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#1e40af', flex: 1 }}>
             Check reliability with validation
           </span>
           <button
             type="button"
             onClick={() => setActiveTab('validate')}
             style={{
-              fontSize: 12, fontWeight: 600, color: '#2563eb', background: 'none',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#2563eb', background: 'none',
               border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px',
             }}
           >
@@ -1084,7 +1084,7 @@ export function ExtractionEditorPanel() {
               style={{
                 width: '100%',
                 padding: '10px 70px 10px 14px',
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
                 border: '1px solid #d1d5db',
                 borderRadius: 8,
@@ -1101,7 +1101,7 @@ export function ExtractionEditorPanel() {
                 top: '50%',
                 transform: 'translateY(-50%)',
                 padding: '6px 14px',
-                fontSize: 12,
+                fontSize: 'var(--workspace-font-meta)',
                 fontWeight: 700,
                 fontFamily: 'inherit',
                 borderRadius: 6,
@@ -1119,7 +1119,7 @@ export function ExtractionEditorPanel() {
               title="Merge all selected documents into a single context and run one extraction over the combined text. Off: run a separate extraction on each document and show results as numbered tabs."
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
+                fontSize: 'var(--workspace-font-meta)', color: '#374151', cursor: 'pointer', userSelect: 'none',
                 whiteSpace: 'nowrap', flexShrink: 0,
               }}
             >
@@ -1158,7 +1158,7 @@ export function ExtractionEditorPanel() {
               alignItems: 'center',
               gap: 6,
               padding: '10px 20px',
-              fontSize: 13,
+              fontSize: 'var(--workspace-font-control)',
               fontFamily: 'inherit',
               borderRadius: 'var(--ui-radius, 8px)',
               border: 'none',
@@ -1249,7 +1249,7 @@ function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) 
         margin: '8px 0',
         padding: '8px 10px',
         borderRadius: 6,
-        fontSize: 12,
+        fontSize: 'var(--workspace-font-meta)',
         border: `1px solid ${failed ? '#fca5a5' : inconclusive ? '#e5e7eb' : '#bbf7d0'}`,
         background: failed ? '#fef2f2' : inconclusive ? '#f9fafb' : '#f0fdf4',
         color: failed ? '#991b1b' : inconclusive ? '#4b5563' : '#166534',
@@ -1365,7 +1365,7 @@ export function DocumentWarningsStrip({ warnings }: { warnings: DocumentWarning[
         display: 'flex', gap: 8, alignItems: 'flex-start',
         padding: '8px 10px', margin: '8px 0',
         background: '#fffbeb', border: '1px solid #fcd34d',
-        borderRadius: 6, fontSize: 13, color: '#78350f',
+        borderRadius: 6, fontSize: 'var(--workspace-font-control)', color: '#78350f',
       }}
     >
       <AlertCircle className="h-4 w-4" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -1519,7 +1519,7 @@ function DesignTab({
           marginBottom: 16,
         }}
       >
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Extractions</div>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Extractions</div>
         {hasResults && (
           <div ref={exportMenuRef} style={{ position: 'relative' }}>
             <button
@@ -1534,7 +1534,7 @@ function DesignTab({
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: 12,
+                fontSize: 'var(--workspace-font-meta)',
                 color: '#2563eb',
                 fontFamily: 'inherit',
                 padding: 0,
@@ -1581,7 +1581,7 @@ function DesignTab({
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      fontSize: 12,
+                      fontSize: 'var(--workspace-font-meta)',
                       color: '#374151',
                       fontFamily: 'inherit',
                       textAlign: 'left',
@@ -1627,13 +1627,13 @@ function DesignTab({
             }}
           />
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', marginBottom: 3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#1e40af', marginBottom: 3 }}>
               Extracting...
             </div>
             <div
               key={tip}
               style={{
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 color: '#3b5998',
                 lineHeight: 1.45,
                 animation: 'fadeIn 0.4s ease',
@@ -1656,7 +1656,7 @@ function DesignTab({
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 0', borderBottom: '1px solid #e5e7eb',
         }}>
-          <span id="result-set-selector-label" style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+          <span id="result-set-selector-label" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
             Document:
           </span>
           <div
@@ -1685,7 +1685,7 @@ function DesignTab({
                 tabIndex={i === activeResultIdx ? 0 : -1}
                 onClick={() => onSetActiveResultIdx(i)}
                 style={{
-                  padding: '3px 10px', fontSize: 12, fontWeight: 600,
+                  padding: '3px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                   fontFamily: 'inherit', borderRadius: 12, border: 'none',
                   cursor: 'pointer', transition: 'all 0.15s',
                   backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
@@ -1696,14 +1696,14 @@ function DesignTab({
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 4 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginLeft: 4 }}>
             {resultSets.length} result{resultSets.length !== 1 ? 's' : ''}
           </span>
         </div>
       )}
 
       {itemsLoading ? (
-        <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
+        <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
           Loading...
         </div>
       ) : items.length === 0 ? (
@@ -1743,7 +1743,7 @@ function DesignTab({
                   />
                   <span
                     style={{
-                      fontSize: 12,
+                      fontSize: 'var(--workspace-font-meta)',
                       fontWeight: 500,
                       color: '#6b7280',
                       width: 20,
@@ -1778,7 +1778,7 @@ function DesignTab({
                       }}
                       style={{
                         flex: 1,
-                        fontSize: 14,
+                        fontSize: 'var(--workspace-font-body)',
                         fontFamily: 'inherit',
                         color: '#202124',
                         border: '1px solid #d1d5db',
@@ -1817,7 +1817,7 @@ function DesignTab({
                       title="Click for settings, double-click to rename"
                       style={{
                         background: 'none', border: 'none', padding: 0, margin: 0,
-                        fontFamily: 'inherit', fontSize: 14, color: '#202124', flex: 1,
+                        fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: 1,
                         minWidth: 0, cursor: 'pointer', textAlign: 'left',
                         display: 'flex', alignItems: 'center', gap: 4,
                       }}
@@ -1828,10 +1828,10 @@ function DesignTab({
                       }
                       {item.searchphrase}
                       {item.is_optional && (
-                        <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
                       )}
                       {item.enum_values.length > 0 && (
-                        <span style={{ fontSize: 10, color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
                       )}
                     </button>
                   )}
@@ -1914,7 +1914,7 @@ function DesignTab({
                       style={{
                         marginTop: 4,
                         marginLeft: 42,
-                        fontSize: 13,
+                        fontSize: 'var(--workspace-font-control)',
                         fontWeight: 600,
                         color: '#202124',
                         cursor: clickable ? 'pointer' : 'default',
@@ -1936,7 +1936,7 @@ function DesignTab({
                         <span
                           title={badge.title}
                           style={{
-                            marginLeft: 6, fontSize: 10, fontWeight: 500,
+                            marginLeft: 6, fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                             color: badge.color, background: badge.background,
                             borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap',
                           }}
@@ -1955,7 +1955,7 @@ function DesignTab({
                     background: '#f9fafb',
                     borderRadius: 6,
                     border: '1px solid #e5e7eb',
-                    fontSize: 12,
+                    fontSize: 'var(--workspace-font-meta)',
                   }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 8 }}>
                       <input
@@ -1983,7 +1983,7 @@ function DesignTab({
                         placeholder="e.g. USD, EUR, GBP"
                         style={{
                           width: '100%',
-                          fontSize: 12,
+                          fontSize: 'var(--workspace-font-meta)',
                           fontFamily: 'inherit',
                           color: '#202124',
                           border: '1px solid #d1d5db',
@@ -1993,7 +1993,7 @@ function DesignTab({
                           boxSizing: 'border-box',
                         }}
                       />
-                      <div style={{ color: '#6b7280', fontSize: 11, marginTop: 3 }}>
+                      <div style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)', marginTop: 3 }}>
                         Comma-separated. LLM will pick from these values.
                       </div>
                     </div>
@@ -2034,8 +2034,8 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
       }}>
         <Shield aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>No validation data yet</div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>No validation data yet</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
             Run validation to check extraction reliability
           </div>
         </div>
@@ -2063,13 +2063,13 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
             regressionPending={status.regression_pending_review}
           />
           {status.last_validated_at && (
-            <span style={{ fontSize: 11, color: '#6b7280' }}>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               {relativeTime(status.last_validated_at)}
             </span>
           )}
         </div>
         {status.config_changed && (
-          <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginTop: 4 }}>
             Config changed since last validation. Re-validate for accurate results.
           </div>
         )}
@@ -2235,7 +2235,7 @@ function ToolCard({
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          fontSize: 14,
+          fontSize: 'var(--workspace-font-body)',
           fontWeight: 600,
           color: danger ? '#dc2626' : '#202124',
         }}
@@ -2243,12 +2243,12 @@ function ToolCard({
         {danger && <Trash2 style={{ width: 14, height: 14 }} aria-hidden="true" />}
         {title}
       </div>
-      <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
       {error && (
         <div
           role="alert"
           style={{
-            fontSize: 12, lineHeight: 1.4, color: '#991b1b',
+            fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4, color: '#991b1b',
             background: '#fef2f2', border: '1px solid #fecaca',
             borderRadius: 6, padding: '8px 10px',
           }}
@@ -2275,7 +2275,7 @@ function ToolCard({
               }
             }}
             style={{
-              fontSize: 11,
+              fontSize: 'var(--workspace-font-meta)',
               color: secondaryAction.disabled ? '#6b7280' : '#2563eb',
               cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
               fontWeight: 500,
@@ -2350,7 +2350,7 @@ export function AdvancedTab({
       </div>
 
       <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+        <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
           Extraction Settings
         </div>
 
@@ -2361,7 +2361,7 @@ export function AdvancedTab({
             checked={useDefaults}
             onChange={(e) => onSetUseDefaults(e.target.checked)}
           />
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#202124' }}>
+          <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 500, color: '#202124' }}>
             Use system defaults
           </span>
         </label>
@@ -2370,7 +2370,7 @@ export function AdvancedTab({
           <>
           {/* Mode selector */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
               Mode
             </div>
             <select
@@ -2380,7 +2380,7 @@ export function AdvancedTab({
                 updateField({ mode: e.target.value as 'one_pass' | 'two_pass' })
               }
               style={{
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
                 border: '1px solid #d1d5db',
                 borderRadius: 6,
@@ -2431,7 +2431,7 @@ export function AdvancedTab({
 
           {/* Key Chunking */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
               Key Chunking
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -2447,11 +2447,11 @@ export function AdvancedTab({
                   })
                 }
               />
-              <span style={{ fontSize: 13, color: '#374151' }}>Enable key chunking</span>
+              <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Enable key chunking</span>
             </label>
             {config.key_chunking?.enabled && (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <label htmlFor="max-keys-per-chunk" style={{ fontSize: 13, color: '#5f6368' }}>Max keys per chunk:</label>
+                <label htmlFor="max-keys-per-chunk" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Max keys per chunk:</label>
                 <input
                   id="max-keys-per-chunk"
                   type="number"
@@ -2468,7 +2468,7 @@ export function AdvancedTab({
                   }
                   style={{
                     width: 60,
-                    fontSize: 13,
+                    fontSize: 'var(--workspace-font-control)',
                     fontFamily: 'inherit',
                     border: '1px solid #d1d5db',
                     borderRadius: 6,
@@ -2481,7 +2481,7 @@ export function AdvancedTab({
 
           {/* Repetition / Consensus */}
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
               Repetition / Consensus
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
@@ -2494,9 +2494,9 @@ export function AdvancedTab({
                   })
                 }
               />
-              <span style={{ fontSize: 13, color: '#374151' }}>Enable repetition</span>
+              <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Enable repetition</span>
             </label>
-            <div style={{ marginTop: 4, fontSize: 12, color: '#5f6368' }}>
+            <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#5f6368' }}>
               Run the extraction multiple times and use consensus to improve accuracy.
             </div>
           </div>
@@ -2511,10 +2511,10 @@ export function AdvancedTab({
         <ApiTab searchSetUuid={searchSetUuid} />
       ) : (
         <div style={cardStyle}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 6 }}>
             Run this extraction via API
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6 }}>
             Add at least one field to this extraction and the endpoint, its UUID, and ready-to-copy
             Python and cURL examples will appear here.
           </div>
@@ -2626,11 +2626,11 @@ print(response.json())`
 
   const codeBlockStyle: React.CSSProperties = {
     padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
+    fontSize: 'var(--workspace-font-meta)', color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+    padding: '4px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     borderRadius: 4, cursor: 'pointer', border: 'none',
     backgroundColor: active ? '#3b82f6' : '#e5e7eb',
     color: active ? '#fff' : '#6b7280',
@@ -2639,7 +2639,7 @@ print(response.json())`
   return (
     <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+        <label style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
           Run this extraction via API
         </label>
           <div
@@ -2660,14 +2660,14 @@ print(response.json())`
           </div>
         </div>
 
-        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
           Call this extraction directly from any HTTP client. No automation required. The endpoint runs synchronously
           and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
           the top-right menu. Rate-limited to 10 requests/minute.
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Endpoint
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2676,7 +2676,7 @@ print(response.json())`
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             This extraction's UUID
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2712,7 +2712,7 @@ print(response.json())`
         />
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Response
           </div>
           <div style={codeBlockStyle}>
@@ -2721,7 +2721,7 @@ print(response.json())`
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Status lookup (optional)
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
@@ -2737,7 +2737,7 @@ print(response.json())`
           />
         </div>
 
-      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
         Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
         <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
         <code>text</code> (optional, raw text to extract from) with an optional{' '}
@@ -2745,7 +2745,7 @@ print(response.json())`
         <code>text</code> must be provided.
       </div>
 
-      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
         <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
         Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
         with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
@@ -2764,14 +2764,14 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
           type="button"
           onClick={() => onCopy(code, id)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 'var(--workspace-font-meta)',
             fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
             border: '1px solid #e5e7eb', backgroundColor: '#fff',
             color: copied === id ? '#16a34a' : '#6b7280',
@@ -2800,7 +2800,7 @@ function PassSettings({
   const modelSelectId = useId()
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 8 }}>
         {label}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 4 }}>
@@ -2810,7 +2810,7 @@ function PassSettings({
             checked={value.thinking ?? false}
             onChange={(e) => onChange({ ...value, thinking: e.target.checked })}
           />
-          <span style={{ fontSize: 13, color: '#374151' }}>Thinking</span>
+          <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Thinking</span>
         </label>
         <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
           <input
@@ -2818,17 +2818,17 @@ function PassSettings({
             checked={value.structured ?? false}
             onChange={(e) => onChange({ ...value, structured: e.target.checked })}
           />
-          <span style={{ fontSize: 13, color: '#374151' }}>Structured</span>
+          <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Structured</span>
         </label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label htmlFor={modelSelectId} style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+          <label htmlFor={modelSelectId} style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Model:</label>
           <select
             id={modelSelectId}
             value={value.model ?? ''}
             onChange={(e) => onChange({ ...value, model: e.target.value || undefined })}
             style={{
               width: 220,
-              fontSize: 13,
+              fontSize: 'var(--workspace-font-control)',
               fontFamily: 'inherit',
               border: '1px solid #d1d5db',
               borderRadius: 6,
@@ -3006,14 +3006,14 @@ function ValidationProgressDisplay({
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
         <Loader2 aria-hidden="true" style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#1e40af' }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1e40af' }}>
             Running {sources.length} {sources.length === 1 ? 'source' : 'sources'} &times; {numRuns} {numRuns === 1 ? 'replicate' : 'replicates'}
           </div>
-          <div style={{ fontSize: 12, color: '#3b5998', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#3b5998', marginTop: 2 }}>
             {progress.phase}
           </div>
         </div>
-        <div style={{ marginLeft: 'auto', fontSize: 20, fontWeight: 700, color: '#3b82f6' }}>
+        <div style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#3b82f6' }}>
           {progress.pct}%
         </div>
       </div>
@@ -3021,47 +3021,47 @@ function ValidationProgressDisplay({
       {/* Config details */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <span style={{
-          fontSize: 11, padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           {modeLabel}
         </span>
         <span style={{
-          fontSize: 11, padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           Model: {modelName}
         </span>
         <span style={{
-          fontSize: 11, padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           {numFields} fields
         </span>
         {hasThinking && (
-          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
             Thinking
           </span>
         )}
         {hasStructured && (
-          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
             Structured
           </span>
         )}
         {hasConsensus && (
-          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
             Consensus
           </span>
         )}
         {hasChunking && (
-          <span style={{ fontSize: 11, padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
             Chunking
           </span>
         )}
       </div>
 
       {/* Elapsed time */}
-      <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>
+      <div style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         Elapsed: {progress.elapsed < 60 ? `${progress.elapsed}s` : `${Math.floor(progress.elapsed / 60)}m ${progress.elapsed % 60}s`}
       </div>
     </div>
@@ -3453,10 +3453,10 @@ function ValidateTab({
     return (
       <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
             Validate & Improve
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
             One click scores this extraction against your test cases and tries better settings.
           </div>
         </div>
@@ -3472,10 +3472,10 @@ function ValidateTab({
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
           Validate & Improve
         </div>
-        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
           One click scores this extraction against your test cases and tries better settings.
           The sections below hold the test data and per-field diagnostics.
         </div>
@@ -3514,11 +3514,11 @@ function ValidateTab({
               ? <ChevronRight style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
               : <ChevronDown style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
           )}
-          <span style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
+          <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>
             Test cases
           </span>
           {sources.length > 0 && sourcesCollapsed && (
-            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400 }}>
               ({sources.length} source{sources.length !== 1 ? 's' : ''})
             </span>
           )}
@@ -3533,7 +3533,7 @@ function ValidateTab({
               backgroundColor: '#fef2f2', border: '1px solid #fecaca',
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
-              <div style={{ flex: 1, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>
+              <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#7f1d1d', lineHeight: 1.5 }}>
                 <strong>{portability.missing_snapshot_count} of {portability.document_count} document-bound test case{portability.document_count !== 1 ? 's' : ''} {portability.missing_snapshot_count === 1 ? 'has' : 'have'} no saved text snapshot.</strong>
                 {' '}They will only run for users with access to the original document.
               </div>
@@ -3545,7 +3545,7 @@ function ValidateTab({
               backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
             }}>
               <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 2 }} />
-              <div style={{ flex: 1, fontSize: 12, color: '#075985', lineHeight: 1.5 }}>
+              <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#075985', lineHeight: 1.5 }}>
                 {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation, and they won't need the original documents.
               </div>
             </div>
@@ -3566,7 +3566,7 @@ function ValidateTab({
                 backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
               }}>
                 <ShieldCheck style={{ width: 14, height: 14, color: '#059669', flexShrink: 0 }} />
-                <span style={{ fontSize: 12, color: '#065f46' }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#065f46' }}>
                   Sample size requirements met. Run validation again to update your score.
                 </span>
               </div>
@@ -3579,11 +3579,11 @@ function ValidateTab({
               backgroundColor: '#fffbeb', border: '1px solid #fde68a',
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
-              <div style={{ flex: 1, fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+              <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
                 <strong>Quality score reduced due to low sample size.</strong>
                 {' '}
                 Raw score: <strong>{Math.round(bd.raw_score)}%</strong>, final: <strong>{Math.round(bd.final_score)}%</strong>
-                <div style={{ marginTop: 4, fontSize: 11, color: '#78350f' }}>
+                <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#78350f' }}>
                   {needMoreDocs && <>Add <strong>{3 - sources.length}</strong> more test document{3 - sources.length !== 1 ? 's' : ''} (need 3 total). </>}
                   {needMoreRuns && <>Increase to <strong>3</strong> runs per validation (currently {numRuns}).</>}
                 </div>
@@ -3594,7 +3594,7 @@ function ValidateTab({
 
         {sourcesCollapsed ? null : loadingSources ? (
           <div role="status" style={{
-            textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0',
+            textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0',
             border: '1px dashed #d1d5db', borderRadius: 8,
           }}>
             <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading sources...
@@ -3605,10 +3605,10 @@ function ValidateTab({
             border: '1px dashed #d1d5db', borderRadius: 8,
           }}>
             <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#6b7280', margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Validate your extraction
             </div>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 16, lineHeight: 1.5 }}>
               Add documents with expected values to measure accuracy and consistency across multiple runs.
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -3617,7 +3617,7 @@ function ValidateTab({
                 onClick={() => setShowDocPicker(true)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', fontSize: 13, fontWeight: 600,
+                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
                   fontFamily: 'inherit', borderRadius: 8, border: 'none',
                   backgroundColor: 'var(--color-panel-dark)', color: '#fff', cursor: 'pointer',
                 }}
@@ -3629,7 +3629,7 @@ function ValidateTab({
                 onClick={addTextSource}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', fontSize: 13, fontWeight: 500,
+                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                   fontFamily: 'inherit', borderRadius: 8,
                   border: '1px solid #d1d5db', backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
@@ -3649,19 +3649,19 @@ function ValidateTab({
                 <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {label}
                     </span>
                     {docMissing && (
                       <span
-                        style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', flexShrink: 0 }}
+                        style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic', flexShrink: 0 }}
                         title="The source document was deleted. Validation still runs against the saved snapshot."
                       >
                         source deleted
                       </span>
                     )}
                     <span style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                      fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4,
                       backgroundColor: src.source_type === 'text' ? '#eff6ff' : '#fef3c7',
                       color: src.source_type === 'text' ? '#1d4ed8' : '#92400e',
                     }}>
@@ -3715,7 +3715,7 @@ function ValidateTab({
                             placeholder="Paste the text to extract from..."
                             rows={3}
                             style={{
-                              width: '100%', fontSize: 12, fontFamily: 'inherit',
+                              width: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                               border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px',
                               resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                             }}
@@ -3723,7 +3723,7 @@ function ValidateTab({
                         </div>
                       )}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#5f6368' }}>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#5f6368' }}>
                           Expected Values (optional)
                         </div>
                         {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
@@ -3733,7 +3733,7 @@ function ValidateTab({
                             disabled={fillingSourceId === src.id}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 3,
-                              padding: '2px 7px', fontSize: 11, fontFamily: 'inherit',
+                              padding: '2px 7px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                               borderRadius: 4, border: '1px solid #d1d5db', backgroundColor: '#fff',
                               color: fillingSourceId === src.id ? '#6b7280' : '#5f6368',
                               cursor: fillingSourceId === src.id ? 'not-allowed' : 'pointer',
@@ -3748,7 +3748,7 @@ function ValidateTab({
                         )}
                       </div>
                       {fillError && !fillingSourceId && (
-                        <div role="alert" style={{ fontSize: 11, color: '#dc2626', marginBottom: 6 }}>
+                        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 6 }}>
                           {fillError}
                         </div>
                       )}
@@ -3757,13 +3757,13 @@ function ValidateTab({
                           <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{
-                                fontSize: 11, color: '#374151', width: 120, flexShrink: 0,
+                                fontSize: 'var(--workspace-font-meta)', color: '#374151', width: 120, flexShrink: 0,
                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                                 display: 'flex', alignItems: 'center', gap: 3,
                               }}>
                                 {item.searchphrase}
                                 {item.is_optional && (
-                                  <span style={{ fontSize: 9, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '0px 3px', fontWeight: 500 }}>opt</span>
+                                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '0px 3px', fontWeight: 500 }}>opt</span>
                                 )}
                               </span>
                               <input
@@ -3772,7 +3772,7 @@ function ValidateTab({
                                 onChange={e => updateExpectedValue(src.id, item.searchphrase, e.target.value)}
                                 placeholder={item.is_optional ? 'Expected value (optional field)' : 'Expected value'}
                                 style={{
-                                  flex: 1, fontSize: 11, fontFamily: 'inherit',
+                                  flex: 1, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                                   border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 6px',
                                   outline: 'none',
                                   backgroundColor: item.is_optional && !src.expected_values[item.searchphrase] ? '#fafafa' : '#fff',
@@ -3792,7 +3792,7 @@ function ValidateTab({
                               </label>
                             </div>
                             {item.enum_values.length > 0 && (
-                              <div style={{ marginLeft: 126, fontSize: 10, color: '#7c3aed' }}>
+                              <div style={{ marginLeft: 126, fontSize: 'var(--workspace-font-meta)', color: '#7c3aed' }}>
                                 Allowed: {item.enum_values.join(', ')}
                               </div>
                             )}
@@ -3815,7 +3815,7 @@ function ValidateTab({
               onClick={() => setShowDocPicker(true)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                 borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
                 color: '#202124', cursor: 'pointer',
               }}
@@ -3827,7 +3827,7 @@ function ValidateTab({
               onClick={addTextSource}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                 borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
                 color: '#202124', cursor: 'pointer',
               }}
@@ -3850,7 +3850,7 @@ function ValidateTab({
             }}
             style={{
               marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+              padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
               borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
               color: '#1d4ed8', cursor: 'pointer',
             }}
@@ -3871,15 +3871,15 @@ function ValidateTab({
           deep-dive. The headline score lives in the tune panel above; this is
           a diagnostic breakdown, not a competing score. */}
       <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
           Detailed validation
         </div>
-        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 12 }}>
           Run the test cases as-is and inspect expected vs. extracted values per source and field.
           For the official score, use “Validate & improve” at the top.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label htmlFor="detailed-validation-replicates" style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
+          <label htmlFor="detailed-validation-replicates" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Replicates:</label>
           <input
             id="detailed-validation-replicates"
             type="number"
@@ -3888,7 +3888,7 @@ function ValidateTab({
             value={numRuns}
             onChange={e => setNumRuns(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
             style={{
-              width: 50, fontSize: 13, fontFamily: 'inherit',
+              width: 50, fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px',
             }}
           />
@@ -3898,7 +3898,7 @@ function ValidateTab({
             disabled={validating || sources.length === 0}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 8, border: 'none',
               backgroundColor: 'var(--color-panel-dark)', color: '#fff',
               cursor: validating || sources.length === 0 ? 'not-allowed' : 'pointer',
@@ -3935,8 +3935,8 @@ function ValidateTab({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
             <TrendingUp aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280' }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
-            <span style={{ fontSize: 11, color: '#6b7280' }}>({qualityHistory.length} runs)</span>
+            <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
+            <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
           </div>
           <div style={{ width: '100%', height: 80 }}>
             <QualityHistoryChart runs={qualityHistory} />
@@ -3950,7 +3950,7 @@ function ValidateTab({
             aria-controls="quality-history-run-table"
             style={{
               display: 'flex', alignItems: 'center', gap: 4, marginTop: 8,
-              fontSize: 11, color: '#6b7280', background: 'none', border: 'none',
+              fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: 'none', border: 'none',
               cursor: 'pointer', padding: '4px 0', fontFamily: 'inherit',
             }}
           >
@@ -3962,7 +3962,7 @@ function ValidateTab({
 
           {/* Collapsible run comparison table */}
           {historyExpanded && (
-            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 4 }}>
+            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 4 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                   <th style={{ width: 20, padding: '4px 2px' }} />
@@ -4006,7 +4006,7 @@ function ValidateTab({
                           {Math.round(run.score)}
                           {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
                             <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
-                              style={{ color: '#d97706', fontSize: 9, marginLeft: 2, verticalAlign: 'super' }}>*</span>
+                              style={{ color: '#d97706', fontSize: 'var(--workspace-font-meta)', marginLeft: 2, verticalAlign: 'super' }}>*</span>
                           )}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
@@ -4018,12 +4018,12 @@ function ValidateTab({
                         <td style={{ padding: '4px 6px' }}>
                           <span style={{
                             display: 'inline-block', padding: '1px 6px', borderRadius: 4,
-                            backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 10,
+                            backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 'var(--workspace-font-meta)',
                           }}>
                             {_summarizeConfig(run.extraction_config)}
                           </span>
                         </td>
-                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
+                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
                           {run.model || '-'}
                         </td>
                       </tr>
@@ -4037,7 +4037,7 @@ function ValidateTab({
                                 backgroundColor: '#fffbeb', border: '1px solid #fde68a',
                               }}>
                                 <AlertTriangle style={{ width: 14, height: 14, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
-                                <div style={{ fontSize: 11, color: '#92400e', lineHeight: 1.5 }}>
+                                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', lineHeight: 1.5 }}>
                                   <strong>Score reduced by sample size confidence penalty</strong>
                                   <br />
                                   Raw score: <strong>{Math.round(run.score_breakdown.raw_score)}</strong> → Final: <strong>{Math.round(run.score_breakdown.final_score)}</strong> ({`-${Math.round(run.score_breakdown.sample_size_penalty)} pts`})
@@ -4079,18 +4079,18 @@ function ValidateTab({
             backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
           }}>
             <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
-            <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
+            <div style={{ flex: 1, fontSize: 'var(--workspace-font-control)', color: '#065f46' }}>
               <strong>Great results!</strong> This extraction has a quality score of {Math.round(displayScore)}%. Consider sharing it with Explore so others can benefit.
             </div>
             {submitLibraryResult === 'success' ? (
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
             ) : (
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowSubmitDialog(true) }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
                   color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
@@ -4118,14 +4118,14 @@ function ValidateTab({
       {results && (
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
                 onClick={() => downloadValidationCSV(results)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
                 }}
@@ -4139,7 +4139,7 @@ function ValidateTab({
                 title="Download the raw results (JSON + CSV): every replicate's extracted value for every document, for archival and cross-model comparison"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
                   color: '#374151', cursor: downloadingResults ? 'wait' : 'pointer',
                   opacity: downloadingResults ? 0.6 : 1,
@@ -4165,38 +4165,38 @@ function ValidateTab({
             border: '1px solid #e5e7eb',
           }}>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Mean Accuracy</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: _scoreColor(results.executive_summary.mean_accuracy) }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Mean Accuracy</div>
+              <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: _scoreColor(results.executive_summary.mean_accuracy) }}>
                 {results.executive_summary.mean_accuracy !== null ? `${Math.round(results.executive_summary.mean_accuracy * 100)}%` : 'N/A'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Mean Consistency</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: _scoreColor(results.executive_summary.mean_consistency) }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Mean Consistency</div>
+              <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: _scoreColor(results.executive_summary.mean_consistency) }}>
                 {Math.round(results.executive_summary.mean_consistency * 100)}%
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Perfect Fields</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#202124' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Perfect Fields</div>
+              <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#202124' }}>
                 {results.executive_summary.perfect_fields_count}/{results.executive_summary.total_fields_count}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Std Dev</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#374151' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Std Dev</div>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#374151' }}>
                 {results.executive_summary.run_to_run_std_dev.toFixed(2)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Best Run</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#059669' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Best Run</div>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#059669' }}>
                 Src {results.executive_summary.best_run.source_index + 1}, Run {results.executive_summary.best_run.run_index + 1} ({results.executive_summary.best_run.correct} correct)
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Worst Run</div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#dc2626' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Worst Run</div>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#dc2626' }}>
                 Src {results.executive_summary.worst_run.source_index + 1}, Run {results.executive_summary.worst_run.run_index + 1} ({results.executive_summary.worst_run.correct} correct)
               </div>
             </div>
@@ -4222,7 +4222,7 @@ function ValidateTab({
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Sparkles aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
+                  <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
                 </div>
                 {!suggestions && !loadingSuggestions && (
                   <button
@@ -4231,7 +4231,7 @@ function ValidateTab({
                     disabled={loadingSuggestions}
                     style={{
                       display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                       borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
                       color: '#92400e', cursor: 'pointer',
                     }}
@@ -4241,7 +4241,7 @@ function ValidateTab({
                 )}
               </div>
               {loadingSuggestions && (
-                <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e', marginTop: 8 }}>
+                <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--workspace-font-control)', color: '#92400e', marginTop: 8 }}>
                   <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
                   Analyzing validation results...
                 </div>
@@ -4249,7 +4249,7 @@ function ValidateTab({
               {suggestions && (
                 <div
                   className="chat-markdown"
-                  style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, marginTop: 8 }}
+                  style={{ fontSize: 'var(--workspace-font-control)', color: '#78350f', lineHeight: 1.6, marginTop: 8 }}
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(suggestions) as string) }}
                 />
               )}
@@ -4259,8 +4259,8 @@ function ValidateTab({
           {/* 5. Per-Run Reproducibility */}
           {results.executive_summary.per_run_reproducibility.length > 0 && (
             <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, backgroundColor: '#fff' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 8 }}>Per-Run Reproducibility</div>
-              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 8 }}>Per-Run Reproducibility</div>
+              <table style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                     <th style={{ textAlign: 'left', padding: '4px 6px', color: '#5f6368', fontWeight: 600 }}>Run #</th>
@@ -4282,7 +4282,7 @@ function ValidateTab({
                         return (
                           <td key={pr.source_label} style={{ padding: '4px 6px', textAlign: 'center' }}>
                             <span style={{
-                              padding: '1px 6px', borderRadius: 4, fontSize: 11,
+                              padding: '1px 6px', borderRadius: 4, fontSize: 'var(--workspace-font-meta)',
                               backgroundColor: _scoreBg(ratio), color: _scoreColor(ratio),
                             }}>
                               {correct}
@@ -4315,18 +4315,18 @@ function ValidateTab({
                   ? <ChevronDown style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} aria-hidden="true" />
                   : <ChevronRight style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} aria-hidden="true" />
                 }
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#202124', flex: 1 }}>{sr.source_label}</span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_accuracy), color: _scoreColor(sr.overall_accuracy) }}>
+                <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', flex: 1 }}>{sr.source_label}</span>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_accuracy), color: _scoreColor(sr.overall_accuracy) }}>
                   {sr.overall_accuracy !== null ? `${Math.round(sr.overall_accuracy * 100)}% acc` : 'N/A'}
                 </span>
-                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_consistency), color: _scoreColor(sr.overall_consistency) }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_consistency), color: _scoreColor(sr.overall_consistency) }}>
                   {Math.round(sr.overall_consistency * 100)}% cons
                 </span>
               </button>
 
               {expandedSource === `${si}` && (
                 <div id={`source-detail-${si}`} style={{ padding: '0 14px 14px' }}>
-                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
+                  <table style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 8 }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                         <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Field</th>
@@ -4350,20 +4350,20 @@ function ValidateTab({
                             </td>
                             <td style={{ padding: '6px 4px', textAlign: 'center', color: '#374151' }}>{f.distinct_value_count}</td>
                             <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-                              <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.consistency), color: _scoreColor(f.consistency), fontSize: 11 }}>
+                              <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.consistency), color: _scoreColor(f.consistency), fontSize: 'var(--workspace-font-meta)' }}>
                                 {Math.round(f.consistency * 100)}%
                               </span>
                             </td>
                             <td style={{ padding: '6px 4px', textAlign: 'center' }}>
                               {f.accuracy !== null ? (
-                                <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.accuracy), color: _scoreColor(f.accuracy), fontSize: 11 }}>
+                                <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.accuracy), color: _scoreColor(f.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
                                   {Math.round(f.accuracy * 100)}%
                                 </span>
                               ) : (
-                                <span style={{ color: '#6b7280', fontSize: 11 }}>N/A</span>
+                                <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>N/A</span>
                               )}
                             </td>
-                            <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 10 }}>
+                            <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 'var(--workspace-font-meta)' }}>
                               {errorEntries.length > 0
                                 ? errorEntries.map(([t, c]) => `${t}:${c}`).join(', ')
                                 : <span style={{ color: '#6b7280' }}>-</span>
@@ -4387,22 +4387,22 @@ function ValidateTab({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
                 <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
-                <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
+                <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {results.challenging_fields.map((cf, i) => (
-                  <div key={i} style={{ fontSize: 12, color: '#78350f', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ fontWeight: 600 }}>{cf.field_name}</span>
                     <span style={{ color: '#92400e' }}>({cf.source_label})</span>
                     {cf.accuracy !== null && (
-                      <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.accuracy), color: _scoreColor(cf.accuracy), fontSize: 10 }}>
+                      <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.accuracy), color: _scoreColor(cf.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
                         {Math.round(cf.accuracy * 100)}% acc
                       </span>
                     )}
-                    <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.consistency), color: _scoreColor(cf.consistency), fontSize: 10 }}>
+                    <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.consistency), color: _scoreColor(cf.consistency), fontSize: 'var(--workspace-font-meta)' }}>
                       {Math.round(cf.consistency * 100)}% cons
                     </span>
-                    <span style={{ fontSize: 10, color: '#92400e' }}>({cf.most_common_error})</span>
+                    <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e' }}>({cf.most_common_error})</span>
                   </div>
                 ))}
               </div>
@@ -4415,7 +4415,7 @@ function ValidateTab({
               {Object.entries(results.error_type_summary).map(([type, count]) => (
                 <span key={type} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', fontSize: 12, borderRadius: 6,
+                  padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', borderRadius: 6,
                   backgroundColor: type === 'missing' ? '#fef2f2' : type === 'wrong_value' ? '#fef2f2' : type === 'format_difference' ? '#fffbeb' : '#eff6ff',
                   color: type === 'missing' ? '#dc2626' : type === 'wrong_value' ? '#dc2626' : type === 'format_difference' ? '#d97706' : '#1d4ed8',
                   fontWeight: 600,
@@ -4451,10 +4451,10 @@ function ValidateTab({
             backgroundColor: '#fff', borderRadius: 12, padding: 24, maxWidth: 440, width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }}>
-            <div style={{ fontSize: 15, fontWeight: 700, color: '#202124', marginBottom: 8 }}>
+            <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#202124', marginBottom: 8 }}>
               Auto-populate expected values?
             </div>
-            <div style={{ fontSize: 13, color: '#5f6368', lineHeight: 1.6, marginBottom: 20 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368', lineHeight: 1.6, marginBottom: 20 }}>
               Run extraction on {pendingDocs.length === 1 ? 'this document' : `these ${pendingDocs.length} documents`} and
               use the results as expected values. You can review and correct them afterwards.
             </div>
@@ -4468,7 +4468,7 @@ function ValidateTab({
                   addDocuments(docs, false)
                 }}
                 style={{
-                  padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
                 }}
@@ -4484,7 +4484,7 @@ function ValidateTab({
                   addDocuments(docs, true)
                 }}
                 style={{
-                  padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
                   borderRadius: 8, border: 'none',
                   backgroundColor: 'var(--color-panel-dark)', color: '#fff',
                   cursor: autoFilling ? 'not-allowed' : 'pointer',
@@ -4520,10 +4520,10 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#6b7280' }} interval="preserveStartEnd" />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#6b7280' }} />
+        <XAxis dataKey="date" tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} interval="preserveStartEnd" />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
         <Tooltip
-          contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
+          contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 6, border: '1px solid #e5e7eb' }}
           formatter={(value, name) => {
             const label = name === 'score' ? 'Quality' : 'Adjusted'
             return [`${Number(value ?? 0)}%`, label]
@@ -4544,15 +4544,15 @@ function _summarizeConfig(config?: Record<string, unknown> | null): string {
 
 function _renderConfigDetails(config?: Record<string, unknown> | null): React.ReactNode {
   if (!config || Object.keys(config).length === 0) {
-    return <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>System defaults were used</span>
+    return <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontStyle: 'italic' }}>System defaults were used</span>
   }
 
   const kvStyle: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: 11,
+    display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: 'var(--workspace-font-meta)',
   }
   const labelStyle: React.CSSProperties = { color: '#6b7280', fontWeight: 500 }
   const valStyle: React.CSSProperties = { color: '#374151' }
-  const sectionStyle: React.CSSProperties = { fontWeight: 600, color: '#4b5563', fontSize: 11, marginTop: 6, marginBottom: 2 }
+  const sectionStyle: React.CSSProperties = { fontWeight: 600, color: '#4b5563', fontSize: 'var(--workspace-font-meta)', marginTop: 6, marginBottom: 2 }
 
   const mode = (config.mode as string) || 'one_pass'
   const onePass = config.one_pass as Record<string, unknown> | undefined
@@ -4680,7 +4680,7 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
         flexShrink: 0,
       }}
     >
-      <div style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
+      <div style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
         {title}
       </div>
       <button

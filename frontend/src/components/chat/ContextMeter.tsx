@@ -28,15 +28,15 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick, state, percen
   // Color: backend state wins; local ratio thresholds are the fallback for
   // turns before the first context_meter chunk arrives.
   let strokeColor = '#9ca3af'
-  let textColor = '#6b7280'
+  let textColor = 'var(--workspace-muted)'
   const effectiveState =
     state ?? (ratio >= 0.9 ? 'compact' : ratio >= 0.7 ? 'warning' : 'ok')
   if (effectiveState === 'compact' || effectiveState === 'blocked') {
     strokeColor = '#ef4444'
-    textColor = '#ef4444'
+    textColor = 'var(--workspace-danger)'
   } else if (effectiveState === 'warning') {
     strokeColor = '#f59e0b'
-    textColor = '#d97706'
+    textColor = 'var(--workspace-warning)'
   }
 
   let tooltip = `${formatTokenCount(tokensUsed)} / ${formatTokenCount(contextWindow)} tokens used`
@@ -48,7 +48,7 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick, state, percen
     tooltip += ` · ${percentUntilCompact}% until compaction is recommended`
   }
 
-  const size = 30
+  const size = 40
   const strokeWidth = 3
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
@@ -102,7 +102,7 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick, state, percen
         <span
           style={{
             position: 'absolute',
-            fontSize: 8,
+            fontSize: 'var(--workspace-font-meta)',
             fontWeight: 700,
             color: textColor,
             userSelect: 'none',

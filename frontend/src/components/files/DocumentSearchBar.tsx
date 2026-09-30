@@ -77,7 +77,7 @@ export function DocumentSearchBar({
           maxWidth: '100%',
           height: 28,
           padding: '0 8px',
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
           border: 'none',
           outline: 'none',
           background: 'transparent',
@@ -90,7 +90,7 @@ export function DocumentSearchBar({
         style={{
           minWidth: 70,
           textAlign: 'center',
-          fontSize: 12,
+          fontSize: 'var(--workspace-font-meta)',
           color: statusColor,
           padding: '0 4px',
         }}

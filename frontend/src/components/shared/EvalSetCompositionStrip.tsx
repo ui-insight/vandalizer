@@ -106,7 +106,7 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
       title={title}
       style={{
         display: 'inline-flex', alignItems: 'center',
-        fontSize: 10, fontWeight: 600,
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         padding: '2px 8px', borderRadius: 6,
         color: c.fg, backgroundColor: c.bg,
         border: `1px solid ${c.border}`,
@@ -121,7 +121,7 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
 function SubChip({ label }: { label: string }) {
   return (
     <span style={{
-      fontSize: 9, color: 'var(--workspace-muted)',
+      fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
       padding: '1px 6px', borderRadius: 4,
       backgroundColor: 'var(--workspace-canvas)',
       border: '1px solid var(--workspace-border)',

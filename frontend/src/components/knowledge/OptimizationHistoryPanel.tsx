@@ -61,9 +61,9 @@ export function OptimizationHistoryPanel({
       >
         {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
         <History size={14} style={{ color: 'var(--workspace-muted)' }} />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--workspace-muted)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -77,10 +77,10 @@ export function OptimizationHistoryPanel({
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', padding: '12px 8px' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '12px 8px' }}>
               No prior optimization runs for this KB.
             </div>
           )}
@@ -143,7 +143,7 @@ function HistoryRow({
         <StatusDot status={run.status} />
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{
-            fontSize: 12, color: 'var(--workspace-text)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
             overflowWrap: 'anywhere',
           }}>
             {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
@@ -151,7 +151,7 @@ function HistoryRow({
             {run.options?.apply_on_finish ? <span style={{ color: 'var(--workspace-info)' }}> · auto-applied</span> : null}
           </div>
           <div style={{
-            fontSize: 12, color: 'var(--workspace-muted)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
             overflowWrap: 'anywhere', marginTop: 1,
           }}>
             {run.judge_model && <>judge: {run.judge_model}</>}
@@ -162,7 +162,7 @@ function HistoryRow({
           </div>
           {run.error_message && run.status === 'failed' && (
             <div style={{
-              fontSize: 12, color: 'var(--workspace-danger)',
+              fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
               overflowWrap: 'anywhere', marginTop: 1,
             }}>
               {run.error_message}
@@ -170,13 +170,13 @@ function HistoryRow({
           )}
         </div>
         {score != null && (
-          <span style={{ fontSize: 12, fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
             {(score * 100).toFixed(0)}%
           </span>
         )}
         {lift != null && (
           <span style={{
-            fontSize: 12,
+            fontSize: 'var(--workspace-font-meta)',
             color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
             minWidth: 50, textAlign: 'right',
           }}>
@@ -190,7 +190,7 @@ function HistoryRow({
           title="Compare this run with the current one"
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4,
-            minHeight: 36, padding: '4px 8px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            minHeight: 36, padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: 'var(--workspace-info)', background: 'transparent',
             border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 4,
             cursor: 'pointer',

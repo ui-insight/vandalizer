@@ -173,10 +173,10 @@ export function StepInputSources({
 
   return (
     <div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
         Data Sources
       </div>
-      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 12 }}>
         Pick one or more. Multiple selections are combined in labeled sections, e.g.,
         check Step Input + Workflow Documents to give this step both the prior output and the original documents.
       </div>
@@ -191,8 +191,8 @@ export function StepInputSources({
             style={{ marginTop: 2 }}
           />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Step Input</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Step Input</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
               Only the output of the immediately previous step: no documents, no earlier
               steps. Pair with another source to also include document context.
             </div>
@@ -209,8 +209,8 @@ export function StepInputSources({
             style={{ marginTop: 2 }}
           />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Select a Document</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Select a Document</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
               A single document pinned to this step now, used every run, regardless of
               what triggered the workflow.
             </div>
@@ -230,7 +230,7 @@ export function StepInputSources({
                   onChange={e => { setDocSearchQuery(e.target.value); setDocHighlight(0) }}
                   placeholder="Search documents..."
                   style={{
-                    width: '100%', padding: '8px 12px', fontSize: 13,
+                    width: '100%', padding: '8px 12px', fontSize: 'var(--workspace-font-control)',
                     fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
                     outline: 'none', boxSizing: 'border-box',
                   }}
@@ -260,7 +260,7 @@ export function StepInputSources({
                     maxHeight: 200, overflowY: 'auto',
                   }}>
                     {docSearchResults.length === 0 ? (
-                      <div style={{ padding: '8px 12px', fontSize: 13, color: '#6b7280' }}>
+                      <div style={{ padding: '8px 12px', fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
                         No documents found
                       </div>
                     ) : docSearchResults.map((doc, i) => (
@@ -272,7 +272,7 @@ export function StepInputSources({
                         onMouseEnter={() => setDocHighlight(i)}
                         onMouseDown={() => pickDocument(doc)}
                         style={{
-                          padding: '8px 12px', fontSize: 13, cursor: 'pointer',
+                          padding: '8px 12px', fontSize: 'var(--workspace-font-control)', cursor: 'pointer',
                           display: 'flex', alignItems: 'center', gap: 8,
                           backgroundColor: i === Math.min(docHighlight, docSearchResults.length - 1) || doc.uuid === value.selectedDocUuid ? '#f3f4f6' : '#fff',
                         }}
@@ -288,7 +288,7 @@ export function StepInputSources({
                 {value.selectedDocUuid && !showDocDropdown && (
                   <div style={{
                     marginTop: 6, display: 'flex', alignItems: 'center', gap: 6,
-                    padding: '6px 10px', backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 12,
+                    padding: '6px 10px', backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 'var(--workspace-font-meta)',
                   }}>
                     <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
                     <span
@@ -323,8 +323,8 @@ export function StepInputSources({
             style={{ marginTop: 2 }}
           />
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Workflow Documents</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Workflow Documents</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
               The documents the workflow was triggered with this run, plus any fixed
               documents pinned below at the workflow level.
             </div>
@@ -334,7 +334,7 @@ export function StepInputSources({
                 {/* Fixed documents list */}
                 {fixedDocs.length > 0 && (
                   <div style={{ marginBottom: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Fixed Documents
                     </div>
                     {fixedDocs.map(doc => (
@@ -342,7 +342,7 @@ export function StepInputSources({
                         display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px',
                         backgroundColor: doc.missing ? '#fef2f2' : '#f3f4f6',
                         border: `1px solid ${doc.missing ? '#fecaca' : 'transparent'}`,
-                        borderRadius: 6, fontSize: 12, marginBottom: 4,
+                        borderRadius: 6, fontSize: 'var(--workspace-font-meta)', marginBottom: 4,
                       }}>
                         <FileText style={{ width: 12, height: 12, color: doc.missing ? '#b91c1c' : '#6b7280', flexShrink: 0 }} />
                         <span style={{
@@ -385,7 +385,7 @@ export function StepInputSources({
                       onChange={e => { setFixedDocSearch(e.target.value); setFixedDocHighlight(0) }}
                       placeholder="Search documents by name..."
                       style={{
-                        width: '100%', padding: '7px 10px 7px 28px', fontSize: 12,
+                        width: '100%', padding: '7px 10px 7px 28px', fontSize: 'var(--workspace-font-meta)',
                         fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
                         outline: 'none', boxSizing: 'border-box',
                       }}
@@ -418,7 +418,7 @@ export function StepInputSources({
                       maxHeight: 160, overflowY: 'auto',
                     }}>
                       {fixedDocResults.length === 0 ? (
-                        <div style={{ padding: '7px 10px', fontSize: 12, color: '#6b7280' }}>
+                        <div style={{ padding: '7px 10px', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
                           No documents found
                         </div>
                       ) : fixedDocResults.map((doc, i) => (
@@ -434,7 +434,7 @@ export function StepInputSources({
                             setShowFixedDocDropdown(false)
                           }}
                           style={{
-                            padding: '7px 10px', fontSize: 12, cursor: 'pointer',
+                            padding: '7px 10px', fontSize: 'var(--workspace-font-meta)', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', gap: 6,
                             backgroundColor: i === Math.min(fixedDocHighlight, fixedDocResults.length - 1) ? '#f3f4f6' : '#fff',
                           }}
@@ -473,12 +473,12 @@ export function StepInputSources({
                   {uploading ? (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                       <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
-                      <span style={{ fontSize: 12, color: '#6b7280' }}>Uploading...</span>
+                      <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>Uploading...</span>
                     </div>
                   ) : (
                     <>
                       <Upload style={{ width: 18, height: 18, color: '#6b7280', margin: '0 auto 4px' }} />
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
                         Drag &amp; drop files here
                       </div>
                       <button
@@ -486,7 +486,7 @@ export function StepInputSources({
                         disabled={disabled}
                         onClick={() => fileInputRef.current?.click()}
                         style={{
-                          marginTop: 6, padding: '4px 12px', fontSize: 12, fontWeight: 500,
+                          marginTop: 6, padding: '4px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                           fontFamily: 'inherit', borderRadius: 5, border: '1px solid #d1d5db',
                           backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
                         }}
@@ -529,7 +529,7 @@ export function StepInputSources({
                       }}
                       style={{
                         marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-                        padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                        padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                         borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
                         color: '#1d4ed8', cursor: 'pointer',
                       }}

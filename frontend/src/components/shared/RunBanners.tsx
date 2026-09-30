@@ -46,7 +46,7 @@ interface ErrorBannerProps {
 export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div role="alert" style={{
-      padding: 10, marginBottom: 10, fontSize: 12,
+      padding: 10, marginBottom: 10, fontSize: 'var(--workspace-font-meta)',
       color: RED.text, backgroundColor: RED.surface,
       border: `1px solid ${RED.border}`, borderRadius: 6,
     }}>
@@ -68,7 +68,7 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
       padding: '8px 12px',
       backgroundColor: VIOLET.surface,
       border: `1px solid ${VIOLET.border}`, borderRadius: 6,
-      fontSize: 12, color: VIOLET.text,
+      fontSize: 'var(--workspace-font-meta)', color: VIOLET.text,
     }}>
       <Sparkles size={13} style={{ color: VIOLET.icon, flexShrink: 0 }} />
       <span style={{ flex: 1 }}>
@@ -77,7 +77,7 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
       <button
         onClick={onExit}
         style={{
-          padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+          padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
           color: VIOLET.text, background: '#fff',
           border: `1px solid ${VIOLET.border}`, borderRadius: 5,
           cursor: 'pointer',
@@ -146,35 +146,35 @@ export function FailedBanner({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <AlertCircle size={16} style={{ color: RED.icon }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: RED.strong }}>{title}</span>
+        <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: RED.strong }}>{title}</span>
       </div>
       {remediation ? (
         <>
-          <div style={{ fontSize: 12, color: RED.text, marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 6 }}>
             {remediation.what}
           </div>
           <div style={{
             padding: '8px 10px', marginBottom: 10,
-            fontSize: 12, color: NEUTRAL.text, lineHeight: 1.5,
+            fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, lineHeight: 1.5,
             backgroundColor: '#fff', border: `1px solid ${RED.border}`,
             borderRadius: 6,
           }}>
             <strong style={{ color: NEUTRAL.strong }}>What to do:</strong> {remediation.how}
           </div>
           <details style={{ marginBottom: 10 }}>
-            <summary style={{ fontSize: 11, color: NEUTRAL.muted, cursor: 'pointer' }}>
+            <summary style={{ fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.muted, cursor: 'pointer' }}>
               Raw error message
             </summary>
-            <div style={{ marginTop: 6, fontSize: 11, color: NEUTRAL.text, fontFamily: 'monospace' }}>
+            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, fontFamily: 'monospace' }}>
               {message}
             </div>
           </details>
         </>
       ) : (
-        <div style={{ fontSize: 12, color: RED.text, marginBottom: 10 }}>{message}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 10 }}>{message}</div>
       )}
       <button onClick={onRunAgain} style={{
-        padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
         color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
         border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
       }}>
@@ -199,13 +199,13 @@ export function CancelledBanner({ completedTrials, onRunAgain, title = 'Optimiza
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Info size={16} style={{ color: NEUTRAL.muted }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: NEUTRAL.strong }}>{title}</span>
+        <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: NEUTRAL.strong }}>{title}</span>
       </div>
-      <div style={{ fontSize: 12, color: NEUTRAL.text, marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, marginBottom: 10 }}>
         {completedTrials} trial{completedTrials !== 1 ? 's' : ''} completed before you cancelled.
       </div>
       <button onClick={onRunAgain} style={{
-        padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
         color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
         border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
       }}>

@@ -141,7 +141,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             borderBottom: '1px solid #eee',
           }}
         >
-          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
+          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 'var(--workspace-font-card-title)' }}>Extracted Text</span>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -173,7 +173,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               <Loader2
                 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }}
               />
-              <div style={{ fontSize: 14, color: '#555' }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555' }}>
                 {state.status === 'readying'
                   ? 'Indexing document...'
                   : 'Extracting text from your document...'}
@@ -184,10 +184,10 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           {state.kind === 'error' && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 32, textAlign: 'center' }}>
               <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
                 Text extraction failed
               </div>
-              <div style={{ fontSize: 14, color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {state.message}
               </div>
               {state.canRetry && (
@@ -199,7 +199,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     alignItems: 'center',
                     gap: 6,
                     padding: '8px 14px',
-                    fontSize: 14,
+                    fontSize: 'var(--workspace-font-body)',
                     fontWeight: 500,
                     backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                     color: '#fff',
@@ -234,7 +234,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     gap: 10,
                     padding: '10px 12px',
                     marginBottom: 12,
-                    fontSize: 13,
+                    fontSize: 'var(--workspace-font-control)',
                     lineHeight: 1.4,
                     color: '#92400e',
                     backgroundColor: '#fffbeb',
@@ -255,7 +255,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                       gap: 6,
                       flexShrink: 0,
                       padding: '5px 10px',
-                      fontSize: 13,
+                      fontSize: 'var(--workspace-font-control)',
                       fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                       color: '#fff',
@@ -278,7 +278,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               <div
                 className="chat-markdown"
                 style={{
-                  fontSize: 14,
+                  fontSize: 'var(--workspace-font-body)',
                   lineHeight: 1.7,
                   color: '#333',
                 }}

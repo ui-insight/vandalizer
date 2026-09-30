@@ -226,7 +226,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
           padding: '16px 20px 0', display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#111827' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#111827' }}>
             Select {kindLabel}
           </div>
           <button
@@ -259,7 +259,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               aria-label={`Search ${kindPlural}`}
               style={{
                 border: 'none', flex: 1, minWidth: 0,
-                backgroundColor: 'transparent', fontSize: 14,
+                backgroundColor: 'transparent', fontSize: 'var(--workspace-font-body)',
                 fontFamily: 'inherit', color: '#111827',
               }}
             />
@@ -295,7 +295,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                 onClick={() => setScope(tab.value)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 10px', fontSize: 13, fontWeight: 600,
+                  padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
                   fontFamily: 'inherit', cursor: 'pointer',
                   color: active ? 'var(--highlight-on-light, #806600)' : '#555e68',
                   backgroundColor: 'transparent', border: 'none',
@@ -323,14 +323,14 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
           ) : loading || search !== debouncedSearch ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8, padding: 24, color: '#555e68', fontSize: 13,
+              gap: 8, padding: 24, color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
               Loading...
             </div>
           ) : items.length === 0 ? (
             <div style={{
-              textAlign: 'center', padding: '24px 12px', color: '#555e68', fontSize: 13,
+              textAlign: 'center', padding: '24px 12px', color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               {debouncedSearch
                 ? `No ${kindPlural} matching "${debouncedSearch}"`
@@ -382,7 +382,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
                         <div style={{
-                          fontSize: 14, fontWeight: 600, color: '#111827',
+                          fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#111827',
                           overflowWrap: 'anywhere',
                         }}>
                           {item.name}
@@ -400,7 +400,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                       </div>
                       {item.description && (
                         <div style={{
-                          fontSize: 12, color: '#555e68', marginTop: 2,
+                          fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 2,
                           overflowWrap: 'anywhere',
                         }}>
                           {item.description}
@@ -409,7 +409,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     </div>
                     {item.qualityTier && tierColors[item.qualityTier] && (
                       <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '2px 8px',
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px',
                         borderRadius: 10, textTransform: 'uppercase', flexShrink: 0,
                         backgroundColor: tierColors[item.qualityTier].bg,
                         color: tierColors[item.qualityTier].text,
@@ -419,7 +419,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     )}
                     {isSelected && (
                       <span style={{
-                        fontSize: 12, fontWeight: 600, padding: '2px 8px',
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px',
                         borderRadius: 10, backgroundColor: '#f7f4e8', color: '#554400',
                         flexShrink: 0,
                       }}>

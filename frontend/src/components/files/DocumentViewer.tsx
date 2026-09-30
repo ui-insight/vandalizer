@@ -834,7 +834,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
     background: '#fff', cursor: 'pointer', color: '#374151',
-    fontSize: 13, fontWeight: 500,
+    fontSize: 'var(--workspace-font-control)', fontWeight: 500,
   }
 
   // Processing overlay - shown when document is still being processed
@@ -864,10 +864,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, lineHeight: 1.3 }}>
               {stageCopy(taskStatus).title}
             </div>
-            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 3 }}>
               {stageCopy(taskStatus).message}
             </div>
           </div>
@@ -902,7 +902,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   }, [docxText])
 
   if (loadError) {
-    return <div role="alert" style={{ padding: 24, color: '#374151', fontSize: 14, lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+    return <div role="alert" style={{ padding: 24, color: '#374151', fontSize: 'var(--workspace-font-body)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
       <h3 style={{ fontWeight: 600, marginBottom: 8 }}>Source unavailable</h3>
       <p>{loadError}</p>
       <p style={{ marginTop: 8 }}>The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.</p>
@@ -963,7 +963,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             aria-live="polite"
             style={{
               display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', fontSize: 13, color: '#92400e',
+              padding: '8px 12px', fontSize: 'var(--workspace-font-control)', color: '#92400e',
               backgroundColor: '#fffbeb', borderBottom: '1px solid #fde68a',
               flexShrink: 0,
             }}
@@ -997,10 +997,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               gap: 16, padding: 32, height: '100%', textAlign: 'center',
             }}>
               <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
                 Text extraction failed
               </div>
-              <div style={{ fontSize: 14, color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
                 {extractionError}
               </div>
               <button
@@ -1009,7 +1009,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 disabled={retrying}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', fontSize: 14, fontWeight: 500,
+                  padding: '8px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 500,
                   backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                   color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
                   cursor: retrying ? 'not-allowed' : 'pointer',
@@ -1029,7 +1029,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               padding: '32px 48px',
               maxWidth: 800,
               margin: '0 auto',
-              fontSize: `${14 * zoomLevel}px`,
+              fontSize: `calc(var(--workspace-font-body) * ${zoomLevel})`,
               lineHeight: 1.7,
               color: '#333',
             }}>
@@ -1040,7 +1040,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 <div style={{
                   display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
                   padding: '10px 12px', marginBottom: 16,
-                  fontSize: 13, lineHeight: 1.4, color: '#92400e',
+                  fontSize: 'var(--workspace-font-control)', lineHeight: 1.4, color: '#92400e',
                   backgroundColor: '#fffbeb', border: '1px solid #fcd34d',
                   borderRadius: 6,
                 }}>
@@ -1054,7 +1054,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                     disabled={retrying}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                      padding: '5px 10px', fontSize: 13, fontWeight: 500,
+                      padding: '5px 10px', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                       color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
                       cursor: retrying ? 'not-allowed' : 'pointer',
@@ -1088,7 +1088,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#525659' }}>
-          <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
+          <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-body)' }}>Loading document...</div>
         </div>
       </div>
     )
@@ -1105,10 +1105,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           backgroundColor: '#f9fafb',
         }}>
           <FileText style={{ width: 40, height: 40, color: '#9ca3af' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+          <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
             No preview available
           </div>
-          <div style={{ fontSize: 14, color: '#555', maxWidth: 420, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', color: '#555', maxWidth: 420, lineHeight: 1.5 }}>
             This file is in a format the viewer can&rsquo;t display. You can download
             the original to open it in another application.
           </div>
@@ -1116,7 +1116,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             href={downloadUrl}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 14, fontWeight: 500,
+              padding: '8px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 500,
               backgroundColor: 'var(--highlight-color)', color: 'var(--highlight-text-color, #fff)',
               borderRadius: 6, textDecoration: 'none',
             }}
@@ -1178,7 +1178,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 title="Document viewer"
               />
             ) : (
-              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 13 }}>
+              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 'var(--workspace-font-control)' }}>
                 Loading...
               </div>
             )}
@@ -1279,7 +1279,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
               style={{
                 flex: 1,
                 textAlign: 'center',
-                fontSize: 14,
+                fontSize: 'var(--workspace-font-body)',
                 color: '#374151',
                 overflow: 'hidden',
                 whiteSpace: 'nowrap',

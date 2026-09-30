@@ -88,14 +88,14 @@ export function ContextLimitDialog({
           }}
         >
           <div>
-            <h3 id="context-limit-title" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+            <h3 id="context-limit-title" style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', fontWeight: 600 }}>
               {percent >= 100
                 ? 'Conversation memory is full'
                 : percent >= 90
                   ? 'Conversation memory is nearly full'
                   : 'Manage conversation memory'}
             </h3>
-            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
+            <p style={{ margin: '4px 0 0', fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
               {percent}% of the model's memory is in use.{percent >= 90 ? ' Pick how to free some up.' : ''}
             </p>
           </div>
@@ -150,10 +150,10 @@ export function ContextLimitDialog({
             >
               <Sparkles size={18} style={{ marginTop: 2, color: '#2563eb', flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>
                   Answer with {suggestedModel.tag || suggestedModel.name}
                 </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                   Its {suggestedModel.context_window.toLocaleString()}-token context holds this
                   conversation whole. Nothing is dropped or summarised.
                 </div>
@@ -189,8 +189,8 @@ export function ContextLimitDialog({
           >
             <Scissors size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Trim older messages</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Trim older messages</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                 Stop sending the oldest messages to the model. They stay visible here in the conversation.
               </div>
             </div>
@@ -228,8 +228,8 @@ export function ContextLimitDialog({
               <Minimize2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             )}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Summarize the conversation</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Summarize the conversation</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                 Replace earlier messages with a short summary to save room. Old messages remain visible.
               </div>
             </div>
@@ -262,8 +262,8 @@ export function ContextLimitDialog({
           >
             <Trash2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Start fresh</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Start fresh</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
                 Keep chatting with a clean slate. Old messages stay visible but won't be sent to the model.
               </div>
             </div>

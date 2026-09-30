@@ -60,9 +60,9 @@ export function ExtractionOptimizationHistoryPanel({
       >
         {open ? <ChevronDown size={14} style={{ color: 'var(--workspace-muted)' }} /> : <ChevronRight size={14} style={{ color: 'var(--workspace-muted)' }} />}
         <History size={14} style={{ color: 'var(--workspace-muted)' }} />
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
+        <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--workspace-muted)' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -76,14 +76,14 @@ export function ExtractionOptimizationHistoryPanel({
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
             <div style={{ padding: '12px 8px' }}>
-              <div style={{ fontSize: 13, color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 6 }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 6 }}>
                 No prior tuning runs for this extraction
               </div>
-              <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
                 Each run scores your extraction against test cases and lands here, so
                 you can see whether model or strategy changes are actually helping.
                 A run takes <b style={{ color: 'var(--workspace-muted)' }}>5–15 minutes</b> for small
@@ -132,7 +132,7 @@ function HistoryRow({
       <StatusDot status={run.status} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, color: 'var(--workspace-text)',
+          fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
           {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
@@ -141,7 +141,7 @@ function HistoryRow({
         </div>
         {run.judge_model && (
           <div style={{
-            fontSize: 10, color: 'var(--workspace-muted)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
           }}>
             judge: {run.judge_model}
@@ -149,7 +149,7 @@ function HistoryRow({
         )}
         {run.error_message && run.status === 'failed' && (
           <div style={{
-            fontSize: 10, color: 'var(--workspace-danger)',
+            fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
           }}>
             {run.error_message}
@@ -157,13 +157,13 @@ function HistoryRow({
         )}
       </div>
       {score != null && (
-        <span style={{ fontSize: 12, fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: scoreColor(score), minWidth: 42, textAlign: 'right' }}>
           {(score * 100).toFixed(0)}%
         </span>
       )}
       {lift != null && (
         <span style={{
-          fontSize: 10,
+          fontSize: 'var(--workspace-font-meta)',
           color: lift > 0 ? 'var(--workspace-success)' : lift < 0 ? 'var(--workspace-danger)' : 'var(--workspace-muted)',
           minWidth: 50, textAlign: 'right',
         }}>

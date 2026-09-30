@@ -129,7 +129,7 @@ export function VerificationNavBar({
       }}
     >
       {/* Progress row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#6b7280' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         <span style={{ fontWeight: 600, color: '#92400e' }}>
           Verifying: {session.label || session.document_title}
         </span>
@@ -158,7 +158,7 @@ export function VerificationNavBar({
           borderRadius: 8,
           background: '#fff',
           border: '1px solid #fef3c7',
-          fontSize: 13,
+          fontSize: 'var(--workspace-font-control)',
         }}
       >
         <button
@@ -172,7 +172,7 @@ export function VerificationNavBar({
         </button>
 
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ color: '#9ca3af', fontSize: 11, fontWeight: 500 }}>
+          <div style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}>
             {current.key}
             <span style={{ marginLeft: 8, color: currentStatus.color }}>
               · {currentStatus.text}
@@ -196,7 +196,7 @@ export function VerificationNavBar({
                 padding: '3px 6px',
                 border: '1px solid #3b82f6',
                 borderRadius: 4,
-                fontSize: 13,
+                fontSize: 'var(--workspace-font-control)',
                 outline: 'none',
               }}
             />
@@ -344,7 +344,7 @@ const actionBtn: React.CSSProperties = {
   background: '#fff',
   color: '#374151',
   borderRadius: 6,
-  fontSize: 12,
+  fontSize: 'var(--workspace-font-meta)',
   fontWeight: 500,
   cursor: 'pointer',
   fontFamily: 'inherit',

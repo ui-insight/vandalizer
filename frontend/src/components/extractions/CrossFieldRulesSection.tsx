@@ -281,21 +281,21 @@ function RuleRow({
           </span>
           {rule.auto_disabled && (
             <span
-              className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
+              className="inline-flex items-center gap-0.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
               title={rule.auto_disabled_reason ?? undefined}
             >
               <AlertCircle size={10} aria-hidden="true" /> Auto-disabled
             </span>
           )}
           {rule.source === 'suggested' && (
-            <span className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
               Suggested
             </span>
           )}
         </div>
         <div className="text-gray-800 mt-0.5 break-words">{describeRule(rule)}</div>
         {evals > 0 && (
-          <div className="text-[11px] text-gray-500 mt-1">
+          <div className="text-xs text-gray-500 mt-1">
             {passes} pass · {fails} fail · {fps > 0 ? `${fps} marked false alarm · ` : ''}
             {evals} total
           </div>

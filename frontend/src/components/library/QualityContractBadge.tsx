@@ -49,7 +49,7 @@ export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, m
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        fontSize: '11px',
+        fontSize: 'var(--workspace-font-meta)',
         lineHeight: '16px',
         padding: '1px 6px',
         borderRadius: '4px',

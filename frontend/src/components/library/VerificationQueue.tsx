@@ -396,12 +396,12 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                                   not a warning about a subsystem. Absence is information, not
                                   a reason to hesitate — it can be pinned later from the Catalog tab. */}
                               {(req.validation_snapshot || req.examiner_baseline_additions) ? (
-                                <div className="text-[10px] text-gray-500 inline-flex items-center gap-1">
+                                <div className="text-xs text-gray-500 inline-flex items-center gap-1">
                                   <Pin className="h-3 w-3" />
                                   Accepting pins the {req.examiner_baseline_additions && req.validation_snapshot ? 'merged' : req.examiner_baseline_additions ? 'examiner-curated' : 'submitter\'s'} validation as the baseline monitoring compares against.
                                 </div>
                               ) : (
-                                <div className="text-[10px] text-gray-500 inline-flex items-center gap-1">
+                                <div className="text-xs text-gray-500 inline-flex items-center gap-1">
                                   <Pin className="h-3 w-3" />
                                   No validation run yet — the entry won't be monitored for drift until one is pinned. You can pin one later from the Catalog tab.
                                 </div>
@@ -434,7 +434,7 @@ export function VerificationQueue({ focusRequestUuid }: { focusRequestUuid?: str
                               <button
                                 type="button"
                                 onClick={() => handleAction(req.uuid, 'rejected')}
-                                className="self-start text-[11px] text-red-700 hover:underline"
+                                className="self-start text-xs text-red-700 hover:underline"
                                 title="Close this request without sharing it. Prefer Send back when a revision could get it there."
                               >
                                 Decline instead

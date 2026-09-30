@@ -37,7 +37,7 @@ export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
 
       {/* Hero */}
       <div className="pj-section text-center" style={{ animationDelay: '40ms' }}>
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-violet-600">
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-violet-600">
           <Sparkles size={12} /> Projects
         </div>
         <h2 className="text-2xl font-bold leading-tight tracking-tight text-gray-900">
@@ -179,7 +179,7 @@ function ProjectsDiagram() {
           <FolderKanban size={22} className="text-violet-600" />
         </div>
         <div className="text-sm font-semibold text-gray-900">Project</div>
-        <div className="flex items-center gap-1 text-[11px] text-gray-500">
+        <div className="flex items-center gap-1 text-xs text-gray-500">
           <Database size={11} /> KB
           <span className="mx-0.5">·</span>
           <Users size={11} /> Team

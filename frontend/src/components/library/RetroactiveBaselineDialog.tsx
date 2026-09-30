@@ -15,10 +15,10 @@ interface Props {
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px',
   border: '1px solid #d1d5db', borderRadius: 6,
-  fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 3,
+  display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 3,
 }
 
 function kindLabel(k: string) {
@@ -139,10 +139,10 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
         }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 700, color: '#111' }}>
               {item.official_baseline_pinned_at ? 'Update' : 'Establish'} official baseline
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
               Retroactively pin a validation baseline for this {kindLabel(item.item_kind)}: <strong>{item.name}</strong>
             </div>
           </div>
@@ -153,7 +153,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {item.official_baseline_pinned_at && (
-            <div style={{ fontSize: 12, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6, padding: '8px 12px' }}>
               This item already has a pinned baseline ({item.official_baseline_test_case_count} case(s), score {item.official_baseline_score != null ? Math.round(item.official_baseline_score) + '%' : 'unknown'}). Saving will archive the previous one.
             </div>
           )}
@@ -161,7 +161,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           {/* Kind-specific editor */}
           {item.item_kind === 'search_set' && (
             <section>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Test cases
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -180,13 +180,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                       }} rows={3} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'ui-monospace, monospace' }} placeholder='{"field": "value"}' />
                     </div>
                     <button onClick={() => setExtractionRows(extractionRows.filter((_, j) => j !== i))}
-                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ))}
                 <button onClick={() => setExtractionRows([...extractionRows, { document_uuid: '', expected_json: '' }])}
-                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                   <Plus size={12} /> Add test case
                 </button>
               </div>
@@ -195,7 +195,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
 
           {item.item_kind === 'knowledge_base' && (
             <section>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Queries
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -214,13 +214,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                       }} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
                     <button onClick={() => setKbRows(kbRows.filter((_, j) => j !== i))}
-                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ))}
                 <button onClick={() => setKbRows([...kbRows, { query: '', expected_answer: '' }])}
-                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                   <Plus size={12} /> Add query
                 </button>
               </div>
@@ -229,7 +229,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
 
           {item.item_kind === 'workflow' && (
             <section>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#111827', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                 Regression inputs
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -248,13 +248,13 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
                       }} rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
                     </div>
                     <button onClick={() => setWorkflowRows(workflowRows.filter((_, j) => j !== i))}
-                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
+                      style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer' }}>
                       <Trash2 size={12} /> Remove
                     </button>
                   </div>
                 ))}
                 <button onClick={() => setWorkflowRows([...workflowRows, { input: '', expected_output: '' }])}
-                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
+                  style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#374151', background: '#f3f4f6', border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', cursor: 'pointer' }}>
                   <Plus size={12} /> Add regression input
                 </button>
               </div>
@@ -264,18 +264,18 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           <div>
             <label style={labelStyle}>Baseline reference score (optional, 0–100)</label>
             <input value={score} onChange={e => setScore(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 85" style={{ ...inputStyle, maxWidth: 160 }} />
-            <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+            <p style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 4 }}>
               Drift monitoring compares the live config's score to this reference. Leave blank if unknown, set it after a real validation run.
             </p>
           </div>
 
           {warning && (
-            <div style={{ padding: '10px 12px', borderRadius: 6, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 12, color: '#78350f', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+            <div style={{ padding: '10px 12px', borderRadius: 6, background: '#fef3c7', border: '1px solid #fcd34d', fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
               <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
               <div>
                 <div style={{ fontWeight: 600, marginBottom: 4 }}>Baseline pinned with caveat</div>
                 <div>{warning}</div>
-                <button onClick={onSaved} style={{ marginTop: 6, fontSize: 11, fontWeight: 600, color: '#78350f', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
+                <button onClick={onSaved} style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#78350f', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>
                   Dismiss and close
                 </button>
               </div>
@@ -283,7 +283,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           )}
 
           {error && (
-            <div style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 12, color: '#991b1b' }}>
+            <div style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 'var(--workspace-font-meta)', color: '#991b1b' }}>
               {error}
             </div>
           )}
@@ -295,14 +295,14 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
         }}>
           <button onClick={onClose} style={{
             padding: '7px 16px', borderRadius: 6, border: '1px solid #d1d5db',
-            background: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151',
+            background: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600, cursor: 'pointer', color: '#374151',
           }}>
             Cancel
           </button>
           <button onClick={handleSave} disabled={saving} style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             padding: '7px 18px', borderRadius: 6, border: 'none',
-            background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600,
+            background: '#111827', color: '#fff', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
             cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
           }}>
             <Save size={14} />

@@ -80,7 +80,7 @@ export function ProjectSuggestedActions({
           onClick={() => onSend(s.message)}
           style={{
             padding: '8px 14px',
-            fontSize: 13,
+            fontSize: 'var(--workspace-font-control)',
             fontWeight: 500,
             fontFamily: 'inherit',
             border: '1px solid #e5e7eb',

@@ -31,7 +31,7 @@ export function ApplyBackButton({
         disabled={!canApply || applying}
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+          padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
           color: !canApply ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
           background: !canApply ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
           border: '1px solid ' + (!canApply ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
@@ -42,7 +42,7 @@ export function ApplyBackButton({
         {applying ? applyingLabel : isAlreadyApplied ? applyAgainLabel : label}
       </button>
       {isAlreadyApplied && alreadyAppliedNote && (
-        <span style={{ fontSize: 12, color: 'var(--workspace-success)' }}>
+        <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)' }}>
           {alreadyAppliedNote}
         </span>
       )}

@@ -15,7 +15,7 @@ export function StatusBadge({ status }: { status: string }) {
   return (
     <span style={{
       display: 'inline-block', padding: '2px 10px', borderRadius: 9999,
-      fontSize: 12, fontWeight: 600, backgroundColor: c.bg, color: c.text,
+      fontSize: 'var(--workspace-font-meta)', fontWeight: 600, backgroundColor: c.bg, color: c.text,
     }}>
       {status}
     </span>
@@ -32,7 +32,7 @@ export function RoleBadge({ role }: { role: string }) {
   return (
     <span style={{
       display: 'inline-block', padding: '1px 8px', borderRadius: 9999,
-      fontSize: 10, fontWeight: 700, backgroundColor: c.bg, color: c.text,
+      fontSize: 'var(--workspace-font-meta)', fontWeight: 700, backgroundColor: c.bg, color: c.text,
       textTransform: 'uppercase', letterSpacing: 0.5,
     }}>
       {role}
@@ -45,9 +45,9 @@ export function TrendDelta({ current, previous, invert }: { current: number; pre
   const pct = previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100)
   const isUp = pct > 0
   const isGood = invert ? !isUp : isUp
-  if (pct === 0) return <span style={{ fontSize: 11, color: '#9ca3af' }}>0%</span>
+  if (pct === 0) return <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af' }}>0%</span>
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 11, fontWeight: 600, color: isGood ? '#16a34a' : '#dc2626' }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: isGood ? '#16a34a' : '#dc2626' }}>
       {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
       {isUp ? '+' : ''}{pct}%
     </span>
@@ -70,7 +70,7 @@ export function KpiCard({ label, value, icon: Icon, color, trend }: {
         <Icon size={22} color={color} />
       </div>
       <div>
-        <div style={{ fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>{label}</div>
+        <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>{label}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{value}</div>
           {trend && <TrendDelta current={trend.current} previous={trend.previous} invert={trend.invert} />}
@@ -86,7 +86,7 @@ export function UserAvatar({ name }: { name: string | null }) {
   return (
     <div style={{
       width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      backgroundColor: `hsl(${hue}, 55%, 88%)`, color: `hsl(${hue}, 55%, 35%)`, fontWeight: 700, fontSize: 14, flexShrink: 0,
+      backgroundColor: `hsl(${hue}, 55%, 88%)`, color: `hsl(${hue}, 55%, 35%)`, fontWeight: 700, fontSize: 'var(--workspace-font-body)', flexShrink: 0,
     }}>
       {letter}
     </div>
@@ -114,7 +114,7 @@ export function SortableHeader({ label, sortKey, currentSort, onSort, align = 'l
         style={{
           display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%',
           justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
-          padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#6b7280',
+          padding: '10px 16px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
           textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none',
           background: 'none', border: 'none', fontFamily: 'inherit',
         }}
@@ -138,7 +138,7 @@ export function SearchInput({ value, onChange, placeholder, ariaLabel }: { value
         aria-label={ariaLabel ?? placeholder ?? 'Search'}
         style={{
           width: '100%', padding: '7px 12px 7px 32px', borderRadius: 'var(--ui-radius, 12px)',
-          border: '1px solid #e5e7eb', fontSize: 13, outline: 'none',
+          border: '1px solid #e5e7eb', fontSize: 'var(--workspace-font-control)', outline: 'none',
         }}
       />
     </div>
@@ -152,7 +152,7 @@ export function ExportButton({ onClick }: { onClick: () => void }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
         borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-        fontSize: 12, fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#374151',
+        fontSize: 'var(--workspace-font-meta)', fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#374151',
       }}
     >
       <Download size={13} /> Export CSV
@@ -181,7 +181,7 @@ export function TimeRangeSelector({
   const opts: DayOption[] = includeAll ? [...options, 'all'] : [...options]
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-      <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
+      <span style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
       {opts.map(d => {
         const active = value === d
         const label = d === 'all' ? 'All time' : d >= 365 ? `${Math.round(d / 365)}y` : `${d}d`
@@ -191,7 +191,7 @@ export function TimeRangeSelector({
             onClick={() => onChange(d)}
             style={{
               padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              fontSize: 'var(--workspace-font-control)', fontWeight: 500, cursor: 'pointer',
               backgroundColor: active ? 'var(--highlight-color, #eab308)' : '#fff',
               color: active ? 'var(--highlight-text-color, #000)' : '#374151',
             }}

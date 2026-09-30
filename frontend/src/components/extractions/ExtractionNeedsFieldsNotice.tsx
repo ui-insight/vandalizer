@@ -35,10 +35,10 @@ export function ExtractionNeedsFieldsNotice({
         <ListPlus style={{ width: 18, height: 18, color: '#4f46e5' }} />
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
           Add fields first
         </div>
-        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6 }}>
           Validation scores how well each field is extracted, so this extraction needs at least one
           field before <strong>Validate &amp; improve</strong>, test cases, cross-field rules or detailed
           validation have anything to work against.
@@ -52,7 +52,7 @@ export function ExtractionNeedsFieldsNotice({
             onClick={onAddFields}
             style={{
               marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              padding: '8px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               borderRadius: 6, border: 'none', cursor: 'pointer',
               backgroundColor: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
             }}
@@ -62,7 +62,7 @@ export function ExtractionNeedsFieldsNotice({
           </button>
         )}
         {!canManage && (
-          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 8 }}>
             You can view this extraction but not edit it — ask its owner to add fields.
           </div>
         )}

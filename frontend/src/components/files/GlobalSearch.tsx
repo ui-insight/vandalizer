@@ -92,7 +92,7 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           onBlur={e => { e.currentTarget.style.boxShadow = 'none' }}
           style={{
             flex: 1, border: 'none', background: 'none', outline: 'none',
-            fontSize: 15, color: '#111827', borderRadius: 4,
+            fontSize: 'var(--workspace-font-card-title)', color: '#111827', borderRadius: 4,
           }}
         />
         <button
@@ -114,11 +114,11 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
               : ''}
         </div>
         {loading && (
-          <div role="status" aria-live="polite" style={{ padding: '20px 16px', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Searching...</div>
+          <div role="status" aria-live="polite" style={{ padding: '20px 16px', textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>Searching...</div>
         )}
 
         {!loading && searched && results.length === 0 && (
-          <div role="status" aria-live="polite" style={{ padding: '30px 16px', textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
+          <div role="status" aria-live="polite" style={{ padding: '30px 16px', textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>
             No documents found for "{query}"
           </div>
         )}
@@ -137,17 +137,17 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           >
             <FileText size={18} color="#6b7280" style={{ marginTop: 2, flexShrink: 0 }} aria-hidden="true" />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, color: '#111827' }}>{doc.title}</div>
+              <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 500, color: '#111827' }}>{doc.title}</div>
               {doc.snippet && (
                 <div style={{
-                  fontSize: 12, color: '#6b7280', marginTop: 2,
+                  fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2,
                   overflow: 'hidden', textOverflow: 'ellipsis',
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                 }}>
                   {doc.snippet}
                 </div>
               )}
-              <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 4 }}>
                 {doc.extension.toUpperCase()} · {doc.num_pages} page{doc.num_pages !== 1 ? 's' : ''}
               </div>
             </div>

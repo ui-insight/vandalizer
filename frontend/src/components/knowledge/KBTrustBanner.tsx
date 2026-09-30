@@ -81,7 +81,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
-          fontSize: 12, fontWeight: 700, color: 'var(--workspace-muted)',
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--workspace-muted)',
           textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2,
         }}>
           {composite ? 'Retrieval quality' : 'Answer quality'}
@@ -89,19 +89,19 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
 
         {!hasRun ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
               Answer quality not yet measured
             </div>
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               Test representative questions with and without this knowledge base. Scores describe this test set; they do not guarantee future answers.
             </div>
           </>
         ) : composite ? (
           <>
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
               Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : 'Proposed settings'}
             </div>
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               This combines retrieval and answer quality on the tested questions. It is not answer accuracy or a comparison with the AI alone.
               {configState === 'proposed' && ' Review and apply the settings before using them in chat.'}
               {configState === 'reverted' && ' This score describes the tested settings, not the restored settings.'}
@@ -116,13 +116,13 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
                   {liftPts > 0 ? '+' : ''}{liftPts} pts
                 </span>
               )}
-              <span style={{ fontSize: 13, color: 'var(--workspace-muted)' }}>
+              <span style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
                 {liftPts == null ? 'Answer accuracy measured; no AI-only comparison yet' : positive
                   ? 'more accurate than asking the AI alone'
                   : 'no measured improvement over the AI alone'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               {scorePct != null && baselinePct != null ? (
                 <>
                   Average answer accuracy: {scorePct}% with this KB,

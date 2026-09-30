@@ -133,7 +133,7 @@ export function QualityComparisonCard({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
         <CheckCircle2 size={16} style={{ color: 'var(--workspace-success)' }} />
-        <h3 style={{ margin: 0, fontSize: 14, color: 'var(--workspace-text)' }}>{title}</h3>
+        <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)' }}>{title}</h3>
         {scoreFormulaHint && (
           <InfoHint content={scoreFormulaHint} label="How this score is computed" />
         )}
@@ -142,7 +142,7 @@ export function QualityComparisonCard({
             onClick={() => setCiExpanded(v => !v)}
             title={`Paired bootstrap on ${liftCI.n_queries} queries, ${liftCI.n_iterations} resamples`}
             style={{
-              marginLeft: 'auto', fontSize: 10,
+              marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)',
               color: liftSignificant ? 'var(--workspace-success)' : 'var(--workspace-warning)',
               fontFamily: 'inherit',
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
@@ -155,7 +155,7 @@ export function QualityComparisonCard({
           <button
             onClick={() => setCiExpanded(v => !v)}
             style={{
-              marginLeft: 'auto', fontSize: 10, color: 'var(--workspace-muted)', fontFamily: 'inherit',
+              marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontFamily: 'inherit',
               background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
               textDecoration: 'underline dotted', textUnderlineOffset: 2,
             }}
@@ -167,7 +167,7 @@ export function QualityComparisonCard({
 
       {ciExpanded && (
         <div style={{
-          marginBottom: 12, padding: '8px 10px', fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5,
+          marginBottom: 12, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
           backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
         }}>
           {liftCI ? (
@@ -211,7 +211,7 @@ export function QualityComparisonCard({
       </div>
 
       {measurementNote && (
-        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {measurementNote}
         </div>
       )}
@@ -230,12 +230,12 @@ export function QualityComparisonCard({
           {liftIsNoise ? (
             <>
               <div style={{
-                fontSize: 14, fontWeight: 600, color: nTooSmall ? 'var(--workspace-muted)' : 'var(--workspace-warning)',
+                fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: nTooSmall ? 'var(--workspace-muted)' : 'var(--workspace-warning)',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}>
                 {nTooSmall ? 'Not enough queries for a significance call' : '⚠ No significant change'}
               </div>
-              <div style={{ marginTop: 4, fontSize: 11, color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
                 {liftCI && nTooSmall
                   ? `Only n=${liftCI.n_queries} paired ${liftCI.n_queries === 1 ? 'query was' : 'queries were'} available for the statistical test — at least ${MIN_N_FOR_SIGNIFICANCE} are needed for a reliable call. The bars are real measurements, but we can't yet tell how much of the difference would repeat on new questions. Add more test queries and re-run for a trustworthy verdict.`
                   : liftCI
@@ -249,16 +249,16 @@ export function QualityComparisonCard({
           ) : (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
               <span style={{
-                fontSize: 18, fontWeight: 700,
+                fontSize: 'var(--workspace-font-section-title)', fontWeight: 700,
                 color: liftVsDefault > 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)',
               }}>
                 {liftVsDefault > 0 ? '+' : ''}{liftVsDefault.toFixed(0)}pts
               </span>
-              <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>over {defaultBaseline?.label ?? 'default'}</span>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>over {defaultBaseline?.label ?? 'default'}</span>
               {liftVsSecondary != null && secondaryBaseline && (
                 <>
-                  <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>·</span>
-                  <span style={{ fontSize: 12, color: 'var(--workspace-muted)' }}>
+                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>·</span>
+                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                     +{liftVsSecondary.toFixed(0)}pts over {secondaryBaseline.label}
                   </span>
                 </>
@@ -313,7 +313,7 @@ function SignificanceBadge({
     <span
       title={tip}
       style={{
-        marginLeft: 'auto', fontSize: 11, fontWeight: 600,
+        marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         padding: '2px 8px', borderRadius: 999, cursor: 'help',
         backgroundColor: bg, border: '1px solid ' + border, color,
       }}

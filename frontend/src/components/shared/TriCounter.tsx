@@ -18,7 +18,7 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
   const counts = computeCounts(optimized || [], baseline || [], epsilon)
   if (counts == null) {
     return (
-      <div style={{ fontSize: 11, color: 'var(--workspace-muted)', padding: '6px 0' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '6px 0' }}>
         Per-query comparison unavailable for this run.
       </div>
     )
@@ -54,7 +54,7 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
       />
       {biggestRegression && (
         <div style={{
-          marginLeft: 'auto', fontSize: 10, color: 'var(--workspace-danger)',
+          marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
           maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
         }}
@@ -74,8 +74,8 @@ function Counter({
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span style={{ color }}>{icon}</span>
-      <span style={{ fontSize: 18, fontWeight: 700, color }}>{value}</span>
-      <span style={{ fontSize: 11, color: 'var(--workspace-muted)' }}>{label}</span>
+      <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color }}>{value}</span>
+      <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{label}</span>
     </div>
   )
 }

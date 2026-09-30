@@ -58,11 +58,11 @@ function buildPayload(form: FormState): Record<string, string> {
 }
 
 const labelStyle: React.CSSProperties = {
-  display: 'block', fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+  display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'uppercase',
   letterSpacing: 0.4, color: '#6b7280', marginBottom: 4,
 }
 const inputStyle: React.CSSProperties = {
-  width: '100%', fontSize: 13, fontFamily: 'inherit',
+  width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
   border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
   boxSizing: 'border-box', background: '#fff',
 }
@@ -146,7 +146,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           padding: '14px 20px', borderBottom: '1px solid #e5e7eb',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#111827' }}>New credential</span>
+          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111827' }}>New credential</span>
           <button
             onClick={onClose}
             aria-label="Close"
@@ -300,7 +300,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   onChange={e => setForm({ ...form, private_key: e.target.value })}
                   rows={7}
                   placeholder={'-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----'}
-                  style={{ ...monoInputStyle, fontSize: 12, resize: 'vertical' }}
+                  style={{ ...monoInputStyle, fontSize: 'var(--workspace-font-meta)', resize: 'vertical' }}
                 />
               </div>
             </>
@@ -309,19 +309,19 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           {error && (
             <div role="alert" style={{
               borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2',
-              padding: '8px 10px', fontSize: 12, color: '#b91c1c',
+              padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c',
             }}>
               {error}
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 4 }}>
             Secrets are encrypted at rest and never returned to the client after creation.
           </div>
         </div>
 
           <div style={{ border: '1px solid #e5e7eb', backgroundColor: '#f9fafb', borderRadius: 6, padding: 10, marginBottom: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Test before saving</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 6 }}>Test before saving</div>
             <CredentialTestPanel
               testUrl={testUrl}
               onTestUrlChange={setTestUrl}
@@ -337,7 +337,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
             href="/credentials"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: 12, color: '#6b7280', textDecoration: 'underline' }}
+            style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', textDecoration: 'underline' }}
           >
             Manage all credentials →
           </a>
@@ -346,7 +346,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
               onClick={onClose}
               style={{
                 border: '1px solid #d1d5db', background: '#fff', color: '#374151',
-                fontSize: 13, fontWeight: 500, padding: '7px 14px', borderRadius: 6, cursor: 'pointer',
+                fontSize: 'var(--workspace-font-control)', fontWeight: 500, padding: '7px 14px', borderRadius: 6, cursor: 'pointer',
               }}
             >
               Cancel
@@ -358,7 +358,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                 border: 'none',
                 background: !valid || saving ? '#9ca3af' : 'var(--highlight-color, #2563eb)',
                 color: 'var(--highlight-text, #fff)',
-                fontSize: 13, fontWeight: 600, padding: '7px 14px', borderRadius: 6,
+                fontSize: 'var(--workspace-font-control)', fontWeight: 600, padding: '7px 14px', borderRadius: 6,
                 cursor: !valid || saving ? 'not-allowed' : 'pointer',
               }}
             >
