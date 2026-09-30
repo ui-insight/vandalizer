@@ -1322,7 +1322,7 @@ async def seed_catalog(types: set[str] | None = None, refresh_urls: bool = False
     seed_version = _read_seed_version()
     # Machine-readable line that setup.sh greps for to learn the applied version.
     print(f"Catalog version: {seed_version}")
-    print(f"Seeding verified catalog (types: {', '.join(sorted(selected))})...")
+    print(f"Seeding catalog (types: {', '.join(sorted(selected))})...")
 
     verified_lib = await get_or_create_verified_library()
 
@@ -1515,7 +1515,7 @@ async def main():
         return
 
     if args.reset:
-        print("Resetting verified catalog metadata...")
+        print("Resetting catalog metadata...")
         deleted = await reset_verified_catalog()
         print(
             f"  Deleted: {deleted['collections']} collection(s), "

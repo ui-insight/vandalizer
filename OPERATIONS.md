@@ -294,7 +294,7 @@ If services are crashed, images are missing, or seed data is incomplete:
 ./setup.sh --repair
 ```
 
-This scans the full deployment state and fixes what it finds — restarts crashed containers, rebuilds missing images, generates missing secrets, and re-runs bootstrap if the admin account or verified catalog is missing.
+This scans the full deployment state and fixes what it finds — restarts crashed containers, rebuilds missing images, generates missing secrets, and re-runs bootstrap if the admin account or catalog is missing.
 
 ## Restore Drill Expectations
 

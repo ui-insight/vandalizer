@@ -116,7 +116,7 @@ docker compose up -d redis mongo chromadb
 
 This section covers what you need to know when deploying Vandalizer for real users in a university environment.
 
-**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the verified catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
+**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
 
 ### Resource Requirements
 
