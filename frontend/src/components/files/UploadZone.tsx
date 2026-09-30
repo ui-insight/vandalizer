@@ -50,7 +50,7 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
           : 'border-[#17181a30] hover:border-[#17181a60] hover:bg-[#17181a06]',
       )}
       style={{
-        minHeight: 88, padding: 12, margin: '12px 0', justifyContent: 'center',
+        minHeight: 88, padding: 'var(--workspace-space-12)', margin: "var(--workspace-space-12) 0", justifyContent: 'center',
         transition: 'border-color 0.2s, background-color 0.2s, transform 0.2s',
       }}
     >

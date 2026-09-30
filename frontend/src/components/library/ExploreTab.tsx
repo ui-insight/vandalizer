@@ -798,7 +798,7 @@ export function ExploreTab() {
               </div>
             )}
 
-            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12, borderRadius: 8, marginBottom: 12 }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
+            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)' }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
             {/* Error state */}
             {error && (
               <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">

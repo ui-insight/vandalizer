@@ -65,7 +65,7 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
         aria-modal="true"
         aria-label="Share with team"
         className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
-        style={{ margin: 12, maxHeight: 'calc(100dvh - 24px)', overflowY: 'auto', overflowWrap: 'anywhere' }}
+        style={{ margin: 'var(--workspace-space-12)', maxHeight: 'calc(100dvh - 24px)', overflowY: 'auto', overflowWrap: 'anywhere' }}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Share with team</h3>

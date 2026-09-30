@@ -55,7 +55,7 @@ export function FileList({
   const allSelected = onToggleSelect && selectedUuids && allUuids.length > 0 && allUuids.every(u => selectedUuids.has(u))
 
   const headerStyle: React.CSSProperties = {
-    padding: '8px 15px',
+    padding: "var(--workspace-space-8) 15px",
     textAlign: 'left',
     fontSize: '0.8em',
     fontWeight: 500,
@@ -87,7 +87,7 @@ export function FileList({
       </colgroup>
       <thead>
         <tr style={{ borderBottom: '1px solid #dddddd' }}>
-          <th scope="col" style={{ padding: '8px 0 8px 15px', width: 32 }}>
+          <th scope="col" style={{ padding: "var(--workspace-space-8) 0 var(--workspace-space-8) 15px", width: 32 }}>
             {onToggleSelect && allUuids.length > 0 && (
               <input
                 type="checkbox"

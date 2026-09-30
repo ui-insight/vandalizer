@@ -547,7 +547,7 @@ function CopyButton({ text, label = 'Copy data' }: { text: string; label?: strin
   }
   return <span className="agent-copy-control">
     <button type="button" onClick={handleCopy} title={label} aria-label={label}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 4, border: 'none', background: 'transparent', cursor: 'pointer', color: '#4b5563', flexShrink: 0 }}>
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)', border: 'none', background: 'transparent', cursor: 'pointer', color: '#4b5563', flexShrink: 0 }}>
       {copyState === 'copied' ? <Check size={14} /> : <ClipboardCopy size={14} />}
     </button>
     {copyState !== 'idle' && <span role="status" className={copyState === 'copied' ? 'sr-only' : 'text-xs text-red-800'}>{copyState === 'copied' ? `${label}: copied` : 'Copy failed. Try again or select the result text.'}</span>}
@@ -567,7 +567,7 @@ function CSVDownloadButton({ csv, filename }: { csv: string; filename: string })
       aria-label="Download CSV"
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 20, height: 20, borderRadius: 4, border: 'none',
+        width: 20, height: 20, borderRadius: 'var(--workspace-radius-small)', border: 'none',
         background: 'transparent', cursor: 'pointer',
         color: '#c4c9d1', transition: 'color 0.15s',
         flexShrink: 0,
@@ -635,7 +635,7 @@ function FieldSourceChip({ src, actions }: { src?: FieldSource; actions?: KBSour
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter') handleOpen() } : undefined}
       title={tooltip}
       style={{
-        flexShrink: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: '14px', padding: '0 5px',
+        flexShrink: 0, fontSize: 'var(--workspace-font-meta)', lineHeight: '14px', padding: "0 var(--workspace-space-6)",
         borderRadius: 7, whiteSpace: 'nowrap',
         cursor: clickable ? 'pointer' : 'help',
         color: verified ? '#1d4ed8' : '#b45309',
@@ -696,11 +696,11 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
     const remaining = fields.length - shown.length
 
     return (
-      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.7 }}>
+      <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.7 }}>
         {shown.map((f) => {
           const empty = isEmptyValue(entity[f])
           return (
-            <div key={f} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+            <div key={f} style={{ display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'baseline' }}>
               <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{f}</span>
               {empty ? (
                 <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>not found</span>
@@ -717,12 +717,12 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
             </div>
           )
         })}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-2)' }}>
           {remaining > 0 && (
             <button
               onClick={() => setShowAll(true)}
               style={{
-                background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
+                background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
                 color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
               }}
             >
@@ -733,7 +733,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
             <button
               onClick={() => setShowAll(false)}
               style={{
-                background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
+                background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
                 color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
               }}
             >
@@ -757,7 +757,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
   const hiddenRows = entities.length - Math.min(entities.length, maxRows)
 
   return (
-    <div style={{ overflowX: 'auto', marginTop: 4, marginLeft: 20 }}>
+    <div style={{ overflowX: 'auto', marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)' }}>
       <table style={{
         width: '100%', borderCollapse: 'collapse', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
       }}>
@@ -765,7 +765,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           <tr>
             {visibleFields.map((f) => (
               <th key={f} style={{
-                textAlign: 'left', padding: '4px 8px', borderBottom: '2px solid #e5e7eb',
+                textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderBottom: "2px solid var(--workspace-border)",
                 fontWeight: 600, color: '#374151', whiteSpace: 'nowrap',
               }}>
                 {f}
@@ -787,7 +787,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
                     : traced && src ? sourceTooltip(src) : NO_SOURCE_TOOLTIP
                   return (
                     <td key={f} title={cellTitle} style={{
-                      padding: '3px 8px', color: '#4b5563', maxWidth: 200,
+                      padding: "var(--workspace-space-4) var(--workspace-space-8)", color: '#4b5563', maxWidth: 200,
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                       // A dotted underline marks values with a verified source
                       // passage; hover shows the quote. Untraced values warn on
@@ -804,12 +804,12 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           })}
         </tbody>
       </table>
-      <div style={{ color: '#c4c9d1', fontSize: 'var(--workspace-font-meta)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ color: '#c4c9d1', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-2)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
         {!showAll && (hiddenRows > 0 || hiddenCols > 0) && (
           <button
             onClick={() => setShowAll(true)}
             style={{
-              background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
+              background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
               color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
             }}
           >
@@ -820,7 +820,7 @@ function ExtractionContent({ content, actions }: { content: Record<string, unkno
           <button
             onClick={() => setShowAll(false)}
             style={{
-              background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36, cursor: 'pointer',
+              background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)', cursor: 'pointer',
               color: '#3b82f6', fontSize: 'var(--workspace-font-meta)',
             }}
           >
@@ -861,7 +861,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
   const copyText = toolResultToText('search_knowledge_base', content)
 
   return (
-    <div style={{ marginTop: 4, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
       {passages.slice(0, 3).map((chunk, i) => {
         const sourceType = chunk.source_type as string | undefined
         const docUuid = chunk.document_uuid as string | undefined
@@ -893,7 +893,7 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
         return (
           <div key={i} style={{
             fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280',
-            padding: '4px 8px', borderLeft: '2px solid #e5e7eb',
+            padding: "var(--workspace-space-4) var(--workspace-space-8)", borderLeft: "2px solid var(--workspace-border)",
             background: '#fafafa', borderRadius: '0 4px 4px 0',
           }}>
             <span
@@ -905,14 +905,14 @@ function KBPassages({ content, actions }: { content: unknown; actions?: KBSource
                 fontWeight: 500, fontSize: 'var(--workspace-font-meta)',
                 color: isClickable ? '#3b82f6' : '#9ca3af',
                 cursor: isClickable ? 'pointer' : 'default',
-                display: 'inline-flex', alignItems: 'center', gap: 3,
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
               }}
             >
               {isDoc && <FileText size={10} style={{ flexShrink: 0 }} />}
               {isUrl && <ExternalLink size={9} style={{ flexShrink: 0 }} />}
               {sourceName}
             </span>
-            <span style={{ margin: '0 6px', color: '#d1d5db' }}>&middot;</span>
+            <span style={{ margin: "0 var(--workspace-space-6)", color: '#d1d5db' }}>&middot;</span>
             <span>{chunkContent.slice(0, 200)}{chunkContent.length > 200 ? '...' : ''}</span>
           </div>
         )
@@ -940,18 +940,18 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
   if (typeof output === 'string') {
     if (output.trim().length === 0) return null
     return (
-      <div style={{ marginTop: 4, marginLeft: 20 }}>
+      <div style={{ marginTop: 'var(--workspace-space-4)', marginLeft: 'var(--workspace-space-20)' }}>
         <div
           className="chat-markdown select-text"
           style={{
             fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
             color: '#374151', wordBreak: 'break-word',
-            maxHeight: 480, overflow: 'auto', padding: '8px 12px',
-            background: '#fafafa', borderRadius: 6, border: '1px solid #f3f4f6',
+            maxHeight: 480, overflow: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+            background: '#fafafa', borderRadius: 'var(--workspace-radius-small)', border: '1px solid #f3f4f6',
           }}
           dangerouslySetInnerHTML={{ __html: renderMarkdown(output) }}
         />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--workspace-space-2)' }}>
           <CopyButton text={copyText} label="Copy workflow output" />
         </div>
       </div>
@@ -1066,19 +1066,19 @@ function VerificationLauncher({
   }
 
   return (
-    <div style={{ marginTop: 6, marginLeft: 20 }}>
+    <div style={{ marginTop: 'var(--workspace-space-6)', marginLeft: 'var(--workspace-space-20)' }}>
       <div style={{
         border: '1px solid #fde68a',
         background: '#fffbeb',
-        borderRadius: 8,
-        padding: '10px 12px',
+        borderRadius: 'var(--workspace-radius-medium)',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
         fontSize: 'var(--workspace-font-meta)',
         color: '#374151',
       }}>
-        <div style={{ fontWeight: 600, marginBottom: 4, color: '#92400e' }}>
+        <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-4)', color: '#92400e' }}>
           Guided verification ready
         </div>
-        <div style={{ lineHeight: 1.5, marginBottom: 8 }}>
+        <div style={{ lineHeight: 1.5, marginBottom: 'var(--workspace-space-8)' }}>
           {fields.length} field{fields.length !== 1 ? 's' : ''} to confirm in{' '}
           <span style={{ fontWeight: 500 }}>{label || docTitle}</span>.{' '}
           The test case will be saved only after you finish reviewing each value in the document.
@@ -1086,7 +1086,7 @@ function VerificationLauncher({
         <button
           onClick={handleStart}
           className="chat-action-btn"
-          style={{ fontSize: 'var(--workspace-font-meta)', padding: '6px 16px' }}
+          style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-6) var(--workspace-space-16)" }}
         >
           Open document to verify
         </button>
@@ -1198,7 +1198,7 @@ export function ToolStatusLine({
       <p className="agent-tool-state" role="status" aria-atomic="true">{meta.label} · {executionLabel}</p>
       {/* Status line */}
       <div style={{
-        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 6,
+        display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-6)',
         fontSize: 'var(--workspace-font-control)', lineHeight: '20px', minHeight: 22,
       }}>
         {/* Activity indicator */}
@@ -1317,7 +1317,7 @@ export function ToolStatusLine({
         {typeof obj?.error_detail === 'string' && <p>{obj.error_detail}</p>}
         {onConfirm ? <button type="button" className="chat-action-btn" onClick={() => onConfirm(`Help me recover the failed ${name.replaceAll('_', ' ')} step. Review the existing results and explain the next action. Do not repeat completed changes without my approval.`)}>Review recovery options</button> : <p>Ask the Assistant to review this failed step. Keep completed results when deciding what to retry.</p>}
       </div>}
-      {artifact && <button type="button" className="chat-action-btn" style={{ margin: '8px 0 8px 20px' }} onClick={artifact.open}>{artifact.label}</button>}
+      {artifact && <button type="button" className="chat-action-btn" style={{ margin: "var(--workspace-space-8) 0 var(--workspace-space-8) var(--workspace-space-20)" }} onClick={artifact.open}>{artifact.label}</button>}
       {needsConfirmation && (
         <section className="agent-approval" aria-label="Review proposed action">
           <strong>{decision === 'approved' ? 'Approval requested' : decision === 'canceled' ? 'Cancellation requested' : 'Your approval is needed'}</strong>
@@ -1368,7 +1368,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '6px 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)', margin: "var(--workspace-space-6) 0" }}>
       {[...allCallIds].map((callId) => {
         const result = resultMap.get(callId)
         const call = toolCalls.find((c) => c.tool_call_id === callId)
@@ -1379,7 +1379,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
 
         return (
           <div key={callId}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-2)' }}>
               <div style={{ flex: 1 }}>
                 <ToolStatusLine call={call} result={result} isActive={isActive} onConfirm={onConfirm} />
               </div>
@@ -1391,7 +1391,7 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming, onConfirm
                   onClick={() => toggle(callId)}
                   style={{
                     display: 'flex', alignItems: 'center',
-                    background: 'none', border: 'none', padding: 8, minWidth: 36, minHeight: 36,
+                    background: 'none', border: 'none', padding: 'var(--workspace-space-8)', minWidth: 36, minHeight: 'var(--workspace-control-height)',
                     cursor: 'pointer', color: '#c4c9d1', flexShrink: 0,
                   }}
                 >
@@ -1439,9 +1439,9 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
   ) {
     if (content.length === 0) return null
     return (
-      <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 1 }}>
         {(content as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
-          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <span style={{ color: '#d1d5db' }}>&middot;</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {String(item.title || item.name || item.uuid || 'Untitled')}
@@ -1454,7 +1454,7 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
           </div>
         ))}
         {content.length > 10 && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 10 }}>+{content.length - 10} more</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginLeft: 'var(--workspace-space-12)' }}>+{content.length - 10} more</div>
         )}
       </div>
     )
@@ -1464,9 +1464,9 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
     const docs = Array.isArray(obj.documents) ? obj.documents : []
     if (docs.length === 0) return null
     return (
-      <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
+      <div style={{ marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 1 }}>
         {(docs as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
-          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
             <span style={{ color: '#d1d5db' }}>&middot;</span>
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {String(item.title || item.name || 'Untitled')}
@@ -1479,7 +1479,7 @@ function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
 
   return (
     <pre style={{
-      marginTop: 2, marginLeft: 20, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
+      marginTop: 'var(--workspace-space-2)', marginLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4,
       color: '#9ca3af', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
       maxHeight: 150, overflow: 'auto',
     }}>

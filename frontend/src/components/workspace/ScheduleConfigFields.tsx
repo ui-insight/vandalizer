@@ -51,10 +51,10 @@ export function ScheduleConfigFields({
     : `${docUuids.length} document${docUuids.length === 1 ? '' : 's'}`
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
       <CollapsibleSection title="When" summary={`${describeSchedule(value)} · ${value.timezone}`} testId="schedule-when">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
-          <div role="radiogroup" aria-label="Frequency" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingTop: 'var(--workspace-space-8)' }}>
+          <div role="radiogroup" aria-label="Frequency" style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap' }}>
             {(['daily', 'weekly', 'monthly'] as ScheduleFrequency[]).map(f => (
               <button
                 key={f}
@@ -70,7 +70,7 @@ export function ScheduleConfigFields({
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
             {value.frequency === 'weekly' && (
               <label style={fieldLabel}>
                 On
@@ -130,8 +130,8 @@ export function ScheduleConfigFields({
       </CollapsibleSection>
 
       <CollapsibleSection title="Runs on" summary={runsOnSummary} testId="schedule-runs-on">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 8 }}>
-          <div role="radiogroup" aria-label="Runs on" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingTop: 'var(--workspace-space-8)' }}>
+          <div role="radiogroup" aria-label="Runs on" style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap' }}>
             <button type="button" role="radio" aria-checked={value.source === 'folder'} disabled={disabled}
               onClick={() => set({ source: 'folder' })} style={segmentStyle(value.source === 'folder')}>
               A folder
@@ -161,7 +161,7 @@ export function ScheduleConfigFields({
                 </select>
               )}
               <p id="schedule-folder-help" className="wizard-field-help">Required. Choose the folder this schedule will run on.</p>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 'var(--workspace-font-control)', color: '#374151', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', color: '#374151', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={!!value.only_new}
@@ -178,9 +178,9 @@ export function ScheduleConfigFields({
               </label>
             </>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
               {docUuids.map(uuid => (
-                <div key={uuid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
+                <div key={uuid} style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                   <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
                   <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {docTitles[uuid] || uuid}
@@ -194,7 +194,7 @@ export function ScheduleConfigFields({
                         delete rest[uuid]
                         set({ document_uuids: docUuids.filter(u => u !== uuid), document_titles: rest })
                       }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 2, display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 'var(--workspace-space-2)', display: 'flex' }}
                     >
                       <X style={{ width: 14, height: 14 }} />
                     </button>
@@ -257,14 +257,14 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
   const otherZone = config.timezone !== ownZone
   return (
     <div role="status" aria-live="polite" style={{
-      display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 8,
+      display: 'flex', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-medium)',
       backgroundColor: error ? '#fef2f2' : '#f0f9ff', border: `1px solid ${error ? '#fecaca' : '#bae6fd'}`,
     }}>
-      <CalendarClock aria-hidden="true" style={{ width: 16, height: 16, color: error ? '#b91c1c' : '#0369a1', flexShrink: 0, marginTop: 2 }} />
+      <CalendarClock aria-hidden="true" style={{ width: 16, height: 16, color: error ? '#b91c1c' : '#0369a1', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
       <div style={{ fontSize: 'var(--workspace-font-control)', color: '#0f172a', minWidth: 0 }}>
         {error ? (
           <div>
-            <p style={{ color: '#b91c1c', margin: '0 0 8px' }}>Could not preview this schedule: {error}</p>
+            <p style={{ color: '#b91c1c', margin: "0 0 var(--workspace-space-8)" }}>Could not preview this schedule: {error}</p>
             <button type="button" style={addButtonStyle} onClick={() => setRetry(n => n + 1)}>Retry preview</button>
           </div>
         ) : !runs ? (
@@ -279,7 +279,7 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
               {otherZone && <span style={{ color: '#6b7280' }}> · {formatRunTime(runs[0], ownZone)} your time</span>}
             </div>
             {runs.length > 1 && (
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                 Then {runs.slice(1).map(r => formatRunTime(r, config.timezone)).join(', ')}
               </div>
             )}
@@ -291,23 +291,23 @@ function NextRuns({ config, ownZone }: { config: ScheduleTriggerConfig; ownZone:
 }
 
 const fieldLabel: React.CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 4,
+  display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
   fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280',
 }
 
 const controlStyle: React.CSSProperties = {
-  padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit', fontWeight: 400,
-  border: '1px solid #d1d5db', borderRadius: 8, backgroundColor: '#fff', color: '#202124', minWidth: 0, maxWidth: '100%',
+  padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit', fontWeight: 400,
+  border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff', color: '#202124', minWidth: 0, maxWidth: '100%',
 }
 
 const addButtonStyle: React.CSSProperties = {
-  alignSelf: 'flex-start', padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-  border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
+  alignSelf: 'flex-start', padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+  border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fff', color: '#374151', cursor: 'pointer',
 }
 
 function segmentStyle(selected: boolean): React.CSSProperties {
   return {
-    padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit', borderRadius: 6, cursor: 'pointer',
+    padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
     border: selected ? '1.5px solid var(--highlight-on-light, #806600)' : '1px solid #d1d5db',
     backgroundColor: selected ? '#f7f4e8' : '#fff',
     color: selected ? '#554400' : '#374151',

@@ -67,7 +67,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
             style={{
               position: 'absolute', top: 14, right: 14, zIndex: 10,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, borderRadius: 8,
+              width: 32, height: 32, borderRadius: 'var(--workspace-radius-medium)',
               background: 'rgba(255,255,255,0.06)',
               border: '1px solid rgba(255,255,255,0.1)',
               color: '#c0c7d6', cursor: 'pointer',
@@ -78,23 +78,23 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
           </button>
         )}
 
-        <div className="explainer-content" style={{ padding: '48px 32px 56px', maxWidth: 720, margin: '0 auto', position: 'relative' }}>
+        <div className="explainer-content" style={{ padding: "48px var(--workspace-space-32) 56px", maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           {/* Hero */}
           <div className="explainer-section" style={{ animationDelay: '60ms', textAlign: 'center', marginBottom: 28 }}>
             <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-16)",
               borderRadius: 999,
               background: 'rgba(234, 179, 8, 0.12)',
               border: '1px solid rgba(234, 179, 8, 0.3)',
               fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#fbbf24',
               textTransform: 'uppercase', letterSpacing: '0.1em',
-              marginBottom: 18,
+              marginBottom: 'var(--workspace-space-20)',
             }}>
               <Sparkles size={12} /> Automations
             </div>
             <h1 style={{
               fontSize: 34, fontWeight: 700, color: '#fff', letterSpacing: '-0.025em',
-              lineHeight: 1.1, margin: '0 0 14px',
+              lineHeight: 1.1, margin: "0 0 var(--workspace-space-16)",
             }}>
               Work that runs<br />while you don't have to.
             </h1>
@@ -175,7 +175,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
                   padding: '11px 26px', fontSize: 'var(--workspace-font-body)', fontWeight: 600,
                   color: '#1a1f2e',
                   background: 'linear-gradient(135deg, #fbbf24 0%, #eab308 100%)',
-                  border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                  border: 'none', borderRadius: 'var(--workspace-radius-large)', cursor: 'pointer', fontFamily: 'inherit',
                   boxShadow: '0 6px 20px -6px rgba(234, 179, 8, 0.5)',
                 }}
               >
@@ -197,15 +197,15 @@ function Section({
   return (
     <div className="explainer-section" style={{ animationDelay: delay, marginBottom: 36 }}>
       <h2 style={{
-        fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#fff', margin: '0 0 4px',
+        fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#fff', margin: "0 0 var(--workspace-space-4)",
         letterSpacing: '-0.01em',
       }}>
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 'var(--workspace-font-control)', color: '#aeb7c9', margin: '0 0 14px' }}>{subtitle}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: '#aeb7c9', margin: "0 0 var(--workspace-space-16)" }}>{subtitle}</p>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: subtitle ? 0 : 14 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', marginTop: subtitle ? 0 : 14 }}>
         {children}
       </div>
     </div>
@@ -215,13 +215,13 @@ function Section({
 function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; body: string }) {
   return (
     <div style={{
-      display: 'flex', gap: 14, alignItems: 'flex-start',
-      padding: 16, borderRadius: 12,
+      display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
       background: 'rgba(255,255,255,0.03)',
       border: '1px solid rgba(255,255,255,0.07)',
     }}>
       <div style={{
-        width: 36, height: 36, borderRadius: 10,
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-large)',
         background: 'rgba(234, 179, 8, 0.12)',
         border: '1px solid rgba(234, 179, 8, 0.28)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -229,7 +229,7 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
         <Icon size={18} style={{ color: '#fbbf24' }} />
       </div>
       <div>
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 'var(--workspace-space-4)' }}>
           {title}
         </div>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>
@@ -241,20 +241,20 @@ function Card({ icon: Icon, title, body }: { icon: LucideIcon; title: string; bo
 function UseCase({ trigger, action, accent }: { trigger: string; action: string; accent: string }) {
   return (
     <div style={{
-      padding: 16, borderRadius: 12,
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
       background: 'rgba(255,255,255,0.03)',
       border: '1px solid rgba(255,255,255,0.07)',
       borderLeft: `3px solid ${accent}`,
     }}>
       <div style={{
-        display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+        display: 'inline-block', padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
         background: `${accent}22`, color: accent,
         fontSize: 'var(--workspace-font-meta)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em',
-        marginBottom: 8,
+        marginBottom: 'var(--workspace-space-8)',
       }}>
         When
       </div>
-      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 8, lineHeight: 1.45 }}>
+      <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 'var(--workspace-space-8)', lineHeight: 1.45 }}>
         {trigger}
       </div>
       <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>
@@ -267,8 +267,8 @@ function UseCase({ trigger, action, accent }: { trigger: string; action: string;
 function Step({ num, title, body }: { num: string; title: string; body: string }) {
   return (
     <div style={{
-      display: 'flex', gap: 14, alignItems: 'flex-start',
-      padding: 14, borderRadius: 12,
+      display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+      padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
       background: 'rgba(255,255,255,0.03)',
       border: '1px solid rgba(255,255,255,0.07)',
     }}>
@@ -282,7 +282,7 @@ function Step({ num, title, body }: { num: string; title: string; body: string }
         {num}
       </div>
       <div>
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 2 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#e5e7eb', marginBottom: 'var(--workspace-space-2)' }}>
           {title}
         </div>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: '#9aa3b8', lineHeight: 1.55 }}>{body}</div>

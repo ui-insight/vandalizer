@@ -83,11 +83,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
         aria-modal="true"
         aria-label="Import test queries"
         style={{
-          width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflowY: 'auto', padding: 16, backgroundColor: 'var(--workspace-surface)', overflowWrap: 'anywhere',
-          border: '1px solid var(--workspace-border)', borderRadius: 10,
+          width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflowY: 'auto', padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)', overflowWrap: 'anywhere',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
           <Upload size={16} style={{ color: 'var(--workspace-info)' }} aria-hidden="true" />
           <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>Import test queries</h3>
           <button
@@ -95,12 +95,12 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
             aria-label="Close"
             onClick={onClose}
             disabled={importing}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
           >
             <X size={16} aria-hidden="true" />
           </button>
         </div>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 12 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-12)' }}>
           Upload a CSV or Excel (.xlsx) file, up to 5 MB, with a <strong>Question</strong> column;
           Expected Answer, Category, Source or Section, Notes, and ID columns are
           optional. Rows whose ID matches a previously imported question update it
@@ -116,7 +116,7 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           type="button"
           onClick={downloadTemplate}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12,
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)',
             padding: 0, background: 'transparent', border: 'none', cursor: 'pointer',
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', fontFamily: 'inherit',
           }}
@@ -141,10 +141,10 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
             pickFile(e.dataTransfer.files?.[0])
           }}
           style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-            padding: '22px 12px', marginBottom: 12, cursor: 'pointer',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "22px var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', cursor: 'pointer',
             backgroundColor: dragOver ? 'rgba(14,165,233,0.08)' : 'var(--workspace-surface)',
-            border: `1px dashed ${dragOver ? '#0ea5e9' : 'var(--workspace-border)'}`, borderRadius: 8,
+            border: `1px dashed ${dragOver ? '#0ea5e9' : 'var(--workspace-border)'}`, borderRadius: 'var(--workspace-radius-medium)',
           }}
         >
           <FileSpreadsheet size={20} style={{ color: file ? 'var(--workspace-success)' : 'var(--workspace-muted)' }} aria-hidden="true" />
@@ -165,9 +165,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
         {error && (
           <div role="alert" style={{
-            padding: '8px 10px', marginBottom: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
             backgroundColor: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-            borderRadius: 6, whiteSpace: 'pre-wrap',
+            borderRadius: 'var(--workspace-radius-small)', whiteSpace: 'pre-wrap',
           }}>
             {error}
           </div>
@@ -175,9 +175,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
 
         {result && (
           <div role="status" style={{
-            padding: '8px 10px', marginBottom: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
             backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.3)',
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
           }}>
             <div>
               Imported: <strong>{result.created}</strong> created,{' '}
@@ -186,9 +186,9 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
               {' '}of {result.total_rows} rows.
             </div>
             {result.errors.length > 0 && (
-              <div style={{ marginTop: 6, color: 'var(--workspace-warning)' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', color: 'var(--workspace-warning)' }}>
                 {result.errors.length} row{result.errors.length === 1 ? '' : 's'} could not be imported:
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                <ul style={{ margin: "var(--workspace-space-4) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
                   {result.errors.slice(0, 8).map(e => (
                     <li key={e.row}>Row {e.row}: {e.error}</li>
                   ))}
@@ -197,13 +197,13 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
               </div>
             )}
             {(result.unmatched_source_labels?.length ?? 0) > 0 && (
-              <div style={{ marginTop: 6, color: 'var(--workspace-warning)' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', color: 'var(--workspace-warning)' }}>
                 {result.unmatched_source_labels!.length} source label
                 {result.unmatched_source_labels!.length === 1 ? '' : 's'} match no source in
                 this knowledge base. Questions using them always score 0 retrieval
                 precision, which pulls the run score down for a naming mismatch rather
                 than a retrieval problem — rename them to match a source, or clear them:
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                <ul style={{ margin: "var(--workspace-space-4) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
                   {result.unmatched_source_labels!.slice(0, 8).map(u => (
                     <li key={u.label}>
                       "{u.label}" — {u.questions} question{u.questions === 1 ? '' : 's'}
@@ -218,11 +218,11 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
           <button type="button" onClick={onClose} disabled={importing} style={{
-            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: 'var(--workspace-muted)', background: 'transparent', border: '1px solid var(--workspace-border)',
-            borderRadius: 6, cursor: 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
           }}>
             {result ? 'Done' : 'Cancel'}
           </button>
@@ -231,10 +231,10 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
             onClick={handleImport}
             disabled={!file || importing || !!result}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-text)', backgroundColor: !file || importing || result ? 'var(--workspace-info-surface)' : 'var(--workspace-info-surface)',
-              border: '1px solid #0ea5e9', borderRadius: 6,
+              border: '1px solid #0ea5e9', borderRadius: 'var(--workspace-radius-small)',
               cursor: !file || importing ? 'not-allowed' : 'pointer',
               opacity: !file || importing ? 0.7 : 1,
             }}

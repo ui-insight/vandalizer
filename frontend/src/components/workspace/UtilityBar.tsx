@@ -27,8 +27,8 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: 8,
-        gap: 4,
+        paddingTop: 'var(--workspace-space-8)',
+        gap: 'var(--workspace-space-4)',
         flexShrink: 0,
       }}
     >
@@ -48,14 +48,14 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           background: 'transparent',
           border: 'none',
           borderLeft: projectsActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-          borderRadius: 4,
+          borderRadius: 'var(--workspace-radius-small)',
           cursor: 'pointer',
           padding: 0,
         }}
       >
         <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#888' }} />
       </button>
-      <div style={{ width: 24, height: 1, background: '#333', margin: '2px 0 4px' }} />
+      <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-2) 0 var(--workspace-space-4)" }} />
 
       {modes.map(({ mode, icon: Icon, label }) => {
         const active = activeMode === mode
@@ -79,7 +79,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
               background: 'transparent',
               border: 'none',
               borderLeft: active ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-              borderRadius: 4,
+              borderRadius: 'var(--workspace-radius-small)',
               cursor: 'pointer',
               padding: 0,
               animation: showPulse ? 'automationGlow 2s ease-in-out infinite' : undefined,
@@ -111,7 +111,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           in chat mode (other modes already have a left panel). */}
       {(workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)) && activeProjectRole !== 'viewer' && (
         <>
-          <div style={{ width: 24, height: 1, background: '#333', margin: '4px 0 2px' }} />
+          <div style={{ width: 24, height: 1, background: '#333', margin: "var(--workspace-space-4) 0 var(--workspace-space-2)" }} />
           <button
             onClick={() => setChatSplitOpen(!chatSplitOpen)}
             className="workspace-desktop-split-toggle"
@@ -127,7 +127,7 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
               background: 'transparent',
               border: 'none',
               borderLeft: chatSplitOpen ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-              borderRadius: 4,
+              borderRadius: 'var(--workspace-radius-small)',
               cursor: 'pointer',
               padding: 0,
             }}

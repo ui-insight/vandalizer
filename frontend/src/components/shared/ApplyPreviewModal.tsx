@@ -97,17 +97,17 @@ export function ApplyPreviewModal({
           maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden', overflowWrap: 'anywhere',
           background: 'var(--workspace-canvas)',
           border: '1px solid var(--workspace-border)',
-          borderRadius: 10,
+          borderRadius: 'var(--workspace-radius-large)',
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
         }}
       >
         <header style={{
-          padding: '12px 18px', flexShrink: 0,
+          padding: "var(--workspace-space-12) var(--workspace-space-20)", flexShrink: 0,
           borderBottom: '1px solid var(--workspace-border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
             <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
               Confirm apply
             </span>
@@ -118,7 +118,7 @@ export function ApplyPreviewModal({
             disabled={applying}
             style={{
               background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
-              cursor: applying ? 'not-allowed' : 'pointer', padding: 4, minWidth: 36, minHeight: 36,
+              cursor: applying ? 'not-allowed' : 'pointer', padding: 'var(--workspace-space-4)', minWidth: 36, minHeight: 'var(--workspace-control-height)',
             }}
           >
             <X size={16} />
@@ -127,7 +127,7 @@ export function ApplyPreviewModal({
 
         <div role="region" aria-label="Apply review details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto' }}>
         {/* Summary chips */}
-        <div style={{ padding: '14px 18px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-20) var(--workspace-space-8)", display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
           <SummaryChip
             color="var(--workspace-info)"
             label={`${preview.will_change} of ${preview.total} ${itemNounPlural} will change`}
@@ -155,19 +155,19 @@ export function ApplyPreviewModal({
           />
         </div>
 
-        <p style={{ padding: '0 18px', margin: '4px 0 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>These are recorded test scores for the current and proposed settings. Applying changes retrieval settings; it does not guarantee the same scores on future questions.</p>
+        <p style={{ padding: "0 var(--workspace-space-20)", margin: "var(--workspace-space-4) 0 var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>These are recorded test scores for the current and proposed settings. Applying changes retrieval settings; it does not guarantee the same scores on future questions.</p>
         {/* Items table */}
-        <div style={{ flexShrink: 0, padding: '4px 18px 12px' }}>
+        <div style={{ flexShrink: 0, padding: "var(--workspace-space-4) var(--workspace-space-20) var(--workspace-space-12)" }}>
           {sortedItems.length === 0 ? (
-            <div style={{ padding: 24, textAlign: 'center', color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-meta)' }}>
+            <div style={{ padding: 'var(--workspace-space-24)', textAlign: 'center', color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-meta)' }}>
               No per-{itemNoun} detail available for this run.
             </div>
           ) : (
-            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
               {sortedItems.map((item, idx) => (
-                <li key={item.item_id || idx} style={{ padding: 12, color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)', borderRadius: 6, background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined }}>
-                  <p style={{ margin: '0 0 8px', fontSize: 'var(--workspace-font-control)', lineHeight: 1.5 }}>{item.label || item.item_id || `${capitalize(itemNoun)} ${idx + 1}`}</p>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: 'var(--workspace-font-meta)', fontVariantNumeric: 'tabular-nums' }}>
+                <li key={item.item_id || idx} style={{ padding: 'var(--workspace-space-12)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined }}>
+                  <p style={{ margin: "0 0 var(--workspace-space-8)", fontSize: 'var(--workspace-font-control)', lineHeight: 1.5 }}>{item.label || item.item_id || `${capitalize(itemNoun)} ${idx + 1}`}</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontVariantNumeric: 'tabular-nums' }}>
                     <span>Current: <strong>{(item.baseline * 100).toFixed(0)}</strong></span>
                     <span>Proposed: <strong>{(item.winner * 100).toFixed(0)}</strong></span>
                     <span style={{ color: item.within_noise ? 'var(--workspace-muted)' : item.is_regression ? 'var(--workspace-danger)' : 'var(--workspace-success)' }}>Change: {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)} points</span>
@@ -181,13 +181,13 @@ export function ApplyPreviewModal({
 
         {/* Acknowledgement + actions */}
         <div style={{
-          padding: '12px 18px',
+          padding: "var(--workspace-space-12) var(--workspace-space-20)",
           borderTop: '1px solid var(--workspace-border)',
-          display: 'flex', flexDirection: 'column', gap: 10,
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)',
         }}>
           {requiresAck && (
             <label style={{
-              display: 'flex', gap: 8, alignItems: 'flex-start',
+              display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'flex-start',
               fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)',
             }}>
               <input
@@ -195,7 +195,7 @@ export function ApplyPreviewModal({
                 checked={ack}
                 onChange={(e) => setAck(e.target.checked)}
                 disabled={applying}
-                style={{ marginTop: 2 }}
+                style={{ marginTop: 'var(--workspace-space-2)' }}
               />
               <span>
                 I've reviewed the {preview.significant_regressions} significant
@@ -204,18 +204,18 @@ export function ApplyPreviewModal({
               </span>
             </label>
           )}
-          {error && <p ref={errorRef} role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 'var(--workspace-font-control)', lineHeight: 1.5, color: 'var(--workspace-danger)', background: 'var(--workspace-danger-surface)', borderRadius: 6 }}>{error} Review the result and try again.</p>}
+          {error && <p ref={errorRef} role="alert" style={{ margin: "0 0 var(--workspace-space-12)", padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.5, color: 'var(--workspace-danger)', background: 'var(--workspace-danger-surface)', borderRadius: 'var(--workspace-radius-small)' }}>{error} Review the result and try again.</p>}
         </div>
         </div>
-        <footer style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid var(--workspace-border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <footer style={{ flexShrink: 0, padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: '1px solid var(--workspace-border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
             <button
               onClick={onCancel}
               disabled={applying}
               style={{
-                minHeight: 36, padding: '6px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 500,
+                minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
                 color: 'var(--workspace-muted)', background: 'transparent',
-                border: '1px solid var(--workspace-border)', borderRadius: 6,
+                border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
                 cursor: applying ? 'not-allowed' : 'pointer',
               }}
             >
@@ -225,13 +225,13 @@ export function ApplyPreviewModal({
               onClick={onConfirm}
               disabled={!canConfirm}
               style={{
-                minHeight: 36, padding: '6px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 600,
+                minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 600,
                 color: canConfirm ? 'var(--highlight-text-color, #000)' : 'var(--workspace-muted)',
                 background: canConfirm
                   ? 'var(--highlight-color, #eab308)'
                   : 'var(--workspace-surface)',
                 border: '1px solid ' + (canConfirm ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
-                borderRadius: 6,
+                borderRadius: 'var(--workspace-radius-small)',
                 cursor: canConfirm ? 'pointer' : 'not-allowed',
               }}
             >
@@ -250,8 +250,8 @@ function SummaryChip({
 }: { icon?: React.ReactNode; color: string; label: string }) {
   return (
     <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      padding: '3px 8px',
+      display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+      padding: "var(--workspace-space-4) var(--workspace-space-8)",
       fontSize: 'var(--workspace-font-meta)', color,
       background: 'var(--workspace-canvas)',
       border: '1px solid ' + color + '40',

@@ -53,13 +53,13 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 4,
-          padding: '4px 9px',
+          gap: 'var(--workspace-space-4)',
+          padding: "var(--workspace-space-4) 9px",
           borderRadius: 9999,
           fontSize: 'var(--workspace-font-meta)',
           fontWeight: 500,
           fontFamily: 'inherit',
-          border: '1px solid #e5e7eb',
+          border: "1px solid var(--workspace-border)",
           background: '#fff',
           color: '#475569',
           cursor: 'pointer',
@@ -88,14 +88,14 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
             top: '100%',
             left: '50%',
             transform: 'translateX(-50%)',
-            marginTop: 6,
+            marginTop: 'var(--workspace-space-6)',
             width: 'max-content',
             maxWidth: 'min(280px, calc(100vw - 24px))',
             background: '#fff',
-            border: '1px solid #e5e7eb',
-            borderRadius: 8,
+            border: "1px solid var(--workspace-border)",
+            borderRadius: 'var(--workspace-radius-medium)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            padding: 12,
+            padding: 'var(--workspace-space-12)',
             zIndex: 100,
             fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
@@ -104,7 +104,7 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
             whiteSpace: 'normal',
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 'var(--workspace-font-control)' }}>{term}</div>
+          <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-control)' }}>{term}</div>
           <div>{children}</div>
         </div>
       )}
@@ -140,11 +140,11 @@ export function ConceptStrip({ heading = 'New here? Tap a term to see what it me
   return (
     <div>
       {heading && (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#626a75', marginBottom: 8, fontWeight: 500 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#626a75', marginBottom: 'var(--workspace-space-8)', fontWeight: 500 }}>
           {heading}
         </div>
       )}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
         {CONCEPTS.map(c => (
           <ConceptTip key={c.term} term={c.term}>{c.explanation}</ConceptTip>
         ))}

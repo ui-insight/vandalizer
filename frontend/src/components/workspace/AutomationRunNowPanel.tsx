@@ -183,23 +183,23 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
     <section
       aria-label="Run now"
       style={{
-        border: '1px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 8,
-        padding: 16, marginBottom: 20, overflowWrap: 'anywhere',
+        border: '1px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 'var(--workspace-radius-medium)',
+        padding: 'var(--workspace-space-16)', marginBottom: 'var(--workspace-space-20)', overflowWrap: 'anywhere',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-8)' }}>
         <div>
-          <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
             <Play style={{ width: 14, height: 14 }} /> Run now
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>{describeRunNowSource(automation)}</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>{describeRunNowSource(automation)}</div>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close run now" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 2 }}>
+        <button type="button" onClick={onClose} aria-label="Close run now" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 'var(--workspace-space-2)' }}>
           <X style={{ width: 16, height: 16 }} />
         </button>
       </div>
 
-      <div role="note" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginBottom: 12 }}>
+      <div role="note" style={{ display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'flex-start', fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginBottom: 'var(--workspace-space-12)' }}>
         <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
         <span>
           This is a real run, not a dry run: results are saved and notifications and webhooks are sent exactly as configured below.
@@ -208,12 +208,12 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
       </div>
 
       {needsDocs && (
-        <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 6 }}>Documents to run with</div>
+        <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>Documents to run with</div>
           {chosen.length > 0 && (
-            <ul style={{ listStyle: 'none', margin: '0 0 6px', padding: 0, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <ul style={{ listStyle: 'none', margin: "0 0 var(--workspace-space-6)", padding: 0, display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
               {chosen.map(d => (
-                <li key={d.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 'var(--workspace-font-meta)', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, maxWidth: '100%', minWidth: 0 }}>
+                <li key={d.uuid} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-large)', maxWidth: '100%', minWidth: 0 }}>
                   <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
                   {d.title}
                   <button type="button" disabled={documentsLocked} aria-label={`Remove ${d.title}`} onClick={() => setChosen(c => c.filter(x => x.uuid !== d.uuid))} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, color: '#6b7280', display: 'flex' }}>
@@ -238,23 +238,23 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
               onClick={() => setShowResults(true)}
               onKeyDown={e => { if (e.key === 'Escape') setShowResults(false) }}
               placeholder="Search your library…"
-              style={{ width: '100%', padding: '6px 10px 6px 26px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: "var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-6) 26px", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', boxSizing: 'border-box' }}
             />
             {showResults && !documentsLocked && (
-              <div role="group" aria-label="Document search results" style={{ marginTop: 4, backgroundColor: '#fff', border: '1px solid #d1d5db', borderRadius: 6, maxHeight: 180, overflowY: 'auto' }}>
-                {searching ? <div role="status" style={{ padding: 10, fontSize: 'var(--workspace-font-meta)' }}>Searching documents…</div>
-                  : searchError ? <div role="alert" style={{ padding: 10, fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>
+              <div role="group" aria-label="Document search results" style={{ marginTop: 'var(--workspace-space-4)', backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', maxHeight: 180, overflowY: 'auto' }}>
+                {searching ? <div role="status" style={{ padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)' }}>Searching documents…</div>
+                  : searchError ? <div role="alert" style={{ padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#b91c1c' }}>
                     {searchError}
-                    <button type="button" onClick={() => setSearchAttempt(n => n + 1)} style={{ display: 'block', marginTop: 8 }}>Retry document search</button>
+                    <button type="button" onClick={() => setSearchAttempt(n => n + 1)} style={{ display: 'block', marginTop: 'var(--workspace-space-8)' }}>Retry document search</button>
                   </div>
-                  : results.length === 0 ? <div role="status" style={{ padding: 10, fontSize: 'var(--workspace-font-meta)', color: '#555e68' }}>No documents found. Try a different search.</div>
+                  : results.length === 0 ? <div role="status" style={{ padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#555e68' }}>No documents found. Try a different search.</div>
                   : results.map(d => (
                     <button key={d.uuid} type="button" aria-label={`Choose ${d.title}`} onClick={() => {
                       setChosen(c => c.some(item => item.uuid === d.uuid) ? c : [...c, d])
                       setQuery('')
                       searchInput.current?.focus()
                       setShowResults(false)
-                    }} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', font: 'inherit', fontSize: 'var(--workspace-font-meta)', background: '#fff', color: '#374151', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    }} style={{ width: '100%', textAlign: 'left', padding: "var(--workspace-space-8) var(--workspace-space-12)", font: 'inherit', fontSize: 'var(--workspace-font-meta)', background: '#fff', color: '#374151', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                       <FileText style={{ width: 12, height: 12, flexShrink: 0 }} />
                       <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{d.title}</span>
                     </button>
@@ -265,15 +265,15 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={handleRun}
           disabled={disabled || inFlight}
           title={!automation.action_id ? 'Choose an action first' : !canManage ? 'Only the creator or a team owner/admin can run this' : undefined}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
-            fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit', border: 'none', borderRadius: 6,
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-16)",
+            fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit', border: 'none', borderRadius: 'var(--workspace-radius-small)',
             backgroundColor: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
             cursor: disabled || inFlight ? 'not-allowed' : 'pointer', opacity: disabled || inFlight ? 0.6 : 1,
           }}
@@ -292,41 +292,41 @@ function RunNowSession({ automation, canManage, onClose, userScope }: Props) {
       </div>
 
       {error && (
-        <div role="alert" style={{ marginTop: 10, display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 'var(--workspace-font-control)', color: '#b91c1c' }}>
-          <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />{error}
+        <div role="alert" style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-6)', alignItems: 'flex-start', fontSize: 'var(--workspace-font-control)', color: '#b91c1c' }}>
+          <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />{error}
         </div>
       )}
-      {launch && !starting && <p role="status" style={{ marginTop: 10, fontSize: 'var(--workspace-font-control)', color: '#92400e' }}>Reconnect to recover this request and its current status. The original document selection is retained. This will not start a duplicate run.</p>}
+      {launch && !starting && <p role="status" style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', color: '#92400e' }}>Reconnect to recover this request and its current status. The original document selection is retained. This will not start a duplicate run.</p>}
       {statusError && (
-        <div role="alert" style={{ marginTop: 10, fontSize: 'var(--workspace-font-control)', color: '#92400e' }}>
+        <div role="alert" style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', color: '#92400e' }}>
           <p>Run accepted, but its current status is unavailable. {statusError}</p>
           <p>The run may still finish. Checking again will not start another run.</p>
-          <button type="button" onClick={() => setStatusAttempt(n => n + 1)} style={{ marginTop: 8 }}>Retry status check</button>
+          <button type="button" onClick={() => setStatusAttempt(n => n + 1)} style={{ marginTop: 'var(--workspace-space-8)' }}>Retry status check</button>
         </div>
       )}
       {inFlight && !statusError && (
-        <div role="status" style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+        <div role="status" style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
           Started — {run?.status ?? 'queued'}. This panel updates as the run progresses.
         </div>
       )}
       {result && (error || starting) && (
-        <div style={{ marginTop: 12, fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151' }}>Previous run</div>
+        <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151' }}>Previous run</div>
       )}
       {result && (
         <div role="status" style={{
-          marginTop: 10, display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 'var(--workspace-font-control)',
+          marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-6)', alignItems: 'flex-start', fontSize: 'var(--workspace-font-control)',
           color: result.tone === 'ok' ? '#166534' : result.tone === 'warn' ? '#92400e' : '#b91c1c',
         }}>
           {result.tone === 'ok'
-            ? <CheckCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />
-            : <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 2 }} />}
+            ? <CheckCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
+            : <XCircle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />}
           <span>{result.text}</span>
         </div>
       )}
       {result && run?.output != null && run.output !== '' && (
-        <details style={{ marginTop: 8 }}>
+        <details style={{ marginTop: 'var(--workspace-space-8)' }}>
           <summary style={{ cursor: 'pointer', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151' }}>Output</summary>
-          <pre style={{ margin: '6px 0 0', fontSize: 'var(--workspace-font-meta)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 240, overflowY: 'auto', backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, padding: 8 }}>
+          <pre style={{ margin: "var(--workspace-space-6) 0 0", fontSize: 'var(--workspace-font-meta)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 240, overflowY: 'auto', backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: 'var(--workspace-space-8)' }}>
             {typeof run.output === 'string' ? run.output : JSON.stringify(run.output, null, 2)}
           </pre>
         </details>

@@ -60,8 +60,8 @@ export function optimizedBadgeTitle(opt: KBOptimizationStatus, withTime = false)
 }
 
 const chip = {
-  display: 'inline-flex', alignItems: 'center', gap: 3,
-  fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+  fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
 } as const
 
 export function VerifiedBadge() {

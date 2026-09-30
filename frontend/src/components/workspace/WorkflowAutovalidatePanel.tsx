@@ -212,26 +212,26 @@ export function WorkflowAutovalidatePanel({
   return (
     <div
       style={{
-        padding: 20,
+        padding: 'var(--workspace-space-20)',
         border: '1px solid var(--workspace-border)',
-        borderRadius: 8,
+        borderRadius: 'var(--workspace-radius-medium)',
         background: 'var(--workspace-surface)',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
             <Sparkles size={16} style={{ color: 'var(--workspace-info)' }} />
             <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)' }}>
               Validate & improve
             </div>
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginTop: 4, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-4)', lineHeight: 1.5 }}>
             Runs this workflow against your test data, scores the output, and tries better
             per-step model and prompt combinations. Apply the best configuration with one click.
           </div>
           {testDataSummary && (
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-6)' }}>
               Scores against {testDataSummary.expectedOutputs} expected{' '}
               {testDataSummary.expectedOutputs === 1 ? 'output' : 'outputs'} and{' '}
               {testDataSummary.checks} quality {testDataSummary.checks === 1 ? 'check' : 'checks'}.
@@ -240,7 +240,7 @@ export function WorkflowAutovalidatePanel({
                   type="button"
                   onClick={onOpenTestData}
                   style={{
-                    marginLeft: 6, background: 'none', border: 'none', padding: 0,
+                    marginLeft: 'var(--workspace-space-6)', background: 'none', border: 'none', padding: 0,
                     color: 'var(--workspace-info)', fontSize: 'var(--workspace-font-meta)', cursor: 'pointer',
                     fontFamily: 'inherit', textDecoration: 'underline',
                   }}
@@ -250,7 +250,7 @@ export function WorkflowAutovalidatePanel({
               )}
             </div>
           )}
-          <div style={{ marginTop: 10 }}>
+          <div style={{ marginTop: 'var(--workspace-space-12)' }}>
             <WhenToRunDisclosure kind="workflow" />
           </div>
         </div>
@@ -261,8 +261,8 @@ export function WorkflowAutovalidatePanel({
             disabled={!canManage}
             title={canManage ? '' : 'You cannot manage this workflow'}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', borderRadius: 6,
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)',
               background: canManage ? 'var(--workspace-canvas)' : 'var(--workspace-surface)',
               color: canManage ? 'var(--workspace-text)' : 'var(--workspace-muted)',
               border: '1px solid ' + (canManage ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
@@ -279,7 +279,7 @@ export function WorkflowAutovalidatePanel({
       {error && (
         <div
           style={{
-            marginTop: 12, padding: '8px 12px', borderRadius: 6,
+            marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
             background: 'rgba(239, 68, 68, 0.08)',
             border: '1px solid rgba(239, 68, 68, 0.3)',
             color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)',
@@ -290,7 +290,7 @@ export function WorkflowAutovalidatePanel({
       )}
 
       {isRunning && run && (
-        <div style={{ marginTop: 16 }}>
+        <div style={{ marginTop: 'var(--workspace-space-16)' }}>
           <OptimizationProgressCard<WorkflowOptimizationTrial['config']>
             run={runForProgress(run)}
             scoreFloor={run.baseline_no_workflow_score ?? run.baseline_default_score}
@@ -305,13 +305,13 @@ export function WorkflowAutovalidatePanel({
       )}
 
       {isIdle && run && run.status === 'failed' && (
-        <div style={{ marginTop: 12, color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', color: 'var(--workspace-danger)', fontSize: 'var(--workspace-font-control)' }}>
           Optimization failed: {run.error_message || 'unknown error'}
         </div>
       )}
 
       {isIdle && run && run.status === 'cancelled' && (
-        <div style={{ marginTop: 12, color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)' }}>
           Cancelled. {run.trials.length > 0
             ? `Best so far: ${formatScore(run.best_score_so_far)}.`
             : 'No trial results.'}
@@ -421,7 +421,7 @@ function CompletedView({
   const [selectedTrial, setSelectedTrial] = useState<WorkflowOptimizationTrial | null>(null)
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div style={{ marginTop: 'var(--workspace-space-16)' }}>
       <QualityComparisonCard
         baselines={baselines}
         variance={run.judge_variance ?? 0}
@@ -432,15 +432,15 @@ function CompletedView({
       />
 
       {run.step_breakdown.length > 0 && (
-        <details style={{ marginTop: 12 }}>
+        <details style={{ marginTop: 'var(--workspace-space-12)' }}>
           <summary style={{ cursor: 'pointer', fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: 'var(--workspace-text)' }}>
             Per-step breakdown ({run.step_breakdown.length} steps)
           </summary>
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 'var(--workspace-space-8)' }}>
             {run.step_breakdown.map((s: WorkflowStepBreakdownEntry) => (
               <div
                 key={s.step}
-                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 'var(--workspace-font-meta)' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-4) 0", fontSize: 'var(--workspace-font-meta)' }}
               >
                 <span style={{ width: 140, color: 'var(--workspace-muted)' }}>{s.step}</span>
                 <div style={{ flex: 1, height: 6, background: 'var(--workspace-surface)', borderRadius: 3, overflow: 'hidden' }}>
@@ -462,7 +462,7 @@ function CompletedView({
       )}
 
       {suggestions.length > 0 && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
           <SuggestionsList suggestions={suggestions} />
         </div>
       )}
@@ -470,7 +470,7 @@ function CompletedView({
       {/* Trials — each tunes the workflow's steps differently. Tap one for a
           plain-English breakdown of what it changed and how it scored. */}
       {(run.trials || []).length > 0 && (
-        <div style={{ marginTop: 12 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
           <TrialsTable<WorkflowOptimizationTrial>
             trials={run.trials}
             sortOptions={WORKFLOW_TRIAL_SORT_OPTIONS}
@@ -488,26 +488,26 @@ function CompletedView({
       <WorkflowTrialExplainerModal trial={selectedTrial} onClose={() => setSelectedTrial(null)} />
 
       {Object.keys(run.best_per_step_config || {}).length > 0 && (
-        <details style={{ marginTop: 12 }} open={selectedStepIds !== undefined}>
+        <details style={{ marginTop: 'var(--workspace-space-12)' }} open={selectedStepIds !== undefined}>
           <summary style={{ cursor: 'pointer', fontSize: 'var(--workspace-font-control)', fontWeight: 500, color: 'var(--workspace-text)' }}>
             Best configuration
             {selectedStepIds && selectedStepIds.length > 0 && (
-              <span style={{ marginLeft: 8, color: 'var(--workspace-info)', fontWeight: 400 }}>
+              <span style={{ marginLeft: 'var(--workspace-space-8)', color: 'var(--workspace-info)', fontWeight: 400 }}>
                 · applying {selectedStepIds.length} of {Object.keys(run.best_per_step_config).length}
               </span>
             )}
           </summary>
-          <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+          <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
               <button
                 type="button"
                 onClick={() => onSelectionChange(undefined)}
                 style={{
-                  padding: '2px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+                  padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                   color: selectedStepIds === undefined ? 'var(--workspace-info)' : 'var(--workspace-muted)',
                   background: 'transparent',
                   border: '1px solid ' + (selectedStepIds === undefined ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
-                  borderRadius: 4, cursor: 'pointer',
+                  borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
                 }}
               >
                 Apply all
@@ -516,11 +516,11 @@ function CompletedView({
                 type="button"
                 onClick={() => onSelectionChange([])}
                 style={{
-                  padding: '2px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+                  padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                   color: selectedStepIds !== undefined ? 'var(--workspace-info)' : 'var(--workspace-muted)',
                   background: 'transparent',
                   border: '1px solid ' + (selectedStepIds !== undefined ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
-                  borderRadius: 4, cursor: 'pointer',
+                  borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
                 }}
               >
                 Pick steps…
@@ -533,8 +533,8 @@ function CompletedView({
                 <label
                   key={step}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '2px 0',
+                    display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+                    padding: "var(--workspace-space-2) 0",
                     cursor: stepSelectable ? 'pointer' : 'default',
                     opacity: stepSelectable ? 1 : 0.85,
                   }}
@@ -563,7 +563,7 @@ function CompletedView({
         </details>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)', alignItems: 'center' }}>
         {canApply && (
           <ApplyBackButton
             canApply={canApply && (selectedStepIds === undefined || selectedStepIds.length > 0)}
@@ -583,7 +583,7 @@ function CompletedView({
             onClick={onRevert}
             disabled={reverting}
             style={{
-              padding: '6px 12px', borderRadius: 6,
+              padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
               background: 'transparent', color: reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
               border: '1px solid var(--workspace-border)',
               fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',

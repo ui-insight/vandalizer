@@ -201,12 +201,12 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         position: 'absolute', inset: 0, zIndex: 50,
         backgroundColor: 'rgba(0,0,0,0.3)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 16,
+        padding: 'var(--workspace-space-16)',
       } : {
         position: 'fixed', inset: 0, zIndex: 9999,
         backgroundColor: 'rgba(0,0,0,0.5)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 20,
+        padding: 'var(--workspace-space-20)',
       }}
     >
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
@@ -216,14 +216,14 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         aria-modal="true"
         aria-label={`Select ${kindLabel}`}
         style={{
-        backgroundColor: '#fff', borderRadius: 12,
+        backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)',
         width: '100%', maxWidth: inline ? 480 : 560, maxHeight: inline ? '90%' : '80vh',
         display: 'flex', flexDirection: 'column',
-        boxShadow: '0 25px 50px -12px rgba(0,0,0,0.25)',
+        boxShadow: 'var(--workspace-shadow-dialog)',
       }}>
         {/* Header */}
         <div style={{
-          padding: '16px 20px 0', display: 'flex', alignItems: 'center',
+          padding: "var(--workspace-space-16) var(--workspace-space-20) 0", display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
         }}>
           <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#111827' }}>
@@ -235,7 +235,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             aria-label="Close"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: '#555e68', padding: 4, borderRadius: 6,
+              color: '#555e68', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)',
               display: 'flex', alignItems: 'center',
             }}
           >
@@ -244,11 +244,11 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         </div>
 
         {/* Search bar */}
-        <div style={{ padding: '12px 20px 0' }}>
+        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20) 0" }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '8px 12px', backgroundColor: '#f9fafb',
-            border: '1.5px solid #e5e7eb', borderRadius: 8,
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", backgroundColor: '#f9fafb',
+            border: "1.5px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
           }}>
             <Search size={16} style={{ color: '#9ca3af', flexShrink: 0 }} />
             <input
@@ -270,7 +270,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                 aria-label="Clear search"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  color: '#9ca3af', padding: 2, display: 'flex',
+                  color: '#9ca3af', padding: 'var(--workspace-space-2)', display: 'flex',
                 }}
               >
                 <X size={14} />
@@ -281,8 +281,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
 
         {/* Scope tabs */}
         <div style={{
-          display: 'flex', gap: 0, padding: '12px 20px 0',
-          borderBottom: '1px solid #e5e7eb',
+          display: 'flex', gap: 0, padding: "var(--workspace-space-12) var(--workspace-space-20) 0",
+          borderBottom: "1px solid var(--workspace-border)",
         }}>
           {SCOPE_TABS.map(tab => {
             const active = scope === tab.value
@@ -294,8 +294,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                 aria-pressed={active}
                 onClick={() => setScope(tab.value)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontWeight: 600,
                   fontFamily: 'inherit', cursor: 'pointer',
                   color: active ? 'var(--highlight-on-light, #806600)' : '#555e68',
                   backgroundColor: 'transparent', border: 'none',
@@ -312,7 +312,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
 
         {/* Items list */}
         <div style={{
-          flex: 1, overflowY: 'auto', padding: '8px 12px 12px',
+          flex: 1, overflowY: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-12) var(--workspace-space-12)",
           minHeight: 0,
         }}>
           {(error || (scope !== 'explore' && libraryError)) ? (
@@ -323,14 +323,14 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
           ) : loading || search !== debouncedSearch ? (
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8, padding: 24, color: '#555e68', fontSize: 'var(--workspace-font-control)',
+              gap: 'var(--workspace-space-8)', padding: 'var(--workspace-space-24)', color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               <Loader2 size={16} className="animate-spin" style={{ animation: 'spin 1s linear infinite' }} />
               Loading...
             </div>
           ) : items.length === 0 ? (
             <div style={{
-              textAlign: 'center', padding: '24px 12px', color: '#555e68', fontSize: 'var(--workspace-font-control)',
+              textAlign: 'center', padding: "var(--workspace-space-24) var(--workspace-space-12)", color: '#555e68', fontSize: 'var(--workspace-font-control)',
             }}>
               {debouncedSearch
                 ? `No ${kindPlural} matching "${debouncedSearch}"`
@@ -343,7 +343,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               <p className="wizard-field-help">{debouncedSearch ? 'Clear your search or try another scope.' : 'Try another scope to find an action.'}</p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               {items.map(item => {
                 const isSelected = item.id === currentId
                 return (
@@ -354,11 +354,11 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     className="action-picker-item"
                     onClick={() => onSelect(item.id, item.name)}
                     style={{
-                      display: 'flex', alignItems: 'flex-start', gap: 12,
-                      padding: '10px 12px', textAlign: 'left', width: '100%',
+                      display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+                      padding: "var(--workspace-space-12) var(--workspace-space-12)", textAlign: 'left', width: '100%',
                       backgroundColor: isSelected ? '#f7f4e8' : '#fff',
                       border: isSelected ? '1.5px solid var(--highlight-on-light, #806600)' : '1.5px solid transparent',
-                      borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                      borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer', fontFamily: 'inherit',
                       transition: 'background-color 0.1s, border-color 0.1s',
                     }}
                     onMouseEnter={e => {
@@ -369,7 +369,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     }}
                   >
                     <div style={{
-                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                      width: 32, height: 32, borderRadius: 'var(--workspace-radius-medium)', flexShrink: 0,
                       backgroundColor: kind === 'workflow' ? '#ede9fe' : '#f7f4e8',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       marginTop: 1,
@@ -380,7 +380,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                       }
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', minWidth: 0 }}>
                         <div style={{
                           fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#111827',
                           overflowWrap: 'anywhere',
@@ -400,7 +400,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                       </div>
                       {item.description && (
                         <div style={{
-                          fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 2,
+                          fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 'var(--workspace-space-2)',
                           overflowWrap: 'anywhere',
                         }}>
                           {item.description}
@@ -409,8 +409,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     </div>
                     {item.qualityTier && tierColors[item.qualityTier] && (
                       <span style={{
-                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px',
-                        borderRadius: 10, textTransform: 'uppercase', flexShrink: 0,
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)",
+                        borderRadius: 'var(--workspace-radius-large)', textTransform: 'uppercase', flexShrink: 0,
                         backgroundColor: tierColors[item.qualityTier].bg,
                         color: tierColors[item.qualityTier].text,
                       }}>
@@ -419,8 +419,8 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
                     )}
                     {isSelected && (
                       <span style={{
-                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px',
-                        borderRadius: 10, backgroundColor: '#f7f4e8', color: '#554400',
+                        fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)",
+                        borderRadius: 'var(--workspace-radius-large)', backgroundColor: '#f7f4e8', color: '#554400',
                         flexShrink: 0,
                       }}>
                         Selected

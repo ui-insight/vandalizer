@@ -31,7 +31,7 @@ const VIOLET = {
 
 const NEUTRAL = {
   surface: '#f9fafb',
-  border: '#e5e7eb',
+  border: "var(--workspace-border)",
   strong: '#111827',
   text: '#4b5563',
   // Quiet, but still AA against the red surface it sits on in FailedBanner —
@@ -46,9 +46,9 @@ interface ErrorBannerProps {
 export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
     <div role="alert" style={{
-      padding: 10, marginBottom: 10, fontSize: 'var(--workspace-font-meta)',
+      padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)',
       color: RED.text, backgroundColor: RED.surface,
-      border: `1px solid ${RED.border}`, borderRadius: 6,
+      border: `1px solid ${RED.border}`, borderRadius: 'var(--workspace-radius-small)',
     }}>
       {message}
     </div>
@@ -64,10 +64,10 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
   const when = startedAt ? new Date(startedAt).toLocaleString() : 'Unknown date'
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10,
-      padding: '8px 12px',
+      display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+      padding: "var(--workspace-space-8) var(--workspace-space-12)",
       backgroundColor: VIOLET.surface,
-      border: `1px solid ${VIOLET.border}`, borderRadius: 6,
+      border: `1px solid ${VIOLET.border}`, borderRadius: 'var(--workspace-radius-small)',
       fontSize: 'var(--workspace-font-meta)', color: VIOLET.text,
     }}>
       <Sparkles size={13} style={{ color: VIOLET.icon, flexShrink: 0 }} />
@@ -77,9 +77,9 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
       <button
         onClick={onExit}
         style={{
-          padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+          padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
           color: VIOLET.text, background: '#fff',
-          border: `1px solid ${VIOLET.border}`, borderRadius: 5,
+          border: `1px solid ${VIOLET.border}`, borderRadius: 'var(--workspace-radius-small)',
           cursor: 'pointer',
         }}
       >
@@ -141,42 +141,42 @@ export function FailedBanner({
   const remediation = errorCode ? REMEDIATIONS[errorCode] : null
   return (
     <div role="alert" style={{
-      padding: 14, backgroundColor: RED.surface,
-      border: `1px solid ${RED.border}`, borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: RED.surface,
+      border: `1px solid ${RED.border}`, borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <AlertCircle size={16} style={{ color: RED.icon }} />
         <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: RED.strong }}>{title}</span>
       </div>
       {remediation ? (
         <>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 'var(--workspace-space-6)' }}>
             {remediation.what}
           </div>
           <div style={{
-            padding: '8px 10px', marginBottom: 10,
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
             fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, lineHeight: 1.5,
             backgroundColor: '#fff', border: `1px solid ${RED.border}`,
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
           }}>
             <strong style={{ color: NEUTRAL.strong }}>What to do:</strong> {remediation.how}
           </div>
-          <details style={{ marginBottom: 10 }}>
+          <details style={{ marginBottom: 'var(--workspace-space-12)' }}>
             <summary style={{ fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.muted, cursor: 'pointer' }}>
               Raw error message
             </summary>
-            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, fontFamily: 'monospace' }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, fontFamily: 'monospace' }}>
               {message}
             </div>
           </details>
         </>
       ) : (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 10 }}>{message}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: RED.text, marginBottom: 'var(--workspace-space-12)' }}>{message}</div>
       )}
       <button onClick={onRunAgain} style={{
-        padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+        padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
         color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
-        border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
+        border: '1px solid var(--workspace-accent-ink)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
       }}>
         {retryLabel}
       </button>
@@ -194,20 +194,20 @@ interface CancelledBannerProps {
 export function CancelledBanner({ completedTrials, onRunAgain, title = 'Optimization cancelled', retryLabel = 'Run again' }: CancelledBannerProps) {
   return (
     <div role="status" style={{
-      padding: 14, backgroundColor: NEUTRAL.surface,
-      border: `1px solid ${NEUTRAL.border}`, borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: NEUTRAL.surface,
+      border: `1px solid ${NEUTRAL.border}`, borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Info size={16} style={{ color: NEUTRAL.muted }} />
         <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: NEUTRAL.strong }}>{title}</span>
       </div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: NEUTRAL.text, marginBottom: 'var(--workspace-space-12)' }}>
         {completedTrials} trial{completedTrials !== 1 ? 's' : ''} completed before you cancelled.
       </div>
       <button onClick={onRunAgain} style={{
-        padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+        padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
         color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
-        border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
+        border: '1px solid var(--workspace-accent-ink)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
       }}>
         {retryLabel}
       </button>

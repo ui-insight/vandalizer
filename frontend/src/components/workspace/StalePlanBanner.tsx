@@ -27,9 +27,9 @@ export function StalePlanBanner({
     <div
       data-testid="stale-plan-banner"
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '10px 12px', marginBottom: 8,
-        backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6,
+        display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)',
+        backgroundColor: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 'var(--workspace-radius-small)',
       }}
     >
       <AlertTriangle style={{ width: 15, height: 15, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
@@ -37,21 +37,21 @@ export function StalePlanBanner({
         <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#92400e' }}>
           This plan may be out of sync with the workflow
         </div>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#a16207', marginTop: 2, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#a16207', marginTop: 'var(--workspace-space-2)', lineHeight: 1.4 }}>
           {orphanedCount > 0
             ? `${orphanedCount} check${orphanedCount === 1 ? '' : 's'} target${orphanedCount === 1 ? 's' : ''} a step that no longer exists. `
             : 'The workflow was edited after this plan was created. '}
           Stale checks skip or fail unfairly, dragging the grade down even when the workflow is fine.
         </div>
         {canManage && (
-          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-8)' }}>
             <button
               onClick={onRegenerate}
               disabled={generating}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 5, border: 'none', backgroundColor: '#d97706', color: '#fff',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 'var(--workspace-radius-small)', border: 'none', backgroundColor: '#d97706', color: '#fff',
                 cursor: generating ? 'not-allowed' : 'pointer', opacity: generating ? 0.6 : 1,
               }}
             >
@@ -62,9 +62,9 @@ export function StalePlanBanner({
               disabled={confirming}
               title="Keep the plan as-is and stop warning until the workflow changes again"
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 5, border: '1px solid #fcd34d', backgroundColor: '#fff',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 'var(--workspace-radius-small)', border: '1px solid #fcd34d', backgroundColor: '#fff',
                 color: '#92400e', cursor: confirming ? 'wait' : 'pointer',
                 opacity: confirming ? 0.6 : 1,
               }}

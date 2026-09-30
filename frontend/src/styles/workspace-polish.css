@@ -168,6 +168,21 @@
   --workspace-font-page-title: 1.25rem;
   --workspace-leading-body: 1.5;
   --workspace-leading-title: 1.35;
+  --workspace-space-2: 0.125rem;
+  --workspace-space-4: 0.25rem;
+  --workspace-space-6: 0.375rem;
+  --workspace-space-8: 0.5rem;
+  --workspace-space-12: 0.75rem;
+  --workspace-space-16: 1rem;
+  --workspace-space-20: 1.25rem;
+  --workspace-space-24: 1.5rem;
+  --workspace-space-32: 2rem;
+  --workspace-radius-small: 6px;
+  --workspace-radius-medium: 8px;
+  --workspace-radius-large: 12px;
+  --workspace-control-height: 36px;
+  --workspace-row-height: 44px;
+  --workspace-shadow-dialog: 0 16px 48px #17212b33;
   --workspace-canvas: #f7f8f9;
   --workspace-surface: #fff;
   --workspace-text: #202124;
@@ -266,3 +281,7 @@
 
 @media (max-width: 767px) { .project-context-label { display: none; } }
 .knowledge-surface { color: var(--workspace-text); }
+
+/* Shared list rhythm; content can grow beyond the minimum row height. */
+.file-table td { height: var(--workspace-row-height); }
+.library-item-row { min-height: var(--workspace-row-height); }

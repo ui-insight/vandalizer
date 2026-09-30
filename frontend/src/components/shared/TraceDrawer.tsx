@@ -52,7 +52,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-20)", flexShrink: 0, borderBottom: '1px solid var(--workspace-border)' }}>
           <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)', flex: 1 }}>
             Trace
           </h3>
@@ -60,7 +60,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
-              cursor: 'pointer', padding: 4, minWidth: 36, minHeight: 36, fontFamily: 'inherit',
+              cursor: 'pointer', padding: 'var(--workspace-space-4)', minWidth: 36, minHeight: 'var(--workspace-control-height)', fontFamily: 'inherit',
             }}
             aria-label="Close"
           >
@@ -68,7 +68,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           </button>
         </div>
 
-        <div role="region" aria-label="Question trace details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div role="region" aria-label="Question trace details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', padding: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
         <Section label="Query">
           <Body body={optimized.query} />
         </Section>
@@ -104,7 +104,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           <Section label="Default-config answer" muted>
             <Body body={baseline.actual_answer} muted />
             {baseline.reasoning && (
-              <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
                 <em>Judge:</em> {baseline.reasoning}
               </div>
             )}
@@ -130,7 +130,7 @@ function ScoreRow({
     <div style={{
       display: 'grid',
       gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-      gap: 8,
+      gap: 'var(--workspace-space-8)',
     }}>
       <ScoreCell label="Optimized" score={optimized.score} verdict={optimized.verdict} primary />
       {baseline && <ScoreCell label="Default" score={baseline.score} verdict={baseline.verdict} />}
@@ -145,16 +145,16 @@ function ScoreCell({
   const color = score >= 0.7 ? 'var(--workspace-success)' : score >= 0.4 ? 'var(--workspace-warning)' : 'var(--workspace-danger)'
   return (
     <div style={{
-      padding: 10, borderRadius: 6,
+      padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-small)',
       backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : 'var(--workspace-surface)',
       border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : 'var(--workspace-border)'}`,
     }}>
       <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-      <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color, marginTop: 2 }}>
+      <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color, marginTop: 'var(--workspace-space-2)' }}>
         {(score * 100).toFixed(0)}%
       </div>
       {verdict && (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{verdict}</div>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>{verdict}</div>
       )}
     </div>
   )
@@ -167,7 +167,7 @@ function Section({ label, muted = false, children }: {
     <div>
       <div style={{
         fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
-        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
+        textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)',
       }}>{label}</div>
       {children}
     </div>
@@ -179,7 +179,7 @@ function Body({ body, muted = false }: { body: string; muted?: boolean }) {
     <div style={{
       fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)',
       whiteSpace: 'pre-wrap' as const, lineHeight: 1.5,
-      padding: 10, borderRadius: 6,
+      padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-small)',
       backgroundColor: 'var(--workspace-canvas)',
       border: '1px solid var(--workspace-border)',
     }}>
@@ -194,7 +194,7 @@ function FactList({
   const color = tone === 'bad' ? 'var(--workspace-danger)' : 'var(--workspace-warning)'
   return (
     <Section label={label}>
-      <ul style={{ margin: 0, paddingLeft: 18, color, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5 }}>
+      <ul style={{ margin: 0, paddingLeft: 'var(--workspace-space-20)', color, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5 }}>
         {items.map((it, i) => <li key={i}>{it}</li>)}
       </ul>
     </Section>

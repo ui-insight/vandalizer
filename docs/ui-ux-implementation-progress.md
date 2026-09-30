@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**154/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**155/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,15 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Shared task spacing and surfaces — September 30
+
+**155/169 checklist items implemented locally.** VIS-03 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Task lists, cards, editors and dialogs use a shared spacing scale, 6/8/12px corner radii, neutral border token and dialog elevation. Nearby one-off gap/padding values align to that scale. File rows have a 44px minimum rhythm and continue growing with their content; Library rows retain room for metadata and actions.
+- Added `docs/workspace-style-guide.md` to document text/color roles, spacing, surface geometry and verification expectations for subsequent changes. Compact controls retain their distinct size; the new tokens do not impose fixed content heights.
+- Verification: TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and 11 existing hook-dependency warnings. The 229 selected production-browser captures cover the five-width responsive matrix, all baseline states, file/Library workflow execution and recovery, shared section headers, short validation dialogs, and workflow/extraction tuning. All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly.
+- The responsive recipe now uses the approved Files/Assistant pane controls instead of the removed Ask assistant launcher. Source and tools remain available together on desktop and retain their mobile state. Browser APIs are synthetic; final action/form, accessibility and regrading acceptance remain open.
 
 ## Readable task typography — September 30
 

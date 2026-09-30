@@ -52,10 +52,10 @@ function DarkAuthorChip({ author, size = 'sm' }: { author: AuthorRef | null | un
     </>
   )
   const style: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 4,
+    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
     fontSize, color: 'var(--workspace-muted)',
     background: 'var(--workspace-canvas)',
-    padding: '2px 8px', borderRadius: 999, lineHeight: 1.4,
+    padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 999, lineHeight: 1.4,
     whiteSpace: 'nowrap', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis',
   }
   if (mailto) {
@@ -98,7 +98,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
       className="group"
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
-        padding: 16, borderRadius: 12,
+        padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: C.card, border: `1px solid ${C.border}`,
         cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
       }}
@@ -111,10 +111,10 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
         e.currentTarget.style.borderColor = C.border
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'start', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          height: 32, width: 32, borderRadius: 8,
+          height: 32, width: 32, borderRadius: 'var(--workspace-radius-medium)',
           backgroundColor: 'rgba(234, 179, 8, 0.15)', color: 'var(--workspace-warning)', flexShrink: 0,
         }}>
           <Star size={16} fill="currentColor" />
@@ -124,7 +124,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
         </h3>
       </div>
       {collection.description && (
-        <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textDim, margin: '0 0 10px 0', lineHeight: 1.4 }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textDim, margin: "0 0 var(--workspace-space-12) 0", lineHeight: 1.4 }}>
           {collection.description}
         </p>
       )}
@@ -158,7 +158,7 @@ function KBCatalogCard({
     <article
       style={{
         display: 'flex', flexDirection: 'column', textAlign: 'left',
-        padding: 14, borderRadius: 12,
+        padding: 'var(--workspace-space-16)', borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: C.card, border: tierBorder,
         cursor: 'pointer', transition: 'all 0.15s', fontFamily: 'inherit',
       }}
@@ -169,17 +169,17 @@ function KBCatalogCard({
         e.currentTarget.style.backgroundColor = C.card
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'start', gap: 6, marginBottom: 6 }}>
-        <ShieldCheck size={14} style={{ color: tierIconColor, flexShrink: 0, marginTop: 2 }} />
-        <button type="button" onClick={onClick} style={{ minHeight: 36, fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', alignItems: 'start', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-6)' }}>
+        <ShieldCheck size={14} style={{ color: tierIconColor, flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
+        <button type="button" onClick={onClick} style={{ minHeight: 'var(--workspace-control-height)', fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, flex: 1, minWidth: 0, lineHeight: 1.3, textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}>
           {item.display_name || item.name}
         </button>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-8)' }}>
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
-          fontSize: 'var(--workspace-font-meta)', padding: '1px 6px', borderRadius: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+          fontSize: 'var(--workspace-font-meta)', padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
           backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
           border: '1px solid rgba(56, 189, 248, 0.25)',
         }}>
@@ -197,17 +197,17 @@ function KBCatalogCard({
         <CatalogSignals item={item} style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint }} />
       </div>
 
-      <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', margin: '0 0 12px', lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
+      <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-12)", lineHeight: 1.5 }}>{item.description || 'Purpose not described.'}</p>
       <CatalogUsage item={item} compact />
 
       {item.created_by && (
-        <div style={{ marginBottom: 8 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
           <DarkAuthorChip author={item.created_by} />
         </div>
       )}
 
       {(item.total_sources != null || item.total_chunks != null) && (
-        <div style={{ display: 'flex', gap: 12, fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 8 }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 'var(--workspace-space-8)' }}>
           {item.total_sources != null && (
             <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
           )}
@@ -218,13 +218,13 @@ function KBCatalogCard({
       )}
 
       {item.tags.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 'auto', paddingTop: 6 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-4)', marginTop: 'auto', paddingTop: 'var(--workspace-space-6)' }}>
           {item.tags.slice(0, 4).map((tag, i) => (
             <button type="button"
               key={i}
               onClick={(e) => { e.stopPropagation(); onTagClick(tag) }}
               style={{
-                fontSize: 'var(--workspace-font-meta)', padding: '1px 6px', borderRadius: 999,
+                fontSize: 'var(--workspace-font-meta)', padding: "1px var(--workspace-space-6)", borderRadius: 999,
                 backgroundColor: 'var(--workspace-canvas)', color: 'var(--workspace-muted)',
                 cursor: 'pointer', transition: 'background-color 0.15s',
               }}
@@ -257,21 +257,21 @@ function CollectionLink({
       aria-pressed={active}
       onClick={onClick}
       style={{
-        width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
+        width: '100%', textAlign: 'left', padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-medium)',
         fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
         backgroundColor: active ? 'var(--workspace-canvas)' : 'transparent',
         color: active ? 'var(--workspace-text)' : C.textMuted,
         border: 'none', cursor: 'pointer',
-        display: 'flex', alignItems: 'flex-start', gap: 6,
+        display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)',
         transition: 'background-color 0.15s',
       }}
       onMouseEnter={e => { if (!active) e.currentTarget.style.backgroundColor = 'var(--workspace-canvas)' }}
       onMouseLeave={e => { if (!active) e.currentTarget.style.backgroundColor = 'transparent' }}
     >
-      <FolderOpen size={13} style={{ color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 2 }} />
+      <FolderOpen size={13} style={{ color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
       <span style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>{collection.title}</span>
       {collection.featured && (
-        <Star size={11} fill="currentColor" style={{ color: active ? 'var(--workspace-warning)' : 'var(--workspace-warning)', flexShrink: 0, marginTop: 3 }} />
+        <Star size={11} fill="currentColor" style={{ color: active ? 'var(--workspace-warning)' : 'var(--workspace-warning)', flexShrink: 0, marginTop: 'var(--workspace-space-4)' }} />
       )}
       <span style={{ fontSize: 'var(--workspace-font-meta)', color: active ? 'var(--workspace-muted)' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
         {collection.visible_count ?? collection.item_ids.length}
@@ -341,7 +341,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           width: 224, flexShrink: 0,
           borderRight: `1px solid ${C.border}`,
           backgroundColor: C.panel,
-          overflowY: 'auto', padding: 12,
+          overflowY: 'auto', padding: 'var(--workspace-space-12)',
         }}
           className="hidden md:block"
         >
@@ -349,11 +349,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             aria-pressed={!selectedCollectionId}
             onClick={() => setSelectedCollectionId(null)}
             style={{
-              width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8,
+              width: '100%', textAlign: 'left', padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-medium)',
               fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               backgroundColor: !selectedCollectionId ? 'var(--workspace-canvas)' : 'transparent',
               color: !selectedCollectionId ? 'var(--workspace-text)' : C.textMuted,
-              border: 'none', cursor: 'pointer', marginBottom: 4,
+              border: 'none', cursor: 'pointer', marginBottom: 'var(--workspace-space-4)',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}
           >
@@ -362,8 +362,8 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           </button>
 
           {featuredCollections.length > 0 && (
-            <div style={{ marginTop: 16, marginBottom: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 10px', marginBottom: 6 }}>
+            <div style={{ marginTop: 'var(--workspace-space-16)', marginBottom: 'var(--workspace-space-8)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "0 var(--workspace-space-12)", marginBottom: 'var(--workspace-space-6)' }}>
                 <Star size={10} fill="currentColor" style={{ color: 'var(--workspace-warning)' }} />
                 <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: C.textFaint, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                   Featured
@@ -381,14 +381,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
           )}
 
           {regularCollections.length > 0 && (
-            <div style={{ marginTop: 16, marginBottom: 8 }}>
+            <div style={{ marginTop: 'var(--workspace-space-16)', marginBottom: 'var(--workspace-space-8)' }}>
               <span style={{
                 fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: C.textFaint,
-                textTransform: 'uppercase', letterSpacing: '0.08em', padding: '0 10px',
+                textTransform: 'uppercase', letterSpacing: '0.08em', padding: "0 var(--workspace-space-12)",
               }}>
                 Collections
               </span>
-              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <div style={{ marginTop: 'var(--workspace-space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)' }}>
                 {regularCollections.map(col => (
                   <CollectionLink
                     key={col.id}
@@ -404,14 +404,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
         {/* Main content */}
         <div style={{ flex: 1, minWidth: 0, overflowY: 'auto' }}>
-          <div className="catalog-content" style={{ padding: 24, maxWidth: 1024, margin: '0 auto' }}>
+          <div className="catalog-content" style={{ padding: 'var(--workspace-space-24)', maxWidth: 1024, margin: '0 auto' }}>
             {/* Hero header */}
             {showHero && !activeCollection && (
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+              <div style={{ marginBottom: 'var(--workspace-space-24)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-6)' }}>
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    height: 40, width: 40, borderRadius: 12,
+                    height: 40, width: 40, borderRadius: 'var(--workspace-radius-large)',
                     background: 'var(--workspace-canvas)',
                     color: 'var(--workspace-text)',
                   }}>
@@ -421,10 +421,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <h2 style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                       Explore knowledge bases
                     </h2>
-                    <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, margin: '2px 0 0' }}>
+                    <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, margin: "var(--workspace-space-2) 0 0" }}>
                       Browse shared knowledge bases. Review their sources and measured quality before adding one.
                     </p>
-                    <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, margin: '4px 0 0' }}>
+                    <p style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, margin: "var(--workspace-space-4) 0 0" }}>
                       Built one that works for you? Share it from Mine — it doesn't need to be finished.
                     </p>
                   </div>
@@ -434,18 +434,18 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
             {/* Collection header */}
             {activeCollection && (
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 'var(--workspace-space-20)' }}>
                 <button
                   onClick={() => setSelectedCollectionId(null)}
                   style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                     fontSize: 'var(--workspace-font-meta)', color: C.textDim, background: 'transparent',
-                    border: 'none', cursor: 'pointer', marginBottom: 6, fontFamily: 'inherit',
+                    border: 'none', cursor: 'pointer', marginBottom: 'var(--workspace-space-6)', fontFamily: 'inherit',
                   }}
                 >
                   <ArrowLeft size={12} /> All Knowledge Bases
                 </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                   <FolderOpen size={18} style={{ color: C.textDim }} />
                   <h2 style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: 'var(--workspace-text)', margin: 0 }}>
                     {activeCollection.title}
@@ -455,7 +455,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   )}
                 </div>
                 {activeCollection.description && (
-                  <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, marginTop: 4, marginLeft: 26 }}>
+                  <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, marginTop: 'var(--workspace-space-4)', marginLeft: 26 }}>
                     {activeCollection.description}
                   </p>
                 )}
@@ -463,7 +463,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
             )}
 
             {/* Search + Filters */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)', flexWrap: 'wrap' }}>
               <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 360 }}>
                 <Search size={16} style={{
                   position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
@@ -476,10 +476,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search knowledge bases..."
                   style={{
-                    width: '100%', padding: '7px 10px 7px 32px',
+                    width: '100%', padding: "7px var(--workspace-space-12) 7px var(--workspace-space-32)",
                     fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                     backgroundColor: C.card, color: C.text,
-                    border: `1px solid ${C.border}`, borderRadius: 8,
+                    border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-medium)',
                     boxSizing: 'border-box',
                   }}
                 />
@@ -490,8 +490,8 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 value={qualityFilter}
                 onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
                 style={{
-                  padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
-                  border: `1px solid ${C.border}`, borderRadius: 8,
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+                  border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-medium)',
                   backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                 }}
               >
@@ -500,15 +500,15 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 ))}
               </select>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)' }}>
                 <ArrowUpDown size={13} style={{ color: C.textFaint }} aria-hidden="true" />
                 <select
                   aria-label="Sort knowledge bases"
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
                   style={{
-                    padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
-                    border: `1px solid ${C.border}`, borderRadius: 8,
+                    padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+                    border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-medium)',
                     backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                   }}
                 >
@@ -521,11 +521,11 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
             {/* Active filter chips */}
             {hasActiveFilters && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-16)', flexWrap: 'wrap' }}>
                 {tagFilter && (
                   <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
+                    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                    padding: "var(--workspace-space-4) var(--workspace-space-12)", borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
                     backgroundColor: 'rgba(56, 189, 248, 0.12)', color: 'var(--workspace-info)',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}>
@@ -534,7 +534,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       type="button"
                       aria-label={`Remove tag filter ${tagFilter}`}
                       onClick={() => setTagFilter('')}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 2, display: 'flex', padding: 0 }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 'var(--workspace-space-2)', display: 'flex', padding: 0 }}
                     >
                       <X size={11} aria-hidden="true" />
                     </button>
@@ -542,8 +542,8 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 )}
                 {selectedCollectionId && activeCollection && (
                   <span style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    padding: '3px 10px', borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
+                    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                    padding: "var(--workspace-space-4) var(--workspace-space-12)", borderRadius: 999, fontSize: 'var(--workspace-font-meta)',
                     backgroundColor: 'var(--workspace-canvas)', color: C.text,
                   }}>
                     <FolderOpen size={10} aria-hidden="true" /> {activeCollection.title}
@@ -551,7 +551,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       type="button"
                       aria-label={`Remove collection filter ${activeCollection.title}`}
                       onClick={() => setSelectedCollectionId(null)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 2, display: 'flex', padding: 0 }}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 'var(--workspace-space-2)', display: 'flex', padding: 0 }}
                     >
                       <X size={11} aria-hidden="true" />
                     </button>
@@ -572,20 +572,20 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
               </div>
             )}
 
-            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 12, borderRadius: 8, marginBottom: 12 }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
+            {collectionsError && <div role="alert" style={{ color: '#b91c1c', background: '#fef2f2', padding: 'var(--workspace-space-12)', borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)' }}>{collectionsError} <button onClick={retryCollections} style={{ textDecoration: 'underline', fontWeight: 600 }}>Retry collections</button></div>}
             {/* Error state */}
             {error && (
               <div role="alert" style={{
-                borderRadius: 8, padding: '10px 14px', fontSize: 'var(--workspace-font-control)',
+                borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)',
                 color: 'var(--workspace-danger)', backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.25)', marginBottom: 14,
+                border: '1px solid rgba(239, 68, 68, 0.25)', marginBottom: 'var(--workspace-space-16)',
               }}>
                 {error}
                 <button
                   type="button"
                   onClick={refresh}
                   style={{
-                    marginLeft: 8, textDecoration: 'underline', fontWeight: 500,
+                    marginLeft: 'var(--workspace-space-8)', textDecoration: 'underline', fontWeight: 500,
                     color: 'inherit', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                   }}
                 >
@@ -600,13 +600,13 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', padding: '80px 0', color: C.textFaint,
               }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} aria-hidden="true" />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 'var(--workspace-space-12)' }} aria-hidden="true" />
                 <p style={{ fontSize: 'var(--workspace-font-control)', margin: 0 }}>Loading knowledge bases...</p>
               </div>
             ) : error ? null : items.length === 0 ? (
-              <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '80px 16px' }}>
-                <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} aria-hidden="true" />
-                <h3 style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, marginBottom: 4 }}>
+              <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: "80px var(--workspace-space-16)" }}>
+                <BookOpen size={48} style={{ color: '#404040', margin: "0 auto var(--workspace-space-16)" }} aria-hidden="true" />
+                <h3 style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: C.text, marginBottom: 'var(--workspace-space-4)' }}>
                   {hasActiveFilters ? 'No matching knowledge bases' : 'No knowledge bases shared yet'}
                 </h3>
                 <p style={{ fontSize: 'var(--workspace-font-control)', color: C.textDim, maxWidth: 340, margin: '0 auto' }}>
@@ -619,9 +619,9 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     type="button"
                     onClick={clearFilters}
                     style={{
-                      marginTop: 16, padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+                      marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                       color: C.text, backgroundColor: C.card,
-                      border: `1px solid ${C.border}`, borderRadius: 8, cursor: 'pointer',
+                      border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer',
                     }}
                   >
                     Clear filters
@@ -633,10 +633,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {/* Featured collections (hero landing only) */}
                 {showHero && !activeCollection && featuredCollections.length > 0 && (
                   <div style={{ marginBottom: 28 }}>
-                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 10 }}>
+                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 'var(--workspace-space-12)' }}>
                       Featured Collections
                     </h3>
-                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
+                    <div style={{ display: 'grid', gap: 'var(--workspace-space-12)', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {featuredCollections.map(col => (
                         <FeaturedCollectionCard
                           key={col.id}
@@ -651,7 +651,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {/* Top-tier spotlight */}
                 {showHero && !activeCollection && topItems.length > 0 && (
                   <div style={{ marginBottom: 28 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
                       <div style={{
                         height: 14, width: 14, borderRadius: 999,
                         background: 'var(--workspace-canvas)',
@@ -663,7 +663,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                         {topItems.length} excellent-tier item{topItems.length !== 1 ? 's' : ''}
                       </span>
                     </div>
-                    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
+                    <div style={{ display: 'grid', gap: 'var(--workspace-space-12)', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                       {topItems.slice(0, 6).map(item => (
                         <KBCatalogCard
                           key={item.id}
@@ -677,18 +677,18 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 )}
 
                 {/* Main grid */}
-                <div style={{ marginBottom: 6 }}>
+                <div style={{ marginBottom: 'var(--workspace-space-6)' }}>
                   {showHero && !activeCollection && topItems.length > 0 && (
-                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
+                    <h3 style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 700, color: C.text, marginBottom: 'var(--workspace-space-12)' }}>All Items</h3>
                   )}
                   {!showHero && !loading && (
-                    <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 10 }}>
+                    <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: C.textFaint, marginBottom: 'var(--workspace-space-12)' }}>
                       {total} item{total !== 1 ? 's' : ''}
                     </div>
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
+                <div style={{ display: 'grid', gap: 'var(--workspace-space-12)', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 260px), 1fr))' }}>
                   {(showHero && !activeCollection ? otherItems : items).map(item => (
                     <KBCatalogCard
                       key={item.id}
@@ -706,10 +706,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                       onClick={handleLoadMore}
                       disabled={loadingMore}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 8,
-                        padding: '8px 20px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+                        display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+                        padding: "var(--workspace-space-8) var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
                         color: C.text, backgroundColor: C.card,
-                        border: `1px solid ${C.border}`, borderRadius: 8,
+                        border: `1px solid ${C.border}`, borderRadius: 'var(--workspace-radius-medium)',
                         cursor: loadingMore ? 'default' : 'pointer',
                         opacity: loadingMore ? 0.6 : 1,
                       }}

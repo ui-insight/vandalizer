@@ -60,7 +60,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 15%, white)',
           outline: '2px solid color-mix(in srgb, var(--highlight-color, #eab308) 60%, white)',
           outlineOffset: '-2px',
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
         }
       : {}
 
@@ -72,7 +72,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
       aria-label="Folder navigation"
       tabIndex={0}
       className="flex min-w-0 items-start gap-2"
-      style={{ padding: '16px 0 0' }}
+      style={{ padding: "var(--workspace-space-16) 0 0" }}
     >
       {!atRoot && (
         <button
@@ -97,7 +97,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
               type="button"
               onClick={() => onNavigate(floor)}
               className="bg-transparent border-0 cursor-pointer text-gray-600 hover:text-gray-900 hover:underline"
-              style={{ fontWeight: 400, minHeight: 36, padding: '2px 4px', margin: '-2px -4px', ...dragOverStyle('home') }}
+              style={{ fontWeight: 400, minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-2) var(--workspace-space-4)", margin: '-2px -4px', ...dragOverStyle('home') }}
               {...dropTargetProps('home', homeTargetId)}
             >
               {homeLabel}
@@ -111,7 +111,7 @@ export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home
               type="button"
               onClick={() => onNavigate(item.uuid)}
               className="bg-transparent border-0 cursor-pointer text-gray-600 hover:text-gray-900 hover:underline"
-              style={{ fontWeight: 400, minHeight: 36, padding: '2px 4px', margin: '-2px -4px', ...dragOverStyle(item.uuid) }}
+              style={{ fontWeight: 400, minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-2) var(--workspace-space-4)", margin: '-2px -4px', ...dragOverStyle(item.uuid) }}
               {...dropTargetProps(item.uuid, item.uuid)}
             >
               {item.title}

@@ -63,10 +63,10 @@ export function TrialRow<TConfig>({
   const score = trial.score ?? 0
   return (
     <div style={{
-      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-      padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)',
+      padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
       backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
-      borderRadius: 4,
+      borderRadius: 'var(--workspace-radius-small)',
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: '50%',
@@ -140,10 +140,10 @@ export function TrialsTable<TTrial>({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({trials.length})
         </span>
@@ -156,7 +156,7 @@ export function TrialsTable<TTrial>({
               onChange={e => setSortKey(e.target.value)}
               style={{
                 background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-                borderRadius: 4, padding: '4px 6px', minHeight: 36, maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+                borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", minHeight: 'var(--workspace-control-height)', maxWidth: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
               }}
             >
               {sortOptions.map(o => (
@@ -167,11 +167,11 @@ export function TrialsTable<TTrial>({
         )}
       </div>
       {caption && (
-        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: -6, marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {caption}
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)', maxHeight, overflowY: 'auto' }}>
         {sorted.map(t => (
           onRowClick ? (
             <ClickableRow key={getRowKey(t)} onClick={() => onRowClick(t)}>
@@ -207,7 +207,7 @@ function ClickableRow({ onClick, children }: { onClick: () => void; children: Re
       onMouseLeave={() => setHover(false)}
       style={{
         cursor: 'pointer',
-        borderRadius: 4,
+        borderRadius: 'var(--workspace-radius-small)',
         outline: hover ? '1px solid #3a3a3a' : '1px solid transparent',
         transition: 'outline-color 0.12s',
       }}

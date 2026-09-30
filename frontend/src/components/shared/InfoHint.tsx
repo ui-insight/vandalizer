@@ -151,10 +151,10 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
             visibility: pos ? 'visible' : 'hidden',
             minWidth: 240,
             maxWidth: 320,
-            padding: '10px 12px',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
             background: tipBg,
             border: `1px solid ${tipBorder}`,
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',

@@ -64,7 +64,7 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick, state, percen
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          padding: 2,
+          padding: 'var(--workspace-space-2)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

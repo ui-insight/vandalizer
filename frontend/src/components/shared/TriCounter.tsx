@@ -18,7 +18,7 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
   const counts = computeCounts(optimized || [], baseline || [], epsilon)
   if (counts == null) {
     return (
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '6px 0' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-6) 0" }}>
         Per-query comparison unavailable for this run.
       </div>
     )
@@ -28,11 +28,11 @@ export function TriCounter({ optimized, baseline, epsilon = 0.05 }: Props) {
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12,
-      padding: '10px 12px',
+      display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+      padding: "var(--workspace-space-12) var(--workspace-space-12)",
       backgroundColor: 'var(--workspace-surface)',
       border: '1px solid var(--workspace-border)',
-      borderRadius: 8,
+      borderRadius: 'var(--workspace-radius-medium)',
     }}>
       <Counter
         icon={<ArrowUpRight size={14} />}
@@ -72,7 +72,7 @@ function Counter({
   icon, value, label, color,
 }: { icon: React.ReactNode; value: number; label: string; color: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
       <span style={{ color }}>{icon}</span>
       <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color }}>{value}</span>
       <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{label}</span>

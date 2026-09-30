@@ -76,18 +76,18 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
           overflowWrap: 'anywhere',
           background: 'var(--workspace-canvas)',
           border: '1px solid var(--workspace-border)',
-          borderRadius: 10,
+          borderRadius: 'var(--workspace-radius-large)',
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
         }}
       >
         {/* Header */}
         <header style={{
-          padding: '14px 18px', flexShrink: 0,
+          padding: "var(--workspace-space-16) var(--workspace-space-20)", flexShrink: 0,
           borderBottom: '1px solid var(--workspace-border)',
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--workspace-space-12)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', minWidth: 0 }}>
             <span style={{
               width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
               backgroundColor: scoreColor(score),
@@ -96,7 +96,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
                 Trial details
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 3 }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-4)' }}>
                 <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: 'var(--workspace-text)' }}>
                   {scorePct}%
                 </span>
@@ -124,7 +124,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
-              cursor: 'pointer', padding: 4, flexShrink: 0, minWidth: 36, minHeight: 36,
+              cursor: 'pointer', padding: 'var(--workspace-space-4)', flexShrink: 0, minWidth: 36, minHeight: 'var(--workspace-control-height)',
             }}
           >
             <X size={16} aria-hidden="true" />
@@ -132,20 +132,20 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         </header>
 
         {/* Body */}
-        <div tabIndex={0} role="region" aria-label="Trial explanation" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '14px 18px 18px' }}>
+        <div tabIndex={0} role="region" aria-label="Trial explanation" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: "var(--workspace-space-16) var(--workspace-space-20) var(--workspace-space-20)" }}>
           {/* What it tried */}
           <Section title="What this trial tried">
             <p style={{ margin: 0, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)' }}>
               {whatItTried}
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
+            <p style={{ margin: "var(--workspace-space-8) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
               {outcome}
             </p>
             {earlyStop && (
               <p style={{
-                margin: '10px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-warning)',
+                margin: "var(--workspace-space-12) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-warning)',
                 background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
-                borderRadius: 6, padding: '8px 10px',
+                borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
               }}>
                 {earlyStop}
               </p>
@@ -154,10 +154,10 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
 
           {/* Settings used */}
           <Section title="Settings it used, and why they matter">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
               {params.map((p) => (
                 <div key={p.key} className="optimization-trial-parameter" style={{
-                  display: 'grid', gap: 10,
+                  display: 'grid', gap: 'var(--workspace-space-12)',
                   alignItems: 'baseline',
                 }}>
                   <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
@@ -167,7 +167,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
                     <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
                       {p.value}
                     </div>
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>
                       {p.why}
                     </div>
                   </div>
@@ -178,7 +178,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
 
           {/* How it scored */}
           <Section title="How it scored">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
               <Stat label="Overall quality" value={`${scorePct}%`} />
               {trial.judge_score != null && (
                 <Stat label="Answer-quality grade" value={`${Math.round(trial.judge_score * 100)}%`} />
@@ -194,13 +194,13 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               )}
             </div>
             {disc && (disc.useful + disc.redundant + disc.failing + disc.other) > 0 && (
-              <p style={{ margin: '10px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)' }}>
+              <p style={{ margin: "var(--workspace-space-12) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)' }}>
                 Of the graded questions: <strong style={{ color: 'var(--workspace-success)' }}>{disc.useful} answered
                 well</strong>, {disc.redundant} where the knowledge base added little, and{' '}
                 <strong style={{ color: 'var(--workspace-danger)' }}>{disc.failing} that failed</strong>.
               </p>
             )}
-            <p style={{ margin: '10px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
+            <p style={{ margin: "var(--workspace-space-12) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: 'var(--workspace-muted)' }}>
               The overall quality score blends the AI answer-quality grade (40%) with retrieval
               precision (25%), source health (20%), and how much of each document the
               answers drew on (15%).
@@ -215,9 +215,9 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 18 }}>
+    <section style={{ marginBottom: 'var(--workspace-space-20)' }}>
       <h3 style={{
-        margin: '0 0 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+        margin: "0 0 var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         letterSpacing: 0.4, textTransform: 'uppercase', color: 'var(--workspace-muted)',
       }}>
         {title}
@@ -231,9 +231,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <span style={{
       display: 'inline-flex', flexDirection: 'column', gap: 1,
-      padding: '5px 10px',
+      padding: "var(--workspace-space-6) var(--workspace-space-12)",
       background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
-      borderRadius: 6,
+      borderRadius: 'var(--workspace-radius-small)',
     }}>
       <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         {label}

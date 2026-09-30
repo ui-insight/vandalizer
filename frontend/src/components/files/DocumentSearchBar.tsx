@@ -53,10 +53,10 @@ export function DocumentSearchBar({
         zIndex: 200,
         display: 'flex',
         alignItems: 'center',
-        gap: 2,
-        padding: '4px 6px',
-        borderRadius: 8,
-        border: '1px solid #d1d5db',
+        gap: 'var(--workspace-space-2)',
+        padding: "var(--workspace-space-4) var(--workspace-space-6)",
+        borderRadius: 'var(--workspace-radius-medium)',
+        border: "1px solid var(--workspace-border)",
         backgroundColor: 'rgba(255,255,255,0.97)',
         backdropFilter: 'blur(8px)',
         boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
@@ -76,13 +76,13 @@ export function DocumentSearchBar({
           width: 200,
           maxWidth: '100%',
           height: 28,
-          padding: '0 8px',
+          padding: "0 var(--workspace-space-8)",
           fontSize: 'var(--workspace-font-control)',
           border: 'none',
           outline: 'none',
           background: 'transparent',
           color: '#111827',
-          borderRadius: 4,
+          borderRadius: 'var(--workspace-radius-small)',
         }}
       />
       <span
@@ -92,7 +92,7 @@ export function DocumentSearchBar({
           textAlign: 'center',
           fontSize: 'var(--workspace-font-meta)',
           color: statusColor,
-          padding: '0 4px',
+          padding: "0 var(--workspace-space-4)",
         }}
       >
         {status}
@@ -137,7 +137,7 @@ function iconBtnStyle(disabled: boolean): React.CSSProperties {
     justifyContent: 'center',
     width: 28,
     height: 28,
-    borderRadius: 6,
+    borderRadius: 'var(--workspace-radius-small)',
     border: 'none',
     background: 'transparent',
     cursor: disabled ? 'default' : 'pointer',

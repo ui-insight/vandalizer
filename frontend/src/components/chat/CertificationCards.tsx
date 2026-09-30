@@ -42,13 +42,13 @@ function Stars({ count }: { count: number }) {
 
 function CardShell({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ marginTop: 6, marginLeft: 20 }}>
+    <div style={{ marginTop: 'var(--workspace-space-6)', marginLeft: 'var(--workspace-space-20)' }}>
       <div
         style={{
-          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
+          border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, var(--workspace-border))",
           background: 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)',
-          borderRadius: 10,
-          padding: '12px 14px',
+          borderRadius: 'var(--workspace-radius-large)',
+          padding: "var(--workspace-space-12) var(--workspace-space-16)",
           fontSize: 'var(--workspace-font-meta)',
           color: '#374151',
         }}
@@ -70,13 +70,13 @@ function CardButton({ label, icon, onClick, subtle }: {
       onClick={onClick}
       className={subtle ? undefined : 'chat-action-btn'}
       style={subtle ? {
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
-        borderRadius: 8, border: '1px solid #d1d5db',
+        display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+        padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+        borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)",
         background: '#fff', color: '#374151', cursor: 'pointer',
       } : {
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        fontSize: 'var(--workspace-font-meta)', padding: '6px 14px',
+        display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+        fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-6) var(--workspace-space-16)",
       }}
     >
       {icon}
@@ -127,7 +127,7 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
 
   return (
     <CardShell>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
         <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>Vandal Workflow Architect</span>
         <span style={{ flex: 1 }} />
@@ -136,16 +136,16 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
         </span>
       </div>
 
-      <div style={{ height: 5, borderRadius: 4, background: '#e5e7eb', overflow: 'hidden', marginBottom: 4 }}>
+      <div style={{ height: 5, borderRadius: 'var(--workspace-radius-small)', background: '#e5e7eb', overflow: 'hidden', marginBottom: 'var(--workspace-space-4)' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: ACCENT, transition: 'width 0.4s ease' }} />
       </div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
         {completed}/{total} modules complete
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
         {modules.map((m) => (
-          <div key={m.module_id} style={{ display: 'flex', alignItems: 'center', gap: 6, lineHeight: 1.5 }}>
+          <div key={m.module_id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
             {m.completed
               ? <CircleCheck size={13} style={{ color: '#16a34a', flexShrink: 0 }} />
               : <Circle size={13} style={{ color: m.module_id === nextId ? ACCENT : '#d1d5db', flexShrink: 0 }} />}
@@ -163,11 +163,11 @@ export function CertProgressCard({ content }: { content: Record<string, unknown>
       </div>
 
       {certified ? (
-        <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', fontWeight: 600 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', color: '#16a34a', fontWeight: 600 }}>
           <Sparkles size={13} /> Certified Vandal Workflow Architect
         </div>
       ) : nextModule && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
           <CardButton
             label={completed === 0 ? `Start with ${nextModule.title}` : `Continue: ${nextModule.title}`}
             onClick={() => sendChatMessage(
@@ -201,17 +201,17 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
 
   return (
     <CardShell>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Award size={15} style={{ color: ACCENT, flexShrink: 0 }} />
         <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         {completed && (
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)', color: '#16a34a', fontSize: 'var(--workspace-font-meta)', fontWeight: 600 }}>
             <Check size={11} /> Completed <Stars count={stars} />
           </span>
         )}
         <span style={{ flex: 1 }} />
         <span style={{
-          fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: '2px 8px', borderRadius: 999,
+          fontSize: 'var(--workspace-font-meta)', fontWeight: 700, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 999,
           background: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, white)',
           color: '#806600',
         }}>
@@ -224,7 +224,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
       )}
 
       {instructions.length > 0 && (
-        <ol style={{ margin: '0 0 8px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3, lineHeight: 1.5 }}>
+        <ol style={{ margin: "0 0 var(--workspace-space-8)", paddingLeft: 'var(--workspace-space-20)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)', lineHeight: 1.5 }}>
           {instructions.map((step, i) => (
             <li key={i}>{step}</li>
           ))}
@@ -232,15 +232,15 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
       )}
 
       {expectedFields.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 4 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 'var(--workspace-space-4)' }}>
             Expected fields
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-4)' }}>
             {expectedFields.map((f) => (
               <span key={f} style={{
-                fontSize: 'var(--workspace-font-meta)', padding: '2px 7px', borderRadius: 999,
-                background: '#fff', border: '1px solid #e5e7eb', color: '#4b5563',
+                fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-2) 7px", borderRadius: 999,
+                background: '#fff', border: "1px solid var(--workspace-border)", color: '#4b5563',
               }}>
                 {f}
               </span>
@@ -250,9 +250,9 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
       )}
 
       {Object.keys(starCriteria).length > 0 && (
-        <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)' }}>
           {Object.entries(starCriteria).sort(([a], [b]) => a.localeCompare(b)).map(([n, crit]) => (
-            <div key={n} style={{ display: 'flex', alignItems: 'flex-start', gap: 5, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+            <div key={n} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               <Stars count={Number(n) || 1} />
               <span style={{ lineHeight: 1.45 }}>{crit}</span>
             </div>
@@ -260,7 +260,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-4)' }}>
         {lessonCount > 0 && !completed && (
           <CardButton
             label={`Start the lessons (${lessonCount})`}
@@ -314,7 +314,7 @@ export function CertLessonCard({ content }: { content: Record<string, unknown> }
 
   return (
     <CardShell>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <BookOpen size={15} style={{ color: ACCENT, flexShrink: 0 }} />
         <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         <span style={{ flex: 1 }} />
@@ -324,7 +324,7 @@ export function CertLessonCard({ content }: { content: Record<string, unknown> }
       </div>
 
       {objective && (
-        <div style={{ fontStyle: 'italic', color: '#6b7280', marginBottom: 6, lineHeight: 1.5 }}>
+        <div style={{ fontStyle: 'italic', color: '#6b7280', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
           {objective}
         </div>
       )}
@@ -335,7 +335,7 @@ export function CertLessonCard({ content }: { content: Record<string, unknown> }
         dangerouslySetInnerHTML={{ __html: html }}
       />
 
-      <div style={{ marginTop: 10 }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)' }}>
         <CardButton
           subtle
           label={isLast ? 'Done reading — what’s next?' : `Continue to lesson ${number + 1}`}
@@ -363,10 +363,10 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
 
   return (
     <CardShell>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
         <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)' }}>{title}</span>
         <span style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
           fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
           color: passed ? '#16a34a' : '#b45309',
         }}>
@@ -374,9 +374,9 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
         </span>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
         {checks.map((c, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-6)' }}>
             {c.passed
               ? <Check size={13} style={{ color: '#16a34a', flexShrink: 0, marginTop: 1 }} />
               : <X size={13} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />}
@@ -389,7 +389,7 @@ export function CertCheckCard({ content }: { content: Record<string, unknown> })
       </div>
 
       {passed && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
           <CardButton
             label="Complete the module"
             onClick={() => sendChatMessage(`Complete the "${title}" certification module and bank my XP.`)}
@@ -415,16 +415,16 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
   const certified = Boolean(content.certified)
 
   return (
-    <div style={{ marginTop: 6, marginLeft: 20 }}>
+    <div style={{ marginTop: 'var(--workspace-space-6)', marginLeft: 'var(--workspace-space-20)' }}>
       <div style={{
         border: '1px solid #bbf7d0',
         background: '#f0fdf4',
-        borderRadius: 10,
-        padding: '12px 14px',
+        borderRadius: 'var(--workspace-radius-large)',
+        padding: "var(--workspace-space-12) var(--workspace-space-16)",
         fontSize: 'var(--workspace-font-meta)',
         color: '#374151',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)' }}>
           <Sparkles size={15} style={{ color: '#16a34a', flexShrink: 0 }} />
           <span style={{ fontWeight: 700, fontSize: 'var(--workspace-font-control)', color: '#166534' }}>
             {title} complete
@@ -439,11 +439,11 @@ export function CertCompletionCard({ content }: { content: Record<string, unknow
           </span>
         </div>
         {certified ? (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, color: '#166534', fontWeight: 700 }}>
+          <div style={{ marginTop: 'var(--workspace-space-8)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', color: '#166534', fontWeight: 700 }}>
             <Award size={14} /> You&rsquo;re a Certified Vandal Workflow Architect — all 11 modules complete.
           </div>
         ) : (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 'var(--workspace-space-8)' }}>
             <CardButton
               subtle
               label="What's next?"

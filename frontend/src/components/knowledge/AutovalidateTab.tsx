@@ -232,7 +232,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: 'var(--workspace-muted)' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -242,7 +242,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   // VIEWING A PAST RUN: read-only view, regardless of current state.
   if (viewingPast) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
         {error && <ErrorBanner message={error} />}
         <PastRunBanner
           startedAt={viewingPast.started_at}
@@ -261,7 +261,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (viewingPastLoading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: 'var(--workspace-muted)' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
         <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
@@ -323,7 +323,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   // STATE A: idle
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
       {error && <ErrorBanner message={error} />}
       <IdleHero
         kbUuid={kbUuid}
@@ -363,9 +363,9 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
     // thumbs-up (n=N)" — useful even without a before/after split.
     return (
       <div style={{
-        margin: '8px 0 12px 0', padding: '8px 10px',
+        margin: "var(--workspace-space-8) 0 var(--workspace-space-12) 0", padding: "var(--workspace-space-8) var(--workspace-space-12)",
         backgroundColor: 'rgba(34, 197, 94, 0.06)',
-        border: '1px solid rgba(34, 197, 94, 0.22)', borderRadius: 6,
+        border: '1px solid rgba(34, 197, 94, 0.22)', borderRadius: 'var(--workspace-radius-small)',
         fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-success)',
       }}>
         Since you tuned this KB, <b>{(after * 100).toFixed(0)}%</b> of chats grounded in it
@@ -377,10 +377,10 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
   const positive = deltaPts >= 0
   return (
     <div style={{
-      margin: '8px 0 12px 0', padding: '8px 10px',
+      margin: "var(--workspace-space-8) 0 var(--workspace-space-12) 0", padding: "var(--workspace-space-8) var(--workspace-space-12)",
       backgroundColor: positive ? 'rgba(34, 197, 94, 0.06)' : 'rgba(245, 158, 11, 0.06)',
       border: '1px solid ' + (positive ? 'rgba(34, 197, 94, 0.22)' : 'rgba(245, 158, 11, 0.25)'),
-      borderRadius: 6, fontSize: 'var(--workspace-font-meta)', color: positive ? 'var(--workspace-success)' : 'var(--workspace-warning)',
+      borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', color: positive ? 'var(--workspace-success)' : 'var(--workspace-warning)',
     }}>
       Since you tuned this KB, chat thumbs-up rate is{' '}
       <b>{positive ? '+' : ''}{deltaPts.toFixed(0)}pts</b>
@@ -431,33 +431,33 @@ function IdleHero({
 
   return (
     <div style={{
-      padding: 18, background: 'var(--workspace-canvas)',
-      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, transparent)', borderRadius: 8,
+      padding: 'var(--workspace-space-20)', background: 'var(--workspace-canvas)',
+      border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, transparent)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Sparkles size={18} style={{ color: 'var(--workspace-accent-ink)' }} aria-hidden="true" />
         <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>Compare retrieval settings against your test questions</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
-      <p style={{ margin: '0 0 12px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
         Review the test questions, measure a baseline, and choose a token budget.
         This experiment uses model tokens; cost and duration depend on your model and test set.
         Review the results before applying changes. Automatic application is optional in the wizard.
       </p>
       {coldStart && (
         <div style={{
-          padding: '10px 12px', marginBottom: 12,
+          padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, transparent)', borderRadius: 6,
+          border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, transparent)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           <div style={{
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5,
-            marginBottom: 6, fontWeight: 600,
+            marginBottom: 'var(--workspace-space-6)', fontWeight: 600,
           }}>
             What happens next
           </div>
           <ol style={{
-            margin: 0, paddingLeft: 20, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6,
+            margin: 0, paddingLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6,
           }}>
             <li>We'll write test questions from your documents</li>
             <li>You'll review them before anything else runs</li>
@@ -465,7 +465,7 @@ function IdleHero({
           </ol>
         </div>
       )}
-      <ul style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '0 0 10px 0', paddingLeft: 18, lineHeight: 1.7 }}>
+      <ul style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', lineHeight: 1.7 }}>
         <li>See how much your knowledge base actually helps vs. asking the model directly</li>
         <li>Get a recommended setup with one-click apply</li>
         <li>Find out which documents are pulling weight and which aren't</li>
@@ -473,13 +473,13 @@ function IdleHero({
       <WhenToRunDisclosure kind="kb" />
       {blockedByManage ? (
         <div>
-          <p style={{ margin: '0 0 10px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+          <p style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
             This is a shared catalog knowledge base, so you can't change it
             directly. Make your own copy to validate &amp; improve it — the
             original stays untouched.
           </p>
           {cloneError && (
-            <p role="alert" style={{ margin: '0 0 10px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{cloneError}</p>
+            <p role="alert" style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{cloneError}</p>
           )}
           <button
             type="button"
@@ -487,12 +487,12 @@ function IdleHero({
             disabled={cloning || !onCloned}
             title={!onCloned ? 'Cloning is unavailable here' : ''}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: cloning ? 'var(--workspace-muted)' : 'var(--workspace-text)',
               background: cloning ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
               border: '1px solid ' + (cloning ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
-              borderRadius: 6, cursor: cloning ? 'not-allowed' : 'pointer',
+              borderRadius: 'var(--workspace-radius-small)', cursor: cloning ? 'not-allowed' : 'pointer',
             }}
           >
             {cloning
@@ -508,12 +508,12 @@ function IdleHero({
           disabled={disabled}
           title={reason || ''}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
             color: disabled ? 'var(--workspace-muted)' : 'var(--workspace-text)',
             background: disabled ? 'var(--workspace-surface)' : 'var(--workspace-canvas)',
             border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
-            borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
           <Sparkles size={14} aria-hidden="true" />

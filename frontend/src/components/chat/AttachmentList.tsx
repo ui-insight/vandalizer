@@ -55,7 +55,7 @@ export function AttachmentList({
         className={`${CHIP} font-semibold`}
         style={{
           backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 16%, white)',
-          borderColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 45%, #e5e7eb)',
+          borderColor: "color-mix(in srgb, var(--highlight-color, #eab308) 45%, var(--workspace-border))",
           color: '#424a55',
         }}
       >
@@ -122,7 +122,7 @@ export function AttachmentList({
           className={CHIP}
           style={{
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
-            borderColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
+            borderColor: "color-mix(in srgb, var(--highlight-color, #eab308) 30%, var(--workspace-border))",
           }}
         >
           {processing

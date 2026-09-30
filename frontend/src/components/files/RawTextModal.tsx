@@ -121,13 +121,13 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         aria-labelledby="raw-text-modal-title"
         style={{
           backgroundColor: '#fff',
-          borderRadius: 12,
+          borderRadius: 'var(--workspace-radius-large)',
           maxWidth: 700,
           width: '90%',
           maxHeight: '80vh',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 8px 30px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--workspace-shadow-dialog)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -137,7 +137,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px',
+            padding: "var(--workspace-space-12) var(--workspace-space-16)",
             borderBottom: '1px solid #eee',
           }}
         >
@@ -149,7 +149,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: 4,
+              padding: 'var(--workspace-space-4)',
               display: 'flex',
               alignItems: 'center',
             }}
@@ -159,7 +159,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         </div>
 
         {/* Body */}
-        <div style={{ overflow: 'auto', padding: 16, flex: 1 }}>
+        <div style={{ overflow: 'auto', padding: 'var(--workspace-space-16)', flex: 1 }}>
           {state.kind === 'loading' && (
             <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
               <Loader2
@@ -169,7 +169,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           )}
 
           {state.kind === 'processing' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: 40 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: 40 }}>
               <Loader2
                 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }}
               />
@@ -182,7 +182,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           )}
 
           {state.kind === 'error' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: 32, textAlign: 'center' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', textAlign: 'center' }}>
               <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
               <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
                 Text extraction failed
@@ -197,14 +197,14 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 14px',
+                    gap: 'var(--workspace-space-6)',
+                    padding: "var(--workspace-space-8) var(--workspace-space-16)",
                     fontSize: 'var(--workspace-font-body)',
                     fontWeight: 500,
                     backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                     color: '#fff',
                     border: 'none',
-                    borderRadius: 6,
+                    borderRadius: 'var(--workspace-radius-small)',
                     cursor: retrying ? 'not-allowed' : 'pointer',
                   }}
                 >
@@ -231,15 +231,15 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 10,
-                    padding: '10px 12px',
-                    marginBottom: 12,
+                    gap: 'var(--workspace-space-12)',
+                    padding: "var(--workspace-space-12) var(--workspace-space-12)",
+                    marginBottom: 'var(--workspace-space-12)',
                     fontSize: 'var(--workspace-font-control)',
                     lineHeight: 1.4,
                     color: '#92400e',
                     backgroundColor: '#fffbeb',
                     border: '1px solid #fcd34d',
-                    borderRadius: 6,
+                    borderRadius: 'var(--workspace-radius-small)',
                   }}
                 >
                   <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
@@ -252,15 +252,15 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: 'var(--workspace-space-6)',
                       flexShrink: 0,
-                      padding: '5px 10px',
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)",
                       fontSize: 'var(--workspace-font-control)',
                       fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
                       color: '#fff',
                       border: 'none',
-                      borderRadius: 6,
+                      borderRadius: 'var(--workspace-radius-small)',
                       cursor: retrying ? 'not-allowed' : 'pointer',
                     }}
                   >

@@ -30,8 +30,8 @@ export function ProjectChatBadge({
         flexShrink: 0,
         gridTemplateColumns: '14px minmax(0, 1fr) 36px',
         alignItems: 'center',
-        gap: 8,
-        padding: '6px 16px',
+        gap: 'var(--workspace-space-8)',
+        padding: "var(--workspace-space-6) var(--workspace-space-16)",
         fontSize: 'var(--workspace-font-meta)',
         fontWeight: 600,
         color: '#424a55',
@@ -40,7 +40,7 @@ export function ProjectChatBadge({
       }}
     >
       <BookOpen size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 8px', minWidth: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-2) var(--workspace-space-8)", minWidth: 0 }}>
         <span title={`Sources for ${title}`}>Project sources</span>
         <span style={{ fontWeight: 400 }}>{project ? kbReady ? 'Knowledge available' : 'Knowledge not ready' : 'Checking availability…'}</span>
       </div>
@@ -52,7 +52,7 @@ export function ProjectChatBadge({
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center', padding: 2,
+          minWidth: 36, minHeight: 'var(--workspace-control-height)', alignItems: 'center', justifyContent: 'center', padding: 'var(--workspace-space-2)',
           display: 'flex',
           color: 'inherit',
           opacity: 1,

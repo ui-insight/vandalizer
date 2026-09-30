@@ -57,39 +57,39 @@ export function ColdStartHero({
 
   return (
     <div style={{
-      padding: 18,
+      padding: 'var(--workspace-space-20)',
       background: bg,
       border: `1px solid ${border}`,
-      borderRadius: 8,
+      borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
         <Sparkles size={18} style={{ color: accent }} />
         <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: titleColor }}>{headline}</h3>
       </div>
-      <p style={{ margin: '0 0 12px 0', fontSize: 'var(--workspace-font-control)', color: bodyColor, lineHeight: 1.5 }}>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: bodyColor, lineHeight: 1.5 }}>
         {body}
       </p>
       {whatHappensNext && whatHappensNext.length > 0 && (
         <div style={{
-          padding: '10px 12px',
-          marginBottom: 12,
+          padding: "var(--workspace-space-12) var(--workspace-space-12)",
+          marginBottom: 'var(--workspace-space-12)',
           backgroundColor: stepsBg,
           border: `1px solid ${stepsBorder}`,
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
         }}>
           <div style={{
             fontSize: 'var(--workspace-font-meta)',
             color: accent,
             textTransform: 'uppercase',
             letterSpacing: 0.5,
-            marginBottom: 6,
+            marginBottom: 'var(--workspace-space-6)',
             fontWeight: 600,
           }}>
             What happens next
           </div>
           <ol style={{
             margin: 0,
-            paddingLeft: 20,
+            paddingLeft: 'var(--workspace-space-20)',
             fontSize: 'var(--workspace-font-meta)',
             color: stepsText,
             lineHeight: 1.6,
@@ -102,8 +102,8 @@ export function ColdStartHero({
         <ul style={{
           fontSize: 'var(--workspace-font-meta)',
           color: subtleColor,
-          margin: '0 0 10px 0',
-          paddingLeft: 18,
+          margin: "0 0 var(--workspace-space-12) 0",
+          paddingLeft: 'var(--workspace-space-20)',
           lineHeight: 1.7,
         }}>
           {benefits.map((b, i) => <li key={i}>{b}</li>)}
@@ -117,8 +117,8 @@ export function ColdStartHero({
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '8px 16px',
+          gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-8) var(--workspace-space-16)",
           fontSize: 'var(--workspace-font-control)',
           fontWeight: 600,
           fontFamily: 'inherit',
@@ -127,7 +127,7 @@ export function ColdStartHero({
             ? (isDark ? '#222' : '#e5e7eb')
             : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
           border: '1px solid ' + (disabled ? (isDark ? '#333' : '#d1d5db') : '#7c3aed'),
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
           cursor: disabled ? 'not-allowed' : 'pointer',
         }}
       >

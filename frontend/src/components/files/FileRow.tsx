@@ -55,7 +55,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         {onToggleSelect && (
           <label
             className="flex items-center cursor-pointer"
-            style={{ padding: '12px 4px 12px 15px' }}
+            style={{ padding: "var(--workspace-space-12) var(--workspace-space-4) var(--workspace-space-12) 15px" }}
           >
             <input
               type="checkbox"
@@ -69,7 +69,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       </td>
 
       {/* Name + icon */}
-      <td style={{ padding: '12px 15px' }}>
+      <td style={{ padding: "var(--workspace-space-12) 15px" }}>
         <div className="flex items-center min-w-0">
           {stillProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-on-light, #806600)' }} />
@@ -175,7 +175,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
                   fontSize: '0.78em',
                   color: '#6b7280',
                   lineHeight: 1.4,
-                  marginTop: 2,
+                  marginTop: 'var(--workspace-space-2)',
                 }}
               >
                 {snippet}
@@ -188,7 +188,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       {/* Modified — right-aligned, with hover-revealed action overlay */}
       <td
         style={{
-          padding: '12px 15px',
+          padding: "var(--workspace-space-12) 15px",
           color: '#59616b',
           fontSize: '0.8em',
           fontWeight: 300,
@@ -216,9 +216,9 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             display: 'flex',
             alignItems: 'center',
             background: '#fff',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 999,
-            padding: '2px',
+            padding: "var(--workspace-space-2)",
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           }}
         >

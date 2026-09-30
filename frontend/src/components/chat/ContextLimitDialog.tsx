@@ -70,7 +70,7 @@ export function ContextLimitDialog({
           transform: 'translate(-50%, -50%)',
           background: 'white',
           borderRadius: 'var(--ui-radius, 12px)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+          boxShadow: 'var(--workspace-shadow-dialog)',
           width: 420,
           maxWidth: 'calc(100vw - 32px)',
           zIndex: 1001,
@@ -83,8 +83,8 @@ export function ContextLimitDialog({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '16px 20px',
-            borderBottom: '1px solid #e5e7eb',
+            padding: "var(--workspace-space-16) var(--workspace-space-20)",
+            borderBottom: "1px solid var(--workspace-border)",
           }}
         >
           <div>
@@ -95,7 +95,7 @@ export function ContextLimitDialog({
                   ? 'Conversation memory is nearly full'
                   : 'Manage conversation memory'}
             </h3>
-            <p style={{ margin: '4px 0 0', fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
+            <p style={{ margin: "var(--workspace-space-4) 0 0", fontSize: 'var(--workspace-font-control)', color: '#6b7280' }}>
               {percent}% of the model's memory is in use.{percent >= 90 ? ' Pick how to free some up.' : ''}
             </p>
           </div>
@@ -107,7 +107,7 @@ export function ContextLimitDialog({
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
-              padding: 4,
+              padding: 'var(--workspace-space-4)',
               color: '#6b7280',
               display: 'flex',
             }}
@@ -117,7 +117,7 @@ export function ContextLimitDialog({
         </div>
 
         {/* Options */}
-        <div style={{ padding: '12px 20px 20px' }}>
+        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20) var(--workspace-space-20)" }}>
           {/* Offered first because it is the only option that keeps everything.
               Rendered only when the server found a model — a deployment with a
               single model has nothing to switch to. */}
@@ -130,14 +130,14 @@ export function ContextLimitDialog({
                 width: '100%',
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: 12,
-                padding: '12px 14px',
+                gap: 'var(--workspace-space-12)',
+                padding: "var(--workspace-space-12) var(--workspace-space-16)",
                 background: loading === 'model' ? '#f9fafb' : '#f8fafc',
                 border: '1px solid #bfdbfe',
                 borderRadius: 'var(--ui-radius, 12px)',
                 cursor: loading ? 'not-allowed' : 'pointer',
                 textAlign: 'left',
-                marginBottom: 8,
+                marginBottom: 'var(--workspace-space-8)',
                 transition: 'background 0.15s, border-color 0.15s',
                 opacity: loading && loading !== 'model' ? 0.5 : 1,
               }}
@@ -148,12 +148,12 @@ export function ContextLimitDialog({
                 (e.currentTarget as HTMLButtonElement).style.borderColor = '#bfdbfe'
               }}
             >
-              <Sparkles size={18} style={{ marginTop: 2, color: '#2563eb', flexShrink: 0 }} />
+              <Sparkles size={18} style={{ marginTop: 'var(--workspace-space-2)', color: '#2563eb', flexShrink: 0 }} />
               <div>
                 <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>
                   Answer with {suggestedModel.tag || suggestedModel.name}
                 </div>
-                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+                <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                   Its {suggestedModel.context_window.toLocaleString()}-token context holds this
                   conversation whole. Nothing is dropped or summarised.
                 </div>
@@ -169,14 +169,14 @@ export function ContextLimitDialog({
               width: '100%',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 12,
-              padding: '12px 14px',
+              gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)",
               background: loading === 'truncate' ? '#f9fafb' : 'white',
-              border: '1px solid #e5e7eb',
+              border: "1px solid var(--workspace-border)",
               borderRadius: 'var(--ui-radius, 12px)',
               cursor: loading ? 'not-allowed' : 'pointer',
               textAlign: 'left',
-              marginBottom: 8,
+              marginBottom: 'var(--workspace-space-8)',
               transition: 'background 0.15s, border-color 0.15s',
               opacity: loading && loading !== 'truncate' ? 0.5 : 1,
             }}
@@ -187,10 +187,10 @@ export function ContextLimitDialog({
               (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'
             }}
           >
-            <Scissors size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
+            <Scissors size={18} style={{ marginTop: 'var(--workspace-space-2)', color: '#6b7280', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Trim older messages</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                 Stop sending the oldest messages to the model. They stay visible here in the conversation.
               </div>
             </div>
@@ -204,14 +204,14 @@ export function ContextLimitDialog({
               width: '100%',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 12,
-              padding: '12px 14px',
+              gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)",
               background: loading === 'compact' ? '#f9fafb' : 'white',
-              border: '1px solid #e5e7eb',
+              border: "1px solid var(--workspace-border)",
               borderRadius: 'var(--ui-radius, 12px)',
               cursor: loading ? 'not-allowed' : 'pointer',
               textAlign: 'left',
-              marginBottom: 8,
+              marginBottom: 'var(--workspace-space-8)',
               transition: 'background 0.15s, border-color 0.15s',
               opacity: loading && loading !== 'compact' ? 0.5 : 1,
             }}
@@ -223,13 +223,13 @@ export function ContextLimitDialog({
             }}
           >
             {loading === 'compact' ? (
-              <Loader2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
+              <Loader2 size={18} style={{ marginTop: 'var(--workspace-space-2)', color: '#6b7280', flexShrink: 0, animation: 'spin 1s linear infinite' }} />
             ) : (
-              <Minimize2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
+              <Minimize2 size={18} style={{ marginTop: 'var(--workspace-space-2)', color: '#6b7280', flexShrink: 0 }} />
             )}
             <div>
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Summarize the conversation</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                 Replace earlier messages with a short summary to save room. Old messages remain visible.
               </div>
             </div>
@@ -243,10 +243,10 @@ export function ContextLimitDialog({
               width: '100%',
               display: 'flex',
               alignItems: 'flex-start',
-              gap: 12,
-              padding: '12px 14px',
+              gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)",
               background: loading === 'clear' ? '#f9fafb' : 'white',
-              border: '1px solid #e5e7eb',
+              border: "1px solid var(--workspace-border)",
               borderRadius: 'var(--ui-radius, 12px)',
               cursor: loading ? 'not-allowed' : 'pointer',
               textAlign: 'left',
@@ -260,10 +260,10 @@ export function ContextLimitDialog({
               (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb'
             }}
           >
-            <Trash2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
+            <Trash2 size={18} style={{ marginTop: 'var(--workspace-space-2)', color: '#6b7280', flexShrink: 0 }} />
             <div>
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600 }}>Start fresh</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
                 Keep chatting with a clean slate. Old messages stay visible but won't be sent to the model.
               </div>
             </div>

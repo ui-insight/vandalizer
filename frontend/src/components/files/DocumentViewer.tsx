@@ -832,7 +832,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
+    width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
     background: '#fff', cursor: 'pointer', color: '#374151',
     fontSize: 'var(--workspace-font-control)', fontWeight: 500,
   }
@@ -849,32 +849,32 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         zIndex: 50,
         display: 'flex',
         justifyContent: 'center',
-        padding: '20px 24px',
+        padding: "var(--workspace-space-20) var(--workspace-space-24)",
       }}
     >
       <div style={{
         width: '100%',
         maxWidth: 420,
-        padding: '20px 24px',
+        padding: "var(--workspace-space-20) var(--workspace-space-24)",
         borderRadius: 'var(--ui-radius, 12px)',
         background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
         color: '#fff',
         boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
           <div>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, lineHeight: 1.3 }}>
               {stageCopy(taskStatus).title}
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', opacity: 0.8, marginTop: 'var(--workspace-space-4)' }}>
               {stageCopy(taskStatus).message}
             </div>
           </div>
         </div>
         {/* Progress bar */}
         <div style={{
-          marginTop: 14,
+          marginTop: 'var(--workspace-space-16)',
           height: 4,
           borderRadius: 2,
           backgroundColor: 'rgba(255,255,255,0.2)',
@@ -902,13 +902,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
   }, [docxText])
 
   if (loadError) {
-    return <div role="alert" style={{ padding: 24, color: '#374151', fontSize: 'var(--workspace-font-body)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
-      <h3 style={{ fontWeight: 600, marginBottom: 8 }}>Source unavailable</h3>
+    return <div role="alert" style={{ padding: 'var(--workspace-space-24)', color: '#374151', fontSize: 'var(--workspace-font-body)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>
+      <h3 style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-8)' }}>Source unavailable</h3>
       <p>{loadError}</p>
-      <p style={{ marginTop: 8 }}>The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.</p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
-        <button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ padding: '8px 14px', borderRadius: 6, border: '1px solid #9ca3af', background: '#fff', color: '#1f2937' }}>Retry source</button>
-        <a href={inlineUrl} target="_blank" rel="noreferrer" style={{ padding: '8px 0', color: '#1d4ed8' }}>Open original in new tab</a>
+      <p style={{ marginTop: 'var(--workspace-space-8)' }}>The saved citation preview may describe an earlier version. Return to Chat to continue your conversation.</p>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-12)', marginTop: 'var(--workspace-space-16)' }}>
+        <button type="button" onClick={() => setLoadAttempt(value => value + 1)} style={{ padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', border: '1px solid #9ca3af', background: '#fff', color: '#1f2937' }}>Retry source</button>
+        <a href={inlineUrl} target="_blank" rel="noreferrer" style={{ padding: "var(--workspace-space-8) 0", color: '#1d4ed8' }}>Open original in new tab</a>
       </div>
     </div>
   }
@@ -924,20 +924,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
           <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
           <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
-          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
           <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
             <Search size={16} />
           </button>
@@ -962,8 +962,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             role="status"
             aria-live="polite"
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '8px 12px', fontSize: 'var(--workspace-font-control)', color: '#92400e',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', color: '#92400e',
               backgroundColor: '#fffbeb', borderBottom: '1px solid #fde68a',
               flexShrink: 0,
             }}
@@ -977,7 +977,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 type="button"
                 onClick={onClearHighlights}
                 aria-label="Dismiss"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', display: 'flex', padding: 2 }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#92400e', display: 'flex', padding: 'var(--workspace-space-2)' }}
               >
                 <X size={15} />
               </button>
@@ -994,7 +994,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           ) : extractionError ? (
             <div style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: 16, padding: 32, height: '100%', textAlign: 'center',
+              gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', height: '100%', textAlign: 'center',
             }}>
               <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
               <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#111' }}>
@@ -1008,10 +1008,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 onClick={handleRetryExtraction}
                 disabled={retrying}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 500,
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
                   backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                  color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
+                  color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 'var(--workspace-radius-small)',
                   cursor: retrying ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -1026,7 +1026,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             </div>
           ) : (
             <div style={{
-              padding: '32px 48px',
+              padding: "var(--workspace-space-32) 48px",
               maxWidth: 800,
               margin: '0 auto',
               fontSize: `calc(var(--workspace-font-body) * ${zoomLevel})`,
@@ -1038,11 +1038,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                   was only reachable from that branch. */}
               {lowQuality && (
                 <div style={{
-                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10,
-                  padding: '10px 12px', marginBottom: 16,
+                  display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                  padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-16)',
                   fontSize: 'var(--workspace-font-control)', lineHeight: 1.4, color: '#92400e',
                   backgroundColor: '#fffbeb', border: '1px solid #fcd34d',
-                  borderRadius: 6,
+                  borderRadius: 'var(--workspace-radius-small)',
                 }}>
                   <AlertCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
                   <span style={{ flex: 1 }}>
@@ -1053,10 +1053,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                     onClick={handleRetryExtraction}
                     disabled={retrying}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
-                      padding: '5px 10px', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
+                      display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', flexShrink: 0,
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontWeight: 500,
                       backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
-                      color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 6,
+                      color: 'var(--highlight-text-color, #000)', border: 'none', borderRadius: 'var(--workspace-radius-small)',
                       cursor: retrying ? 'not-allowed' : 'pointer',
                     }}
                   >
@@ -1101,7 +1101,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         {processingOverlay}
         <div style={{
           flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-          justifyContent: 'center', gap: 16, padding: 32, textAlign: 'center',
+          justifyContent: 'center', gap: 'var(--workspace-space-16)', padding: 'var(--workspace-space-32)', textAlign: 'center',
           backgroundColor: '#f9fafb',
         }}>
           <FileText style={{ width: 40, height: 40, color: '#9ca3af' }} />
@@ -1115,10 +1115,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
           <a
             href={downloadUrl}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 'var(--workspace-font-body)', fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
               backgroundColor: 'var(--highlight-color)', color: 'var(--highlight-text-color, #fff)',
-              borderRadius: 6, textDecoration: 'none',
+              borderRadius: 'var(--workspace-radius-small)', textDecoration: 'none',
             }}
           >
             <Download style={{ width: 14, height: 14 }} />
@@ -1135,20 +1135,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-          padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
           <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
           <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
-          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
           <button
             type="button"
             onClick={() => { if (blobUrl) window.open(blobUrl, '_blank') }}
@@ -1194,20 +1194,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
 
       {/* Toolbar */}
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)',
+        padding: "var(--workspace-space-6) var(--workspace-space-12)", borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
         <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+        <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: "0 var(--workspace-space-12)" }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
         <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
-        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: "0 var(--workspace-space-4)" }} />
         <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
@@ -1234,7 +1234,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
         flex: 1, overflow: 'auto', backgroundColor: '#525659',
         position: 'relative',
       }}>
-        <div ref={containerRef} style={{ paddingBottom: 20 }} />
+        <div ref={containerRef} style={{ paddingBottom: 'var(--workspace-space-20)' }} />
 
         {/* Highlight navigation bar — also shown in a "not found" state so a
             failed source lookup gives explicit feedback instead of nothing. */}
@@ -1244,14 +1244,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
             bottom: 12,
             left: 0,
             right: 0,
-            margin: '0 24px',
+            margin: "0 var(--workspace-space-24)",
             height: 48,
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            padding: '0 8px',
-            borderRadius: 10,
-            border: '1px solid #e5e7eb',
+            gap: 'var(--workspace-space-8)',
+            padding: "0 var(--workspace-space-8)",
+            borderRadius: 'var(--workspace-radius-large)',
+            border: "1px solid var(--workspace-border)",
             backdropFilter: 'blur(12px)',
             backgroundColor: 'rgba(255,255,255,0.85)',
             boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
@@ -1290,11 +1290,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], highlightPage = n
                 &ldquo;{effectiveTerms[0]}&rdquo;
               </span>
               {totalHighlights > 0 ? (
-                <span style={{ marginLeft: 6, color: '#6b7280', fontWeight: 400 }}>
+                <span style={{ marginLeft: 'var(--workspace-space-6)', color: '#6b7280', fontWeight: 400 }}>
                   {currentHighlight + 1} of {totalHighlights}
                 </span>
               ) : (
-                <span style={{ marginLeft: 6, color: '#b45309', fontWeight: 500 }}>
+                <span style={{ marginLeft: 'var(--workspace-space-6)', color: '#b45309', fontWeight: 500 }}>
                   {highlightMissLabel(effectivePage, highlightPageApproximate)}
                 </span>
               )}

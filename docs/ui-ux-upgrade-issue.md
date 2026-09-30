@@ -4,6 +4,15 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Shared task spacing and surfaces — September 30
+
+**155/169 checklist items implemented locally.** VIS-03 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Task lists, cards, editors and dialogs use a shared spacing scale, 6/8/12px corner radii, neutral border token and dialog elevation. Nearby one-off gap/padding values align to that scale. File rows have a 44px minimum rhythm and continue growing with their content; Library rows retain room for metadata and actions.
+- Added `docs/workspace-style-guide.md` to document text/color roles, spacing, surface geometry and verification expectations for subsequent changes. Compact controls retain their distinct size; the new tokens do not impose fixed content heights.
+- Verification: TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and 11 existing hook-dependency warnings. The 229 selected production-browser captures cover the five-width responsive matrix, all baseline states, file/Library workflow execution and recovery, shared section headers, short validation dialogs, and workflow/extraction tuning. All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly.
+- The responsive recipe now uses the approved Files/Assistant pane controls instead of the removed Ask assistant launcher. Source and tools remain available together on desktop and retain their mobile state. Browser APIs are synthetic; final action/form, accessibility and regrading acceptance remain open.
+
 ## Readable task typography — September 30
 
 **154/169 checklist items implemented locally.** VIS-02 is complete for the reviewed task surfaces; changes are not deployed.
@@ -410,7 +419,7 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 
 - [x] **VIS-01 · P2 · Fix:** Reconcile the light file/project/editor surfaces, dark automation/KB surfaces, blue wizard controls and purple validation controls into a consistent theme hierarchy.
 - [x] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
-- [ ] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
+- [x] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
 - [ ] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
 - [ ] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.
 - [x] **VIS-06 · P2 · Fix:** Give important names and task content more space than decoration, promotional copy and low-value metadata.

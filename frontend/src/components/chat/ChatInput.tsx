@@ -198,7 +198,7 @@ export function ChatInput({
         {/* Text input area */}
         <div
           className="cursor-text"
-          style={{ padding: '8px 6px 12px 6px' }}
+          style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-6)" }}
           onClick={() => textareaRef.current?.focus()}
         >
           <textarea

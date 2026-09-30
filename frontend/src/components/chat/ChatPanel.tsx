@@ -835,7 +835,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
+            gap: 'var(--workspace-space-8)',
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, rgba(255,255,255,0.95))',
             border: '2px dashed var(--highlight-color, #eab308)',
             borderRadius: 'var(--ui-radius, 12px)',
@@ -918,11 +918,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         tabIndex={0}
         onScroll={handleScroll}
         className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
-        style={{ padding: '20px 20px 24px', position: 'relative' }}
+        style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
       >
         {/* First-session: compact value-prop banner with rotating taglines */}
         {showFirstSessionHome && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
             <FirstSessionHome
               orgName={branding.orgName}
               brandIcon={brandIcon}
@@ -937,7 +937,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {showReturningHome && (
-          <div style={{ marginBottom: 16 }}>
+          <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
             <ReturningHome
               orgName={branding.orgName}
               brandIcon={brandIcon}
@@ -960,9 +960,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             <div
               className="relative overflow-hidden"
               style={{
-                padding: '18px 20px',
+                padding: "var(--workspace-space-20) var(--workspace-space-20)",
                 borderRadius: 'var(--ui-radius, 12px)',
-                background: '#f6f8fa', color: '#30363d', border: '1px solid #dfe3e6',
+                background: '#f6f8fa', color: '#30363d', border: "1px solid var(--workspace-border)",
                 transition: 'filter 0.3s ease',
               }}
             >
@@ -996,7 +996,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                               ? 'Welcome back'
                               : 'What would you like to work on?'}
                   </div>
-                  <div style={{ fontSize: 'var(--workspace-font-control)', opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-control)', opacity: 0.8, marginTop: 'var(--workspace-space-2)', fontWeight: 400 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? "We'll be ready as soon as each document finishes processing."
@@ -1018,7 +1018,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </div>
               </div>
               {bannerProcessingDoc && (
-                <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: '#dfe3e6', overflow: 'hidden' }}>
+                <div className="relative z-[1]" style={{ marginTop: 'var(--workspace-space-16)', height: 4, borderRadius: 2, backgroundColor: '#dfe3e6', overflow: 'hidden' }}>
                   <div
                     className="animate-pulse"
                     style={{
@@ -1041,7 +1041,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               || onboardingStatus?.has_only_onboarding_docs
               || (onboardingStatus?.unprocessed_doc_count ?? 0) > 0
               || (!!onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer')) && (
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 'var(--workspace-space-12)' }}>
                 <WorkspaceBriefing
                   onOpenActivity={openActivityById}
                   recentActivity={onboardingStatus!.recent_activity}
@@ -1056,7 +1056,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               </div>
             )}
 
-            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)' }}>
               {/* Inside a project, surface project-specific actions (run pinned
                   tools, summarize, gaps) instead of generic onboarding/demo. */}
               {activeProjectUuid && (
@@ -1075,12 +1075,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: 5,
-                  padding: '8px 14px',
+                  gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
                   fontSize: 'var(--workspace-font-control)',
                   fontWeight: 500,
                   fontFamily: 'inherit',
-                  border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 40%, #e5e7eb)',
+                  border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 40%, var(--workspace-border))",
                   borderRadius: 20,
                   backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
                   color: '#374151',
@@ -1128,11 +1128,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     handleSend(suggestion, needsOnboardingContext)
                   }}
                   style={{
-                    padding: '8px 14px',
+                    padding: "var(--workspace-space-8) var(--workspace-space-16)",
                     fontSize: 'var(--workspace-font-control)',
                     fontWeight: 500,
                     fontFamily: 'inherit',
-                    border: '1px solid #e5e7eb',
+                    border: "1px solid var(--workspace-border)",
                     borderRadius: 20,
                     backgroundColor: '#fff',
                     color: '#374151',
@@ -1161,14 +1161,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 docs or a KB are selected — that's exactly when the jargon shows up.
                 Hidden inside projects (noisier) and for practitioners+ (who know it). */}
             {!activeProjectUuid && ['newcomer', 'explorer'].includes(onboardingStatus?.maturity_stage ?? 'newcomer') && (
-              <div style={{ marginTop: 16 }}>
+              <div style={{ marginTop: 'var(--workspace-space-16)' }}>
                 <ConceptStrip />
               </div>
             )}
 
             {/* Getting-started stepper for returning users who haven't finished basics */}
             {onboardingStatus && !effectiveFirstSession && hasDocContext && (
-              <div style={{ marginTop: 12 }}>
+              <div style={{ marginTop: 'var(--workspace-space-12)' }}>
                 <OnboardingStepper
                   status={onboardingStatus}
                   hasChatAboutDocs={onboardingStatus.has_chatted_with_docs}
@@ -1189,8 +1189,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    margin: '12px 0',
+                    gap: 'var(--workspace-space-12)',
+                    margin: "var(--workspace-space-12) 0",
                     fontSize: 'var(--workspace-font-meta)',
                     color: '#6b7280',
                     userSelect: 'none',
@@ -1247,7 +1247,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
           <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
               <ChevronRight size={14} />
               <span className="thinking-shimmer"><StreamingLabel /></span>
             </div>
@@ -1263,12 +1263,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           const joined = names.slice(0, 2).join(', ') + (names.length > 2 ? `, +${names.length - 2}` : '')
           return (
             <div style={{
-              padding: 15, marginBottom: 10, color: 'white', backgroundColor: '#191919',
+              padding: 15, marginBottom: 'var(--workspace-space-12)', color: 'white', backgroundColor: '#191919',
               borderLeft: '7px solid var(--highlight-color, #f1b300)', borderRadius: 'var(--ui-radius, 12px)',
               opacity: 0.85,
             }}>
               <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{heldMessage.message}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: '#d1d5db' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#d1d5db' }}>
                 <Loader2 size={13} className="animate-spin" style={{ color: 'var(--highlight-color, #f1b300)' }} />
                 <span style={{ flex: 1 }}>Waiting for {joined || 'your file'} to finish processing…</span>
                 <button
@@ -1514,7 +1514,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               width: 36,
               height: 36,
               borderRadius: '50%',
-              border: '1px solid #d1d5db',
+              border: "1px solid var(--workspace-border)",
               backgroundColor: '#fff',
               color: '#374151',
               cursor: 'pointer',

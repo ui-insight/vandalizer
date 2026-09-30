@@ -355,7 +355,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
           {folderCount > 0 ? ' Folders will be removed along with everything inside them.' : ''} This cannot be undone.
           {usage === undefined && <UsageCheckFailedNote many={!oneDoc} />}
           {usage && usage.total > 0 && (
-            <div style={{ marginTop: 8 }}>
+            <div style={{ marginTop: 'var(--workspace-space-8)' }}>
               {oneDoc ? <><strong>{selectedDocs[0].title}</strong> is</> : 'These files are'} {summarizeUsage(usage)}.
               {' '}{describeDeleteEffects(usage, { many: !oneDoc, removeOffered: kbCount > 0 })}
               <UsageSummaryList usage={usage} />
@@ -626,7 +626,7 @@ export function FileBrowser({ searchAction, searchField, selectedDocumentUuids, 
   return (
     <div
       className="file-browser"
-      style={{ padding: '0 24px 32px' }}
+      style={{ padding: "0 var(--workspace-space-24) var(--workspace-space-32)" }}
       onDragEnter={handlePanelDragEnter}
       onDragOver={handlePanelDragOver}
       onDragLeave={handlePanelDragLeave}

@@ -38,11 +38,11 @@ export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
   const labelColor = theme === 'light' ? '#111827' : 'var(--workspace-text)'
 
   return (
-    <div style={{ margin: '0 0 12px 0' }}>
+    <div style={{ margin: "0 0 var(--workspace-space-12) 0" }}>
       <button
         onClick={() => setOpen(v => !v)}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
           background: 'transparent', border: 'none', padding: 0,
           fontSize: 'var(--workspace-font-meta)', color: triggerColor, fontFamily: 'inherit', cursor: 'pointer',
         }}
@@ -52,7 +52,7 @@ export function WhenToRunDisclosure({ kind, theme = 'dark' }: Props) {
       </button>
       {open && (
         <ul style={{
-          margin: '8px 0 0 0', paddingLeft: 18, fontSize: 'var(--workspace-font-meta)', color: bodyColor, lineHeight: 1.7,
+          margin: "var(--workspace-space-8) 0 0 0", paddingLeft: 'var(--workspace-space-20)', fontSize: 'var(--workspace-font-meta)', color: bodyColor, lineHeight: 1.7,
         }}>
           {bullets.map(b => (
             <li key={b.when}>

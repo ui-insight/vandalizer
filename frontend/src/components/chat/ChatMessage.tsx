@@ -60,8 +60,8 @@ function CitationMenuItem({ icon, label, onClick }: {
       role="menuitem"
       onClick={onClick}
       style={{
-        display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-        padding: '5px 8px', border: 'none', borderRadius: 5,
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', width: '100%',
+        padding: "var(--workspace-space-6) var(--workspace-space-8)", border: 'none', borderRadius: 'var(--workspace-radius-small)',
         background: 'transparent', color: '#374151',
         fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', textAlign: 'left',
         cursor: 'pointer', transition: 'background-color 0.15s',
@@ -394,7 +394,7 @@ export function ChatMessage({
         <>
           {/* Collapsible thinking trace */}
           {hasThinking && (
-            <div style={{ marginBottom: 10 }}>
+            <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
               <button
                 type="button"
                 onClick={() => setThinkingExpanded(!thinkingExpanded)}
@@ -403,11 +403,11 @@ export function ChatMessage({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
+                  gap: 'var(--workspace-space-4)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: '2px 0',
+                  padding: "var(--workspace-space-2) 0",
                   fontSize: 'var(--workspace-font-meta)',
                   color: '#6b7280',
                   fontFamily: 'inherit',
@@ -431,10 +431,10 @@ export function ChatMessage({
                 <div>
                   <div
                     style={{
-                      marginTop: 6, padding: '10px 12px',
+                      marginTop: 'var(--workspace-space-6)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
                       backgroundColor: '#f9fafb',
                       borderLeft: '3px solid var(--highlight-color, #eab308)',
-                      borderRadius: 4, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
+                      borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
                       color: '#6b7280', fontStyle: 'italic',
                       maxHeight: 400, overflowY: 'auto',
                       whiteSpace: 'pre-wrap', wordBreak: 'break-word',
@@ -485,7 +485,7 @@ export function ChatMessage({
                   const result = resultMap.get(seg.call.tool_call_id)
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
-                    <div key={i} style={{ margin: '4px 0' }}>
+                    <div key={i} style={{ margin: "var(--workspace-space-4) 0" }}>
                       <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} />
                     </div>
                   )
@@ -497,7 +497,7 @@ export function ChatMessage({
               {activeToolCalls && activeToolCalls.filter(
                 (c) => !segments.some((s) => s.kind === 'tool_call' && s.call.tool_call_id === c.tool_call_id),
               ).map((c) => (
-                <div key={c.tool_call_id} style={{ margin: '4px 0' }}>
+                <div key={c.tool_call_id} style={{ margin: "var(--workspace-space-4) 0" }}>
                   <ToolStatusLine call={c} isActive />
                 </div>
               ))}
@@ -535,9 +535,9 @@ export function ChatMessage({
             const open = openCitation !== null ? message.citations[openCitation] : null
             const openPreview = open?.content_preview?.trim() || ''
             return (
-              <div style={{ marginTop: 8 }} ref={citationsRef}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+              <div style={{ marginTop: 'var(--workspace-space-8)' }} ref={citationsRef}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
+                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', alignSelf: 'center', marginRight: 'var(--workspace-space-2)' }}>
                     Sources:
                   </span>
                   {message.citations.map((c, i) => {
@@ -549,9 +549,9 @@ export function ChatMessage({
                     const preview = c.content_preview || ''
                     const key = `${c.chunk_id ?? c.document_id ?? i}`
                     const chipBase = {
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
-                      maxWidth: '100%', overflowWrap: 'anywhere', textAlign: 'left', borderRadius: 12, transition: 'all 0.15s',
+                      display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+                      maxWidth: '100%', overflowWrap: 'anywhere', textAlign: 'left', borderRadius: 'var(--workspace-radius-large)', transition: 'all 0.15s',
                     } as const
                     // URL-backed KB source: link straight out to the origin.
                     if (c.url) {
@@ -565,7 +565,7 @@ export function ChatMessage({
                           style={{
                             ...chipBase,
                             backgroundColor: '#f3f4f6', color: '#374151',
-                            border: '1px solid #e5e7eb',
+                            border: "1px solid var(--workspace-border)",
                             cursor: 'pointer', textDecoration: 'none',
                           }}
                         >
@@ -595,12 +595,12 @@ export function ChatMessage({
                             ? setCitationMenu(menuOpen ? null : i)
                             : toggleCitationPreview(i)}
                           style={{
-                            display: 'inline-flex', alignItems: 'center', gap: 4,
-                            padding: '6px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+                            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                            padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                             backgroundColor: active ? '#e0e7ff' : '#f3f4f6',
                             color: active ? '#3730a3' : '#374151',
                             border: `1px solid ${active ? '#c7d2fe' : '#e5e7eb'}`,
-                            borderRadius: 12, overflowWrap: 'anywhere', textAlign: 'left',
+                            borderRadius: 'var(--workspace-radius-large)', overflowWrap: 'anywhere', textAlign: 'left',
                             cursor: 'pointer', transition: 'all 0.15s',
                           }}
                         >
@@ -623,9 +623,9 @@ export function ChatMessage({
                             style={{
                               position: 'absolute', top: 'calc(100% + 4px)',
                               ...(menuAlign === 'right' ? { right: 0 } : { left: 0 }),
-                              zIndex: 30, minWidth: 150, padding: 4,
-                              backgroundColor: '#fff', border: '1px solid #e5e7eb',
-                              borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                              zIndex: 30, minWidth: 150, padding: 'var(--workspace-space-4)',
+                              backgroundColor: '#fff', border: "1px solid var(--workspace-border)",
+                              borderRadius: 'var(--workspace-radius-medium)', boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
                             }}
                           >
                             <CitationMenuItem
@@ -646,12 +646,12 @@ export function ChatMessage({
                 </div>
                 {open && (
                   <div style={{
-                    marginTop: 6, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5,
+                    marginTop: 'var(--workspace-space-6)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5,
                     color: '#374151', backgroundColor: '#f9fafb',
-                    border: '1px solid #e5e7eb', borderRadius: 8,
+                    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
                     whiteSpace: 'pre-wrap' as const,
                   }}>
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', marginBottom: 'var(--workspace-space-4)' }}>
                       {open.document_title}
                       {(() => {
                         const loc = formatPageLocator(open.page, open.page_approximate, open.page_end) ?? open.sheet
@@ -659,9 +659,9 @@ export function ChatMessage({
                       })()}
                     </div>
                     {openPreview || 'No preview was saved for this source.'}
-                    {!open.document_uuid && !open.document_id && <p style={{ marginTop: 8 }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
+                    {!open.document_uuid && !open.document_id && <p style={{ marginTop: 'var(--workspace-space-8)' }}>The original document is not linked to this citation. Ask the source owner for the file, or check the knowledge base’s Sources list.</p>}
                     {open.source_reference && (
-                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 6 }}>
+                      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-6)' }}>
                         Source: {open.source_reference}
                       </div>
                     )}
@@ -670,10 +670,10 @@ export function ChatMessage({
                         type="button"
                         onClick={() => handleCitationClick(open)}
                         style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 4,
-                          marginTop: 8, padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+                          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                          marginTop: 'var(--workspace-space-8)', padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
                           fontFamily: 'inherit', backgroundColor: '#fff', color: '#374151',
-                          border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
+                          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
                         }}
                       >
                         Open the source
@@ -685,20 +685,20 @@ export function ChatMessage({
             )
           })()}
 
-          {message.interruption && <p role="status" style={{ marginTop: 10, padding: '10px 12px', background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 8, fontSize: 'var(--workspace-font-control)', color: '#785411', lineHeight: 1.5 }}>
+          {message.interruption && <p role="status" style={{ marginTop: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-12)", background: '#fff8e6', border: '1px solid #ead4a0', borderRadius: 'var(--workspace-radius-medium)', fontSize: 'var(--workspace-font-control)', color: '#785411', lineHeight: 1.5 }}>
             {message.interruption === 'stopped' ? 'Response stopped.' : 'Connection interrupted.'} Partial output is preserved. An action already started may still finish; check its result before retrying.
           </p>}
           {/* Feedback bar - hidden during streaming */}
           {!isStreamingProp && message.content && <div style={{
-            display: 'flex', alignItems: 'center', gap: 4, marginTop: 10,
-            paddingTop: 8, borderTop: '1px solid #00000010',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-12)',
+            paddingTop: 'var(--workspace-space-8)', borderTop: '1px solid #00000010',
           }}>
             <button
               type="button"
               onClick={() => handleFeedback('up')}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 6, border: 'none',
+                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
                 background: feedback === 'up' ? '#dcfce7' : 'transparent',
                 color: feedback === 'up' ? '#16a34a' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -713,7 +713,7 @@ export function ChatMessage({
               onClick={() => handleFeedback('down')}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 6, border: 'none',
+                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
                 background: feedback === 'down' ? '#fee2e2' : 'transparent',
                 color: feedback === 'down' ? '#dc2626' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
@@ -729,7 +729,7 @@ export function ChatMessage({
               onClick={handleCopy}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 28, height: 28, borderRadius: 6, border: 'none',
+                width: 28, height: 28, borderRadius: 'var(--workspace-radius-small)', border: 'none',
                 background: 'transparent', color: copied ? '#16a34a' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
@@ -743,7 +743,7 @@ export function ChatMessage({
           {/* Comment form — shown after either thumbs-up or thumbs-down */}
           {!isStreamingProp && showComment && !commentSent && (
             <div style={{
-              marginTop: 8, display: 'flex', gap: 8, alignItems: 'flex-start',
+              marginTop: 'var(--workspace-space-8)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'flex-start',
             }}>
               <input
                 autoFocus
@@ -753,15 +753,15 @@ export function ChatMessage({
                 placeholder={feedback === 'up' ? 'What worked well? (optional)' : 'What went wrong? (optional)'}
                 aria-label={feedback === 'up' ? 'What worked well? (optional)' : 'What went wrong? (optional)'}
                 style={{
-                  flex: 1, padding: '6px 10px', borderRadius: 6,
-                  border: '1px solid #d1d5db', fontSize: 'var(--workspace-font-control)',
+                  flex: 1, padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
+                  border: "1px solid var(--workspace-border)", fontSize: 'var(--workspace-font-control)',
                 }}
               />
               <button
                 type="button"
                 onClick={handleSubmitComment}
                 style={{
-                  padding: '6px 12px', borderRadius: 6, border: 'none',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', border: 'none',
                   background: '#374151', color: '#fff', fontSize: 'var(--workspace-font-meta)',
                   fontWeight: 600, cursor: 'pointer',
                 }}
@@ -772,7 +772,7 @@ export function ChatMessage({
                 type="button"
                 onClick={() => setShowComment(false)}
                 style={{
-                  padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)",
                   background: '#fff', fontSize: 'var(--workspace-font-meta)', cursor: 'pointer',
                 }}
               >

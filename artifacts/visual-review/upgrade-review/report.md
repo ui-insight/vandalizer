@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 154/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 155/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,15 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Shared task spacing and surfaces — September 30
+
+**155/169 checklist items implemented locally.** VIS-03 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Task lists, cards, editors and dialogs use a shared spacing scale, 6/8/12px corner radii, neutral border token and dialog elevation. Nearby one-off gap/padding values align to that scale. File rows have a 44px minimum rhythm and continue growing with their content; Library rows retain room for metadata and actions.
+- Added `docs/workspace-style-guide.md` to document text/color roles, spacing, surface geometry and verification expectations for subsequent changes. Compact controls retain their distinct size; the new tokens do not impose fixed content heights.
+- Verification: TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and 11 existing hook-dependency warnings. The 229 selected production-browser captures cover the five-width responsive matrix, all baseline states, file/Library workflow execution and recovery, shared section headers, short validation dialogs, and workflow/extraction tuning. All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly.
+- The responsive recipe now uses the approved Files/Assistant pane controls instead of the removed Ask assistant launcher. Source and tools remain available together on desktop and retain their mobile state. Browser APIs are synthetic; final action/form, accessibility and regrading acceptance remain open.
 
 ## Readable task typography — September 30
 
@@ -255,7 +264,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | Library | 5.5/5.5 | 8/8 | [library-mixed-types-return-1440](../2026-09-28-library-opening-evidence/library-mixed-types-return-1440.png) |
 | Chat workspace | 6.5/6 | 8/8 | [composer-queue-error-draft-768](../2026-09-29-chat-composer-evidence/composer-queue-error-draft-768.png) |
 | Basic chat onboarding | 7/6.5 | 8/8 | [onboarding-evidence-checked-mobile](../upgrade-polish-final-journeys/onboarding-evidence-checked-mobile.png) |
-| Chat uploads | 6/3 | 8/8 | [chat-upload-error](../2026-09-30-typography-baseline/chat-upload-error.png) |
+| Chat uploads | 6/3 | 8/8 | [chat-upload-error](../2026-09-30-spacing-baseline/chat-upload-error.png) |
 | Chat knowledge-base interactions | 7/7 | 8/8 | [chat-citation-preview-mobile](../upgrade-polish-final-journeys/chat-citation-preview-mobile.png) |
 | Agentic chat UI | 7/6.5 | 8/8 | [agent-partial-completion-mobile](../2026-09-26-recovery-verified/agent-partial-completion-mobile.png) |
 
@@ -272,7 +281,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 1240 distinct states / 2363 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 1240 distinct states / 2592 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -418,6 +427,12 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-30-typography-dialogs](../2026-09-30-typography-dialogs/manifest.json): 36 states; source `636847e9847226ae8e533ed8da536fe19f4ab0c15fbf7f18e38244abe2da10b7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-typography-chat-reading-final](../2026-09-30-typography-chat-reading-final/manifest.json): 33 states; source `b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-typography-context-meter-final](../2026-09-30-typography-context-meter-final/manifest.json): 12 states; source `b31ceef44fa2e359b68ff5f1be950388c99984191bcb17973a66ee3e00961b48`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-responsive-final](../2026-09-30-spacing-responsive-final/manifest.json): 42 states; source `1759d635ca2e89f9af413f905b72aafd93c3e59e8c666df4873731d7eca88624`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-baseline](../2026-09-30-spacing-baseline/manifest.json): 55 states; source `1759d635ca2e89f9af413f905b72aafd93c3e59e8c666df4873731d7eca88624`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-domains](../2026-09-30-spacing-domains/manifest.json): 39 states; source `1759d635ca2e89f9af413f905b72aafd93c3e59e8c666df4873731d7eca88624`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-file-library](../2026-09-30-spacing-file-library/manifest.json): 30 states; source `0c1e2cba43612fd33e01d51b2b500025b8405543a328f2914b439deee73d9dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-dialogs](../2026-09-30-spacing-dialogs/manifest.json): 36 states; source `0c1e2cba43612fd33e01d51b2b500025b8405543a328f2914b439deee73d9dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-spacing-headers](../2026-09-30-spacing-headers/manifest.json): 27 states; source `0c1e2cba43612fd33e01d51b2b500025b8405543a328f2914b439deee73d9dd7`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

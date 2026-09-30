@@ -65,18 +65,18 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
           maxHeight: '88vh',
           background: 'var(--workspace-canvas)',
           border: '1px solid var(--workspace-border)',
-          borderRadius: 10,
+          borderRadius: 'var(--workspace-radius-large)',
           display: 'flex', flexDirection: 'column',
           fontFamily: 'inherit',
         }}
       >
         {/* Header */}
         <header style={{
-          padding: '14px 18px',
+          padding: "var(--workspace-space-16) var(--workspace-space-20)",
           borderBottom: '1px solid var(--workspace-border)',
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--workspace-space-12)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', minWidth: 0 }}>
             <span style={{
               width: 9, height: 9, borderRadius: '50%', flexShrink: 0,
               backgroundColor: scoreColor(score),
@@ -85,7 +85,7 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
                 Trial details
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-4)' }}>
                 <span style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: 'var(--workspace-text)' }}>
                   {scorePct}%
                 </span>
@@ -112,7 +112,7 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
-              cursor: 'pointer', padding: 4, flexShrink: 0,
+              cursor: 'pointer', padding: 'var(--workspace-space-4)', flexShrink: 0,
             }}
           >
             <X size={16} />
@@ -120,20 +120,20 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
         </header>
 
         {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px 18px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-16) var(--workspace-space-20) var(--workspace-space-20)" }}>
           {/* What it tried */}
           <Section title="What this trial tried">
             <p style={{ margin: 0, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)' }}>
               {whatItTried}
             </p>
-            <p style={{ margin: '8px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
+            <p style={{ margin: "var(--workspace-space-8) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.6, color: 'var(--workspace-muted)' }}>
               {outcome}
             </p>
             {trial.error && (
               <p style={{
-                margin: '10px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-danger)',
+                margin: "var(--workspace-space-12) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-danger)',
                 background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)',
-                borderRadius: 6, padding: '8px 10px',
+                borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
               }}>
                 {trial.error}
               </p>
@@ -142,10 +142,10 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
 
           {/* Settings used */}
           <Section title="Settings it used, and why they matter">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
               {params.map((p) => (
                 <div key={p.key} style={{
-                  display: 'grid', gridTemplateColumns: '140px 1fr', gap: 10,
+                  display: 'grid', gridTemplateColumns: '140px 1fr', gap: 'var(--workspace-space-12)',
                   alignItems: 'baseline',
                 }}>
                   <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>{p.label}</div>
@@ -153,7 +153,7 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
                     <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
                       {p.value}
                     </div>
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>
                       {p.why}
                     </div>
                   </div>
@@ -164,7 +164,7 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
 
           {/* How it scored */}
           <Section title="How it scored">
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
               <Stat label="Overall score" value={`${scorePct}%`} />
               {trial.accuracy != null && (
                 <Stat label="Accuracy" value={`${Math.round(trial.accuracy * 100)}%`} />
@@ -182,7 +182,7 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
                 <Stat label="Tokens used" value={trial.tokens_used.toLocaleString()} />
               )}
             </div>
-            <p style={{ margin: '10px 0 0', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)' }}>
+            <p style={{ margin: "var(--workspace-space-12) 0 0", fontSize: 'var(--workspace-font-meta)', lineHeight: 1.55, color: 'var(--workspace-muted)' }}>
               <strong style={{ color: 'var(--workspace-muted)' }}>Accuracy</strong> is how often the extracted
               value matched the expected answer; <strong style={{ color: 'var(--workspace-muted)' }}>consistency</strong> is
               how often repeated runs produced the same value.
@@ -200,9 +200,9 @@ export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section style={{ marginBottom: 18 }}>
+    <section style={{ marginBottom: 'var(--workspace-space-20)' }}>
       <h3 style={{
-        margin: '0 0 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+        margin: "0 0 var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
         letterSpacing: 0.4, textTransform: 'uppercase', color: '#7a7a7a',
       }}>
         {title}
@@ -216,9 +216,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <span style={{
       display: 'inline-flex', flexDirection: 'column', gap: 1,
-      padding: '5px 10px',
+      padding: "var(--workspace-space-6) var(--workspace-space-12)",
       background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
-      borderRadius: 6,
+      borderRadius: 'var(--workspace-radius-small)',
     }}>
       <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
         {label}

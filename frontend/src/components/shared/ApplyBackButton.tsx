@@ -25,17 +25,17 @@ export function ApplyBackButton({
   alreadyAppliedNote = 'These settings are applied',
 }: ApplyBackButtonProps) {
   return (
-    <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+    <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center', flexWrap: 'wrap' }}>
       <button
         onClick={onApply}
         disabled={!canApply || applying}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
           color: !canApply ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
           background: !canApply ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
           border: '1px solid ' + (!canApply ? 'var(--workspace-border)' : 'var(--highlight-color, #eab308)'),
-          borderRadius: 6, cursor: !canApply || applying ? 'not-allowed' : 'pointer',
+          borderRadius: 'var(--workspace-radius-small)', cursor: !canApply || applying ? 'not-allowed' : 'pointer',
         }}
       >
         {applying ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}

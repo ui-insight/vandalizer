@@ -29,10 +29,10 @@ function ActivityRow({ item, onOpenActivity }: { item: RecentActivityItem; onOpe
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
+        gap: 'var(--workspace-space-12)',
         width: '100%',
-        padding: '8px 10px',
-        borderRadius: 8,
+        padding: "var(--workspace-space-8) var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-medium)',
         border: 'none',
         backgroundColor: 'transparent',
         cursor: 'pointer',
@@ -88,10 +88,10 @@ function AlertRow({ alert, onSendMessage }: { alert: ActiveAlertItem; onSendMess
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 'var(--workspace-space-8)',
         width: '100%',
-        padding: '7px 10px',
-        borderRadius: 8,
+        padding: "7px var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-medium)',
         border: `1px solid ${style.border}`,
         backgroundColor: style.bg,
         cursor: 'pointer',
@@ -144,12 +144,12 @@ function NextStepNudge({ stage, unprocessedDocCount, onSendMessage }: { stage: M
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 8,
+        gap: 'var(--workspace-space-8)',
         width: '100%',
-        padding: '8px 10px',
-        borderRadius: 8,
+        padding: "var(--workspace-space-8) var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-medium)',
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)',
-        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 15%, #e5e7eb)',
+        border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 15%, var(--workspace-border))",
         cursor: 'pointer',
         fontFamily: 'inherit',
         textAlign: 'left',
@@ -216,11 +216,11 @@ export function WorkspaceBriefing({
     <div style={{
       display: 'flex',
       flexDirection: 'column',
-      gap: 10,
-      padding: '12px 14px',
+      gap: 'var(--workspace-space-12)',
+      padding: "var(--workspace-space-12) var(--workspace-space-16)",
       borderRadius: 'var(--ui-radius, 12px)',
       backgroundColor: '#fff',
-      border: '1px solid #e5e7eb',
+      border: "1px solid var(--workspace-border)",
     }}>
       {/* Synthesized daily guidance — the lead recommendation */}
       {dailyGuidance && (
@@ -229,11 +229,11 @@ export function WorkspaceBriefing({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 'var(--workspace-space-12)',
             width: '100%',
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, #e5e7eb)',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
+            borderRadius: 'var(--workspace-radius-medium)',
+            border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, var(--workspace-border))",
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)',
             cursor: 'pointer',
             fontFamily: 'inherit',
@@ -261,7 +261,7 @@ export function WorkspaceBriefing({
         <div style={{
           fontSize: 'var(--workspace-font-meta)',
           color: '#9ca3af',
-          paddingLeft: 10,
+          paddingLeft: 'var(--workspace-space-12)',
           lineHeight: 1.5,
         }}>
           {sinceLastVisit}
@@ -275,11 +275,11 @@ export function WorkspaceBriefing({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 'var(--workspace-space-12)',
             width: '100%',
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, #e5e7eb)',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
+            borderRadius: 'var(--workspace-radius-medium)',
+            border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, var(--workspace-border))",
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)',
             cursor: 'pointer',
             fontFamily: 'inherit',
@@ -309,8 +309,8 @@ export function WorkspaceBriefing({
             color: '#9ca3af',
             textTransform: 'uppercase' as const,
             letterSpacing: '0.05em',
-            marginBottom: 4,
-            paddingLeft: 10,
+            marginBottom: 'var(--workspace-space-4)',
+            paddingLeft: 'var(--workspace-space-12)',
           }}>
             Recent activity
           </div>
@@ -329,12 +329,12 @@ export function WorkspaceBriefing({
             color: '#9ca3af',
             textTransform: 'uppercase' as const,
             letterSpacing: '0.05em',
-            marginBottom: 4,
-            paddingLeft: 10,
+            marginBottom: 'var(--workspace-space-4)',
+            paddingLeft: 'var(--workspace-space-12)',
           }}>
             Needs attention
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
             {activeAlerts.map((alert, i) => (
               <AlertRow key={i} alert={alert} onSendMessage={onSendMessage} />
             ))}

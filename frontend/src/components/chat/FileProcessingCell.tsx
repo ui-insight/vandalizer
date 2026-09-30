@@ -44,13 +44,13 @@ export function FileProcessingCell({ docs }: Props) {
       style={{
         marginBottom: 15,
         borderRadius: 'var(--ui-radius, 12px)',
-        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
+        border: "1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, var(--workspace-border))",
         background: 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)',
         overflow: 'hidden',
       }}
     >
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', padding: "var(--workspace-space-12) var(--workspace-space-16)" }}>
         <div className="shrink-0">
           {anyProcessing
             ? <Loader2 className="h-5 w-5 animate-spin" style={{ color: 'var(--highlight-color, #eab308)' }} />
@@ -69,8 +69,8 @@ export function FileProcessingCell({ docs }: Props) {
         {docs.map((d) => {
           const copy = stageCopy(d.status)
           return (
-            <div key={d.uuid} style={{ padding: '8px 14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div key={d.uuid} style={{ padding: "var(--workspace-space-8) var(--workspace-space-16)" }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                 {d.phase === 'processing'
                   ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" style={{ color: 'var(--highlight-color, #eab308)' }} />
                   : d.phase === 'error'
@@ -83,7 +83,7 @@ export function FileProcessingCell({ docs }: Props) {
                 </span>
               </div>
               {d.phase === 'processing' && (
-                <div style={{ marginTop: 6, marginLeft: 24, height: 3, borderRadius: 2, background: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, #e5e7eb)', overflow: 'hidden' }}>
+                <div style={{ marginTop: 'var(--workspace-space-6)', marginLeft: 'var(--workspace-space-24)', height: 3, borderRadius: 2, background: 'color-mix(in srgb, var(--highlight-color, #eab308) 18%, #e5e7eb)', overflow: 'hidden' }}>
                   <div
                     style={{
                       height: '100%',

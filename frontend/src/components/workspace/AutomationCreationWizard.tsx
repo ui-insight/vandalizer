@@ -231,8 +231,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   }
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '10px 14px', fontSize: 'var(--workspace-font-body)', fontFamily: 'inherit',
-    border: '1px solid #d1d5db', borderRadius: 8,
+    width: '100%', padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontFamily: 'inherit',
+    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
     boxSizing: 'border-box', color: '#202124', transition: 'border-color 0.15s',
   }
 
@@ -242,9 +242,9 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   }
 
   const btnPrimary = (enabled: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 6,
-    padding: '9px 20px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-    border: 'none', borderRadius: 8,
+    display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+    padding: "9px var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+    border: 'none', borderRadius: 'var(--workspace-radius-medium)',
     cursor: enabled ? 'pointer' : 'not-allowed',
     backgroundColor: enabled ? 'var(--color-panel-dark)' : '#e5e7eb',
     color: enabled ? '#fff' : '#9ca3af',
@@ -252,8 +252,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   })
 
   const btnSecondary: React.CSSProperties = {
-    padding: '9px 20px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-    border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer',
+    padding: "9px var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
+    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer',
     backgroundColor: '#fff', color: '#374151',
   }
 
@@ -274,7 +274,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         className="automation-wizard"
         style={{
         backgroundColor: '#fff', borderRadius: 14, width: 540, maxWidth: '92vw',
-        boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+        boxShadow: 'var(--workspace-shadow-dialog)',
         display: 'flex', flexDirection: 'column', maxHeight: '90vh',
         overflow: 'hidden',
       }}>
@@ -282,13 +282,13 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '20px 24px 0',
+          padding: "var(--workspace-space-20) var(--workspace-space-24) 0",
         }}>
           <div>
             <div style={{ fontSize: 'var(--workspace-font-section-title)', fontWeight: 700, color: '#111', letterSpacing: '-0.01em' }}>
               New Automation
             </div>
-            <div ref={stepHeadingRef} tabIndex={-1} style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginTop: 2 }}>
+            <div ref={stepHeadingRef} tabIndex={-1} style={{ fontSize: 'var(--workspace-font-meta)', color: '#59616b', marginTop: 'var(--workspace-space-2)' }}>
               Step {step} of {totalSteps} · {stepLabels[step - 1]}
             </div>
           </div>
@@ -296,14 +296,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
             type="button"
             onClick={requestClose}
             aria-label="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#555e68', display: 'flex' }}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#555e68', display: 'flex' }}
           >
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
 
         {/* Progress bar */}
-        <div style={{ height: 3, backgroundColor: '#f3f4f6', margin: '16px 0 0' }}>
+        <div style={{ height: 3, backgroundColor: '#f3f4f6', margin: "var(--workspace-space-16) 0 0" }}>
           <div style={{
             height: '100%',
             width: `${(step / totalSteps) * 100}%`,
@@ -314,16 +314,16 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         </div>
 
         {/* Body */}
-        <div className="automation-wizard-body" style={{ padding: '28px 28px 20px', flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div className="automation-wizard-body" style={{ padding: "28px 28px var(--workspace-space-20)", flex: 1, minHeight: 0, overflowY: 'auto' }}>
 
           {/* Step 1: Name */}
           {step === 1 && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 What would you like to call this automation?
               </div>
-              <div style={{ marginBottom: 16 }}>
-                <label htmlFor="wizard-name" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+                <label htmlFor="wizard-name" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Name <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 <input
@@ -343,7 +343,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 <p id="wizard-name-help" className="wizard-field-help">Required. Give this automation a name you can recognize later.</p>
               </div>
               <div>
-                <label htmlFor="wizard-description" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <label htmlFor="wizard-description" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Description <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
@@ -363,10 +363,10 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Step 2: Trigger */}
           {step === 2 && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 What will trigger this automation?
               </div>
-              <div role="radiogroup" aria-label="Trigger type" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div role="radiogroup" aria-label="Trigger type" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
                 {triggerOptions.map(opt => {
                   const Icon = opt.icon
                   const selected = triggerType === opt.value
@@ -378,16 +378,16 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       aria-checked={selected}
                       onClick={() => handleTriggerTypeChange(opt.value)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 14,
-                        padding: '14px 16px',
+                        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-16)',
+                        padding: "var(--workspace-space-16) var(--workspace-space-16)",
                         backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#fff',
                         border: selected ? '2px solid var(--highlight-on-light, #806600)' : '1.5px solid #e5e7eb',
-                        borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                        borderRadius: 'var(--workspace-radius-large)', cursor: 'pointer', fontFamily: 'inherit',
                         textAlign: 'left', width: '100%', transition: 'border-color 0.1s, background-color 0.1s',
                       }}
                     >
                       <div style={{
-                        width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                        width: 40, height: 40, borderRadius: 'var(--workspace-radius-large)', flexShrink: 0,
                         backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#f3f4f6',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         transition: 'background-color 0.1s',
@@ -396,7 +396,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       </div>
                       <div>
                         <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>{opt.label}</div>
-                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 2 }}>{opt.description}</div>
+                        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#555e68', marginTop: 'var(--workspace-space-2)' }}>{opt.description}</div>
                       </div>
                       <div style={{ marginLeft: 'auto', flexShrink: 0 }}>
                         <div style={{
@@ -417,7 +417,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Step 3 (schedule): when it runs and what on */}
           {triggerType === 'schedule' && step === configStep && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 Set the schedule
               </div>
               <ScheduleConfigFields
@@ -434,22 +434,22 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Step 3 (folder_watch): Folder Config */}
           {triggerType === 'folder_watch' && step === configStep && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 Configure folder watch
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
               <CollapsibleSection
                 title="Folder"
                 summary={folders.find(f => f.uuid === watchFolderId)?.path || 'No folder chosen'}
                 testId="folder-watch-folder"
               >
-              <div style={{ paddingTop: 8 }}>
-                <label htmlFor="wizard-watch-folder" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
+                <label htmlFor="wizard-watch-folder" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Watch Folder <span style={{ color: '#ef4444' }}>*</span>
                 </label>
                 {foldersLoading ? (
-                  <div style={{ padding: '10px 14px', fontSize: 'var(--workspace-font-control)', color: '#555e68' }}>Loading folders...</div>
+                  <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', color: '#555e68' }}>Loading folders...</div>
                 ) : (
                   <select
                     id="wizard-watch-folder"
@@ -475,7 +475,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 )}
                 <p id="wizard-folder-help" className="wizard-field-help">Required. Choose the folder to monitor for new documents.</p>
                 {creatingFolder && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-8)' }}>
                     <input
                       autoFocus
                       aria-label="New folder name"
@@ -506,11 +506,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                         setCreatingFolder(false)
                       }}
                       style={{
-                        padding: '8px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                        borderRadius: 6, border: 'none', backgroundColor: 'var(--highlight-on-light, #806600)', color: '#fff',
+                        padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                        borderRadius: 'var(--workspace-radius-small)', border: 'none', backgroundColor: 'var(--highlight-on-light, #806600)', color: '#fff',
                         cursor: newFolderName.trim() ? 'pointer' : 'not-allowed',
                         opacity: newFolderName.trim() ? 1 : 0.5,
-                        display: 'flex', alignItems: 'center', gap: 4,
+                        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                       }}
                     >
                       <Plus style={{ width: 12, height: 12 }} />
@@ -526,11 +526,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 summary={`${fileTypes.length ? fileTypes.map(t => `.${t}`).join(' ') : 'All supported file types'}${excludePatterns ? ' · with exclusions' : ''}${batchMode ? ' · batch' : ''}`}
                 testId="folder-watch-filters"
               >
-              <div style={{ marginBottom: 16, paddingTop: 8 }}>
-                <div id="wizard-filetypes-label" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ marginBottom: 'var(--workspace-space-16)', paddingTop: 'var(--workspace-space-8)' }}>
+                <div id="wizard-filetypes-label" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   File Types
                 </div>
-                <div role="group" aria-labelledby="wizard-filetypes-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                <div role="group" aria-labelledby="wizard-filetypes-label" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-6)' }}>
                   {FILE_TYPE_OPTIONS.map(type => (
                     <button
                       key={type}
@@ -538,7 +538,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       aria-pressed={fileTypes.includes(type)}
                       onClick={() => handleFileTypeToggle(type)}
                       style={{
-                        padding: '4px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+                        padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
                         borderRadius: 14, cursor: 'pointer',
                         backgroundColor: fileTypes.includes(type) ? 'var(--wizard-selected-bg, #f7f4e8)' : '#f3f4f6',
                         color: fileTypes.includes(type) ? '#554400' : '#555e68',
@@ -551,8 +551,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 </div>
               </div>
 
-              <div style={{ marginBottom: 16 }}>
-                <label htmlFor="wizard-exclude" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+                <label htmlFor="wizard-exclude" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   Exclude Patterns <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
@@ -567,7 +567,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 />
               </div>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                 <input
                   type="checkbox"
                   checked={batchMode}
@@ -585,10 +585,10 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Action step (step 3 for API, step 4 for folder_watch) */}
           {step === actionStep && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 {triggerType === 'schedule' ? 'What should run on this schedule?' : 'What should happen when it triggers?'}
               </div>
-              <div role="radiogroup" aria-label="Action type" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 20 }}>
+              <div role="radiogroup" aria-label="Action type" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-20)' }}>
                 {ACTION_OPTIONS.map(opt => {
                   const selected = actionType === opt.value
                   return (
@@ -599,11 +599,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       aria-checked={selected}
                       onClick={() => handleActionTypeChange(opt.value)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 16px',
+                        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                        padding: "var(--workspace-space-12) var(--workspace-space-16)",
                         backgroundColor: selected ? 'var(--wizard-selected-bg, #f7f4e8)' : '#fff',
                         border: selected ? '2px solid var(--highlight-on-light, #806600)' : '1.5px solid #e5e7eb',
-                        borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit',
+                        borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer', fontFamily: 'inherit',
                         textAlign: 'left', width: '100%', transition: 'border-color 0.1s',
                       }}
                     >
@@ -624,7 +624,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               {/* Action selector */}
               {(actionType === 'workflow' || actionType === 'extraction' || actionType === 'task') && (
                 <div>
-                  <label id="wizard-action-label" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <label id="wizard-action-label" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Select {actionType === 'extraction' ? 'Extraction' : actionType === 'task' ? 'Workflow Task' : 'Workflow'} <span style={{ color: '#ef4444' }}>*</span>
                   </label>
                   <button
@@ -635,8 +635,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     aria-expanded={showPicker}
                     onClick={() => setShowPicker(true)}
                     style={{
-                      width: '100%', padding: '10px 14px', fontSize: 'var(--workspace-font-body)',
-                      border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
+                      width: '100%', padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)',
+                      border: "1.5px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', fontFamily: 'inherit',
                       backgroundColor: '#fff', color: actionId ? '#111827' : '#555e68',
                       cursor: 'pointer', textAlign: 'left',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -668,7 +668,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Final step: Output, Enable, Share */}
           {step === finalStep && (
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+              <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-20)' }}>
                 Review your automation
               </div>
 
@@ -680,17 +680,17 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 <div><dt>Action</dt><dd>{actionName || actionId}</dd></div>
                 <div><dt>Output</dt><dd>{saveToFolder ? `${folders.find(folder => folder.uuid === outputFolder)?.path || 'Choose a folder'} · ${outputFormat.toUpperCase()}` : 'Results available in the run'}{emailNotify && ` · Email: ${emailRecipients || 'Add recipients'}`}</dd></div>
               </dl>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
               <CollapsibleSection
                 title="Activation"
                 summary={sharedWithTeam ? 'Shared with team' : 'Private · choose activation below'}
                 testId="wizard-activation"
               >
-              <div style={{ paddingTop: 8 }}>
-              <p style={{ marginBottom: 16, lineHeight: 1.5 }}>Choose <strong>Save disabled</strong> to finish setup without running, or <strong>Create &amp; enable</strong> to activate this automation.</p>
+              <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
+              <p style={{ marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>Choose <strong>Save disabled</strong> to finish setup without running, or <strong>Create &amp; enable</strong> to activate this automation.</p>
 
               {/* Share with team */}
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                 <input
                   type="checkbox"
                   checked={sharedWithTeam}
@@ -708,10 +708,10 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 summary={[saveToFolder && 'save to folder', emailNotify && 'email results'].filter(Boolean).join(' · ') || 'Results stay in the run history'}
                 testId="wizard-output"
               >
-              <div style={{ paddingTop: 8 }}>
+              <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
 
                 {/* Save to folder */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: saveToFolder ? 12 : 8, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: saveToFolder ? 12 : 8, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                   <input
                     type="checkbox"
                     checked={saveToFolder}
@@ -721,7 +721,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   <span style={{ fontWeight: 500 }}>Save results to a folder</span>
                 </label>
                 {saveToFolder && (
-                  <div style={{ paddingLeft: 24, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div style={{ paddingLeft: 'var(--workspace-space-24)', marginBottom: 'var(--workspace-space-12)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
                     <select
                       value={outputFolder}
                       onChange={e => setOutputFolder(e.target.value)}
@@ -763,7 +763,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 )}
 
                 {/* Email notification */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: emailNotify ? 12 : 0, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer', marginBottom: emailNotify ? 12 : 0, fontSize: 'var(--workspace-font-control)', color: '#374151' }}>
                   <input
                     type="checkbox"
                     checked={emailNotify}
@@ -773,7 +773,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   <span style={{ fontWeight: 500 }}>Email results when complete</span>
                 </label>
                 {emailNotify && (
-                  <div style={{ paddingLeft: 24 }}>
+                  <div style={{ paddingLeft: 'var(--workspace-space-24)' }}>
                     <input
                       type="text"
                       value={emailRecipients}
@@ -797,8 +797,8 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
 
           {error && (
             <div id="wizard-error" role="alert" style={{
-              marginTop: 14, padding: '8px 12px', fontSize: 'var(--workspace-font-meta)',
-              color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: 6,
+              marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)',
+              color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: 'var(--workspace-radius-small)',
               border: '1px solid #fecaca',
             }}>
               {error}
@@ -809,11 +809,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         {/* Footer */}
         <div className="automation-wizard-footer" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '16px 28px 20px',
+          padding: "var(--workspace-space-16) 28px var(--workspace-space-20)",
           borderTop: '1px solid #f3f4f6',
         }}>
           {/* Buttons */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
             {step > 1 ? (
               <button onClick={() => setStep(s => s - 1)} disabled={creating} style={btnSecondary}>
                 Back

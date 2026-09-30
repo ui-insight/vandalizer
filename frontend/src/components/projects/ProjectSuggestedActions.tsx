@@ -79,11 +79,11 @@ export function ProjectSuggestedActions({
           disabled={disabled}
           onClick={() => onSend(s.message)}
           style={{
-            padding: '8px 14px',
+            padding: "var(--workspace-space-8) var(--workspace-space-16)",
             fontSize: 'var(--workspace-font-control)',
             fontWeight: 500,
             fontFamily: 'inherit',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 20,
             backgroundColor: '#fff',
             color: '#374151',

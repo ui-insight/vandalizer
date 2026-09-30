@@ -13,7 +13,7 @@ interface StepProps {
 
 function Step({ label, done, number }: StepProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
       <div
         style={{
           width: 20,
@@ -32,7 +32,7 @@ function Step({ label, done, number }: StepProps) {
             : {
                 backgroundColor: '#f3f4f6',
                 color: '#6b7280',
-                border: '1px solid #e5e7eb',
+                border: "1px solid var(--workspace-border)",
               }),
         }}
       >
@@ -67,7 +67,7 @@ export function OnboardingStepper({ status, hasChatAboutDocs }: OnboardingSteppe
   return (
     <div
       style={{
-        padding: '10px 16px',
+        padding: "var(--workspace-space-12) var(--workspace-space-16)",
         borderRadius: 'var(--ui-radius, 12px)',
         backgroundColor: '#fafafa',
         border: '1px solid #f3f4f6',
@@ -80,12 +80,12 @@ export function OnboardingStepper({ status, hasChatAboutDocs }: OnboardingSteppe
           color: '#6b7280',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          marginBottom: 8,
+          marginBottom: 'var(--workspace-space-8)',
         }}
       >
         Getting started
       </div>
-      <div style={{ display: 'flex', gap: 20 }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-20)' }}>
         <Step number={1} label="Upload a document" done={step1} />
         <Step number={2} label="Chat about your files" done={step2} />
         <Step number={3} label="Run an extraction" done={step3} />

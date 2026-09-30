@@ -167,7 +167,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
       className="flex h-full flex-col border-l border-[#d8d8d8] bg-panel-bg"
     >
       {/* Header */}
-      <div className="border-b border-[#ddd]" style={{ padding: '17px 12px' }}>
+      <div className="border-b border-[#ddd]" style={{ padding: "17px var(--workspace-space-12)" }}>
         <div className="flex items-center justify-between gap-2">
           {!visualDocked && (
             <div className="flex items-center gap-2">
@@ -399,7 +399,7 @@ export function ActivityRail({ forceExpanded = false, forceDocked = false, onExp
             padding: visualDocked ? '6px 10px' : '6px 12px',
             ...(certCertified
               ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
-              : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
+              : { background: '#fff', border: "1px solid var(--workspace-border)", boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
           }}
         >
           <Award

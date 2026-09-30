@@ -81,9 +81,9 @@ function UploadPrimaryButton({
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 8,
-          padding: '11px 16px',
-          borderRadius: 12,
+          gap: 'var(--workspace-space-8)',
+          padding: "11px var(--workspace-space-16)",
+          borderRadius: 'var(--workspace-radius-large)',
           border: 'none',
           background: 'var(--highlight-color, #eab308)',
           color: '#111827',
@@ -141,8 +141,8 @@ function UploadPillButton({
           display: 'inline-flex',
           alignItems: 'center',
           gap: 7,
-          padding: '10px 12px',
-          borderRadius: 12,
+          padding: "var(--workspace-space-12) var(--workspace-space-12)",
+          borderRadius: 'var(--workspace-radius-large)',
           border: inverse ? '1px solid rgba(255,255,255,0.22)' : '1px solid #e5e7eb',
           background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
           color: inverse ? '#ffffff' : '#374151',
@@ -191,8 +191,8 @@ function ActionPillButton({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 7,
-        padding: '10px 12px',
-        borderRadius: 12,
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-large)',
         border: inverse ? '1px solid rgba(255,255,255,0.22)' : '1px solid #e5e7eb',
         background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
         color: inverse ? '#ffffff' : '#374151',
@@ -226,7 +226,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: 10,
+          gap: 'var(--workspace-space-12)',
         }}
       >
         <div>
@@ -246,8 +246,8 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           style={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 6,
-            padding: '5px 8px',
+            gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-8)",
             borderRadius: 999,
             background: inverse ? 'rgba(255,255,255,0.12)' : '#ffffff',
             color: inverse ? '#ffffff' : '#334155',
@@ -263,9 +263,9 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
 
       <div
         style={{
-          marginTop: 12,
-          padding: '8px 10px',
-          borderRadius: 10,
+          marginTop: 'var(--workspace-space-12)',
+          padding: "var(--workspace-space-8) var(--workspace-space-12)",
+          borderRadius: 'var(--workspace-radius-large)',
           background: inverse ? 'rgba(255,255,255,0.08)' : '#ffffff',
           border: inverse ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e5e7eb',
           fontSize: 'var(--workspace-font-meta)',
@@ -278,10 +278,10 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
 
       <div
         style={{
-          marginTop: 12,
+          marginTop: 'var(--workspace-space-12)',
           display: 'grid',
           gridTemplateColumns: '1fr auto',
-          gap: 10,
+          gap: 'var(--workspace-space-12)',
           alignItems: 'end',
         }}
       >
@@ -289,7 +289,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Answer</div>
           <div
             style={{
-              marginTop: 3,
+              marginTop: 'var(--workspace-space-4)',
               fontSize: 21,
               lineHeight: 1.1,
               fontWeight: 800,
@@ -303,7 +303,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Source</div>
           <div
             style={{
-              marginTop: 3,
+              marginTop: 'var(--workspace-space-4)',
               fontSize: 'var(--workspace-font-control)',
               fontWeight: 700,
               color: inverse ? '#ffffff' : '#334155',
@@ -316,9 +316,9 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
 
       <div
         style={{
-          marginTop: 12,
-          padding: '10px 11px',
-          borderRadius: 12,
+          marginTop: 'var(--workspace-space-12)',
+          padding: "var(--workspace-space-12) 11px",
+          borderRadius: 'var(--workspace-radius-large)',
           border: inverse ? '1px solid rgba(255,255,255,0.14)' : '1px solid #e5e7eb',
           background: inverse ? 'rgba(0,0,0,0.08)' : '#ffffff',
         }}
@@ -328,7 +328,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
             display: 'flex',
             alignItems: 'center',
             gap: 7,
-            marginBottom: 6,
+            marginBottom: 'var(--workspace-space-6)',
             fontSize: 'var(--workspace-font-meta)',
             fontWeight: 800,
             color: inverse ? '#ffffff' : '#374151',
@@ -355,10 +355,10 @@ function GlossaryDisclosure() {
   return (
     <details
       style={{
-        borderRadius: 12,
-        border: '1px solid #e5e7eb',
+        borderRadius: 'var(--workspace-radius-large)',
+        border: "1px solid var(--workspace-border)",
         backgroundColor: '#ffffff',
-        padding: '10px 12px',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
       }}
     >
       <summary
@@ -372,7 +372,7 @@ function GlossaryDisclosure() {
       >
         New here? See key terms
       </summary>
-      <div style={{ marginTop: 12 }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)' }}>
         <ConceptStrip heading="" />
       </div>
     </details>
@@ -391,16 +391,16 @@ function SurfaceCard({
   return (
     <div
       style={{
-        padding: 18,
+        padding: 'var(--workspace-space-20)',
         borderRadius: 'var(--ui-radius, 12px)',
-        border: '1px solid #e5e7eb',
+        border: "1px solid var(--workspace-border)",
         backgroundColor: '#ffffff',
         boxShadow: '0 12px 28px rgba(0,0,0,0.04)',
       }}
     >
       <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#111827' }}>{title}</div>
-      <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-control)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
-      <div style={{ marginTop: 14 }}>{children}</div>
+      <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
+      <div style={{ marginTop: 'var(--workspace-space-16)' }}>{children}</div>
     </div>
   )
 }
@@ -420,11 +420,11 @@ function PromptButton({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        gap: 10,
+        gap: 'var(--workspace-space-12)',
         width: '100%',
-        padding: '11px 12px',
-        borderRadius: 10,
-        border: '1px solid #e5e7eb',
+        padding: "11px var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-large)',
+        border: "1px solid var(--workspace-border)",
         backgroundColor: '#ffffff',
         color: '#374151',
         cursor: 'pointer',
@@ -650,7 +650,7 @@ function FocusNowCard({
   return (
     <div
       style={{
-        padding: 16,
+        padding: 'var(--workspace-space-16)',
         borderRadius: 16,
         border: '1px solid #dce1e5',
         background: '#f7f8f9',
@@ -663,7 +663,7 @@ function FocusNowCard({
           display: 'inline-flex',
           alignItems: 'center',
           gap: 7,
-          padding: '5px 9px',
+          padding: "var(--workspace-space-6) 9px",
           borderRadius: 999,
           background: '#edf0f2',
           fontSize: 'var(--workspace-font-meta)',
@@ -676,7 +676,7 @@ function FocusNowCard({
         {action.eyebrow}
       </div>
 
-      <div style={{ marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)', display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)' }}>
         <div
           style={{
             display: 'flex',
@@ -684,7 +684,7 @@ function FocusNowCard({
             justifyContent: 'center',
             width: 38,
             height: 38,
-            borderRadius: 12,
+            borderRadius: 'var(--workspace-radius-large)',
             background: '#edf0f2',
             flexShrink: 0,
           }}
@@ -701,7 +701,7 @@ function FocusNowCard({
         </div>
       </div>
 
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: 'var(--workspace-space-16)' }}>
         {action.kind === 'upload' ? (
           <UploadPrimaryButton
             label={action.cta}
@@ -717,9 +717,9 @@ function FocusNowCard({
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 8,
-              padding: '11px 16px',
-              borderRadius: 12,
+              gap: 'var(--workspace-space-8)',
+              padding: "11px var(--workspace-space-16)",
+              borderRadius: 'var(--workspace-radius-large)',
               border: 'none',
               background: 'var(--highlight-color, #eab308)',
               color: '#111827',
@@ -754,12 +754,12 @@ function QueueItemButton({
 }) {
   const palette = tone === 'warning'
     ? {
-        border: 'color-mix(in srgb, var(--highlight-color, #eab308) 42%, #e5e7eb)',
+        border: "color-mix(in srgb, var(--highlight-color, #eab308) 42%, var(--workspace-border))",
         background: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
         icon: '#a16207',
       }
     : {
-        border: '#e5e7eb',
+        border: "var(--workspace-border)",
         background: '#ffffff',
         icon: '#6b7280',
       }
@@ -773,8 +773,8 @@ function QueueItemButton({
         alignItems: 'flex-start',
         gap: 11,
         width: '100%',
-        padding: '12px 12px',
-        borderRadius: 12,
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-large)',
         border: `1px solid ${palette.border}`,
         background: palette.background,
         color: '#111827',
@@ -799,7 +799,7 @@ function QueueItemButton({
           justifyContent: 'center',
           width: 34,
           height: 34,
-          borderRadius: 10,
+          borderRadius: 'var(--workspace-radius-large)',
           background: tone === 'warning'
             ? 'rgba(234,179,8,0.14)'
             : 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
@@ -811,9 +811,9 @@ function QueueItemButton({
       </div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 700, color: '#111827', lineHeight: 1.35 }}>{title}</div>
-        <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
+        <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
       </div>
-      <ArrowRight size={14} style={{ marginTop: 2, flexShrink: 0, color: 'var(--highlight-on-light, #806600)' }} />
+      <ArrowRight size={14} style={{ marginTop: 'var(--workspace-space-2)', flexShrink: 0, color: 'var(--highlight-on-light, #806600)' }} />
     </button>
   )
 }
@@ -833,7 +833,7 @@ function ResumeQueue({
         title="Continue where you left off"
         subtitle="This section turns into a work queue as soon as the workspace has files, runs, or alerts."
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
           <PromptButton
             label="Help me choose a useful task to start with."
             onClick={() => onSendMessage('Help me choose a useful task to start with.')}
@@ -857,11 +857,11 @@ function ResumeQueue({
       {status.since_last_visit && (
         <div
           style={{
-            marginBottom: 12,
-            padding: '8px 10px',
-            borderRadius: 10,
+            marginBottom: 'var(--workspace-space-12)',
+            padding: "var(--workspace-space-8) var(--workspace-space-12)",
+            borderRadius: 'var(--workspace-radius-large)',
             background: '#f8fafc',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             fontSize: 'var(--workspace-font-meta)',
             lineHeight: 1.5,
             color: '#64748b',
@@ -872,7 +872,7 @@ function ResumeQueue({
       )}
 
       {!hasQueue ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
           {status.has_documents ? (
             <>
               <PromptButton
@@ -898,7 +898,7 @@ function ResumeQueue({
           )}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
           {status.active_alerts.map((alert) => (
             <QueueItemButton
               key={`${alert.item_name}-${alert.message}`}
@@ -955,10 +955,10 @@ function ReadyAssetBadge({ label }: { label: string }) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '6px 9px',
+        gap: 'var(--workspace-space-6)',
+        padding: "var(--workspace-space-6) 9px",
         borderRadius: 999,
-        border: '1px solid #e5e7eb',
+        border: "1px solid var(--workspace-border)",
         background: '#ffffff',
         fontSize: 'var(--workspace-font-meta)',
         fontWeight: 700,

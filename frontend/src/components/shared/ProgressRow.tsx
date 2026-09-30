@@ -7,8 +7,8 @@ interface ProgressRowProps {
 
 export function ProgressRow({ label, subtitle, pct, color }: ProgressRowProps) {
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 3 }}>
+    <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-4)' }}>
         <span>{label}</span>
         <span>{subtitle}</span>
       </div>

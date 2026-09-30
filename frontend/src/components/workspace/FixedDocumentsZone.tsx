@@ -24,7 +24,7 @@ export function DeletedDocumentBadge() {
       title="This document was deleted from Files. Runs will fail until it is removed here or replaced."
       style={{
         fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: '#b91c1c', backgroundColor: '#fee2e2',
-        border: '1px solid #fecaca', borderRadius: 999, padding: '1px 6px', whiteSpace: 'nowrap',
+        border: '1px solid #fecaca', borderRadius: 999, padding: "1px var(--workspace-space-6)", whiteSpace: 'nowrap',
       }}
     >
       Deleted from Files
@@ -114,9 +114,9 @@ export function FixedDocumentsZone({
   }
 
   const actionButton: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 12px',
+    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "7px var(--workspace-space-12)",
     fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-    border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fff',
     color: '#374151', cursor: uploading ? 'wait' : 'pointer', opacity: uploading ? 0.6 : 1,
   }
 
@@ -124,14 +124,14 @@ export function FixedDocumentsZone({
     <>
       {fixedDocs.length > 0 && (
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden',
-          backgroundColor: '#fff', marginBottom: 8,
+          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', overflow: 'hidden',
+          backgroundColor: '#fff', marginBottom: 'var(--workspace-space-8)',
         }}>
           {fixedDocs.map((doc, idx) => (
             <div
               key={doc.uuid}
               style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
                 borderBottom: idx < fixedDocs.length - 1 ? '1px solid #f3f4f6' : 'none',
                 fontSize: 'var(--workspace-font-control)',
                 backgroundColor: doc.missing ? '#fef2f2' : undefined,
@@ -151,7 +151,7 @@ export function FixedDocumentsZone({
                   type="button"
                   onClick={() => onRemoveDoc(doc.uuid)}
                   style={{
-                    background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                    background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)',
                     color: '#6b7280', display: 'flex',
                   }}
                   aria-label={doc.missing ? `Remove deleted document ${doc.title}` : `Remove ${doc.title}`}
@@ -170,7 +170,7 @@ export function FixedDocumentsZone({
 
       {!readOnly && (
         <>
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-8)' }}>
             <button
               type="button"
               onClick={() => { if (!uploading) setShowPicker(true) }}
@@ -231,14 +231,14 @@ export function FixedDocumentsZone({
             }}
             style={{
               border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
-              borderRadius: 8, padding: '16px', textAlign: 'center',
+              borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-16)", textAlign: 'center',
               color: '#6b7280', fontSize: 'var(--workspace-font-meta)',
               backgroundColor: dragOver ? '#fefce8' : '#fff',
               transition: 'all 0.15s ease',
             }}
           >
             {uploading ? (
-              <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--workspace-space-6)' }}>
                 <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
                 Uploading {uploadingName}…
               </div>
@@ -260,9 +260,9 @@ export function FixedDocumentsZone({
             await onAddDocs(docs)
           }}
           style={{
-            marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
-            borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
+            marginTop: 'var(--workspace-space-8)', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+            padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+            borderRadius: 'var(--workspace-radius-small)', border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
             color: '#1d4ed8', cursor: 'pointer',
           }}
         >

@@ -64,9 +64,9 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         aria-label="Add URLs"
         style={{
           width: 480, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh',
-          backgroundColor: 'var(--workspace-canvas)', borderRadius: 12,
-          border: '1px solid var(--workspace-border)', padding: 16,
-          display: 'flex', flexDirection: 'column', gap: 16,
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 'var(--workspace-radius-large)',
+          border: '1px solid var(--workspace-border)', padding: 'var(--workspace-space-16)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)',
           overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
@@ -77,12 +77,12 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
             onClick={onClose}
             aria-label="Close"
             disabled={submitted}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', display: 'flex' }}
           >
             <X size={18} style={{ color: 'var(--workspace-muted)' }} />
           </button>
         </div>
-        <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           Paste one website URL per line; addresses without a scheme use https://. Adding queues retrieval; each source becomes usable after its text is indexed. Existing URLs are skipped; use Refresh on their source rows to fetch them again.
         </div>
@@ -94,15 +94,15 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           placeholder={'https://example.com/page1\nhttps://example.com/page2'}
           rows={8}
           style={{
-            width: '100%', padding: 12, fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+            width: '100%', padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
             backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
-            border: '1px solid var(--workspace-border)', borderRadius: 8,
+            border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
             resize: 'vertical', minHeight: 120, flexShrink: 0,
           }}
         />
 
         {/* Crawl toggle */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
           <input
             type="checkbox"
             disabled={submitted}
@@ -114,11 +114,11 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         </label>
 
         {crawlEnabled && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', paddingLeft: 'var(--workspace-space-4)' }}>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
               The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <label htmlFor="add-urls-max-pages" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', minWidth: 80 }}>Max pages</label>
               <input
                 id="add-urls-max-pages"
@@ -129,13 +129,13 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 min={1}
                 max={50}
                 style={{
-                  width: 72, padding: '6px 8px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+                  width: 72, padding: "var(--workspace-space-6) var(--workspace-space-8)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                   backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
-                  border: '1px solid var(--workspace-border)', borderRadius: 6,
+                  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
                 }}
               />
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>Allowed domains (optional)</label>
               <input
                 id="add-urls-allowed-domains"
@@ -145,9 +145,9 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 onChange={e => setAllowedDomains(e.target.value)}
                 placeholder="example.com, example.com/section"
                 style={{
-                  width: '100%', padding: '6px 8px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+                  width: '100%', padding: "var(--workspace-space-6) var(--workspace-space-8)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
                   backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)',
-                  border: '1px solid var(--workspace-border)', borderRadius: 6,
+                  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
                 }}
               />
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
@@ -160,14 +160,14 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
 
         </div>
         {error && <div role="alert" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-danger)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{error}</div>}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)', flexShrink: 0 }}>
           <button
             onClick={onClose}
             disabled={submitted}
             style={{
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
               color: 'var(--workspace-text)', backgroundColor: 'transparent',
-              border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
+              border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             Cancel
@@ -176,9 +176,9 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
             onClick={handleSubmit}
             disabled={!text.trim() || submitted}
             style={{
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 6,
+              border: 'none', borderRadius: 'var(--workspace-radius-small)',
               cursor: text.trim() && !submitted ? 'pointer' : 'default',
               opacity: text.trim() && !submitted ? 1 : 0.5,
             }}

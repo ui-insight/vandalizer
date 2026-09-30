@@ -23,13 +23,13 @@ function relativeAge(iso: string): string {
 function MemoryGroup({ heading, items }: { heading: string; items: MemoryItem[] }) {
   if (!items.length) return null
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: '#9ca3af', marginBottom: 4 }}>
+    <div style={{ marginBottom: 'var(--workspace-space-12)' }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.4, color: '#9ca3af', marginBottom: 'var(--workspace-space-4)' }}>
         {heading}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
         {items.map((item, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontSize: 'var(--workspace-font-meta)' }}>
+          <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)' }}>
             <span style={{ color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
               {item.title}
             </span>
@@ -117,16 +117,16 @@ export function MemoryPanel() {
           style={{ bottom: 'calc(100% + 8px)', width: 320, borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
           onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid #f3f4f6' }}>
+          <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", borderBottom: '1px solid #f3f4f6' }}>
             <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1f2937' }}>What the assistant remembers</div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 2 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#9ca3af', marginTop: 'var(--workspace-space-2)' }}>
               Habits it references to tailor suggestions. Scoped to your current team.
             </div>
           </div>
 
-          <div style={{ padding: '12px 14px', maxHeight: 320, overflowY: 'auto' }}>
+          <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", maxHeight: 320, overflowY: 'auto' }}>
             {loading ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', padding: '8px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-8) 0" }}>
                 <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> Loading&hellip;
               </div>
             ) : isEmpty ? (
@@ -144,14 +144,14 @@ export function MemoryPanel() {
           </div>
 
           {!isEmpty && !loading && memory && (
-            <div style={{ padding: '10px 14px', borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
+            <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", borderTop: '1px solid #f3f4f6', display: 'flex', justifyContent: 'flex-end' }}>
               <button
                 onClick={handleClear}
                 disabled={clearing}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  fontSize: 'var(--workspace-font-meta)', fontWeight: 500, padding: '5px 12px',
-                  borderRadius: 8, border: '1px solid #fecaca',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  fontSize: 'var(--workspace-font-meta)', fontWeight: 500, padding: "var(--workspace-space-6) var(--workspace-space-12)",
+                  borderRadius: 'var(--workspace-radius-medium)', border: '1px solid #fecaca',
                   background: '#fff', color: '#b91c1c',
                   cursor: clearing ? 'default' : 'pointer', opacity: clearing ? 0.6 : 1,
                 }}

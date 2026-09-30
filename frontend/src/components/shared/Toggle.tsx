@@ -15,16 +15,16 @@ export function Toggle({ label, description, checked, onChange, disabled = false
       onClick={() => !disabled && onChange?.(!checked)}
       disabled={disabled}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 10,
-        padding: '8px 10px', width: '100%', textAlign: 'left',
+        display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+        padding: "var(--workspace-space-8) var(--workspace-space-12)", width: '100%', textAlign: 'left',
         backgroundColor: checked && !disabled ? 'var(--workspace-selected)' : 'transparent',
         border: '1px solid ' + (checked && !disabled ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
-        borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
-        opacity: disabled ? 0.5 : 1, marginBottom: 6, fontFamily: 'inherit', color: 'var(--workspace-text)',
+        borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1, marginBottom: 'var(--workspace-space-6)', fontFamily: 'inherit', color: 'var(--workspace-text)',
       }}
     >
       <span style={{
-        width: 16, height: 16, borderRadius: 4, marginTop: 2,
+        width: 16, height: 16, borderRadius: 'var(--workspace-radius-small)', marginTop: 'var(--workspace-space-2)',
         background: checked ? 'var(--highlight-color, #eab308)' : 'transparent',
         border: '1.5px solid ' + (checked ? 'var(--workspace-accent-ink)' : 'var(--workspace-border)'),
         flexShrink: 0,
@@ -34,7 +34,7 @@ export function Toggle({ label, description, checked, onChange, disabled = false
       </span>
       <div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}>{label}</div>
-        {description && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{description}</div>}
+        {description && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>{description}</div>}
       </div>
     </button>
   )

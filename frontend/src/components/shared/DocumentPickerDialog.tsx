@@ -71,16 +71,16 @@ export function DocumentPickerDialog({
     }}>
       <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div role="dialog" aria-modal="true" aria-label={title} style={{
-        backgroundColor: '#fff', borderRadius: 12, width: 480, maxHeight: '70vh',
-        display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+        backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)', width: 480, maxHeight: '70vh',
+        display: 'flex', flexDirection: 'column', boxShadow: 'var(--workspace-shadow-dialog)',
       }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)", display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>{title}</span>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
+          <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
+        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)" }}>
           <div style={{ position: 'relative' }}>
             <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
@@ -90,25 +90,25 @@ export function DocumentPickerDialog({
               placeholder="Search documents..."
               style={{
                 width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
+                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12) var(--workspace-space-8) var(--workspace-space-32)",
                 boxSizing: 'border-box',
               }}
             />
           </div>
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px', minHeight: 200, maxHeight: 400 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-20)", minHeight: 200, maxHeight: 400 }}>
           {searching ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
               <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite', display: 'inline-block' }} />
             </div>
           ) : searchResults.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
+            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
               {query ? 'No documents found.' : 'Type to search documents...'}
             </div>
           ) : (
             searchResults.map(doc => (
               <label key={doc.uuid} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) 0",
                 borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
               }}>
                 <input
@@ -124,12 +124,12 @@ export function DocumentPickerDialog({
             ))
           )}
         </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: "1px solid var(--workspace-border)", display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
           <button
             onClick={onClose}
             style={{
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
+              borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
               color: '#374151', cursor: 'pointer',
             }}
           >
@@ -139,8 +139,8 @@ export function DocumentPickerDialog({
             onClick={handleAdd}
             disabled={selected.size === 0}
             style={{
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 6, border: 'none',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 'var(--workspace-radius-small)', border: 'none',
               backgroundColor: selected.size > 0 ? 'var(--color-panel-dark)' : '#e5e7eb',
               color: selected.size > 0 ? '#fff' : '#6b7280',
               cursor: selected.size > 0 ? 'pointer' : 'not-allowed',

@@ -268,11 +268,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
   return (
     <div
       style={{
-        marginTop: 12,
-        padding: 12,
+        marginTop: 'var(--workspace-space-12)',
+        padding: 'var(--workspace-space-12)',
         backgroundColor: 'var(--workspace-surface)',
         border: '1px solid var(--workspace-border)',
-        borderRadius: 8,
+        borderRadius: 'var(--workspace-radius-medium)',
       }}
     >
       {/* Header — doubles as the collapse toggle when the parent controls it */}
@@ -282,7 +282,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
         aria-expanded={onToggleCollapsed ? !collapsed : undefined}
         disabled={!onToggleCollapsed}
         style={{
-          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', width: '100%',
           marginBottom: collapsed ? 0 : 10, padding: 0,
           background: 'transparent', border: 'none', fontFamily: 'inherit',
           cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left',
@@ -301,8 +301,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
             aria-live="polite"
             title={tooltip}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-medium)',
               color: scoreColor, backgroundColor: 'var(--workspace-canvas)',
               border: `1px solid color-mix(in srgb, ${scoreColor} 20.0%, transparent)`,
             }}
@@ -348,14 +348,14 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
           know what each tab is for without clicking through. */}
       <div
         style={{
-          fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5,
+          fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5,
         }}
       >
         Add test questions, check answer quality, then compare retrieval settings if needed.
       </div>
 
       {/* Tabs */}
-      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, flexWrap: 'wrap', borderBottom: '1px solid var(--workspace-border)', marginBottom: 10 }}>
+      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 'var(--workspace-space-2)', flexWrap: 'wrap', borderBottom: '1px solid var(--workspace-border)', marginBottom: 'var(--workspace-space-12)' }}>
         {TAB_LABELS.map((t, idx) => {
           const active = tab === t.id
           const Icon = t.icon
@@ -373,11 +373,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
               onClick={() => selectTab(t.id)}
               style={{
                 fontFamily: 'inherit',
-                display: 'inline-flex', alignItems: 'center', gap: 5,
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                 background: 'transparent',
                 color: active ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                 border: 'none',
-                padding: '6px 12px',
+                padding: "var(--workspace-space-6) var(--workspace-space-12)",
                 fontSize: 'var(--workspace-font-meta)',
                 fontWeight: 600,
                 cursor: 'pointer',
@@ -395,16 +395,16 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, kbHasSources = t
       </div>
 
       {tab !== 'run' && progress && (
-        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: '10px 0', fontSize: 'var(--workspace-font-control)', color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} style={{ padding: "var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-control)', color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', lineHeight: 1.6 }}>
           <div>{progress.message}</div>
           {progress.delayed && <div>This check is taking longer than usual; it remains active.</div>}
-          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 8, padding: '7px 12px', color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}
+          {running && <button type="button" onClick={retryValidation} style={{ display: 'block', marginTop: 'var(--workspace-space-8)', padding: "7px var(--workspace-space-12)", color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer' }}>Check status / reconnect</button>}
         </div>
       )}
       {/* Tab content */}
       <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
       {loading ? (
-        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: 'var(--workspace-muted)' }}>
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
           <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
           <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
         </div>

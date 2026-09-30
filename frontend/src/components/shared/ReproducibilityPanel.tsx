@@ -90,14 +90,14 @@ export function ReproducibilityPanel({ run }: Props) {
   return (
     <div style={{
       backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       overflow: 'hidden',
     }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8, width: '100%',
-          padding: '10px 14px', background: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', width: '100%',
+          padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'transparent', border: 'none',
           fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
@@ -112,20 +112,20 @@ export function ReproducibilityPanel({ run }: Props) {
 
       {open && (
         <div style={{
-          padding: '4px 14px 14px 14px',
+          padding: "var(--workspace-space-4) var(--workspace-space-16) var(--workspace-space-16) var(--workspace-space-16)",
           display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))',
-          gap: 8,
+          gap: 'var(--workspace-space-8)',
         }}>
           {rows.map(r => (
             <div
               key={r.label}
               title={r.title}
               style={{
-                padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
+                padding: "var(--workspace-space-6) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
               }}
             >
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 2, wordBreak: 'break-word' }}>{r.value}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 'var(--workspace-space-2)', wordBreak: 'break-word' }}>{r.value}</div>
             </div>
           ))}
         </div>

@@ -22,7 +22,7 @@ export function EvalSetCompositionStrip({
     // Older runs without a snapshot — fall back to bare query count.
     if (fallbackQueryCount == null) return null
     return (
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap' }}>
         <Chip label={`${fallbackQueryCount} ${fallbackQueryCount === 1 ? 'query' : 'queries'}`} tone="neutral" />
         <Chip label="no composition snapshot" tone="warn" title="This run pre-dates eval-set snapshots, so composition info is unavailable." />
       </div>
@@ -47,7 +47,7 @@ export function EvalSetCompositionStrip({
 
   return (
     <div style={{
-      display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center',
+      display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap', alignItems: 'center',
     }}>
       <Chip
         label={`${total} ${total === 1 ? 'query' : 'queries'}`}
@@ -80,7 +80,7 @@ export function EvalSetCompositionStrip({
         />
       )}
       {variant === 'expanded' && categoryCount > 0 && (
-        <div style={{ flexBasis: '100%', marginTop: 4, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ flexBasis: '100%', marginTop: 'var(--workspace-space-4)', display: 'flex', gap: 'var(--workspace-space-4)', flexWrap: 'wrap' }}>
           {Object.entries(snapshot.categories || {}).map(([cat, count]) => (
             <SubChip key={cat} label={`${cat} · ${count}`} />
           ))}
@@ -107,7 +107,7 @@ function Chip({ label, tone, title }: { label: string; tone: ChipTone; title?: s
       style={{
         display: 'inline-flex', alignItems: 'center',
         fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-        padding: '2px 8px', borderRadius: 6,
+        padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
         color: c.fg, backgroundColor: c.bg,
         border: `1px solid ${c.border}`,
         whiteSpace: 'nowrap',
@@ -122,7 +122,7 @@ function SubChip({ label }: { label: string }) {
   return (
     <span style={{
       fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
-      padding: '1px 6px', borderRadius: 4,
+      padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
       backgroundColor: 'var(--workspace-canvas)',
       border: '1px solid var(--workspace-border)',
     }}>{label}</span>

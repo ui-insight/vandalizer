@@ -115,12 +115,12 @@ export function VerificationNavBar({
         bottom: 12,
         left: 0,
         right: 0,
-        margin: '0 24px',
+        margin: "0 var(--workspace-space-24)",
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
-        padding: 10,
-        borderRadius: 12,
+        gap: 'var(--workspace-space-6)',
+        padding: 'var(--workspace-space-12)',
+        borderRadius: 'var(--workspace-radius-large)',
         border: '1px solid #fde68a',
         backdropFilter: 'blur(12px)',
         backgroundColor: 'rgba(255,251,235,0.95)',
@@ -129,7 +129,7 @@ export function VerificationNavBar({
       }}
     >
       {/* Progress row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         <span style={{ fontWeight: 600, color: '#92400e' }}>
           Verifying: {session.label || session.document_title}
         </span>
@@ -153,9 +153,9 @@ export function VerificationNavBar({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
-          padding: '6px 8px',
-          borderRadius: 8,
+          gap: 'var(--workspace-space-8)',
+          padding: "var(--workspace-space-6) var(--workspace-space-8)",
+          borderRadius: 'var(--workspace-radius-medium)',
           background: '#fff',
           border: '1px solid #fef3c7',
           fontSize: 'var(--workspace-font-control)',
@@ -174,7 +174,7 @@ export function VerificationNavBar({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: '#9ca3af', fontSize: 'var(--workspace-font-meta)', fontWeight: 500 }}>
             {current.key}
-            <span style={{ marginLeft: 8, color: currentStatus.color }}>
+            <span style={{ marginLeft: 'var(--workspace-space-8)', color: currentStatus.color }}>
               · {currentStatus.text}
             </span>
           </div>
@@ -193,9 +193,9 @@ export function VerificationNavBar({
               }}
               style={{
                 width: '100%',
-                padding: '3px 6px',
+                padding: "var(--workspace-space-4) var(--workspace-space-6)",
                 border: '1px solid #3b82f6',
-                borderRadius: 4,
+                borderRadius: 'var(--workspace-radius-small)',
                 fontSize: 'var(--workspace-font-control)',
                 outline: 'none',
               }}
@@ -213,7 +213,7 @@ export function VerificationNavBar({
             >
               {current.expected && current.status === 'corrected' ? (
                 <>
-                  <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 6 }}>
+                  <span style={{ textDecoration: 'line-through', color: '#9ca3af', marginRight: 'var(--workspace-space-6)' }}>
                     {current.extracted}
                   </span>
                   <span>{current.expected}</span>
@@ -237,7 +237,7 @@ export function VerificationNavBar({
       </div>
 
       {/* Action row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
         {!editing && (
           <>
             <button
@@ -332,18 +332,18 @@ const navBtn: React.CSSProperties = {
   background: 'transparent',
   cursor: 'pointer',
   color: '#6b7280',
-  borderRadius: 4,
+  borderRadius: 'var(--workspace-radius-small)',
 }
 
 const actionBtn: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
-  gap: 4,
-  padding: '5px 10px',
-  border: '1px solid #d1d5db',
+  gap: 'var(--workspace-space-4)',
+  padding: "var(--workspace-space-6) var(--workspace-space-12)",
+  border: "1px solid var(--workspace-border)",
   background: '#fff',
   color: '#374151',
-  borderRadius: 6,
+  borderRadius: 'var(--workspace-radius-small)',
   fontSize: 'var(--workspace-font-meta)',
   fontWeight: 500,
   cursor: 'pointer',

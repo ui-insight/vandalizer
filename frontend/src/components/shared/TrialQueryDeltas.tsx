@@ -52,8 +52,8 @@ export function TrialQueryDeltas({
   if (!optimized || optimized.length === 0) {
     return (
       <div style={{
-        padding: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
-        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 8,
+        padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+        backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       }}>
         Per-query data isn't available for this run.
       </div>
@@ -66,10 +66,10 @@ export function TrialQueryDeltas({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>
           {title} ({rows.length})
         </span>
@@ -80,7 +80,7 @@ export function TrialQueryDeltas({
           onChange={e => setSortKey(e.target.value as SortKey)}
           style={{
             background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-            borderRadius: 4, padding: '4px 6px', fontSize: 'var(--workspace-font-meta)', minHeight: 36, maxWidth: '100%', fontFamily: 'inherit',
+            borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", fontSize: 'var(--workspace-font-meta)', minHeight: 'var(--workspace-control-height)', maxWidth: '100%', fontFamily: 'inherit',
           }}
         >
           <option value="delta-desc">Biggest wins</option>
@@ -91,7 +91,7 @@ export function TrialQueryDeltas({
       </div>
 
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 3,
+        display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
         maxHeight: 360, overflowY: 'auto',
       }}>
         {rows.map(({ optimized: o, baseline: b, delta }) => (
@@ -138,11 +138,11 @@ function Row({
       onClick={onOpen}
       style={{
         display: 'flex', flexDirection: 'column',
-        gap: 6, padding: '6px 8px',
+        gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-8)",
         fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
         backgroundColor: 'var(--workspace-canvas)',
         border: '1px solid var(--workspace-border)',
-        borderRadius: 4, cursor: 'pointer',
+        borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
         textAlign: 'left', fontFamily: 'inherit',
       }}
       onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--workspace-border)')}
@@ -152,7 +152,7 @@ function Row({
       <span style={{ overflowWrap: 'anywhere', lineHeight: 1.5, color: 'var(--workspace-text)' }}>
         {optimized.query}
       </span>
-      <span style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+      <span style={{ display: 'flex', flexWrap: 'wrap', gap: "var(--workspace-space-6) var(--workspace-space-16)" }}>
       <span style={{ color: bScore != null ? scoreColor(bScore) : 'var(--workspace-muted)' }}>
         Default:
         {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '-'}
@@ -162,7 +162,7 @@ function Row({
       </span>
       <span style={{
         textAlign: 'right', color: deltaColor, fontWeight: 600,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 'var(--workspace-space-2)',
       }}>
         Change: {deltaPts == null ? 'Not available' : (
           <>

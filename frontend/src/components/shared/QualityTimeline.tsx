@@ -138,7 +138,7 @@ export function QualityTimeline({
 
   if (loading) {
     return (
-      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: 'var(--workspace-muted)' }}>
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 'var(--workspace-space-24)', color: 'var(--workspace-muted)' }}>
         <Loader2 size={18} aria-hidden="true" style={{ animation: 'spin 1s linear infinite' }} />
         <span style={{
           position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
@@ -151,8 +151,8 @@ export function QualityTimeline({
   }
 
   const recovery = error && (
-    <div role="alert" style={{ padding: 12, marginBottom: 12, border: '1px solid #835b32', borderRadius: 6, color: 'var(--workspace-warning)', fontSize: 'var(--workspace-font-control)' }}>
-      <p style={{ margin: '0 0 8px' }}>{items.length ? 'History could not refresh. Previously loaded runs are still shown.' : 'History could not load. Your saved runs have not been changed.'}</p>
+    <div role="alert" style={{ padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', border: '1px solid #835b32', borderRadius: 'var(--workspace-radius-small)', color: 'var(--workspace-warning)', fontSize: 'var(--workspace-font-control)' }}>
+      <p style={{ margin: "0 0 var(--workspace-space-8)" }}>{items.length ? 'History could not refresh. Previously loaded runs are still shown.' : 'History could not load. Your saved runs have not been changed.'}</p>
       <button type="button" onClick={() => setRetryKey(k => k + 1)} style={actionStyle}>Retry history</button>
     </div>
   )
@@ -163,7 +163,7 @@ export function QualityTimeline({
     // absence, in the register of the "No prior optimization runs" note, and
     // leave the pitch to the Validate tab.
     return (
-      <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '12px 8px', lineHeight: 1.6 }}>
+      <div role="status" aria-live="polite" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-12) var(--workspace-space-8)", lineHeight: 1.6 }}>
         No validation runs yet for this {itemKindLabel}. {blockedReason}
       </div>
     )
@@ -172,17 +172,17 @@ export function QualityTimeline({
   if (items.length === 0) {
     return (
       <div role="status" aria-live="polite" style={{
-        padding: 20, margin: '12px 0',
+        padding: 'var(--workspace-space-20)', margin: "var(--workspace-space-12) 0",
         background: 'var(--workspace-canvas)',
-        border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
+        border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 'var(--workspace-radius-medium)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
           <Sparkles size={16} style={{ color: 'var(--workspace-info)' }} />
           <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)', fontWeight: 600 }}>
             No quality history yet for this {itemKindLabel}
           </h3>
         </div>
-        <p style={{ margin: '0 0 14px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
+        <p style={{ margin: "0 0 var(--workspace-space-16) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
           Each Validate &amp; improve run records a quality score here so you can
           watch {itemKindPluralLabel} improve over time. Nothing is mutated until
           you choose to apply a winning configuration.
@@ -192,11 +192,11 @@ export function QualityTimeline({
             type="button"
             onClick={onSwitchToAutovalidate}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)',
               background: 'var(--highlight-color, #eab308)',
-              border: '1px solid var(--workspace-accent-ink)', borderRadius: 6, cursor: 'pointer',
+              border: '1px solid var(--workspace-accent-ink)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
             }}
           >
             <Sparkles size={12} />
@@ -232,7 +232,7 @@ export function QualityTimeline({
     <div>
       {recovery}
       <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6 }}>Compare runs with the same test set, scoring mode, and grader. Selected-question checks do not update the quality score.</p>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-8)' }}>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Last {ordered.length} runs
         </div>
@@ -241,7 +241,7 @@ export function QualityTimeline({
             title={`Judge model changed across this window: ${[...judgeModels].join(', ')}`}
             style={{
               fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-              padding: '1px 6px', borderRadius: 4,
+              padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
               color: 'var(--workspace-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)',
               border: '1px solid rgba(245, 158, 11, 0.3)',
             }}
@@ -254,7 +254,7 @@ export function QualityTimeline({
             title={`Model under test changed across this window: ${[...taskModels].join(', ')} — score changes may reflect the model swap, not the content`}
             style={{
               fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-              padding: '1px 6px', borderRadius: 4,
+              padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
               color: 'var(--workspace-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)',
               border: '1px solid rgba(245, 158, 11, 0.3)',
             }}
@@ -264,9 +264,9 @@ export function QualityTimeline({
         )}
       </div>
       <div style={{
-        display: 'flex', alignItems: 'flex-end', gap: 2,
-        height: 80, padding: 8, backgroundColor: 'var(--workspace-canvas)',
-        border: '1px solid var(--workspace-border)', borderRadius: 6, marginBottom: 12,
+        display: 'flex', alignItems: 'flex-end', gap: 'var(--workspace-space-2)',
+        height: 80, padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)',
+        border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', marginBottom: 'var(--workspace-space-12)',
         position: 'relative',
       }}>
         {ordered.map((it, i) => {
@@ -340,7 +340,7 @@ export function QualityTimeline({
           )
         })}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
         {items.map((it, i) => (
           <Row
             key={it.uuid || i}
@@ -357,8 +357,8 @@ export function QualityTimeline({
 }
 
 const actionStyle = {
-  fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '7px 10px',
-  borderRadius: 5, color: '#d5eaff', background: '#253447', border: '1px solid #52657e', cursor: 'pointer',
+  fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "7px var(--workspace-space-12)",
+  borderRadius: 'var(--workspace-radius-small)', color: '#d5eaff', background: '#253447', border: '1px solid #52657e', cursor: 'pointer',
 } as const
 
 function Row({ item, setChanged = false, sampleNoun, onExportRun, onOpenRun }: {
@@ -376,13 +376,13 @@ function Row({ item, setChanged = false, sampleNoun, onExportRun, onOpenRun }: {
   const date = item.created_at ? new Date(item.created_at).toLocaleString() : 'Date not recorded'
   return (
     <article aria-label={`Validation run ${date}${item.uuid ? ` · ${item.uuid}` : ''}`} style={{
-      padding: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-surface)', border: '1px solid #393939', borderRadius: 6, overflowWrap: 'anywhere',
+      padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-surface)', border: '1px solid #393939', borderRadius: 'var(--workspace-radius-small)', overflowWrap: 'anywhere',
     }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', justifyContent: 'space-between' }}>
         <strong style={{ color: 'var(--workspace-text)' }}>{date}</strong>
         <strong style={{ color: 'var(--workspace-text)' }}>{item.score == null ? 'Score unavailable' : `${item.score.toFixed(0)}%`}</strong>
       </div>
-      <div style={{ marginTop: 6, lineHeight: 1.7 }}>
+      <div style={{ marginTop: 'var(--workspace-space-6)', lineHeight: 1.7 }}>
         <div>{source}{isSmoke && <> · {item.query_selection ? `${item.query_selection.selected} of ${item.query_selection.total} ${sampleNoun} · ` : ''}Does not update quality score</>}</div>
         <div>{nq == null ? 'Sample size not recorded' : `${nq} ${sampleNoun}`} · Mode: {item.mode || 'not recorded'}</div>
         <div>Grader: {item.judge_model || 'not recorded'}{item.model && <> · Answer model: {item.model}</>}</div>
@@ -393,7 +393,7 @@ function Row({ item, setChanged = false, sampleNoun, onExportRun, onOpenRun }: {
         {sigmaPts > 0 && <div>95% noise-floor band: ±{(sigmaPts * 1.96).toFixed(1)} points{item.judge_variance_meta?.n ? ` (estimated from ${item.judge_variance_meta.n} samples)` : ''}</div>}
         {item.uuid && <div style={{ color: 'var(--workspace-muted)' }}>Run: <code>{item.uuid}</code></div>}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginTop: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--workspace-space-8)', alignItems: 'center', marginTop: 'var(--workspace-space-8)' }}>
         {onOpenRun && <button type="button" style={actionStyle} onClick={() => onOpenRun(item)}>Open results</button>}
         {onExportRun && item.uuid && !isApply && <RowExportMenu onExport={format => onExportRun(item.uuid!, format)} />}
       </div>
@@ -433,7 +433,7 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
       onClick={() => void run(format)}
       style={{
         fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-        padding: '7px 10px', borderRadius: 4,
+        padding: "7px var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
         color: busy ? 'var(--workspace-muted)' : 'var(--workspace-info)', background: 'transparent',
         border: '1px solid #2e3a52', cursor: busy ? 'wait' : 'pointer',
       }}
@@ -443,7 +443,7 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
   )
 
   return (
-    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, maxWidth: '100%' }}>
+    <span style={{ display: 'inline-flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', maxWidth: '100%' }}>
       {error && <span role="alert" style={{ color: 'var(--workspace-danger)', flexBasis: '100%' }}>Export failed. Choose a format to retry.</span>}
       {busy && <span role="status">Preparing download…</span>}
       {open && (
@@ -464,7 +464,7 @@ function RowExportMenu({ onExport }: { onExport: (format: QualityRunExportFormat
         onClick={() => setOpen(o => !o)}
         style={{
           display: 'inline-flex', alignItems: 'center',
-          gap: 6, padding: '7px 10px', fontSize: 'var(--workspace-font-meta)', background: 'transparent', border: 'none',
+          gap: 'var(--workspace-space-6)', padding: "7px var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', background: 'transparent', border: 'none',
           color: open ? 'var(--workspace-info)' : 'var(--workspace-muted)', cursor: 'pointer',
         }}
       >

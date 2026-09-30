@@ -128,10 +128,10 @@ export function QualityComparisonCard({
 
   return (
     <div style={{
-      padding: 16, backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <CheckCircle2 size={16} style={{ color: 'var(--workspace-success)' }} />
         <h3 style={{ margin: 0, fontSize: 'var(--workspace-font-body)', color: 'var(--workspace-text)' }}>{title}</h3>
         {scoreFormulaHint && (
@@ -167,8 +167,8 @@ export function QualityComparisonCard({
 
       {ciExpanded && (
         <div style={{
-          marginBottom: 12, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
-          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          marginBottom: 'var(--workspace-space-12)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           {liftCI ? (
             <>
@@ -195,10 +195,10 @@ export function QualityComparisonCard({
       )}
 
       {topSlot && (
-        <div style={{ marginBottom: 12 }}>{topSlot}</div>
+        <div style={{ marginBottom: 'var(--workspace-space-12)' }}>{topSlot}</div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
         {baselines.map(b => (
           <BarRow
             key={b.id}
@@ -211,31 +211,31 @@ export function QualityComparisonCard({
       </div>
 
       {measurementNote && (
-        <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
           {measurementNote}
         </div>
       )}
 
       {liftVsDefault != null && (
         <div style={{
-          marginTop: 14, padding: '10px 12px',
+          marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
           backgroundColor: liftIsNoise
             ? (nTooSmall ? 'rgba(120, 120, 120, 0.10)' : 'rgba(245, 158, 11, 0.08)')
             : liftVsDefault > 0 ? 'rgba(34, 197, 94, 0.08)' : 'rgba(239, 68, 68, 0.08)',
           border: '1px solid ' + (liftIsNoise
             ? (nTooSmall ? 'rgba(160, 160, 160, 0.30)' : 'rgba(245, 158, 11, 0.3)')
             : liftVsDefault > 0 ? 'rgba(34, 197, 94, 0.25)' : 'rgba(239, 68, 68, 0.25)'),
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
         }}>
           {liftIsNoise ? (
             <>
               <div style={{
                 fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: nTooSmall ? 'var(--workspace-muted)' : 'var(--workspace-warning)',
-                display: 'flex', alignItems: 'center', gap: 6,
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
               }}>
                 {nTooSmall ? 'Not enough queries for a significance call' : '⚠ No significant change'}
               </div>
-              <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
+              <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
                 {liftCI && nTooSmall
                   ? `Only n=${liftCI.n_queries} paired ${liftCI.n_queries === 1 ? 'query was' : 'queries were'} available for the statistical test — at least ${MIN_N_FOR_SIGNIFICANCE} are needed for a reliable call. The bars are real measurements, but we can't yet tell how much of the difference would repeat on new questions. Add more test queries and re-run for a trustworthy verdict.`
                   : liftCI
@@ -247,7 +247,7 @@ export function QualityComparisonCard({
               </div>
             </>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
               <span style={{
                 fontSize: 'var(--workspace-font-section-title)', fontWeight: 700,
                 color: liftVsDefault > 0 ? 'var(--workspace-success)' : 'var(--workspace-danger)',
@@ -270,7 +270,7 @@ export function QualityComparisonCard({
       )}
 
       {bottomSlot && (
-        <div style={{ marginTop: 12 }}>{bottomSlot}</div>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>{bottomSlot}</div>
       )}
     </div>
   )
@@ -314,7 +314,7 @@ function SignificanceBadge({
       title={tip}
       style={{
         marginLeft: 'auto', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-        padding: '2px 8px', borderRadius: 999, cursor: 'help',
+        padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 999, cursor: 'help',
         backgroundColor: bg, border: '1px solid ' + border, color,
       }}
     >

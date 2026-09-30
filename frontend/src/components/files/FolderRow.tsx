@@ -76,7 +76,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         {onToggleSelect && (
           <label
             className="flex items-center cursor-pointer"
-            style={{ padding: '12px 4px 12px 15px' }}
+            style={{ padding: "var(--workspace-space-12) var(--workspace-space-4) var(--workspace-space-12) 15px" }}
           >
             <input
               type="checkbox"
@@ -90,7 +90,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       </td>
 
       {/* Name + icon */}
-      <td style={{ padding: '12px 15px' }}>
+      <td style={{ padding: "var(--workspace-space-12) 15px" }}>
         <div className="folder-name-layout flex items-center min-w-0">
           {isTeam ? (
             <Users className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
@@ -99,8 +99,8 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           )}
           <span className="file-name"
             style={{
-              paddingRight: 10,
-              paddingLeft: 5,
+              paddingRight: 'var(--workspace-space-12)',
+              paddingLeft: 'var(--workspace-space-6)',
               fontWeight: 450,
               color: '#17181abb',
               overflow: 'hidden',
@@ -114,18 +114,18 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           </span>
           {isTeam && (
             <span className="shrink-0" style={{
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
               color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
-              marginLeft: 6, whiteSpace: 'nowrap',
+              marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap',
             }}>
               Team
             </span>
           )}
           {isWatched && (
             <span className="shrink-0" style={{
-              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-medium)',
               color: '#1e40af', backgroundColor: 'rgba(37, 99, 235, 0.1)',
-              marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
+              marginLeft: 'var(--workspace-space-6)', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-2)',
             }}>
               <Eye style={{ width: 9, height: 9 }} />
               Watched
@@ -135,7 +135,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       </td>
 
       {/* Modified (empty for folders) — with hover-revealed action overlay */}
-      <td style={{ padding: '12px 15px', position: 'relative' }}>
+      <td style={{ padding: "var(--workspace-space-12) 15px", position: 'relative' }}>
         <div
           onClick={(e) => e.stopPropagation()}
           className="file-row-actions"
@@ -147,9 +147,9 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
             display: 'flex',
             alignItems: 'center',
             background: '#fff',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 999,
-            padding: '2px',
+            padding: "var(--workspace-space-2)",
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           }}
         >

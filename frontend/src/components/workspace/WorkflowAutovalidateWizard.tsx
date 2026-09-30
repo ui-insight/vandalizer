@@ -264,8 +264,8 @@ export function WorkflowAutovalidateWizard({ workflowId, canApply = true, onClos
 function ConceptStep() {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What happens when you run this?</h4>
-      <p style={{ margin: '0 0 10px 0' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What happens when you run this?</h4>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0" }}>
         First we run your workflow as-is and score it against your{' '}
         <TermDef term="test-set">expected outputs</TermDef>. That's your validation score.
         Then we try other ways of running it (each per-step combination of model and
@@ -273,19 +273,19 @@ function ConceptStep() {
         scores best. Another AI, the <TermDef term="judge">judge</TermDef>, grades each
         result so wording differences don't unfairly penalize a good answer.
       </p>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it changes</h4>
-      <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it changes</h4>
+      <ul style={{ margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>Per-step LLM model</li>
         <li>Per-step prompt style (when the step is prompt-driven)</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it doesn't change</h4>
-      <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it doesn't change</h4>
+      <ul style={{ margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>The workflow's structure (steps, order)</li>
         <li>Your expected outputs</li>
         <li>Your live config, until you click Apply</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Caveats</h4>
-      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Caveats</h4>
+      <ul style={{ margin: 0, paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>Costs LLM tokens (you'll set the budget shortly)</li>
         <li>Each trial runs the full workflow once per expected output</li>
       </ul>
@@ -318,17 +318,17 @@ function TestCasesStep({
   if (proposals && proposals.length > 0) {
     return (
       <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+        <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
           {proposals.length} candidate{proposals.length === 1 ? '' : 's'} from past runs
         </h4>
-        <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+        <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
           Pick which ones to keep as expected outputs. Higher confidence = better fit
           based on the workflow's purpose.
         </p>
         <div style={{
-          display: 'flex', flexDirection: 'column', gap: 6,
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)',
           maxHeight: 280, overflowY: 'auto',
-          padding: 8, backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           {proposals.map(p => {
             const checked = selectedSessions.has(p.session_id)
@@ -337,9 +337,9 @@ function TestCasesStep({
               <label
                 key={p.session_id}
                 style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 8,
-                  padding: '8px 10px', backgroundColor: checked ? '#22c55e22' : 'var(--workspace-surface)',
-                  borderRadius: 4, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
+                  display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-12)", backgroundColor: checked ? '#22c55e22' : 'var(--workspace-surface)',
+                  borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
                   cursor: 'pointer',
                 }}
               >
@@ -352,23 +352,23 @@ function TestCasesStep({
                     else next.delete(p.session_id)
                     setSelectedSessions(next)
                   }}
-                  style={{ marginTop: 3 }}
+                  style={{ marginTop: 'var(--workspace-space-4)' }}
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', alignItems: 'center' }}>
                     <input
                       value={label}
                       onChange={e => setLabelEdits({ ...labelEdits, [p.session_id]: e.target.value })}
                       onClick={e => e.stopPropagation()}
                       style={{
                         flex: 1, background: 'var(--workspace-canvas)', color: 'var(--workspace-text)',
-                        border: '1px solid var(--workspace-border)', borderRadius: 4, padding: '3px 6px',
+                        border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)",
                         fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
                       }}
                     />
                     <span style={{
                       fontSize: 'var(--workspace-font-meta)', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
-                      padding: '2px 6px', borderRadius: 4,
+                      padding: "var(--workspace-space-2) var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
                       background: p.confidence >= 0.7 ? '#22c55e33' : p.confidence >= 0.4 ? '#f59e0b33' : '#ef444433',
                       color: p.confidence >= 0.7 ? 'var(--workspace-success)' : p.confidence >= 0.4 ? 'var(--workspace-warning)' : 'var(--workspace-danger)',
                     }}>
@@ -376,7 +376,7 @@ function TestCasesStep({
                     </span>
                   </div>
                   {p.why && (
-                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontStyle: 'italic', marginTop: 3 }}>
+                    <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', fontStyle: 'italic', marginTop: 'var(--workspace-space-4)' }}>
                       {p.why}
                     </div>
                   )}
@@ -385,7 +385,7 @@ function TestCasesStep({
             )
           })}
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)' }}>
           <button
             onClick={() => onAccept(
               [...selectedSessions].map(sid => ({
@@ -395,8 +395,8 @@ function TestCasesStep({
             )}
             disabled={proposing || selectedSessions.size === 0}
             style={{
-              padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-              border: 'none', borderRadius: 6, cursor: proposing || selectedSessions.size === 0 ? 'not-allowed' : 'pointer',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+              border: 'none', borderRadius: 'var(--workspace-radius-small)', cursor: proposing || selectedSessions.size === 0 ? 'not-allowed' : 'pointer',
               background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
               opacity: proposing || selectedSessions.size === 0 ? 0.5 : 1,
             }}
@@ -414,22 +414,22 @@ function TestCasesStep({
   if (expectedOutputs.length === 0) {
     return (
       <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>You don't have expected outputs yet</h4>
-        <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)' }}>
+        <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>You don't have expected outputs yet</h4>
+        <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
           The optimizer scores trial configurations against past results. We'll suggest
           candidates from your run history, or synthesize a seed input you can run first.
         </p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
           <button
             onClick={onPropose}
             disabled={proposing}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-text)',
               background: 'var(--workspace-canvas)',
               border: '1px solid var(--workspace-accent-ink)',
-              borderRadius: 6, cursor: proposing ? 'wait' : 'pointer',
+              borderRadius: 'var(--workspace-radius-small)', cursor: proposing ? 'wait' : 'pointer',
               opacity: proposing ? 0.7 : 1,
             }}
           >
@@ -440,11 +440,11 @@ function TestCasesStep({
             onClick={onSynthesize}
             disabled={synthesizing}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-info)', background: 'transparent',
               border: '1px solid var(--workspace-border)',
-              borderRadius: 6, cursor: synthesizing ? 'wait' : 'pointer',
+              borderRadius: 'var(--workspace-radius-small)', cursor: synthesizing ? 'wait' : 'pointer',
               opacity: synthesizing ? 0.7 : 1,
             }}
           >
@@ -452,7 +452,7 @@ function TestCasesStep({
             Synthesize seed input
           </button>
         </div>
-        <p style={{ marginTop: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+        <p style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Once at least one expected output is saved, the Next button will unlock.
         </p>
       </div>
@@ -464,24 +464,24 @@ function TestCasesStep({
 
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
         {expectedOutputs.length} expected output{expectedOutputs.length === 1 ? '' : 's'} ready
       </h4>
-      <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
         Each trial runs the full workflow against the input that produced these outputs
         and scores the result.
       </p>
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)',
         maxHeight: 200, overflowY: 'auto',
-        padding: 8, backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+        padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
       }}>
         {visible.map((eo, i) => (
           <div key={eo.id} style={{
-            padding: '6px 8px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
+            padding: "var(--workspace-space-6) var(--workspace-space-8)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
           }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', alignItems: 'baseline' }}>
               <span style={{ color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-meta)' }}>{i + 1}.</span>
               <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {eo.label || `Test ${eo.id.slice(0, 8)}`}
@@ -493,19 +493,19 @@ function TestCasesStep({
           </div>
         ))}
         {hidden > 0 && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '4px 8px' }}>…and {hidden} more</div>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-4) var(--workspace-space-8)" }}>…and {hidden} more</div>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)' }}>
         <button
           onClick={onPropose}
           disabled={proposing}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
             color: 'var(--workspace-info)', background: 'transparent',
             border: '1px solid var(--workspace-border)',
-            borderRadius: 6, cursor: proposing ? 'wait' : 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: proposing ? 'wait' : 'pointer',
           }}
         >
           + Suggest more from history
@@ -568,7 +568,7 @@ function AdvancedStep({
 }) {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
       <Toggle
         label="Score by meaning, not exact text (recommended)"
         description="The judge LLM grades each output for content match instead of strict string equality. Costs extra tokens; turn off only for deterministic workflows where you want exact-match scoring."
@@ -584,11 +584,11 @@ function AdvancedStep({
         />
       )}
       <div style={{
-        marginTop: 16, padding: '10px 12px',
+        marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
-        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
+        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-small)',
       }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)' }}>
           Ready to tune
         </div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>

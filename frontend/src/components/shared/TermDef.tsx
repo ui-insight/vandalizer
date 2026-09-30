@@ -180,10 +180,10 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
             visibility: pos ? 'visible' : 'hidden',
             minWidth: 240,
             maxWidth: 320,
-            padding: '10px 12px',
+            padding: "var(--workspace-space-12) var(--workspace-space-12)",
             background: tipBg,
             border: `1px solid ${tipBorder}`,
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
             boxShadow: isDark
               ? '0 6px 24px rgba(0,0,0,0.4)'
               : '0 6px 24px rgba(0,0,0,0.12)',
@@ -197,7 +197,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
         >
           <div>{def.short}</div>
           {def.example && (
-            <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: tipMeta }}>
+            <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: tipMeta }}>
               {def.example}
             </div>
           )}

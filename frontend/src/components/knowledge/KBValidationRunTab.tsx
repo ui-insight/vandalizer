@@ -100,15 +100,15 @@ export function KBValidationRunTab({
 
   return (
     <div>
-      {!running && <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.6, margin: '0 0 12px' }}>Test questions describe what people should be able to ask this KB. An expected answer gives the grader a reference; expected sources identify where supporting information should come from. Review both before measuring quality.</p>}
+      {!running && <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', lineHeight: 1.6, margin: "0 0 var(--workspace-space-12)" }}>Test questions describe what people should be able to ask this KB. An expected answer gives the grader a reference; expected sources identify where supporting information should come from. Review both before measuring quality.</p>}
       {/* Question set — which questions this run covers */}
       {queries.length > 0 && !running && (
         <div style={{
-          padding: '8px 10px', marginBottom: 10,
-          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
-          display: 'flex', flexDirection: 'column', gap: 8,
+          padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+          backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+          display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)',
         }}>
-          <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 6 }}>
+          <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
             Questions:
             <select
               value={scope}
@@ -134,8 +134,8 @@ export function KBValidationRunTab({
           </label>
 
           {scopeCategories.length > 0 && (
-            <div role="group" aria-label="Categories to include" style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginRight: 2 }}>Categories:</span>
+            <div role="group" aria-label="Categories to include" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginRight: 'var(--workspace-space-2)' }}>Categories:</span>
               {scopeCategories.map(([cat, count]) => {
                 const on = !excluded.has(cat)
                 return (
@@ -148,7 +148,7 @@ export function KBValidationRunTab({
                     title={on ? `Exclude ${cat} questions from this run` : `Include ${cat} questions in this run`}
                     style={{
                       fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-                      padding: '2px 8px', borderRadius: 8, cursor: 'pointer',
+                      padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer',
                       color: on ? 'var(--workspace-text)' : 'var(--workspace-muted)',
                       backgroundColor: on ? 'var(--workspace-info-surface)' : 'transparent',
                       border: `1px solid ${on ? '#3b82f6' : 'var(--workspace-border)'}`,
@@ -182,11 +182,11 @@ export function KBValidationRunTab({
           </div>
           <details>
             <summary style={{ cursor: 'pointer', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Preview selected questions ({n})</summary>
-            <div role="region" aria-label="Selected question preview" tabIndex={0} style={{ maxHeight: 280, overflowY: 'auto', marginTop: 8, padding: 4 }}>
+            <div role="region" aria-label="Selected question preview" tabIndex={0} style={{ maxHeight: 280, overflowY: 'auto', marginTop: 'var(--workspace-space-8)', padding: 'var(--workspace-space-4)' }}>
               <ol style={{ margin: 0, paddingLeft: 22 }}>
-                {selection.questions.slice(0, showAllQuestions ? undefined : 20).map(question => <li key={question.uuid} style={{ padding: '8px 0', borderBottom: '1px solid var(--workspace-border)' }}><QuestionExpectations question={question} /></li>)}
+                {selection.questions.slice(0, showAllQuestions ? undefined : 20).map(question => <li key={question.uuid} style={{ padding: "var(--workspace-space-8) 0", borderBottom: '1px solid var(--workspace-border)' }}><QuestionExpectations question={question} /></li>)}
               </ol>
-              {n > 20 && !showAllQuestions && <button type="button" onClick={() => setShowAllQuestions(true)} style={{ color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', padding: '8px 12px', marginTop: 8, borderRadius: 5 }}>Show all {n} questions</button>}
+              {n > 20 && !showAllQuestions && <button type="button" onClick={() => setShowAllQuestions(true)} style={{ color: 'var(--workspace-text)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', padding: "var(--workspace-space-8) var(--workspace-space-12)", marginTop: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)' }}>Show all {n} questions</button>}
             </div>
           </details>
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6 }}>
@@ -197,31 +197,31 @@ export function KBValidationRunTab({
         </div>
       )}
 
-      {!running && queries.length > 0 && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginBottom: 12 }}>
-        <p style={{ margin: '0 0 6px' }}>{mode === 'judge+baseline' ? 'The same questions are answered with the KB and with the model alone. Their answer grades show whether the KB adds useful information. This comparison makes additional model calls.' : 'Grades answers produced with this KB against the expected answers. It does not measure how well the model answers without the KB.'}</p>
-        <p style={{ margin: '0 0 6px' }}>Retrieval checks compare the sources found with your expected sources; they are separate from grading the answer itself.</p>
+      {!running && queries.length > 0 && <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginBottom: 'var(--workspace-space-12)' }}>
+        <p style={{ margin: "0 0 var(--workspace-space-6)" }}>{mode === 'judge+baseline' ? 'The same questions are answered with the KB and with the model alone. Their answer grades show whether the KB adds useful information. This comparison makes additional model calls.' : 'Grades answers produced with this KB against the expected answers. It does not measure how well the model answers without the KB.'}</p>
+        <p style={{ margin: "0 0 var(--workspace-space-6)" }}>Retrieval checks compare the sources found with your expected sources; they are separate from grading the answer itself.</p>
         <p style={{ margin: 0 }}>Time depends on the question count, model and queue; a check may take several minutes. It uses model tokens. A cost estimate and per-check spending limit are not available here.</p>
       </div>}
 
       {/* Run controls */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
         <button
           type="button"
           onClick={handleRun}
           disabled={disabled}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: disabled ? 'var(--workspace-muted)' : 'var(--highlight-text-color, #000)',
             backgroundColor: disabled ? 'var(--workspace-surface)' : 'var(--highlight-color, #eab308)',
             border: '1px solid ' + (disabled ? 'var(--workspace-border)' : 'transparent'),
-            borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
           {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
           {running ? 'Running…' : queries.length > 0 ? `Run ${n} ${n === 1 ? 'question' : 'questions'}` : 'Run Validation'}
         </button>
-        <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 6 }}>
+        <label style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', display: 'inline-flex', flexWrap: 'wrap', minWidth: 0, maxWidth: '100%', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
           Mode:
           <select
             value={running && activeOptions ? activeOptions.skip_judge ? 'retrieval' : activeOptions.mode || mode : mode}
@@ -252,24 +252,24 @@ export function KBValidationRunTab({
       </div>
 
       {error && (
-        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', marginBottom: 10 }}>{error}</div>
+        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', marginBottom: 'var(--workspace-space-12)' }}>{error}</div>
       )}
 
       {progress ? (
-        <div role={progress.phase === 'failed' ? 'alert' : 'status'} aria-live="polite" style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', padding: '12px 0' }}>
+        <div role={progress.phase === 'failed' ? 'alert' : 'status'} aria-live="polite" style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: progress.phase === 'failed' ? 'var(--workspace-danger)' : 'var(--workspace-muted)', padding: "var(--workspace-space-12) 0" }}>
           <strong>{progress.phase === 'restoring' ? 'Restoring check' : progress.phase === 'starting' ? 'Submitting check' : progress.phase === 'queued' ? 'Check queued' : progress.phase === 'running' ? 'Checking answers' : progress.phase === 'retrying' ? 'Worker retrying' : progress.phase === 'completed' ? 'Check complete' : progress.phase === 'failed' ? 'Check failed' : 'Connection needs attention'}</strong>
           <div>{progress.message}</div>
           {running && activeOptions && <div>Active check: {activeOptions.skip_judge ? 'retrieval only (no answer grading)' : activeOptions.mode === 'judge+baseline' ? 'answers compared with and without the KB' : 'answer quality'} · {activeOptions.query_uuids ? `${activeOptions.query_uuids.length} selected questions` : 'all test questions'}.</div>}
           {progress.delayed && <div>This is taking longer than usual. You can switch tabs; the same check remains active.</div>}
           {running && <div>Starting another check is disabled until this task has a confirmed outcome.</div>}
-          {running && onRetryStatus && <button type="button" onClick={onRetryStatus} style={{ marginTop: 8, padding: '7px 12px', background: 'var(--workspace-surface)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)', borderRadius: 5, cursor: 'pointer' }}>Check status / reconnect</button>}
+          {running && onRetryStatus && <button type="button" onClick={onRetryStatus} style={{ marginTop: 'var(--workspace-space-8)', padding: "7px var(--workspace-space-12)", background: 'var(--workspace-surface)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer' }}>Check status / reconnect</button>}
         </div>
       ) : running && (
-        <div role="status" style={{ color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)', padding: '12px 0' }}>Validation running… You can switch tabs; results appear here and in History when finished.</div>
+        <div role="status" style={{ color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-12) 0" }}>Validation running… You can switch tabs; results appear here and in History when finished.</div>
       )}
       {!latestRun ? (!running && (
-        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '20px 0', textAlign: 'center' }}>
-          {queries.length === 0 ? <><strong>No test questions yet</strong><p>Add or generate representative questions and expected answers before measuring quality.</p>{onChooseQuestions && <button type="button" onClick={onChooseQuestions} style={{ padding: '8px 14px', borderRadius: 6, background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', color: 'var(--workspace-text)', cursor: 'pointer' }}>Set up test questions</button>}</> : <>No validation run yet. Review the selected questions, then run the check.</>}
+        <div role="status" style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-20) 0", textAlign: 'center' }}>
+          {queries.length === 0 ? <><strong>No test questions yet</strong><p>Add or generate representative questions and expected answers before measuring quality.</p>{onChooseQuestions && <button type="button" onClick={onChooseQuestions} style={{ padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', background: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', color: 'var(--workspace-text)', cursor: 'pointer' }}>Set up test questions</button>}</> : <>No validation run yet. Review the selected questions, then run the check.</>}
         </div>
       )) : (
         <div>
@@ -277,7 +277,7 @@ export function KBValidationRunTab({
           <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', overflowWrap: 'anywhere', lineHeight: 1.6 }}>Recorded grader: {latestRun.judge_model || 'not recorded'} · Mode: {latestRun.mode || 'not recorded'}{latestRun.answer_model && <> · Answer model: {latestRun.answer_model}</>}</p>
           {/* Export the displayed run for outside-Vandalizer analysis */}
           {onExport && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
               <Download size={11} style={{ color: 'var(--workspace-muted)' }} aria-hidden="true" />
               <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                 Export results
@@ -292,8 +292,8 @@ export function KBValidationRunTab({
             <div
               role="note"
               style={{
-                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', padding: '6px 10px', marginBottom: 10,
-                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 6,
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', padding: "var(--workspace-space-6) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 'var(--workspace-radius-small)',
               }}
             >
               Smoke test over {latestRun.query_selection.selected} of {latestRun.query_selection.total} test
@@ -306,8 +306,8 @@ export function KBValidationRunTab({
             <div
               role="note"
               style={{
-                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', padding: '6px 10px', marginBottom: 10,
-                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 6,
+                fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', padding: "var(--workspace-space-6) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+                backgroundColor: '#f59e0b14', border: '1px solid #f59e0b44', borderRadius: 'var(--workspace-radius-small)',
               }}
             >
               Graded by {latestRun.judge_model_fallback.used}, not the chosen grader{' '}
@@ -317,7 +317,7 @@ export function KBValidationRunTab({
           )}
           {latestRun.question_set && (
             <div
-              style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 10 }}
+              style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-12)' }}
               title="Fingerprint of the exact questions, expected answers, categories and source labels this run used. Runs with different fingerprints measured different question sets."
             >
               Question set <code style={{ color: 'var(--workspace-info)' }}>{latestRun.question_set.fingerprint}</code>
@@ -336,13 +336,13 @@ export function KBValidationRunTab({
 
           {/* Discrimination summary chips */}
           {latestRun.retrieval_precision.discrimination_summary && (
-            <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', marginTop: 'var(--workspace-space-12)', flexWrap: 'wrap' }}>
               {(['useful', 'redundant', 'failing', 'other'] as const).map(k => {
                 const n = latestRun.retrieval_precision.discrimination_summary?.[k] ?? 0
                 if (n === 0) return null
                 return (
                   <span key={k} style={{
-                    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '2px 8px', borderRadius: 8,
+                    fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-medium)',
                     color: discColor(k), backgroundColor: `color-mix(in srgb, ${discColor(k)} 10.2%, transparent)`,
                     border: `1px solid color-mix(in srgb, ${discColor(k)} 33.33%, transparent)`,
                   }}>
@@ -354,7 +354,7 @@ export function KBValidationRunTab({
           )}
 
           {/* Per-query details */}
-          <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ marginTop: 'var(--workspace-space-16)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
             {latestRun.retrieval_precision.details.map((d, i) => (
               <DetailRow
                 key={d.query_uuid || i}
@@ -392,7 +392,7 @@ function ExportButton({ format, onExport }: {
       onClick={() => void click()}
       style={{
         fontFamily: 'inherit', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-        padding: '2px 8px', borderRadius: 4,
+        padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
         color: busy ? 'var(--workspace-muted)' : 'var(--workspace-info)', background: 'transparent',
         border: '1px solid #2e3a52', cursor: busy ? 'wait' : 'pointer',
       }}
@@ -418,10 +418,10 @@ function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
   const { components } = explainKBScore(run)
   return (
     <div style={{
-      padding: 12, marginBottom: 10, backgroundColor: 'var(--workspace-info-surface)',
-      border: `1px solid ${c.border}`, borderRadius: 6,
+      padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-12)', backgroundColor: 'var(--workspace-info-surface)',
+      border: `1px solid ${c.border}`, borderRadius: 'var(--workspace-radius-small)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-8)' }}>
         <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Overall quality</span>
         <span style={{ fontSize: 22, fontWeight: 700, color: c.text }}>
           {tierLabel} - {Math.round(run.score)}%
@@ -429,7 +429,7 @@ function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
       </div>
       {/* The formula is printed, not tucked in a tooltip: this number is a
           composite and was being read as the judge's answer accuracy. */}
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginTop: 4 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.6, marginTop: 'var(--workspace-space-4)' }}>
         A weighted composite, not answer accuracy on its own:{' '}
         {components.map((comp, i) => (
           <span key={comp.key} style={{ whiteSpace: 'nowrap' }}>
@@ -441,7 +441,7 @@ function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
         ))}
       </div>
       {penalized && bd && (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', lineHeight: 1.5, marginTop: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)', lineHeight: 1.5, marginTop: 'var(--workspace-space-4)' }}>
           Discounted from a raw {Math.round(bd.raw_score)}% by a sample-size confidence penalty
           ({`-${Math.round(bd.sample_size_penalty)} pts`}).{needed > 0
             ? ` Add at least ${needed} representative test quer${needed > 1 ? 'ies' : 'y'} and rerun to reduce the small-sample penalty. New results may be higher or lower.`
@@ -461,15 +461,15 @@ function LiftCard({ run }: { run: KBValidationResult }) {
 
   return (
     <div style={{
-      padding: 12, backgroundColor: 'var(--workspace-info-surface)',
-      border: '1px solid #2e3a52', borderRadius: 6,
+      padding: 'var(--workspace-space-12)', backgroundColor: 'var(--workspace-info-surface)',
+      border: '1px solid #2e3a52', borderRadius: 'var(--workspace-radius-small)',
     }}>
       {/* This is the number to use for "how accurate are the answers" — the
           judge's mean score, before it is blended into the overall composite. */}
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-6)' }}>
         Answer accuracy — judge score averaged over {n ?? '?'} question{n === 1 ? '' : 's'}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-24)', flexWrap: 'wrap' }}>
         {b != null && (
           <Stat label="Without KB" value={b * 100} color="var(--workspace-muted)" />
         )}
@@ -484,7 +484,7 @@ function LiftCard({ run }: { run: KBValidationResult }) {
         )}
       </div>
       {run.retrieval_precision.judge_variance != null && (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-6)' }}>
           Judge variance: ±{(run.retrieval_precision.judge_variance * 100).toFixed(1)} pts (sampled on first run)
         </div>
       )}
@@ -504,7 +504,7 @@ function Stat({ label, value, color, sign = false }: { label: string; value: num
 
 function BarComparison({ baseline, withKb }: { baseline: number; withKb: number }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
       <BarRow label="No KB" value={baseline} color="var(--workspace-muted)" />
       <BarRow label="With KB" value={withKb} color="var(--workspace-success)" />
     </div>
@@ -514,7 +514,7 @@ function BarComparison({ baseline, withKb }: { baseline: number; withKb: number 
 function BarRow({ label, value, color }: { label: string; value: number; color: string }) {
   const pct = Math.max(0, Math.min(1, value)) * 100
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
       <div style={{ width: 50 }}>{label}</div>
       <div style={{ flex: 1, height: 6, backgroundColor: 'var(--workspace-surface)', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', backgroundColor: color }} />
@@ -531,15 +531,15 @@ function DetailRow({
   const b = detail.baseline_judge
   return (
     <div style={{
-      backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6, overflow: 'hidden',
+      backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', overflow: 'hidden',
     }}>
       <button
         type="button"
         aria-expanded={expanded}
         onClick={onToggle}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '8px 10px', background: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
+          padding: "var(--workspace-space-8) var(--workspace-space-12)", background: 'transparent', border: 'none',
           cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
         }}
       >
@@ -550,7 +550,7 @@ function DetailRow({
         </div>
         {detail.discrimination && detail.discrimination !== 'other' && (
           <span style={{
-            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: '1px 6px', borderRadius: 6,
+            fontSize: 'var(--workspace-font-meta)', fontWeight: 600, padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
             color: discColor(detail.discrimination),
             backgroundColor: `color-mix(in srgb, ${discColor(detail.discrimination)} 10.2%, transparent)`,
           }}>
@@ -569,7 +569,7 @@ function DetailRow({
         )}
       </button>
       {expanded && (
-        <div style={{ padding: '8px 12px 12px 32px', borderTop: '1px solid var(--workspace-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ padding: "var(--workspace-space-8) var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-32)", borderTop: '1px solid var(--workspace-border)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
           {detail.generation_truncated && (
             <TruncationNote what="The with-KB answer" />
           )}
@@ -632,7 +632,7 @@ function TruncationNote({ what }: { what: string }) {
 function Block({ label, body, muted = false }: { label: string; body: string; muted?: boolean }) {
   return (
     <div>
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-2)' }}>{label}</div>
       <div style={{ fontSize: 'var(--workspace-font-meta)', color: muted ? 'var(--workspace-muted)' : 'var(--workspace-text)', whiteSpace: 'pre-wrap' as const, lineHeight: 1.5 }}>
         {body}
       </div>
@@ -656,6 +656,6 @@ function discColor(d: string) {
 
 const selectStyle: React.CSSProperties = {
   background: 'var(--workspace-canvas)', color: 'var(--workspace-text)', border: '1px solid var(--workspace-border)',
-  borderRadius: 4, padding: '3px 6px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+  borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
   maxWidth: '100%', minWidth: 0,
 }

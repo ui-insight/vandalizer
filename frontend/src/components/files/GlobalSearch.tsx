@@ -58,7 +58,7 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
         onClick={() => setOpen(true)}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          width: 32, height: 32, borderRadius: 6, border: 'none',
+          width: 32, height: 32, borderRadius: 'var(--workspace-radius-small)', border: 'none',
           background: 'none', cursor: 'pointer', color: '#fff',
         }}
         aria-label="Search documents"
@@ -75,8 +75,8 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
     }}>
       {/* Search header */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-        borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
+        borderBottom: "1px solid var(--workspace-border)", backgroundColor: '#f9fafb',
       }}>
         <Search size={18} color="#6b7280" />
         <input
@@ -92,20 +92,20 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           onBlur={e => { e.currentTarget.style.boxShadow = 'none' }}
           style={{
             flex: 1, border: 'none', background: 'none', outline: 'none',
-            fontSize: 'var(--workspace-font-card-title)', color: '#111827', borderRadius: 4,
+            fontSize: 'var(--workspace-font-card-title)', color: '#111827', borderRadius: 'var(--workspace-radius-small)',
           }}
         />
         <button
           onClick={handleClose}
           aria-label="Close search"
-          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 'var(--workspace-space-4)' }}
         >
           <X size={18} />
         </button>
       </div>
 
       {/* Results */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: "var(--workspace-space-8) 0" }}>
         <div aria-live="polite" className="sr-only">
           {loading
             ? 'Searching'
@@ -114,11 +114,11 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
               : ''}
         </div>
         {loading && (
-          <div role="status" aria-live="polite" style={{ padding: '20px 16px', textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>Searching...</div>
+          <div role="status" aria-live="polite" style={{ padding: "var(--workspace-space-20) var(--workspace-space-16)", textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>Searching...</div>
         )}
 
         {!loading && searched && results.length === 0 && (
-          <div role="status" aria-live="polite" style={{ padding: '30px 16px', textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>
+          <div role="status" aria-live="polite" style={{ padding: "30px var(--workspace-space-16)", textAlign: 'center', color: '#6b7280', fontSize: 'var(--workspace-font-body)' }}>
             No documents found for "{query}"
           </div>
         )}
@@ -128,26 +128,26 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
             key={doc.uuid}
             onClick={() => handleSelect(doc)}
             style={{
-              display: 'flex', alignItems: 'flex-start', gap: 12, width: '100%',
-              padding: '10px 16px', border: 'none', background: 'transparent',
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)', width: '100%',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)", border: 'none', background: 'transparent',
               cursor: 'pointer', textAlign: 'left',
             }}
             onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
             onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent' }}
           >
-            <FileText size={18} color="#6b7280" style={{ marginTop: 2, flexShrink: 0 }} aria-hidden="true" />
+            <FileText size={18} color="#6b7280" style={{ marginTop: 'var(--workspace-space-2)', flexShrink: 0 }} aria-hidden="true" />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 500, color: '#111827' }}>{doc.title}</div>
               {doc.snippet && (
                 <div style={{
-                  fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2,
+                  fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)',
                   overflow: 'hidden', textOverflow: 'ellipsis',
                   display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                 }}>
                   {doc.snippet}
                 </div>
               )}
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 4 }}>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
                 {doc.extension.toUpperCase()} · {doc.num_pages} page{doc.num_pages !== 1 ? 's' : ''}
               </div>
             </div>

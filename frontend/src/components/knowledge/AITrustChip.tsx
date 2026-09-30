@@ -37,7 +37,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
         title={composite
           ? 'Composite retrieval and answer quality on tested questions. This is not an answer-accuracy comparison with AI alone.'
           : 'Answer accuracy on tested questions; no AI-only comparison was recorded.'}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: `${padY}px ${padX}px`, borderRadius: 10, fontSize, fontWeight: 600, color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)' }}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: `${padY}px ${padX}px`, borderRadius: 'var(--workspace-radius-large)', fontSize, fontWeight: 600, color: 'var(--workspace-muted)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)' }}
       >
         <Minus size={iconSize} style={{ flexShrink: 0 }} />
         {composite
@@ -52,7 +52,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
       <span
         title="No validation has been run on this knowledge base yet, so we can't show how much it improves AI accuracy. Click into the KB and run validation to find out."
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
           padding: `${padY}px ${padX}px`, borderRadius: 999,
           fontSize, fontWeight: 600,
           color: 'var(--workspace-warning)',
@@ -75,7 +75,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
             : 'The AI answers more accurately with this KB than without.'
         }
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 4,
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
           padding: `${padY}px ${padX}px`, borderRadius: 999,
           fontSize, fontWeight: 600,
           color: 'var(--workspace-success)',
@@ -98,7 +98,7 @@ export function AITrustChip({ score, baseline, lift, size = 'sm', metric, config
           : 'The AI did not answer more accurately with this KB than without.'
       }
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 4,
+        display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
         padding: `${padY}px ${padX}px`, borderRadius: 999,
         fontSize, fontWeight: 600,
         color: 'var(--workspace-muted)',

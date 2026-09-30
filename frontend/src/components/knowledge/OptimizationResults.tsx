@@ -105,7 +105,7 @@ export function OptimizationResults({
   const noKbPerQuery: PerQueryResult[] | undefined = run.no_kb_per_query_results
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)' }}>
       {/* Comparison card — now with eval-set composition strip and the
           improved/regressed counter rendered inline so users get the credibility
           context before they read the headline number. */}
@@ -143,7 +143,7 @@ export function OptimizationResults({
                     above uses the holdout slice — without this caption the two
                     read as contradictory counts over the same queries. */}
                 {holdoutHeadline && (
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 6, lineHeight: 1.5 }}>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)', lineHeight: 1.5 }}>
                     Per-query outcomes below are from the {trainCount ?? ''} training
                     quer{trainCount === 1 ? 'y' : 'ies'}; the significance test above uses
                     the {holdoutCount ?? ''} held-out quer{holdoutCount === 1 ? 'y' : 'ies'}.
@@ -183,11 +183,11 @@ export function OptimizationResults({
         <div
           role="status"
           style={{
-            padding: '10px 14px', borderRadius: 6, fontSize: 'var(--workspace-font-control)',
+            padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)',
             background: 'rgba(245, 158, 11, 0.08)',
             border: '1px solid rgba(245, 158, 11, 0.3)',
             color: 'var(--workspace-warning)',
-            display: 'flex', flexDirection: 'column', gap: 4,
+            display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)',
           }}
         >
           <div style={{ fontWeight: 600 }}>No significant improvement</div>
@@ -279,12 +279,12 @@ export function OptimizationResults({
           onClick={onRunAgain}
           disabled={!canManage}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: canManage ? 'var(--workspace-info)' : 'var(--workspace-muted)',
             background: 'transparent',
             border: '1px solid ' + (canManage ? 'rgba(124, 58, 237, 0.3)' : 'var(--workspace-border)'),
-            borderRadius: 6, cursor: canManage ? 'pointer' : 'not-allowed',
+            borderRadius: 'var(--workspace-radius-small)', cursor: canManage ? 'pointer' : 'not-allowed',
           }}
         >
           <RotateCcw size={12} />
@@ -338,14 +338,14 @@ function BestConfigCard({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <Sparkles size={14} style={{ color: 'var(--workspace-info)' }} />
         <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)' }}>Best configuration</span>
         {hasDefault && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginLeft: 8 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginLeft: 'var(--workspace-space-8)' }}>
             {changed.length === 0
               ? 'identical to default, no settings changed'
               : `${changed.length} setting${changed.length === 1 ? '' : 's'} changed vs default`}
@@ -356,32 +356,32 @@ function BestConfigCard({
       {/* If we don't have a default snapshot (legacy run), fall back to the
           flat grid; otherwise show diff rows only. */}
       {!hasDefault ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-6)' }}>
           {rows.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
+              padding: "var(--workspace-space-6) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
             }}>
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 2 }}>{r.winner}</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', marginTop: 'var(--workspace-space-2)' }}>{r.winner}</div>
             </div>
           ))}
         </div>
       ) : changed.length === 0 ? (
         <div style={{
-          padding: '8px 12px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
+          padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
           backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
-          borderRadius: 6,
+          borderRadius: 'var(--workspace-radius-small)',
         }}>
           The optimizer didn't find a better setting than your current default. Your
           KB is already tuned for this test set.
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
           {changed.map(r => (
             <div key={r.key} title={r.hint} style={{
-              padding: '8px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
               display: 'grid', gridTemplateColumns: '1fr auto 1fr auto 1fr',
-              alignItems: 'center', gap: 8,
+              alignItems: 'center', gap: 'var(--workspace-space-8)',
             }}>
               <div>
                 <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
@@ -396,7 +396,7 @@ function BestConfigCard({
             <button
               onClick={() => setShowUnchanged(v => !v)}
               style={{
-                marginTop: 4, padding: '4px 8px',
+                marginTop: 'var(--workspace-space-4)', padding: "var(--workspace-space-4) var(--workspace-space-8)",
                 fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', color: 'var(--workspace-muted)',
                 background: 'transparent', border: 'none', cursor: 'pointer',
                 textAlign: 'left',
@@ -406,13 +406,13 @@ function BestConfigCard({
             </button>
           )}
           {showUnchanged && unchanged.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-6)' }}>
               {unchanged.map(r => (
                 <div key={r.key} title={r.hint} style={{
-                  padding: '6px 10px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4, cursor: 'help',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)', cursor: 'help',
                 }}>
                   <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>{r.label}</div>
-                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 2 }}>{r.winner}</div>
+                  <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginTop: 'var(--workspace-space-2)' }}>{r.winner}</div>
                 </div>
               ))}
             </div>
@@ -420,7 +420,7 @@ function BestConfigCard({
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginTop: 'var(--workspace-space-12)' }}>
         <ApplyBackButton
           canApply={canManage}
           onApply={onApply}
@@ -432,11 +432,11 @@ function BestConfigCard({
             onClick={onRevert}
             disabled={!canManage || reverting}
             style={{
-              padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+              padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
               color: canManage && !reverting ? 'var(--workspace-muted)' : 'var(--workspace-muted)',
               background: 'transparent',
               border: '1px solid var(--workspace-border)',
-              borderRadius: 6,
+              borderRadius: 'var(--workspace-radius-small)',
               cursor: canManage && !reverting ? 'pointer' : 'not-allowed',
             }}
             title="Restore your previous KB configuration"

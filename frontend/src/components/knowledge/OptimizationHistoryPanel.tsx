@@ -46,15 +46,15 @@ export function OptimizationHistoryPanel({
   return (
     <div style={{
       backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       overflow: 'hidden',
     }}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '10px 14px', background: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
+          padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'transparent', border: 'none',
           fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
@@ -70,22 +70,22 @@ export function OptimizationHistoryPanel({
       </button>
 
       {open && (
-        <div style={{ padding: '0 12px 12px 12px' }}>
+        <div style={{ padding: "0 var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-12)" }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: 'var(--workspace-muted)' }}>
+            <div style={{ textAlign: 'center', padding: 'var(--workspace-space-16)', color: 'var(--workspace-muted)' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 'var(--workspace-space-8)' }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '12px 8px' }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-12) var(--workspace-space-8)" }}>
               No prior optimization runs for this KB.
             </div>
           )}
           {items != null && filtered.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               {filtered.map(run => (
                 <HistoryRow
                   key={run.uuid}
@@ -124,17 +124,17 @@ function HistoryRow({
   return (
     <div
       style={{
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
-        padding: '7px 10px',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)',
+        padding: "7px var(--workspace-space-12)",
         background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
-        borderRadius: 5,
+        borderRadius: 'var(--workspace-radius-small)',
       }}
     >
       <button
         onClick={() => onSelect?.(run.uuid)}
         disabled={!onSelect}
         style={{
-          flex: '1 1 220px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, minHeight: 36,
+          flex: '1 1 220px', minWidth: 0, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', minHeight: 'var(--workspace-control-height)',
           background: 'transparent', border: 'none', padding: 0,
           cursor: onSelect ? 'pointer' : 'default',
           fontFamily: 'inherit', color: 'var(--workspace-text)', textAlign: 'left',
@@ -189,10 +189,10 @@ function HistoryRow({
           onClick={onCompare}
           title="Compare this run with the current one"
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            minHeight: 36, padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+            minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
             color: 'var(--workspace-info)', background: 'transparent',
-            border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 4,
+            border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-small)',
             cursor: 'pointer',
           }}
         >

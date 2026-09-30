@@ -16,7 +16,7 @@ const statusColors: Record<string, { bg: string; text: string; border: string }>
   monitored: { bg: '#f0fdf4', text: '#15803d', border: '#bbf7d0' },
   stale: { bg: '#fffbeb', text: '#a16207', border: '#fde68a' },
   degraded: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
-  unmonitored: { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' },
+  unmonitored: { bg: '#f9fafb', text: '#6b7280', border: "var(--workspace-border)" },
 }
 
 export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, monitored, asserted }: QualityContractBadgeProps) {
@@ -51,7 +51,7 @@ export function QualityContractBadge({ status, tier, lastValidatedAt, isStale, m
         alignItems: 'center',
         fontSize: 'var(--workspace-font-meta)',
         lineHeight: '16px',
-        padding: '1px 6px',
+        padding: "1px var(--workspace-space-6)",
         borderRadius: '4px',
         border: `1px solid ${colors.border}`,
         backgroundColor: colors.bg,

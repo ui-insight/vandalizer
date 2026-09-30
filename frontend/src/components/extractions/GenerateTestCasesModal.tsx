@@ -119,15 +119,15 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
           maxWidth: 'calc(100vw - 24px)',
           maxHeight: '90vh', overflowY: 'auto',
           padding: 22, backgroundColor: '#fff',
-          border: '1px solid #e5e7eb', borderRadius: 10,
+          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-large)',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
             <h3 id="generate-test-cases-title" tabIndex={-1} style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: '#1f2937' }}>
               {step === 'review' ? 'Review proposed test cases' : 'Generate test cases'}
             </h3>
             <button
               onClick={onClose} aria-label="Close test case generation"
-              style={{ marginLeft: 'auto', minWidth: 36, minHeight: 36, flexShrink: 0, display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
+              style={{ marginLeft: 'auto', minWidth: 36, minHeight: 'var(--workspace-control-height)', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
             >
               <X size={18} />
             </button>
@@ -144,7 +144,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
           {step === 'generating' && (
             <div style={{ padding: '40px 0', textAlign: 'center', color: 'var(--workspace-muted)' }}>
               <Loader2 size={32} style={{ animation: 'spin 1s linear infinite', color: 'var(--workspace-info)' }} />
-              <div style={{ marginTop: 12, fontSize: 'var(--workspace-font-control)' }}>Generating proposals…</div>
+              <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)' }}>Generating proposals…</div>
             </div>
           )}
 
@@ -186,15 +186,15 @@ function PickStep({
 }) {
   return (
     <div>
-      <p style={{ fontSize: 'var(--workspace-font-control)', color: '#4b5563', lineHeight: 1.6, marginBottom: 14 }}>
+      <p style={{ fontSize: 'var(--workspace-font-control)', color: '#4b5563', lineHeight: 1.6, marginBottom: 'var(--workspace-space-16)' }}>
         Pick documents to extract from. We'll propose expected values for each, and you review and
         edit before they're saved as test cases. Nothing is saved until you approve.
       </p>
-      <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+      <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-8)' }}>
           Coverage
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
           {(Object.keys(COVERAGE_LABELS) as TestCaseCoverage[]).map(c => {
             const active = coverage === c
             return (
@@ -202,11 +202,11 @@ function PickStep({
                 key={c}
                 onClick={() => onCoverage(c)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '8px 12px', textAlign: 'left',
+                  display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-12)", textAlign: 'left',
                   backgroundColor: active ? 'var(--workspace-selected)' : '#f9fafb',
                   border: '1px solid ' + (active ? 'var(--workspace-accent-ink)' : '#e5e7eb'),
-                  borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
                 <span style={{
@@ -227,12 +227,12 @@ function PickStep({
       <button
         onClick={onPick}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
           color: 'var(--workspace-text)',
           background: 'var(--workspace-canvas)',
           border: '1px solid var(--workspace-accent-ink)',
-          borderRadius: 6, cursor: 'pointer',
+          borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
         }}
       >
         <FileText size={14} />
@@ -261,13 +261,13 @@ function ReviewStep({
     return (
       <div>
         <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 8,
-          padding: 12, marginBottom: 14,
-          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6,
+          display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+          padding: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)',
+          background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--workspace-radius-small)',
         }}>
-          <AlertCircle size={14} style={{ color: 'var(--workspace-danger)', flexShrink: 0, marginTop: 2 }} />
+          <AlertCircle size={14} style={{ color: 'var(--workspace-danger)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#7f1d1d' }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>No proposals could be generated.</div>
+            <div style={{ fontWeight: 600, marginBottom: 'var(--workspace-space-4)' }}>No proposals could be generated.</div>
             {errors.map((e, i) => (
               <div key={i}>{e.reason}</div>
             ))}
@@ -280,7 +280,7 @@ function ReviewStep({
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
         <span><strong style={{ color: '#1f2937' }}>{selectedIds.size}</strong> of {proposals.length} selected</span>
         <button
           onClick={onSelectAll}
@@ -293,33 +293,33 @@ function ReviewStep({
 
       {errors.length > 0 && (
         <div style={{
-          display: 'flex', alignItems: 'flex-start', gap: 8,
-          padding: 8, marginBottom: 10,
-          background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 6,
+          display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+          padding: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)',
+          background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-small)',
           fontSize: 'var(--workspace-font-meta)', color: '#78350f',
         }}>
-          <AlertCircle size={12} style={{ color: 'var(--workspace-warning)', flexShrink: 0, marginTop: 2 }} />
+          <AlertCircle size={12} style={{ color: 'var(--workspace-warning)', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
           <div>
             {errors.length} document{errors.length === 1 ? '' : 's'} couldn't be processed.
           </div>
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 420, overflowY: 'auto' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', maxHeight: 420, overflowY: 'auto' }}>
         {proposals.map(p => {
           const selected = selectedIds.has(p.proposal_id)
           return (
             <div
               key={p.proposal_id}
               style={{
-                padding: 12,
+                padding: 'var(--workspace-space-12)',
                 background: selected ? '#fff' : '#f9fafb',
                 border: '1px solid ' + (selected ? 'var(--workspace-accent-ink)' : '#e5e7eb'),
-                borderRadius: 6,
+                borderRadius: 'var(--workspace-radius-small)',
                 opacity: selected ? 1 : 0.6,
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
                 <input
                   type="checkbox"
                   checked={selected}
@@ -328,7 +328,7 @@ function ReviewStep({
                 />
                 <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1f2937', flex: 1 }}>{p.label}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 6, fontSize: 'var(--workspace-font-meta)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)' }}>
                 {Object.entries(p.expected_values).map(([field, value]) => (
                   <Row
                     key={field}
@@ -344,20 +344,20 @@ function ReviewStep({
         })}
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-16)' }}>
         <button onClick={onCancel} disabled={saving} style={cancelBtnStyle}>Cancel</button>
         <button
           onClick={onApprove}
           disabled={saving || selectedIds.size === 0}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
             color: 'var(--workspace-text)',
             background: saving || selectedIds.size === 0
               ? '#9ca3af'
               : 'var(--workspace-canvas)',
             border: '1px solid ' + (saving || selectedIds.size === 0 ? 'var(--workspace-border)' : 'var(--workspace-accent-ink)'),
-            borderRadius: 6,
+            borderRadius: 'var(--workspace-radius-small)',
             cursor: saving || selectedIds.size === 0 ? 'not-allowed' : 'pointer',
           }}
         >
@@ -382,11 +382,11 @@ function Row({
         placeholder="(empty)"
         aria-label={`Expected value for ${field}`}
         style={{
-          padding: '4px 8px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+          padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
           color: '#1f2937',
           background: disabled ? '#f3f4f6' : '#fff',
           border: '1px solid var(--workspace-border)',
-          borderRadius: 4,
+          borderRadius: 'var(--workspace-radius-small)',
         }}
       />
     </>
@@ -394,13 +394,13 @@ function Row({
 }
 
 const cancelBtnStyle: React.CSSProperties = {
-  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
+  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
   color: '#374151', background: '#fff',
-  border: '1px solid var(--workspace-border)', borderRadius: 6, cursor: 'pointer',
+  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
 }
 
 const linkBtnStyle: React.CSSProperties = {
-  padding: '2px 8px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+  padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
   color: 'var(--workspace-info)', background: 'transparent', border: 'none',
   cursor: 'pointer', textDecoration: 'underline',
 }

@@ -322,30 +322,30 @@ export function ExtractionAutovalidateWizard({ searchSetUuid, onClose, onStarted
 function ConceptStep() {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What is tuning?</h4>
-      <p style={{ margin: '0 0 10px 0' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What is tuning?</h4>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0" }}>
         We try many ways of running your extraction (each combination of model,
         strategy, and prompt shape is a <TermDef term="candidate">candidate</TermDef>) and keep whichever
         one scores best against your <TermDef term="test-set">test cases</TermDef>. Another AI, the{' '}
         <TermDef term="judge">judge</TermDef>, grades each answer, so different formats of the
         same value still count as a match.
       </p>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it changes</h4>
-      <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it changes</h4>
+      <ul style={{ margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>Which LLM does the extracting</li>
         <li>Strategy: one call vs. plan-then-extract (one-pass / two-pass)</li>
         <li>Whether the model takes extra "thinking" time before answering</li>
         <li>Whether documents are sent as images (useful for fillable PDFs and scans)</li>
         <li>How long documents get split into chunks</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it doesn't change</h4>
-      <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>What it doesn't change</h4>
+      <ul style={{ margin: "0 0 var(--workspace-space-12) 0", paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>Your extraction fields or prompts</li>
         <li>Your test cases</li>
         <li>Your live config, until you click Apply</li>
       </ul>
-      <h4 style={{ margin: '0 0 6px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Caveats</h4>
-      <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-6) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Caveats</h4>
+      <ul style={{ margin: 0, paddingLeft: 'var(--workspace-space-20)', color: 'var(--workspace-muted)' }}>
         <li>Costs LLM tokens (you'll set the budget shortly)</li>
         <li>Tuning quality depends on test-case quality</li>
       </ul>
@@ -371,25 +371,25 @@ function TestCasesStep({
   if (cases.length === 0) {
     return (
       <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>You don't have any test cases yet</h4>
-        <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)' }}>
+        <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>You don't have any test cases yet</h4>
+        <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
           We need at least one example to check the AI's work against. Pick a few documents
           and we'll suggest expected values for each one. You review them before they're saved.
         </p>
         <button
           onClick={onGenerate}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
             color: 'var(--workspace-text)',
             background: 'var(--workspace-canvas)',
             border: '1px solid var(--workspace-accent-ink)',
-            borderRadius: 6, cursor: 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
           }}
         >
           Generate test cases from documents
         </button>
-        <p style={{ marginTop: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+        <p style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Once you save at least one test case, the Next button below will unlock.
         </p>
       </div>
@@ -400,16 +400,16 @@ function TestCasesStep({
 
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
         {selectedCount} of {cases.length} test case{cases.length === 1 ? '' : 's'} selected
       </h4>
-      <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
         We'll score each trial against the cases you check below. Uncheck any you want to
         skip for this run, or remove duplicates and outdated cases for good.
       </p>
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 6,
+        marginBottom: 'var(--workspace-space-6)',
       }}>
         <button
           onClick={onToggleAll}
@@ -422,17 +422,17 @@ function TestCasesStep({
         </button>
       </div>
       <div style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)',
         maxHeight: 200, overflowY: 'auto',
-        padding: 8, backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+        padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
       }}>
         {cases.map((c, i) => {
           const fieldCount = Object.keys(c.expected_values || {}).length
           const checked = selected.has(c.uuid)
           return (
             <div key={c.uuid} style={{
-              display: 'flex', gap: 8, alignItems: 'center',
-              padding: '6px 8px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
+              display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center',
+              padding: "var(--workspace-space-6) var(--workspace-space-8)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
               fontSize: 'var(--workspace-font-meta)', color: checked ? 'var(--workspace-text)' : 'var(--workspace-muted)',
             }}>
               <input
@@ -454,7 +454,7 @@ function TestCasesStep({
                 title="Remove this test case permanently"
                 aria-label={`Remove ${c.label}`}
                 style={{
-                  background: 'transparent', border: 'none', padding: '0 2px',
+                  background: 'transparent', border: 'none', padding: "0 var(--workspace-space-2)",
                   fontSize: 'var(--workspace-font-body)', lineHeight: 1, color: 'var(--workspace-muted)', cursor: 'pointer', flexShrink: 0,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = 'var(--workspace-danger)' }}
@@ -467,25 +467,25 @@ function TestCasesStep({
         })}
       </div>
       {selectedCount === 0 && (
-        <p style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)' }}>
+        <p style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-warning)' }}>
           Select at least one test case to continue.
         </p>
       )}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)' }}>
         <button
           onClick={onGenerate}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+            padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
             color: 'var(--workspace-info)', background: 'transparent',
             border: '1px solid var(--workspace-border)',
-            borderRadius: 6, cursor: 'pointer',
+            borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
           }}
         >
           + Generate more from documents
         </button>
       </div>
-      <p style={{ marginTop: 12, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+      <p style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
         Tip: 3–5 carefully-checked cases work better than 20 rushed ones. The optimizer is
         only as good as the cases you give it.
       </p>
@@ -567,8 +567,8 @@ function BaselineStep({
   if (noSettingsScore == null) {
     return (
       <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Baseline skipped</h4>
-        <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+        <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Baseline skipped</h4>
+        <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
           We couldn't score a no-settings baseline because none of the test cases have
           expected values yet. Tuning will still measure baselines during the run.
         </p>
@@ -579,21 +579,21 @@ function BaselineStep({
   const scorePct = Math.round(noSettingsScore * 100)
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
         How well extraction does without your settings
       </h4>
       <div style={{
-        padding: '14px 16px', marginBottom: 10,
+        padding: "var(--workspace-space-16) var(--workspace-space-16)", marginBottom: 'var(--workspace-space-12)',
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
-        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
+        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-small)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)' }}>
           <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--workspace-text)' }}>{scorePct}%</span>
           <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             of test cases extracted correctly <i>without</i> your custom settings
           </span>
         </div>
-        <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)' }}>
           {scorePct >= 85
             ? <>The model already handles most of this. Tuning will probably gain a few points at best.</>
             : scorePct >= 60
@@ -613,8 +613,8 @@ function BaselineStep({
       </button>
       {whyOpen && (
         <div style={{
-          marginTop: 8, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
-          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          marginTop: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           Tuning only matters where your settings beat what the model does on its own. If the
           model already handles most cases from defaults, even the best configuration can only
@@ -623,7 +623,7 @@ function BaselineStep({
         </div>
       )}
       {recommendedTier && (
-        <div style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)' }}>
           Suggested budget: <b style={{ textTransform: 'capitalize' }}>{recommendedTier}</b>{' '}
           (you can change this on the next step).
         </div>
@@ -690,7 +690,7 @@ function AdvancedStep({
 }) {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
       <Toggle
         label="Score by meaning, not exact text (recommended)"
         description="Treats 'Jan 5, 2026' and '2026-01-05' as the same answer. Uses a small amount of extra AI usage; turn off for strict character-by-character matching."
@@ -704,11 +704,11 @@ function AdvancedStep({
         onChange={onApplyOnFinish}
       />
       <div style={{
-        marginTop: 16, padding: '10px 12px',
+        marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
         backgroundColor: 'rgba(124, 58, 237, 0.08)',
-        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
+        border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-small)',
       }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-info)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)' }}>
           Ready to tune
         </div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6 }}>

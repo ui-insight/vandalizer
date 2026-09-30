@@ -23,21 +23,21 @@ export function FileOutputCard({ summary, downloadHref, onDownload, maxHeight = 
   const hasDownload = Boolean(downloadHref || onDownload)
 
   const actionStyle: React.CSSProperties = {
-    display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)', padding: "var(--workspace-space-6) var(--workspace-space-12)",
     fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit', textDecoration: 'none',
-    border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fff',
     color: '#374151', cursor: 'pointer', flexShrink: 0,
   }
 
   return (
     <div data-testid="file-output-card">
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12,
-        border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#f9fafb',
-        padding: '10px 12px',
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+        border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#f9fafb',
+        padding: "var(--workspace-space-12) var(--workspace-space-12)",
       }}>
         <div style={{
-          width: 36, height: 36, borderRadius: 6, backgroundColor: '#eef2ff',
+          width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#eef2ff',
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
         }}>
           <FileText style={{ width: 18, height: 18, color: '#4f46e5' }} />
@@ -46,7 +46,7 @@ export function FileOutputCard({ summary, downloadHref, onDownload, maxHeight = 
           <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={summary.filename}>
             {summary.filename}
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
             {meta}{summary.text === null ? ' · download to open' : ''}
           </div>
         </div>
@@ -67,8 +67,8 @@ export function FileOutputCard({ summary, downloadHref, onDownload, maxHeight = 
           <div
             className="chat-markdown"
             style={{
-              marginTop: 8, backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
-              padding: 12, fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
+              marginTop: 'var(--workspace-space-8)', backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
+              padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-control)', lineHeight: 1.6,
               maxHeight, overflowY: 'auto', overflowX: 'auto',
               color: '#374151', wordBreak: 'break-word',
             }}
@@ -76,8 +76,8 @@ export function FileOutputCard({ summary, downloadHref, onDownload, maxHeight = 
           />
         ) : (
           <pre style={{
-            marginTop: 8, backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
-            padding: 12, fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, fontFamily: 'monospace',
+            marginTop: 'var(--workspace-space-8)', backgroundColor: '#fff', border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)',
+            padding: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', lineHeight: 1.5, fontFamily: 'monospace',
             maxHeight, overflow: 'auto', color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           }}>
             {summary.text}
@@ -85,7 +85,7 @@ export function FileOutputCard({ summary, downloadHref, onDownload, maxHeight = 
         )
       )}
       {summary.textTruncated && (
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-4)' }}>
           Preview cut at {Math.round(summary.text!.length / 1000)}k characters — download the file for the rest.
         </div>
       )}

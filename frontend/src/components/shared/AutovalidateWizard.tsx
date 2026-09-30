@@ -80,19 +80,19 @@ export function AutovalidateWizard<TOptions>({
         aria-labelledby="autovalidate-wizard-title"
         style={{
           width: 560, maxWidth: 'calc(100vw - 24px)', maxHeight: '90dvh', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-          padding: 16, backgroundColor: 'var(--workspace-surface)',
-          border: '1px solid var(--workspace-border)', borderRadius: 10,
+          padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+          border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-large)',
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)', flexShrink: 0 }}>
           <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--workspace-accent-ink)' }} />
           <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>{title}</h3>
           <button
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
+            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
           >
             <X size={18} aria-hidden="true" />
           </button>
@@ -102,12 +102,12 @@ export function AutovalidateWizard<TOptions>({
         <WizardSteps steps={stepIds} current={currentStep.id} labels={stepLabels} />
 
         {/* Body */}
-        <div key={currentStep.id} role="region" aria-label={currentStep.label} tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', marginTop: 14, padding: 3 }}>
+        <div key={currentStep.id} role="region" aria-label={currentStep.label} tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', marginTop: 'var(--workspace-space-16)', padding: 'var(--workspace-space-4)' }}>
           {currentStep.render(options, setOptions)}
         </div>
 
         {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginTop: 16, flexShrink: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginTop: 'var(--workspace-space-16)', flexShrink: 0 }}>
           <button onClick={isFirst ? onClose : prev} style={btn()}>
             {isFirst ? 'Cancel' : (<><ChevronLeft size={12} />Back</>)}
           </button>
@@ -130,12 +130,12 @@ export function AutovalidateWizard<TOptions>({
 
 function btn(enabled: boolean = true, color?: string): React.CSSProperties {
   return {
-    display: 'inline-flex', alignItems: 'center', gap: 4,
-    padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+    padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
     color: enabled ? color ? 'var(--highlight-text-color, #000)' : 'var(--workspace-text)' : 'var(--workspace-muted)',
     backgroundColor: color ? color : 'var(--workspace-surface)',
     border: `1px solid ${color || 'var(--workspace-border)'}`,
-    borderRadius: 5,
+    borderRadius: 'var(--workspace-radius-small)',
     cursor: enabled ? 'pointer' : 'not-allowed',
     opacity: enabled ? 1 : 0.5,
   }

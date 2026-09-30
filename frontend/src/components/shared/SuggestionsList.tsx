@@ -38,7 +38,7 @@ export function SuggestionsList({
   if (suggestions.length === 0) return null
 
   const rows = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
       {suggestions.map((s, i) => {
         const icon = icons?.[s.severity] ?? DEFAULT_ICONS[s.severity]
         const color = COLORS[s.severity]
@@ -46,14 +46,14 @@ export function SuggestionsList({
           <div
             key={i}
             style={{
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '8px 10px',
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+              padding: "var(--workspace-space-8) var(--workspace-space-12)",
               backgroundColor: `color-mix(in srgb, ${color} 5.49%, transparent)`,
               border: `1px solid color-mix(in srgb, ${color} 20.0%, transparent)`,
-              borderRadius: 6,
+              borderRadius: 'var(--workspace-radius-small)',
             }}
           >
-            <span style={{ color, flexShrink: 0, marginTop: 2, display: 'flex' }}>
+            <span style={{ color, flexShrink: 0, marginTop: 'var(--workspace-space-2)', display: 'flex' }}>
               {icon}
             </span>
             <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
@@ -63,9 +63,9 @@ export function SuggestionsList({
               <button
                 onClick={s.onAction}
                 style={{
-                  padding: '3px 8px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                  padding: "var(--workspace-space-4) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
                   color, background: 'transparent',
-                  border: `1px solid color-mix(in srgb, ${color} 40.0%, transparent)`, borderRadius: 4,
+                  border: `1px solid color-mix(in srgb, ${color} 40.0%, transparent)`, borderRadius: 'var(--workspace-radius-small)',
                   cursor: 'pointer', flexShrink: 0,
                 }}
               >
@@ -82,10 +82,10 @@ export function SuggestionsList({
 
   return (
     <div style={{
-      padding: 14, backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      padding: 'var(--workspace-space-16)', backgroundColor: 'var(--workspace-surface)',
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 10 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-12)' }}>
         {title}
       </div>
       {rows}

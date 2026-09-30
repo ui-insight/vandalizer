@@ -107,7 +107,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
       style={{
         display: 'grid',
         gridTemplateColumns: 'minmax(0, 1fr) 100px',
-        padding: '12px 24px',
+        padding: "var(--workspace-space-12) var(--workspace-space-24)",
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
         cursor: 'pointer',
@@ -118,7 +118,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
       }}
     >
       {/* Name column */}
-      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 16 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', overflow: 'hidden', paddingRight: 'var(--workspace-space-16)' }}>
         <button type="button" aria-label={`Open ${item.name}`}
           style={{
             padding: 0, border: 0, background: 'transparent', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
@@ -131,7 +131,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             textOverflow: 'ellipsis',
             display: 'flex',
             alignItems: 'center',
-            gap: 6,
+            gap: 'var(--workspace-space-6)',
           }}
         >
           {item.name}
@@ -156,7 +156,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             style={{
               fontSize: 'var(--workspace-font-meta)',
               color: '#5f6368',
-              marginTop: 2,
+              marginTop: 'var(--workspace-space-2)',
               whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
@@ -165,7 +165,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             {item.description}
           </div>
         )}
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-4)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <span>{kindLabel}</span>
           {item.verified && (
             <span style={{ color: '#b45309', fontWeight: 500 }}>Shared with everyone</span>
@@ -182,7 +182,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
           )}
         </div>
         {item.tags.length > 0 && (
-          <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
+          <div style={{ marginTop: 'var(--workspace-space-4)', display: 'flex', gap: 'var(--workspace-space-4)' }}>
             {item.tags.slice(0, 3).map((tag) => (
               <span
                 key={tag}
@@ -190,8 +190,8 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                   fontSize: 'var(--workspace-font-meta)',
                   color: 'var(--library-highlight-ink, #78640c)',
                   background: 'color-mix(in srgb, var(--library-highlight, #eab308) 12%, #ffffff)',
-                  padding: '2px 6px',
-                  borderRadius: 4,
+                  padding: "var(--workspace-space-2) var(--workspace-space-6)",
+                  borderRadius: 'var(--workspace-radius-small)',
                 }}
               >
                 {tag}
@@ -221,11 +221,11 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
             transform: 'translateY(-50%)',
             display: 'flex',
             alignItems: 'center',
-            gap: 2,
+            gap: 'var(--workspace-space-2)',
             background: '#fff',
-            border: '1px solid #e5e7eb',
+            border: "1px solid var(--workspace-border)",
             borderRadius: 999,
-            padding: '2px 4px',
+            padding: "var(--workspace-space-2) var(--workspace-space-4)",
             boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
             zIndex: 1,
           }}
@@ -338,7 +338,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                     border: '1px solid rgba(0,0,0,0.15)',
                     background: '#fff',
                     boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                    padding: '6px 0',
+                    padding: "var(--workspace-space-6) 0",
                   }}
                 >
                   <MenuItem disabled={busy}
@@ -388,7 +388,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                       }}
                     />
                   )}
-                  <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                   {(item.kind === 'workflow' || item.kind === 'search_set') && (item.item_uuid || item.item_id) && (
                     <MenuItem disabled={busy}
                       icon={<Link2 size={14} />}
@@ -441,7 +441,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                   )}
                   {onMoveToFolder && folders && folders.length > 0 && (
                     <>
-                      <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                      <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                       {/* Move to folder submenu trigger */}
                       <div style={{ position: 'relative' }}>
                         <button disabled={busy}
@@ -453,8 +453,8 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                             display: 'flex',
                             width: '100%',
                             alignItems: 'center',
-                            gap: 10,
-                            padding: '8px 16px',
+                            gap: 'var(--workspace-space-12)',
+                            padding: "var(--workspace-space-8) var(--workspace-space-16)",
                             background: 'none',
                             border: 'none',
                             cursor: 'default',
@@ -474,14 +474,14 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                           <div
                             style={{
                               position: 'relative',
-                              margin: '4px 8px',
+                              margin: "var(--workspace-space-4) var(--workspace-space-8)",
                               zIndex: 1100,
                               minWidth: 180,
                               borderRadius: 'var(--ui-radius, 12px)',
                               border: '1px solid rgba(0,0,0,0.15)',
                               background: '#fff',
                               boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                              padding: '6px 0',
+                              padding: "var(--workspace-space-6) 0",
                             }}
                           >
                             {/* Remove from folder option */}
@@ -497,8 +497,8 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                                   display: 'flex',
                                   width: '100%',
                                   alignItems: 'center',
-                                  gap: 10,
-                                  padding: '8px 16px',
+                                  gap: 'var(--workspace-space-12)',
+                                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
@@ -526,8 +526,8 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                                   display: 'flex',
                                   width: '100%',
                                   alignItems: 'center',
-                                  gap: 10,
-                                  padding: '8px 16px',
+                                  gap: 'var(--workspace-space-12)',
+                                  padding: "var(--workspace-space-8) var(--workspace-space-16)",
                                   background: 'none',
                                   border: 'none',
                                   cursor: 'pointer',
@@ -549,7 +549,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
                       </div>
                     </>
                   )}
-                  <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  <div style={{ borderTop: '1px solid #e0e0e0', margin: "var(--workspace-space-4) 0" }} />
                   {/* Only owners can truly delete. For a bookmark of someone
                       else's item (e.g. added from Explore) removal only drops
                       the bookmark, so label it "Remove" — same as KB cards. */}
@@ -611,8 +611,8 @@ function MenuItem({
         display: 'flex',
         width: '100%',
         alignItems: 'center',
-        gap: 10,
-        padding: '8px 16px',
+        gap: 'var(--workspace-space-12)',
+        padding: "var(--workspace-space-8) var(--workspace-space-16)",
         background: 'none',
         border: 'none',
         cursor: 'pointer',

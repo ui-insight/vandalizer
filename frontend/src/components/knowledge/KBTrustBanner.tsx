@@ -65,15 +65,15 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
   return (
     <div
       style={{
-        display: 'flex', gap: 14, alignItems: 'flex-start',
-        padding: '12px 14px', borderRadius: 10,
+        display: 'flex', gap: 'var(--workspace-space-16)', alignItems: 'flex-start',
+        padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: bg, border: `1px solid ${border}`,
-        marginBottom: 16,
+        marginBottom: 'var(--workspace-space-16)',
       }}
     >
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        width: 36, height: 36, borderRadius: 10,
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-large)',
         backgroundColor: 'var(--workspace-canvas)', color: accent, flexShrink: 0,
       }}>
         <Icon size={18} />
@@ -82,14 +82,14 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{
           fontSize: 'var(--workspace-font-meta)', fontWeight: 700, color: 'var(--workspace-muted)',
-          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2,
+          textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 'var(--workspace-space-2)',
         }}>
           {composite ? 'Retrieval quality' : 'Answer quality'}
         </div>
 
         {!hasRun ? (
           <>
-            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
               Answer quality not yet measured
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
@@ -98,7 +98,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
           </>
         ) : composite ? (
           <>
-            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 4 }}>
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-4)' }}>
               Composite quality: {scorePct}/100 · {configState === 'applied' ? 'Settings applied in this run' : configState === 'reverted' ? 'Application reverted' : configState === 'default' ? 'Default settings tested' : 'Proposed settings'}
             </div>
             <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5 }}>
@@ -110,7 +110,7 @@ export function KBTrustBanner({ score, baseline, lift, validatedAt, metric, conf
           </>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)', flexWrap: 'wrap', marginBottom: 'var(--workspace-space-4)' }}>
               {liftPts != null && (
                 <span style={{ fontSize: 22, fontWeight: 700, color: accent }}>
                   {liftPts > 0 ? '+' : ''}{liftPts} pts

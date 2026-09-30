@@ -173,9 +173,9 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
             recommendationReason={recommendationReason(opts.noKbScore, { withoutLabel: 'without the KB' })}
             description="Each candidate uses model tokens. Choose a spending limit for this experiment. More trials may help, but results depend on your test questions and are not guaranteed."
           />
-          <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)', marginTop: 16 }}>{opts.sampleQueryIds.length} reviewed questions · {tokens_label}{cost_label ? ` · ${cost_label}` : ' · Dollar estimate unavailable for this model'}. You review the results before applying changes unless you enable automatic application below.</p>
+          <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)', marginTop: 'var(--workspace-space-16)' }}>{opts.sampleQueryIds.length} reviewed questions · {tokens_label}{cost_label ? ` · ${cost_label}` : ' · Dollar estimate unavailable for this model'}. You review the results before applying changes unless you enable automatic application below.</p>
           <p style={{ fontSize: 'var(--workspace-font-control)', lineHeight: 1.6, color: 'var(--workspace-text)' }}>Grader: {grader?.model || 'details unavailable'}. Time: {KB_BUDGET_TIERS.find(t => t.id === opts.tier)?.timeEstimate || 'no estimate for a custom budget'}{opts.tier !== 'custom' && ' (approximate)'}. Queue, models and question length affect duration. Results cover this reviewed test set; more trials do not guarantee improvement.</p>
-          <details style={{ marginTop: 16, color: 'var(--workspace-text)', fontSize: 'var(--workspace-font-control)' }}><summary style={{ cursor: 'pointer' }}>Optional settings</summary><AdvancedStep applyOnFinish={opts.applyOnFinish} onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))} tokensLabel={tokens_label} costLabel={cost_label} /></details>
+          <details style={{ marginTop: 'var(--workspace-space-16)', color: 'var(--workspace-text)', fontSize: 'var(--workspace-font-control)' }}><summary style={{ cursor: 'pointer' }}>Optional settings</summary><AdvancedStep applyOnFinish={opts.applyOnFinish} onApplyOnFinish={b => set(o => ({ ...o, applyOnFinish: b }))} tokensLabel={tokens_label} costLabel={cost_label} /></details>
           </>
         )
       },
@@ -283,17 +283,17 @@ function TestSetStep({
 
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>How should we build the test set?</h4>
-      <p style={{ margin: '0 0 12px 0', color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>How should we build the test set?</h4>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
         Test questions represent what people should be able to ask. Expected answers give the grader a reference; expected sources identify the supporting information. Tuning compares settings against this test set. <b>Review generated questions and their expectations before continuing</b>.
       </p>
       <button
         type="button"
         onClick={() => setShowExample(v => !v)}
         style={{
-          marginBottom: 10, padding: 0, background: 'transparent', border: 'none',
+          marginBottom: 'var(--workspace-space-12)', padding: 0, background: 'transparent', border: 'none',
           color: 'var(--workspace-accent-ink)', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+          cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
         }}
         aria-expanded={showExample}
       >
@@ -301,18 +301,18 @@ function TestSetStep({
       </button>
       {showExample && (
         <div style={{
-          padding: '8px 10px', marginBottom: 10,
-          background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
+          background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
           fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', lineHeight: 1.6,
         }}>
           <div><span style={{ color: 'var(--workspace-muted)' }}>Question:</span> Who is the principal investigator on the Reed grant?</div>
-          <div style={{ marginTop: 4 }}><span style={{ color: 'var(--workspace-muted)' }}>Expected answer:</span> Dr. Maria Reed</div>
-          <div style={{ marginTop: 6, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+          <div style={{ marginTop: 'var(--workspace-space-4)' }}><span style={{ color: 'var(--workspace-muted)' }}>Expected answer:</span> Dr. Maria Reed</div>
+          <div style={{ marginTop: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             The grader compares the AI's answer with this reference. Check that the expected answer is correct and supported by a source.
           </div>
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
         {MODES.map(m => {
           const active = mode === m.id
           return (
@@ -322,11 +322,11 @@ function TestSetStep({
               disabled={m.disabled}
               title={m.disabled ? 'No saved questions on this KB yet.' : undefined}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '8px 12px', textAlign: 'left',
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+                padding: "var(--workspace-space-8) var(--workspace-space-12)", textAlign: 'left',
                 backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
                 border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
-                borderRadius: 6, cursor: m.disabled ? 'not-allowed' : 'pointer',
+                borderRadius: 'var(--workspace-radius-small)', cursor: m.disabled ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit', color: m.disabled ? 'var(--workspace-muted)' : 'var(--workspace-text)',
                 opacity: m.disabled ? 0.6 : 1,
               }}
@@ -342,9 +342,9 @@ function TestSetStep({
       </div>
 
       {showCoverage && (
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 6 }}>How many new questions to generate:</div>
-          <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-6)' }}>How many new questions to generate:</div>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-6)' }}>
             {(['quick', 'standard', 'exhaustive'] as const).map(c => {
               const active = coverage === c
               return (
@@ -352,11 +352,11 @@ function TestSetStep({
                   key={c}
                   onClick={() => onCoverageChange(c)}
                   style={{
-                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
-                    padding: '6px 8px', textAlign: 'center',
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--workspace-space-2)',
+                    padding: "var(--workspace-space-6) var(--workspace-space-8)", textAlign: 'center',
                     backgroundColor: active ? 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, transparent)' : 'var(--workspace-surface)',
                     border: '1px solid ' + (active ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
-                    borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
+                    borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', fontFamily: 'inherit', color: 'var(--workspace-text)',
                   }}
                 >
                   <span style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, textTransform: 'capitalize' }}>{c}</span>
@@ -369,7 +369,7 @@ function TestSetStep({
       )}
 
       {showCoverage && (
-        <p style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
+        <p style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
           Generated queries are saved to this KB, so future re-runs can reuse them.
         </p>
       )}
@@ -377,7 +377,7 @@ function TestSetStep({
         <button
           onClick={() => { onClose(); onSwitchToQueries() }}
           style={{
-            marginTop: 8, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+            marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
             background: 'transparent', border: 'none', padding: 0,
             color: 'var(--workspace-accent-ink)', cursor: 'pointer',
             textDecoration: 'underline dotted', textUnderlineOffset: 2,
@@ -545,8 +545,8 @@ function PreviewStep({
 
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>{heading}</h4>
-      <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>{heading}</h4>
+      <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
         {buildMode === 'existing' ? (
           <>We'll grade each tuning trial against these <b>{queries.length}</b> questions using a <TermDef term="judge">judge</TermDef>.</>
         ) : (
@@ -554,32 +554,32 @@ function PreviewStep({
         )}
       </p>
       {buildMode === 'combined' && composition && composition.generated > 0 && (
-        <div style={{ margin: '0 0 10px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)' }}>
+        <div style={{ margin: "0 0 var(--workspace-space-12) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)' }}>
           {composition.existing} saved + {composition.generated} generated = <b>{queries.length}</b> total
         </div>
       )}
       {actionError && (
-        <div style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{actionError}</div>
+        <div style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)' }}>{actionError}</div>
       )}
       <div role="region" aria-label="Questions and expectations" tabIndex={0} style={{
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)',
         maxHeight: 260, overflowY: 'auto',
-        padding: 8, backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+        padding: 'var(--workspace-space-8)', backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
       }}>
         {queries.map((q, i) => (
           <div key={q.uuid} style={{
-            padding: '6px 8px', backgroundColor: 'var(--workspace-surface)', borderRadius: 4,
+            padding: "var(--workspace-space-6) var(--workspace-space-8)", backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
           }}>
             {editingUuid === q.uuid ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)' }}>
                 <QueryFormFields draft={editDraft} onChange={setEditDraft} />
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 'var(--workspace-space-8)' }}>
                   <button
                     onClick={handleUpdate}
                     disabled={saving || !editDraft.query.trim()}
                     style={{
-                      fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: '4px 10px', borderRadius: 5,
+                      fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: "var(--workspace-space-4) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
                       border: '1px solid #15803d55', backgroundColor: '#15803d1a',
                       color: saving || !editDraft.query.trim() ? 'var(--workspace-muted)' : 'var(--workspace-text)',
                       cursor: saving || !editDraft.query.trim() ? 'not-allowed' : 'pointer',
@@ -590,7 +590,7 @@ function PreviewStep({
                   <button
                     onClick={() => setEditingUuid(null)}
                     style={{
-                      fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: '4px 10px', borderRadius: 5,
+                      fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit', padding: "var(--workspace-space-4) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)',
                       border: '1px solid var(--workspace-border)', backgroundColor: 'var(--workspace-surface)', color: 'var(--workspace-text)', cursor: 'pointer',
                     }}
                   >
@@ -599,17 +599,17 @@ function PreviewStep({
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', alignItems: 'flex-start' }}>
                 <span style={{ color: 'var(--workspace-muted)', fontSize: 'var(--workspace-font-meta)', marginTop: 1 }}>{i + 1}.</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <QuestionExpectations question={q} />
                 </div>
-                <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 'var(--workspace-space-2)', flexShrink: 0 }}>
                   <button
                     type="button"
                     aria-label="Edit question"
                     onClick={() => startEdit(q)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
                     title="Edit question"
                   >
                     <Pencil size={12} />
@@ -618,7 +618,7 @@ function PreviewStep({
                     type="button"
                     aria-label="Remove question"
                     onClick={() => handleDelete(q)}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: 'var(--workspace-muted)' }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
                     title="Remove question"
                   >
                     <Trash2 size={12} />
@@ -629,7 +629,7 @@ function PreviewStep({
           </div>
         ))}
         {queries.length === 0 && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: '4px 8px' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', padding: "var(--workspace-space-4) var(--workspace-space-8)" }}>
             No test questions left. Add some on the Test Queries tab before tuning.
           </div>
         )}
@@ -638,7 +638,7 @@ function PreviewStep({
         <button
           onClick={() => { onClose(); onSwitchToQueries() }}
           style={{
-            marginTop: 10, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+            marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
             background: 'transparent', border: 'none', padding: 0,
             color: 'var(--workspace-accent-ink)', cursor: 'pointer',
             textDecoration: 'underline dotted', textUnderlineOffset: 2,
@@ -720,8 +720,8 @@ function BaselineStep({
   if (noKbScore == null) {
     return (
       <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-        <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Baseline skipped</h4>
-        <p style={{ margin: '0 0 10px 0', color: 'var(--workspace-muted)' }}>
+        <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Baseline skipped</h4>
+        <p style={{ margin: "0 0 var(--workspace-space-12) 0", color: 'var(--workspace-muted)' }}>
           We couldn't measure a no-KB <TermDef term="baseline">baseline</TermDef> because none of your test questions have an expected answer yet. Tuning will still measure baselines during the run.
         </p>
       </div>
@@ -731,19 +731,19 @@ function BaselineStep({
   const scorePct = Math.round(noKbScore * 100)
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>How well the model does without your KB</h4>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>How well the model does without your KB</h4>
       <div style={{
-        padding: '14px 16px', marginBottom: 10,
+        padding: "var(--workspace-space-16) var(--workspace-space-16)", marginBottom: 'var(--workspace-space-12)',
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
+        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 'var(--workspace-radius-small)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--workspace-space-12)' }}>
           <span style={{ fontSize: 28, fontWeight: 700, color: 'var(--workspace-text)' }}>{scorePct}%</span>
           <span style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
             average answer grade on a sample of up to five questions <i>without</i> the knowledge base
           </span>
         </div>
-        <div style={{ marginTop: 8, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)' }}>
           {scorePct >= 85
             ? <>The model scored well on this small sample without the KB. There may be limited room to improve these questions; other questions can behave differently.</>
             : scorePct >= 60
@@ -763,14 +763,14 @@ function BaselineStep({
       </button>
       {whyOpen && (
         <div style={{
-          marginTop: 8, padding: '8px 10px', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
-          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 6,
+          marginTop: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.5,
+          backgroundColor: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
         }}>
           This asks the same questions without retrieving KB sources, then grades the answers against your expectations. Comparing those grades with KB-assisted answers helps measure the KB's contribution. Retrieval checks measure which sources were found; answer grades measure what the model said. This small sample guides a budget suggestion and does not establish performance on all your questions.
         </div>
       )}
       {recommendedTier && (
-        <div style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)' }}>
+        <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)' }}>
           Suggested budget: <b style={{ textTransform: 'capitalize' }}>{recommendedTier}</b>{' '}
           (you can change this on the next step).
         </div>
@@ -794,7 +794,7 @@ function AdvancedStep({
 }) {
   return (
     <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
+      <h4 style={{ margin: "0 0 var(--workspace-space-8) 0", fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>Advanced options</h4>
       <Toggle
         label="Apply optimized settings automatically when finished"
         description="If unchecked, we'll show you the results and you can apply them manually."
@@ -802,11 +802,11 @@ function AdvancedStep({
         onChange={onApplyOnFinish}
       />
       <div style={{
-        marginTop: 16, padding: '10px 12px',
+        marginTop: 'var(--workspace-space-16)', padding: "var(--workspace-space-12) var(--workspace-space-12)",
         backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, transparent)',
-        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 6,
+        border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, transparent)', borderRadius: 'var(--workspace-radius-small)',
       }}>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-accent-ink)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 'var(--workspace-space-4)' }}>
           Ready to start
         </div>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)' }}>

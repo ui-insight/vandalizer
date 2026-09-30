@@ -657,7 +657,7 @@ export function ExtractionEditorPanel() {
     return (
       <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
         <PanelHeader title="Extraction" onClose={closeExtraction} />
-        <div role="alert" style={{ padding: 24, textAlign: 'center', color: '#b91c1c', fontSize: 'var(--workspace-font-control)' }}><p>{loadError || 'Extraction unavailable.'}</p><button type="button" onClick={async () => { setLoading(true); await refresh(); setLoading(false) }} style={{ marginTop: 12 }}>Retry extraction</button><p style={{ marginTop: 12, color: '#59616b' }}>Close this panel to return to your Library.</p></div>
+        <div role="alert" style={{ padding: 'var(--workspace-space-24)', textAlign: 'center', color: '#b91c1c', fontSize: 'var(--workspace-font-control)' }}><p>{loadError || 'Extraction unavailable.'}</p><button type="button" onClick={async () => { setLoading(true); await refresh(); setLoading(false) }} style={{ marginTop: 'var(--workspace-space-12)' }}>Retry extraction</button><p style={{ marginTop: 'var(--workspace-space-12)', color: '#59616b' }}>Close this panel to return to your Library.</p></div>
       </div>
     )
   }
@@ -672,7 +672,7 @@ export function ExtractionEditorPanel() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '16px 24px 8px',
+          padding: "var(--workspace-space-16) var(--workspace-space-24) var(--workspace-space-8)",
           backgroundColor: '#fff',
           flexShrink: 0,
         }}
@@ -691,16 +691,16 @@ export function ExtractionEditorPanel() {
                 fontSize: 'var(--workspace-font-section-title)',
                 fontWeight: 600,
                 color: '#202124',
-                border: '1px solid #dadce0',
-                borderRadius: 6,
-                padding: '4px 8px',
+                border: "1px solid var(--workspace-border)",
+                borderRadius: 'var(--workspace-radius-small)',
+                padding: "var(--workspace-space-4) var(--workspace-space-8)",
                 outline: 'none',
                 width: '100%',
                 fontFamily: 'inherit',
               }}
             />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <span
                 style={{
                   fontSize: 'var(--workspace-font-section-title)',
@@ -723,7 +723,7 @@ export function ExtractionEditorPanel() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  padding: 4,
+                  padding: 'var(--workspace-space-4)',
                   color: '#6b7280',
                   display: 'flex',
                   flexShrink: 0,
@@ -748,7 +748,7 @@ export function ExtractionEditorPanel() {
               )}
             </div>
           )}
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginTop: 'var(--workspace-space-2)' }}>
             {selectedDocUuids.length > 0
               ? `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`
               : activeProjectUuid
@@ -765,8 +765,8 @@ export function ExtractionEditorPanel() {
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            padding: 4,
-            borderRadius: 4,
+            padding: 'var(--workspace-space-4)',
+            borderRadius: 'var(--workspace-radius-small)',
             color: '#5f6368',
             display: 'flex',
             flexShrink: 0,
@@ -783,8 +783,8 @@ export function ExtractionEditorPanel() {
             background: 'none',
             border: 'none',
             cursor: 'pointer',
-            padding: 4,
-            borderRadius: 4,
+            padding: 'var(--workspace-space-4)',
+            borderRadius: 'var(--workspace-radius-small)',
             color: '#5f6368',
             display: 'flex',
             flexShrink: 0,
@@ -797,8 +797,8 @@ export function ExtractionEditorPanel() {
       {/* Verified extraction notice */}
       {searchSet.verified && (
         <div style={{
-          margin: '0 24px 8px', padding: '8px 12px', fontSize: 'var(--workspace-font-meta)', color: '#78350f',
-          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
+          margin: "0 var(--workspace-space-24) var(--workspace-space-8)", padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', color: '#78350f',
+          backgroundColor: '#fef3c7', borderRadius: 'var(--workspace-radius-small)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
           border: '1px solid #fde68a',
         }}>
           <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
@@ -809,8 +809,8 @@ export function ExtractionEditorPanel() {
             onClick={handleClone}
             disabled={cloning}
             style={{
-              padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 4, border: '1px solid #b45309',
+              padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 'var(--workspace-radius-small)', border: '1px solid #b45309',
               backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
               whiteSpace: 'nowrap', opacity: cloning ? 0.6 : 1,
             }}
@@ -828,7 +828,7 @@ export function ExtractionEditorPanel() {
         style={{
           display: 'flex',
           gap: 0,
-          borderBottom: '1px solid #e5e7eb',
+          borderBottom: "1px solid var(--workspace-border)",
           paddingLeft: tabsCompact ? 8 : 24,
           flexShrink: 0,
         }}
@@ -879,7 +879,7 @@ export function ExtractionEditorPanel() {
                 transition: 'color 0.15s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: 'var(--workspace-space-6)',
               }}
             >
               <TabIcon style={{ width: 14, height: 14 }} aria-hidden="true" />
@@ -1019,8 +1019,8 @@ export function ExtractionEditorPanel() {
       {/* Nudge banner for unvalidated items */}
       {activeTab === 'design' && !nudgeDismissed && searchSet.validation_run_count === 0 && Object.keys(results).length > 0 && (
         <div style={{
-          padding: '8px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
-          display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+          padding: "var(--workspace-space-8) var(--workspace-space-24)", backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', flexShrink: 0,
         }}>
           <Shield style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} aria-hidden="true" />
           <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#1e40af', flex: 1 }}>
@@ -1031,7 +1031,7 @@ export function ExtractionEditorPanel() {
             onClick={() => setActiveTab('validate')}
             style={{
               fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#2563eb', background: 'none',
-              border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: "var(--workspace-space-2) var(--workspace-space-6)",
             }}
           >
             Validate
@@ -1045,7 +1045,7 @@ export function ExtractionEditorPanel() {
               if (openExtractionId) localStorage.setItem(`quality-nudge-dismissed-${openExtractionId}`, '1')
             }}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+              background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)',
               color: '#6b7280', display: 'flex',
             }}
           >
@@ -1059,11 +1059,11 @@ export function ExtractionEditorPanel() {
         <div
           style={{
             flexShrink: 0,
-            borderTop: '1px solid #e5e7eb',
-            padding: '12px 24px',
+            borderTop: "1px solid var(--workspace-border)",
+            padding: "var(--workspace-space-12) var(--workspace-space-24)",
             backgroundColor: '#fff',
             display: 'flex',
-            gap: 8,
+            gap: 'var(--workspace-space-8)',
             alignItems: 'center',
           }}
         >
@@ -1083,11 +1083,11 @@ export function ExtractionEditorPanel() {
               placeholder="Add term to extract..."
               style={{
                 width: '100%',
-                padding: '10px 70px 10px 14px',
+                padding: "var(--workspace-space-12) 70px var(--workspace-space-12) var(--workspace-space-16)",
                 fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
-                border: '1px solid #d1d5db',
-                borderRadius: 8,
+                border: "1px solid var(--workspace-border)",
+                borderRadius: 'var(--workspace-radius-medium)',
                 outline: 'none',
                 boxSizing: 'border-box',
               }}
@@ -1100,11 +1100,11 @@ export function ExtractionEditorPanel() {
                 right: 4,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                padding: '6px 14px',
+                padding: "var(--workspace-space-6) var(--workspace-space-16)",
                 fontSize: 'var(--workspace-font-meta)',
                 fontWeight: 700,
                 fontFamily: 'inherit',
-                borderRadius: 6,
+                borderRadius: 'var(--workspace-radius-small)',
                 border: 'none',
                 backgroundColor: 'var(--color-panel-dark)',
                 color: '#fff',
@@ -1118,7 +1118,7 @@ export function ExtractionEditorPanel() {
             <label
               title="Merge all selected documents into a single context and run one extraction over the combined text. Off: run a separate extraction on each document and show results as numbered tabs."
               style={{
-                display: 'flex', alignItems: 'center', gap: 6,
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
                 fontSize: 'var(--workspace-font-meta)', color: '#374151', cursor: 'pointer', userSelect: 'none',
                 whiteSpace: 'nowrap', flexShrink: 0,
               }}
@@ -1156,8 +1156,8 @@ export function ExtractionEditorPanel() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 6,
-              padding: '10px 20px',
+              gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-12) var(--workspace-space-20)",
               fontSize: 'var(--workspace-font-control)',
               fontFamily: 'inherit',
               borderRadius: 'var(--ui-radius, 8px)',
@@ -1246,9 +1246,9 @@ function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) 
     <div
       role={failed ? 'alert' : undefined}
       style={{
-        margin: '8px 0',
-        padding: '8px 10px',
-        borderRadius: 6,
+        margin: "var(--workspace-space-8) 0",
+        padding: "var(--workspace-space-8) var(--workspace-space-12)",
+        borderRadius: 'var(--workspace-radius-small)',
         fontSize: 'var(--workspace-font-meta)',
         border: `1px solid ${failed ? '#fca5a5' : inconclusive ? '#e5e7eb' : '#bbf7d0'}`,
         background: failed ? '#fef2f2' : inconclusive ? '#f9fafb' : '#f0fdf4',
@@ -1268,9 +1268,9 @@ function CrossFieldRunStrip({ report }: { report: CrossFieldRunReport | null }) 
         )}
       </div>
       {failed && (
-        <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+        <ul style={{ margin: "var(--workspace-space-6) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
           {failures.map((r, i) => (
-            <li key={r.rule_id ?? i} style={{ marginBottom: 2 }}>{r.message}</li>
+            <li key={r.rule_id ?? i} style={{ marginBottom: 'var(--workspace-space-2)' }}>{r.message}</li>
           ))}
         </ul>
       )}
@@ -1362,10 +1362,10 @@ export function DocumentWarningsStrip({ warnings }: { warnings: DocumentWarning[
     <div
       role="status"
       style={{
-        display: 'flex', gap: 8, alignItems: 'flex-start',
-        padding: '8px 10px', margin: '8px 0',
+        display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'flex-start',
+        padding: "var(--workspace-space-8) var(--workspace-space-12)", margin: "var(--workspace-space-8) 0",
         background: '#fffbeb', border: '1px solid #fcd34d',
-        borderRadius: 6, fontSize: 'var(--workspace-font-control)', color: '#78350f',
+        borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-control)', color: '#78350f',
       }}
     >
       <AlertCircle className="h-4 w-4" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -1376,7 +1376,7 @@ export function DocumentWarningsStrip({ warnings }: { warnings: DocumentWarning[
             : `${warnings.length} documents were not read in full.`}
         </strong>{' '}
         Values below may be missing or wrong because of what the extraction could not see.
-        <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+        <ul style={{ margin: "var(--workspace-space-4) 0 0", paddingLeft: 'var(--workspace-space-20)' }}>
           {warnings.map(w => (
             <li key={w.document_uuid}>
               <span style={{ fontWeight: 500 }}>{w.title}</span>
@@ -1509,14 +1509,14 @@ function DesignTab({
   }
 
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 'var(--workspace-space-24)' }}>
       {/* Section header */}
       <div
         style={{
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: 16,
+          marginBottom: 'var(--workspace-space-16)',
         }}
       >
         <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Extractions</div>
@@ -1530,7 +1530,7 @@ function DesignTab({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 'var(--workspace-space-4)',
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
@@ -1551,10 +1551,10 @@ function DesignTab({
                   position: 'absolute',
                   right: 0,
                   top: '100%',
-                  marginTop: 4,
+                  marginTop: 'var(--workspace-space-4)',
                   background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 8,
+                  border: "1px solid var(--workspace-border)",
+                  borderRadius: 'var(--workspace-radius-medium)',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   zIndex: 50,
                   minWidth: 160,
@@ -1575,9 +1575,9 @@ function DesignTab({
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 8,
+                      gap: 'var(--workspace-space-8)',
                       width: '100%',
-                      padding: '8px 12px',
+                      padding: "var(--workspace-space-8) var(--workspace-space-12)",
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
@@ -1607,12 +1607,12 @@ function DesignTab({
           style={{
             display: 'flex',
             alignItems: 'flex-start',
-            gap: 10,
-            padding: '14px 16px',
-            marginBottom: 16,
+            gap: 'var(--workspace-space-12)',
+            padding: "var(--workspace-space-16) var(--workspace-space-16)",
+            marginBottom: 'var(--workspace-space-16)',
             backgroundColor: '#f0f4ff',
             border: '1px solid #dbeafe',
-            borderRadius: 8,
+            borderRadius: 'var(--workspace-radius-medium)',
           }}
         >
           <Loader2
@@ -1627,7 +1627,7 @@ function DesignTab({
             }}
           />
           <div>
-            <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#1e40af', marginBottom: 3 }}>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#1e40af', marginBottom: 'var(--workspace-space-4)' }}>
               Extracting...
             </div>
             <div
@@ -1653,8 +1653,8 @@ function DesignTab({
       {/* Result set selector for multi-document extractions */}
       {resultSets.length > 1 && (
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '8px 0', borderBottom: '1px solid #e5e7eb',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+          padding: "var(--workspace-space-8) 0", borderBottom: "1px solid var(--workspace-border)",
         }}>
           <span id="result-set-selector-label" style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 500 }}>
             Document:
@@ -1662,7 +1662,7 @@ function DesignTab({
           <div
             role="radiogroup"
             aria-labelledby="result-set-selector-label"
-            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}
             onKeyDown={(e) => {
               let next = activeResultIdx
               if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (activeResultIdx + 1) % resultSets.length
@@ -1685,8 +1685,8 @@ function DesignTab({
                 tabIndex={i === activeResultIdx ? 0 : -1}
                 onClick={() => onSetActiveResultIdx(i)}
                 style={{
-                  padding: '3px 10px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
-                  fontFamily: 'inherit', borderRadius: 12, border: 'none',
+                  padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600,
+                  fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-large)', border: 'none',
                   cursor: 'pointer', transition: 'all 0.15s',
                   backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
                   color: i === activeResultIdx ? 'var(--highlight-text-color, #000)' : '#374151',
@@ -1696,14 +1696,14 @@ function DesignTab({
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginLeft: 4 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginLeft: 'var(--workspace-space-4)' }}>
             {resultSets.length} result{resultSets.length !== 1 ? 's' : ''}
           </span>
         </div>
       )}
 
       {itemsLoading ? (
-        <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0' }}>
+        <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
           Loading...
         </div>
       ) : items.length === 0 ? (
@@ -1723,14 +1723,14 @@ function DesignTab({
                 onDrop={() => handleDrop(idx)}
                 onDragEnd={handleDragEnd}
                 style={{
-                  padding: '10px 0',
+                  padding: "var(--workspace-space-12) 0",
                   borderBottom: '1px solid #f0f0f0',
                   opacity: isDragging ? 0.4 : 1,
                   borderTop: isOver ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
                   transition: 'opacity 0.15s',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                   <GripVertical
                     aria-hidden="true"
                     style={{
@@ -1749,7 +1749,7 @@ function DesignTab({
                       width: 20,
                       textAlign: 'right',
                       flexShrink: 0,
-                      marginRight: 4,
+                      marginRight: 'var(--workspace-space-4)',
                     }}
                   >
                     {idx + 1}
@@ -1781,9 +1781,9 @@ function DesignTab({
                         fontSize: 'var(--workspace-font-body)',
                         fontFamily: 'inherit',
                         color: '#202124',
-                        border: '1px solid #d1d5db',
-                        borderRadius: 4,
-                        padding: '2px 6px',
+                        border: "1px solid var(--workspace-border)",
+                        borderRadius: 'var(--workspace-radius-small)',
+                        padding: "var(--workspace-space-2) var(--workspace-space-6)",
                         outline: 'none',
                       }}
                     />
@@ -1819,7 +1819,7 @@ function DesignTab({
                         background: 'none', border: 'none', padding: 0, margin: 0,
                         fontFamily: 'inherit', fontSize: 'var(--workspace-font-body)', color: '#202124', flex: 1,
                         minWidth: 0, cursor: 'pointer', textAlign: 'left',
-                        display: 'flex', alignItems: 'center', gap: 4,
+                        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                       }}
                     >
                       {expandedSettingsId === item.id
@@ -1828,10 +1828,10 @@ function DesignTab({
                       }
                       {item.searchphrase}
                       {item.is_optional && (
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: "1px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
                       )}
                       {item.enum_values.length > 0 && (
-                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
+                        <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: "1px var(--workspace-space-4)", fontWeight: 500 }}>{item.enum_values.length}</span>
                       )}
                     </button>
                   )}
@@ -1845,7 +1845,7 @@ function DesignTab({
                       background: 'none',
                       border: 'none',
                       cursor: idx === 0 ? 'default' : 'pointer',
-                      padding: 4,
+                      padding: 'var(--workspace-space-4)',
                       color: '#6b7280',
                       opacity: idx === 0 ? 0.4 : 1,
                       display: 'flex',
@@ -1864,7 +1864,7 @@ function DesignTab({
                       background: 'none',
                       border: 'none',
                       cursor: idx === items.length - 1 ? 'default' : 'pointer',
-                      padding: 4,
+                      padding: 'var(--workspace-space-4)',
                       color: '#6b7280',
                       opacity: idx === items.length - 1 ? 0.4 : 1,
                       display: 'flex',
@@ -1882,7 +1882,7 @@ function DesignTab({
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
-                      padding: 4,
+                      padding: 'var(--workspace-space-4)',
                       color: '#6b7280',
                       display: 'flex',
                       flexShrink: 0,
@@ -1912,14 +1912,14 @@ function DesignTab({
                         if (clickable) onValueClick(item.searchphrase, resultVal)
                       }}
                       style={{
-                        marginTop: 4,
+                        marginTop: 'var(--workspace-space-4)',
                         marginLeft: 42,
                         fontSize: 'var(--workspace-font-control)',
                         fontWeight: 600,
                         color: '#202124',
                         cursor: clickable ? 'pointer' : 'default',
-                        borderRadius: 4,
-                        padding: '2px 4px',
+                        borderRadius: 'var(--workspace-radius-small)',
+                        padding: "var(--workspace-space-2) var(--workspace-space-4)",
                         transition: 'background-color 0.15s',
                       }}
                       onMouseEnter={e => {
@@ -1936,9 +1936,9 @@ function DesignTab({
                         <span
                           title={badge.title}
                           style={{
-                            marginLeft: 6, fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
+                            marginLeft: 'var(--workspace-space-6)', fontSize: 'var(--workspace-font-meta)', fontWeight: 500,
                             color: badge.color, background: badge.background,
-                            borderRadius: 3, padding: '1px 4px', whiteSpace: 'nowrap',
+                            borderRadius: 3, padding: "1px var(--workspace-space-4)", whiteSpace: 'nowrap',
                           }}
                         >
                           {badge.label(locator)}
@@ -1949,15 +1949,15 @@ function DesignTab({
                 })()}
                 {expandedSettingsId === item.id && (
                   <div id={`field-settings-${item.id}`} style={{
-                    marginTop: 6,
+                    marginTop: 'var(--workspace-space-6)',
                     marginLeft: 42,
-                    padding: '8px 10px',
+                    padding: "var(--workspace-space-8) var(--workspace-space-12)",
                     background: '#f9fafb',
-                    borderRadius: 6,
-                    border: '1px solid #e5e7eb',
+                    borderRadius: 'var(--workspace-radius-small)',
+                    border: "1px solid var(--workspace-border)",
                     fontSize: 'var(--workspace-font-meta)',
                   }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', cursor: 'pointer', marginBottom: 'var(--workspace-space-8)' }}>
                       <input
                         type="checkbox"
                         checked={item.is_optional}
@@ -1968,7 +1968,7 @@ function DesignTab({
                       <span style={{ color: '#6b7280' }}>skip accuracy penalty when not found</span>
                     </label>
                     <div>
-                      <label htmlFor={`allowed-values-${item.id}`} style={{ display: 'block', color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</label>
+                      <label htmlFor={`allowed-values-${item.id}`} style={{ display: 'block', color: '#374151', fontWeight: 500, marginBottom: 'var(--workspace-space-4)' }}>Allowed values</label>
                       <input
                         id={`allowed-values-${item.id}`}
                         value={enumDraft}
@@ -1986,14 +1986,14 @@ function DesignTab({
                           fontSize: 'var(--workspace-font-meta)',
                           fontFamily: 'inherit',
                           color: '#202124',
-                          border: '1px solid #d1d5db',
-                          borderRadius: 4,
-                          padding: '4px 8px',
+                          border: "1px solid var(--workspace-border)",
+                          borderRadius: 'var(--workspace-radius-small)',
+                          padding: "var(--workspace-space-4) var(--workspace-space-8)",
                           outline: 'none',
                           boxSizing: 'border-box',
                         }}
                       />
-                      <div style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)', marginTop: 3 }}>
+                      <div style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-4)' }}>
                         Comma-separated. LLM will pick from these values.
                       </div>
                     </div>
@@ -2028,14 +2028,14 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
     if (itemCount === 0) return null
     return (
       <div style={{
-        marginTop: 20, padding: 16, border: '1px solid #e5e7eb',
-        borderRadius: 8, backgroundColor: '#fafafa',
-        display: 'flex', alignItems: 'center', gap: 12,
+        marginTop: 'var(--workspace-space-20)', padding: 'var(--workspace-space-16)', border: "1px solid var(--workspace-border)",
+        borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fafafa',
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
       }}>
         <Shield aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>No validation data yet</div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginTop: 'var(--workspace-space-2)' }}>
             Run validation to check extraction reliability
           </div>
         </div>
@@ -2045,18 +2045,18 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
 
   return (
     <div style={{
-      marginTop: 20, padding: 16,
+      marginTop: 'var(--workspace-space-20)', padding: 'var(--workspace-space-16)',
       border: status.config_changed ? '1px solid #fde68a' : '1px solid #e5e7eb',
-      borderRadius: 8,
+      borderRadius: 'var(--workspace-radius-medium)',
       backgroundColor: status.config_changed ? '#fffbeb' : '#fafafa',
-      display: 'flex', alignItems: 'center', gap: 12,
+      display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
     }}>
       <Shield style={{
         width: 20, height: 20, flexShrink: 0,
         color: status.config_changed ? '#d97706' : status.tier === 'excellent' ? '#16a34a' : status.tier === 'good' ? '#2563eb' : '#d97706',
       }} />
       <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
           <QualityBadge
             tier={status.tier}
             score={status.score}
@@ -2069,7 +2069,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
           )}
         </div>
         {status.config_changed && (
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginTop: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e', marginTop: 'var(--workspace-space-4)' }}>
             Config changed since last validation. Re-validate for accurate results.
           </div>
         )}
@@ -2114,12 +2114,12 @@ export function ToolsTab({
   hasItems: boolean
 }) {
   return (
-    <div style={{ padding: 24 }}>
+    <div style={{ padding: 'var(--workspace-space-24)' }}>
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
-          gap: 16,
+          gap: 'var(--workspace-space-16)',
         }}
       >
         {/* Export PDF */}
@@ -2217,10 +2217,10 @@ function ToolCard({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
-        padding: 16,
+        gap: 'var(--workspace-space-6)',
+        padding: 'var(--workspace-space-16)',
         border: danger ? '1px solid #fecaca' : '1px solid #e5e7eb',
-        borderRadius: 8,
+        borderRadius: 'var(--workspace-radius-medium)',
         backgroundColor: disabled ? '#f9fafb' : danger ? '#fef2f2' : '#fff',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -2234,7 +2234,7 @@ function ToolCard({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
+          gap: 'var(--workspace-space-6)',
           fontSize: 'var(--workspace-font-body)',
           fontWeight: 600,
           color: danger ? '#dc2626' : '#202124',
@@ -2250,7 +2250,7 @@ function ToolCard({
           style={{
             fontSize: 'var(--workspace-font-meta)', lineHeight: 1.4, color: '#991b1b',
             background: '#fef2f2', border: '1px solid #fecaca',
-            borderRadius: 6, padding: '8px 10px',
+            borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12)",
           }}
         >
           {error}
@@ -2258,7 +2258,7 @@ function ToolCard({
       )}
       {secondaryAction && (
         <>
-          <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 4 }} />
+          <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 'var(--workspace-space-4)' }} />
           <span
             role="button"
             tabIndex={secondaryAction.disabled ? -1 : 0}
@@ -2279,7 +2279,7 @@ function ToolCard({
               color: secondaryAction.disabled ? '#6b7280' : '#2563eb',
               cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
               fontWeight: 500,
-              paddingTop: 2,
+              paddingTop: 'var(--workspace-space-2)',
             }}
           >
             {secondaryAction.label}
@@ -2325,15 +2325,15 @@ export function AdvancedTab({
   }
 
   const cardStyle: React.CSSProperties = {
-    padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb',
+    padding: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)",
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
       {/* Import / Export Definition. Import is at its most useful on an empty
           extraction, so it stays available; export has nothing to write out
           until there is at least one field. */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--workspace-space-16)' }}>
         <ToolCard
           title="Import Definition"
           description="Create a new extraction from an exported JSON file"
@@ -2349,13 +2349,13 @@ export function AdvancedTab({
         />
       </div>
 
-      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-20)' }}>
         <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
           Extraction Settings
         </div>
 
         {/* Use system defaults */}
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={useDefaults}
@@ -2370,7 +2370,7 @@ export function AdvancedTab({
           <>
           {/* Mode selector */}
           <div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-6)' }}>
               Mode
             </div>
             <select
@@ -2382,9 +2382,9 @@ export function AdvancedTab({
               style={{
                 fontSize: 'var(--workspace-font-control)',
                 fontFamily: 'inherit',
-                border: '1px solid #d1d5db',
-                borderRadius: 6,
-                padding: '6px 10px',
+                border: "1px solid var(--workspace-border)",
+                borderRadius: 'var(--workspace-radius-small)',
+                padding: "var(--workspace-space-6) var(--workspace-space-12)",
                 backgroundColor: '#fff',
               }}
             >
@@ -2431,10 +2431,10 @@ export function AdvancedTab({
 
           {/* Key Chunking */}
           <div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-6)' }}>
               Key Chunking
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={config.key_chunking?.enabled ?? false}
@@ -2450,7 +2450,7 @@ export function AdvancedTab({
               <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Enable key chunking</span>
             </label>
             {config.key_chunking?.enabled && (
-              <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ marginTop: 'var(--workspace-space-8)', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                 <label htmlFor="max-keys-per-chunk" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Max keys per chunk:</label>
                 <input
                   id="max-keys-per-chunk"
@@ -2470,9 +2470,9 @@ export function AdvancedTab({
                     width: 60,
                     fontSize: 'var(--workspace-font-control)',
                     fontFamily: 'inherit',
-                    border: '1px solid #d1d5db',
-                    borderRadius: 6,
-                    padding: '4px 8px',
+                    border: "1px solid var(--workspace-border)",
+                    borderRadius: 'var(--workspace-radius-small)',
+                    padding: "var(--workspace-space-4) var(--workspace-space-8)",
                   }}
                 />
               </div>
@@ -2481,10 +2481,10 @@ export function AdvancedTab({
 
           {/* Repetition / Consensus */}
           <div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 6 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-6)' }}>
               Repetition / Consensus
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
               <input
                 type="checkbox"
                 checked={config.repetition?.enabled ?? false}
@@ -2496,7 +2496,7 @@ export function AdvancedTab({
               />
               <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Enable repetition</span>
             </label>
-            <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#5f6368' }}>
+            <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#5f6368' }}>
               Run the extraction multiple times and use consensus to improve accuracy.
             </div>
           </div>
@@ -2511,7 +2511,7 @@ export function AdvancedTab({
         <ApiTab searchSetUuid={searchSetUuid} />
       ) : (
         <div style={cardStyle}>
-          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+          <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-6)' }}>
             Run this extraction via API
           </div>
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6 }}>
@@ -2625,27 +2625,27 @@ print(response.json())`
 }`
 
   const codeBlockStyle: React.CSSProperties = {
-    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    padding: "var(--workspace-space-16) var(--workspace-space-16)", backgroundColor: '#1a1a2e', borderRadius: 'var(--workspace-radius-small)', fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
     fontSize: 'var(--workspace-font-meta)', color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
   }
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
-    padding: '4px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-    borderRadius: 4, cursor: 'pointer', border: 'none',
+    padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer', border: 'none',
     backgroundColor: active ? '#3b82f6' : '#e5e7eb',
     color: active ? '#fff' : '#6b7280',
   })
 
   return (
-    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+    <div style={{ padding: 'var(--workspace-space-16)', backgroundColor: '#f9fafb', borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)" }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-12)' }}>
         <label style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#374151' }}>
           Run this extraction via API
         </label>
           <div
             role="radiogroup"
             aria-label="API example language"
-            style={{ display: 'flex', gap: 4 }}
+            style={{ display: 'flex', gap: 'var(--workspace-space-4)' }}
             onKeyDown={(e) => {
               if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault()
@@ -2660,14 +2660,14 @@ print(response.json())`
           </div>
         </div>
 
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.6 }}>
           Call this extraction directly from any HTTP client. No automation required. The endpoint runs synchronously
           and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
           the top-right menu. Rate-limited to 10 requests/minute.
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Endpoint
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2675,8 +2675,8 @@ print(response.json())`
           </div>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             This extraction's UUID
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2711,8 +2711,8 @@ print(response.json())`
           style={codeBlockStyle}
         />
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Response
           </div>
           <div style={codeBlockStyle}>
@@ -2720,11 +2720,11 @@ print(response.json())`
           </div>
         </div>
 
-        <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 'var(--workspace-space-6)' }}>
             Status lookup (optional)
           </div>
-          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 'var(--workspace-space-8)' }}>
             <span style={{ color: '#22d3ee' }}>GET</span>{' '}{statusEndpoint}
           </div>
           <ApiCodeBlock
@@ -2737,7 +2737,7 @@ print(response.json())`
           />
         </div>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
         Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
         <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
         <code>text</code> (optional, raw text to extract from) with an optional{' '}
@@ -2745,7 +2745,7 @@ print(response.json())`
         <code>text</code> must be provided.
       </div>
 
-      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}>
         <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
         Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
         with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
@@ -2762,8 +2762,8 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
   onCopy: (text: string, id: string) => void; style: React.CSSProperties;
 }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+    <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--workspace-space-6)' }}>
         <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
@@ -2771,9 +2771,9 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
           type="button"
           onClick={() => onCopy(code, id)}
           style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 'var(--workspace-font-meta)',
-            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
-            border: '1px solid #e5e7eb', backgroundColor: '#fff',
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)',
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
+            border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
             color: copied === id ? '#16a34a' : '#6b7280',
           }}
         >
@@ -2800,11 +2800,11 @@ function PassSettings({
   const modelSelectId = useId()
   return (
     <div>
-      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 8 }}>
+      <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-8)' }}>
         {label}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 4 }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-8)', paddingLeft: 'var(--workspace-space-4)' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={value.thinking ?? false}
@@ -2812,7 +2812,7 @@ function PassSettings({
           />
           <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Thinking</span>
         </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
           <input
             type="checkbox"
             checked={value.structured ?? false}
@@ -2820,7 +2820,7 @@ function PassSettings({
           />
           <span style={{ fontSize: 'var(--workspace-font-control)', color: '#374151' }}>Structured</span>
         </label>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
           <label htmlFor={modelSelectId} style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Model:</label>
           <select
             id={modelSelectId}
@@ -2830,9 +2830,9 @@ function PassSettings({
               width: 220,
               fontSize: 'var(--workspace-font-control)',
               fontFamily: 'inherit',
-              border: '1px solid #d1d5db',
-              borderRadius: 6,
-              padding: '6px 10px',
+              border: "1px solid var(--workspace-border)",
+              borderRadius: 'var(--workspace-radius-small)',
+              padding: "var(--workspace-space-6) var(--workspace-space-12)",
               backgroundColor: '#fff',
             }}
           >
@@ -2977,7 +2977,7 @@ function ValidationProgressDisplay({
 
   return (
     <div aria-live="off" style={{
-      border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
+      border: '1px solid #dbeafe', borderRadius: 'var(--workspace-radius-large)', padding: 'var(--workspace-space-20)',
       backgroundColor: '#f0f5ff',
     }}>
       {/* Single terse live region — announces the phase only, not the whole ticking panel */}
@@ -2991,7 +2991,7 @@ function ValidationProgressDisplay({
         aria-label="Validation progress"
         style={{
           height: 6, borderRadius: 3, backgroundColor: '#dbeafe',
-          marginBottom: 16, overflow: 'hidden',
+          marginBottom: 'var(--workspace-space-16)', overflow: 'hidden',
         }}
       >
         <div style={{
@@ -3003,13 +3003,13 @@ function ValidationProgressDisplay({
       </div>
 
       {/* Current operation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)', marginBottom: 'var(--workspace-space-16)' }}>
         <Loader2 aria-hidden="true" style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#1e40af' }}>
             Running {sources.length} {sources.length === 1 ? 'source' : 'sources'} &times; {numRuns} {numRuns === 1 ? 'replicate' : 'replicates'}
           </div>
-          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#3b5998', marginTop: 2 }}>
+          <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#3b5998', marginTop: 'var(--workspace-space-2)' }}>
             {progress.phase}
           </div>
         </div>
@@ -3019,49 +3019,49 @@ function ValidationProgressDisplay({
       </div>
 
       {/* Config details */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 'var(--workspace-space-6)', flexWrap: 'wrap' }}>
         <span style={{
-          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           {modeLabel}
         </span>
         <span style={{
-          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           Model: {modelName}
         </span>
         <span style={{
-          fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4,
+          fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
           backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
         }}>
           {numFields} fields
         </span>
         {hasThinking && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
             Thinking
           </span>
         )}
         {hasStructured && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#e0e7ff', color: '#4338ca', fontWeight: 500 }}>
             Structured
           </span>
         )}
         {hasConsensus && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
             Consensus
           </span>
         )}
         {hasChunking && (
-          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '3px 8px', borderRadius: 4, backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
+          <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-4) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: '#fef3c7', color: '#92400e', fontWeight: 500 }}>
             Chunking
           </span>
         )}
       </div>
 
       {/* Elapsed time */}
-      <div style={{ marginTop: 10, fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
+      <div style={{ marginTop: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>
         Elapsed: {progress.elapsed < 60 ? `${progress.elapsed}s` : `${Math.floor(progress.elapsed / 60)}m ${progress.elapsed % 60}s`}
       </div>
     </div>
@@ -3451,9 +3451,9 @@ function ValidateTab({
   // fields appear.)
   if (items.length === 0) {
     return (
-      <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-20)' }}>
         <div>
-          <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
             Validate & Improve
           </div>
           <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
@@ -3470,9 +3470,9 @@ function ValidateTab({
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div style={{ padding: 'var(--workspace-space-24)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-20)' }}>
       <div>
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
           Validate & Improve
         </div>
         <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', lineHeight: 1.5 }}>
@@ -3497,7 +3497,7 @@ function ValidateTab({
           aria-expanded={sources.length > 0 ? !sourcesCollapsed : undefined}
           aria-controls={sources.length > 0 ? 'test-cases-content' : undefined}
           style={{
-            display: 'flex', alignItems: 'center', gap: 6, marginBottom: sourcesCollapsed ? 0 : 12,
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: sourcesCollapsed ? 0 : 12,
             cursor: sources.length > 0 ? 'pointer' : 'default',
             userSelect: 'none',
           }}
@@ -3528,8 +3528,8 @@ function ValidateTab({
         {portability && portability.document_count > 0 && (
           portability.missing_snapshot_count > 0 ? (
             <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-              padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)',
               backgroundColor: '#fef2f2', border: '1px solid #fecaca',
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
@@ -3540,11 +3540,11 @@ function ValidateTab({
             </div>
           ) : (
             <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-              padding: '8px 14px', borderRadius: 8, marginBottom: 12,
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginBottom: 'var(--workspace-space-12)',
               backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
             }}>
-              <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 2 }} />
+              <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 'var(--workspace-space-2)' }} />
               <div style={{ flex: 1, fontSize: 'var(--workspace-font-meta)', color: '#075985', lineHeight: 1.5 }}>
                 {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation, and they won't need the original documents.
               </div>
@@ -3561,8 +3561,8 @@ function ValidateTab({
           if (!needMoreDocs && !needMoreRuns) {
             return (
               <div style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '8px 14px', borderRadius: 8, marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
+                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+                padding: "var(--workspace-space-8) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
                 backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
               }}>
                 <ShieldCheck style={{ width: 14, height: 14, color: '#059669', flexShrink: 0 }} />
@@ -3574,8 +3574,8 @@ function ValidateTab({
           }
           return (
             <div style={{
-              display: 'flex', alignItems: 'flex-start', gap: 10,
-              padding: '10px 14px', borderRadius: 8, marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-12)',
+              padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
               backgroundColor: '#fffbeb', border: '1px solid #fde68a',
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
@@ -3583,7 +3583,7 @@ function ValidateTab({
                 <strong>Quality score reduced due to low sample size.</strong>
                 {' '}
                 Raw score: <strong>{Math.round(bd.raw_score)}%</strong>, final: <strong>{Math.round(bd.final_score)}%</strong>
-                <div style={{ marginTop: 4, fontSize: 'var(--workspace-font-meta)', color: '#78350f' }}>
+                <div style={{ marginTop: 'var(--workspace-space-4)', fontSize: 'var(--workspace-font-meta)', color: '#78350f' }}>
                   {needMoreDocs && <>Add <strong>{3 - sources.length}</strong> more test document{3 - sources.length !== 1 ? 's' : ''} (need 3 total). </>}
                   {needMoreRuns && <>Increase to <strong>3</strong> runs per validation (currently {numRuns}).</>}
                 </div>
@@ -3594,31 +3594,31 @@ function ValidateTab({
 
         {sourcesCollapsed ? null : loadingSources ? (
           <div role="status" style={{
-            textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: '24px 0',
-            border: '1px dashed #d1d5db', borderRadius: 8,
+            textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0",
+            border: "1px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
           }}>
             <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading sources...
           </div>
         ) : sources.length === 0 ? (
           <div style={{
-            textAlign: 'center', padding: '32px 16px',
-            border: '1px dashed #d1d5db', borderRadius: 8,
+            textAlign: 'center', padding: "var(--workspace-space-32) var(--workspace-space-16)",
+            border: "1px dashed var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)',
           }}>
-            <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#6b7280', margin: '0 auto 12px' }} />
-            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+            <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#6b7280', margin: "0 auto var(--workspace-space-12)" }} />
+            <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#374151', marginBottom: 'var(--workspace-space-4)' }}>
               Validate your extraction
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 16, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#6b7280', marginBottom: 'var(--workspace-space-16)', lineHeight: 1.5 }}>
               Add documents with expected values to measure accuracy and consistency across multiple runs.
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', justifyContent: 'center' }}>
               <button
                 type="button"
                 onClick={() => setShowDocPicker(true)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600,
-                  fontFamily: 'inherit', borderRadius: 8, border: 'none',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600,
+                  fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-medium)', border: 'none',
                   backgroundColor: 'var(--color-panel-dark)', color: '#fff', cursor: 'pointer',
                 }}
               >
@@ -3628,10 +3628,10 @@ function ValidateTab({
                 type="button"
                 onClick={addTextSource}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 500,
-                  fontFamily: 'inherit', borderRadius: 8,
-                  border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500,
+                  fontFamily: 'inherit', borderRadius: 'var(--workspace-radius-medium)',
+                  border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
                 }}
               >
@@ -3646,8 +3646,8 @@ function ValidateTab({
               const label = (!isUuidLike && src.document_title) || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
               const docMissing = src.source_type === 'document' && src.document_uuid && src.document_exists === false
               return (
-                <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div key={src.id} style={{ padding: "var(--workspace-space-12) 0", borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
                     <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
                     <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {label}
@@ -3661,7 +3661,7 @@ function ValidateTab({
                       </span>
                     )}
                     <span style={{
-                      fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4,
+                      fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)',
                       backgroundColor: src.source_type === 'text' ? '#eff6ff' : '#fef3c7',
                       color: src.source_type === 'text' ? '#1d4ed8' : '#92400e',
                     }}>
@@ -3671,7 +3671,7 @@ function ValidateTab({
                       <button
                         type="button"
                         onClick={() => viewDocument(src.document_uuid!, src.document_title || label)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
                         title="View document"
                         aria-label={`View document ${label}`}
                       >
@@ -3681,7 +3681,7 @@ function ValidateTab({
                     <button
                       type="button"
                       onClick={() => toggleExpanded(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
                       title="Expected Values"
                       aria-label={`Expected values for ${label}`}
                       aria-expanded={!!src.expanded}
@@ -3695,7 +3695,7 @@ function ValidateTab({
                     <button
                       type="button"
                       onClick={() => removeSource(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#6b7280', display: 'flex' }}
                       aria-label={`Remove ${label}`}
                       title="Remove"
                     >
@@ -3704,10 +3704,10 @@ function ValidateTab({
                   </div>
 
                   {src.expanded && (
-                    <div id={`source-expected-${src.id}`} style={{ marginTop: 8, marginLeft: 22 }}>
+                    <div id={`source-expected-${src.id}`} style={{ marginTop: 'var(--workspace-space-8)', marginLeft: 22 }}>
                       {/* Text input for text sources */}
                       {src.source_type === 'text' && (
-                        <div style={{ marginBottom: 8 }}>
+                        <div style={{ marginBottom: 'var(--workspace-space-8)' }}>
                           <textarea
                             value={src.source_text ?? ''}
                             aria-label="Source text"
@@ -3716,13 +3716,13 @@ function ValidateTab({
                             rows={3}
                             style={{
                               width: '100%', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
-                              border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px',
+                              border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-8)",
                               resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                             }}
                           />
                         </div>
                       )}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-6)' }}>
                         <div style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#5f6368' }}>
                           Expected Values (optional)
                         </div>
@@ -3732,9 +3732,9 @@ function ValidateTab({
                             onClick={() => fillFromExtraction(src)}
                             disabled={fillingSourceId === src.id}
                             style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 3,
-                              padding: '2px 7px', fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
-                              borderRadius: 4, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                              padding: "var(--workspace-space-2) 7px", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
+                              borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                               color: fillingSourceId === src.id ? '#6b7280' : '#5f6368',
                               cursor: fillingSourceId === src.id ? 'not-allowed' : 'pointer',
                             }}
@@ -3748,22 +3748,22 @@ function ValidateTab({
                         )}
                       </div>
                       {fillError && !fillingSourceId && (
-                        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 6 }}>
+                        <div role="alert" style={{ fontSize: 'var(--workspace-font-meta)', color: '#dc2626', marginBottom: 'var(--workspace-space-6)' }}>
                           {fillError}
                         </div>
                       )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-6)' }}>
                         {items.map(item => (
-                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-2)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                               <span style={{
                                 fontSize: 'var(--workspace-font-meta)', color: '#374151', width: 120, flexShrink: 0,
                                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                display: 'flex', alignItems: 'center', gap: 3,
+                                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
                               }}>
                                 {item.searchphrase}
                                 {item.is_optional && (
-                                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '0px 3px', fontWeight: 500 }}>opt</span>
+                                  <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: "0px var(--workspace-space-4)", fontWeight: 500 }}>opt</span>
                                 )}
                               </span>
                               <input
@@ -3773,7 +3773,7 @@ function ValidateTab({
                                 placeholder={item.is_optional ? 'Expected value (optional field)' : 'Expected value'}
                                 style={{
                                   flex: 1, fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
-                                  border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 6px',
+                                  border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-4) var(--workspace-space-6)",
                                   outline: 'none',
                                   backgroundColor: item.is_optional && !src.expected_values[item.searchphrase] ? '#fafafa' : '#fff',
                                 }}
@@ -3809,14 +3809,14 @@ function ValidateTab({
 
         {/* Add buttons */}
         {!sourcesCollapsed && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-12)' }}>
             <button
               type="button"
               onClick={() => setShowDocPicker(true)}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                 color: '#202124', cursor: 'pointer',
               }}
             >
@@ -3826,9 +3826,9 @@ function ValidateTab({
               type="button"
               onClick={addTextSource}
               style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                 color: '#202124', cursor: 'pointer',
               }}
             >
@@ -3849,9 +3849,9 @@ function ValidateTab({
               if (newDocs.length > 0) setPendingDocs(newDocs)
             }}
             style={{
-              marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
+              marginTop: 'var(--workspace-space-8)', display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+              padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 500, fontFamily: 'inherit',
+              borderRadius: 'var(--workspace-radius-small)', border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
               color: '#1d4ed8', cursor: 'pointer',
             }}
           >
@@ -3870,15 +3870,15 @@ function ValidateTab({
       {/* 2. Detailed validation (on demand) — optional per-source/per-field
           deep-dive. The headline score lives in the tune panel above; this is
           a diagnostic breakdown, not a competing score. */}
-      <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+      <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-16)' }}>
+        <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-4)' }}>
           Detailed validation
         </div>
-        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 12 }}>
+        <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280', marginBottom: 'var(--workspace-space-12)' }}>
           Run the test cases as-is and inspect expected vs. extracted values per source and field.
           For the official score, use “Validate & improve” at the top.
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)' }}>
           <label htmlFor="detailed-validation-replicates" style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368' }}>Replicates:</label>
           <input
             id="detailed-validation-replicates"
@@ -3889,7 +3889,7 @@ function ValidateTab({
             onChange={e => setNumRuns(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))}
             style={{
               width: 50, fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
-              border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px',
+              border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-6) var(--workspace-space-8)",
             }}
           />
           <button
@@ -3897,9 +3897,9 @@ function ValidateTab({
             onClick={handleRunValidation}
             disabled={validating || sources.length === 0}
             style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 8, border: 'none',
+              display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 'var(--workspace-radius-medium)', border: 'none',
               backgroundColor: 'var(--color-panel-dark)', color: '#fff',
               cursor: validating || sources.length === 0 ? 'not-allowed' : 'pointer',
               opacity: validating || sources.length === 0 ? 0.5 : 1,
@@ -3915,7 +3915,7 @@ function ValidateTab({
 
         {/* Progress display */}
         {validating && (
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 'var(--workspace-space-16)' }}>
             <ValidationProgressDisplay
               progress={progress}
               sources={sources}
@@ -3930,10 +3930,10 @@ function ValidateTab({
       {/* 3. Quality History — graph only, expandable run table */}
       {qualityHistory.length > 1 && (
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
+          border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-16)',
           backgroundColor: '#fff',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-12)' }}>
             <TrendingUp aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280' }} />
             <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124' }}>Quality History</span>
             <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#6b7280' }}>({qualityHistory.length} runs)</span>
@@ -3949,9 +3949,9 @@ function ValidateTab({
             aria-expanded={historyExpanded}
             aria-controls="quality-history-run-table"
             style={{
-              display: 'flex', alignItems: 'center', gap: 4, marginTop: 8,
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-4)', marginTop: 'var(--workspace-space-8)',
               fontSize: 'var(--workspace-font-meta)', color: '#6b7280', background: 'none', border: 'none',
-              cursor: 'pointer', padding: '4px 0', fontFamily: 'inherit',
+              cursor: 'pointer', padding: "var(--workspace-space-4) 0", fontFamily: 'inherit',
             }}
           >
             {historyExpanded
@@ -3962,16 +3962,16 @@ function ValidateTab({
 
           {/* Collapsible run comparison table */}
           {historyExpanded && (
-            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 4 }}>
+            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 'var(--workspace-space-4)' }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                  <th style={{ width: 20, padding: '4px 2px' }} />
-                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Date</th>
-                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
-                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
-                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
-                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
-                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
+                <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
+                  <th style={{ width: 20, padding: "var(--workspace-space-4) var(--workspace-space-2)" }} />
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Date</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Score</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Acc</th>
+                  <th style={{ textAlign: 'right', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Cons</th>
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Config</th>
+                  <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontWeight: 500 }}>Model</th>
                 </tr>
               </thead>
               <tbody>
@@ -3994,46 +3994,46 @@ function ValidateTab({
                           }
                         }}
                       >
-                        <td style={{ padding: '4px 2px', color: '#6b7280' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-2)", color: '#6b7280' }}>
                           {isExpanded
                             ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
                             : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
                         </td>
-                        <td style={{ padding: '4px 6px', color: '#374151' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#374151' }}>
                           {new Date(run.created_at).toLocaleDateString()}
                         </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', fontWeight: 600, color: scoreColor }}>
                           {Math.round(run.score)}
                           {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
                             <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
-                              style={{ color: '#d97706', fontSize: 'var(--workspace-font-meta)', marginLeft: 2, verticalAlign: 'super' }}>*</span>
+                              style={{ color: '#d97706', fontSize: 'var(--workspace-font-meta)', marginLeft: 'var(--workspace-space-2)', verticalAlign: 'super' }}>*</span>
                           )}
                         </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
                           {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '-'}
                         </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'right', color: '#374151' }}>
                           {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '-'}
                         </td>
-                        <td style={{ padding: '4px 6px' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)" }}>
                           <span style={{
-                            display: 'inline-block', padding: '1px 6px', borderRadius: 4,
+                            display: 'inline-block', padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)',
                             backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 'var(--workspace-font-meta)',
                           }}>
                             {_summarizeConfig(run.extraction_config)}
                           </span>
                         </td>
-                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
+                        <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>
                           {run.model || '-'}
                         </td>
                       </tr>
                       {isExpanded && (
                         <tr>
-                          <td colSpan={7} style={{ padding: '8px 6px 12px 24px', backgroundColor: '#f9fafb' }}>
+                          <td colSpan={7} style={{ padding: "var(--workspace-space-8) var(--workspace-space-6) var(--workspace-space-12) var(--workspace-space-24)", backgroundColor: '#f9fafb' }}>
                             {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
                               <div style={{
-                                display: 'flex', alignItems: 'flex-start', gap: 8,
-                                padding: '8px 12px', marginBottom: 8, borderRadius: 6,
+                                display: 'flex', alignItems: 'flex-start', gap: 'var(--workspace-space-8)',
+                                padding: "var(--workspace-space-8) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-8)', borderRadius: 'var(--workspace-radius-small)',
                                 backgroundColor: '#fffbeb', border: '1px solid #fde68a',
                               }}>
                                 <AlertTriangle style={{ width: 14, height: 14, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
@@ -4074,8 +4074,8 @@ function ValidateTab({
         if (displayScore < 80) return null
         return (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 12,
-            padding: '12px 16px', borderRadius: 8,
+            display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-12)',
+            padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)',
             backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
           }}>
             <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
@@ -4089,9 +4089,9 @@ function ValidateTab({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setShowSubmitDialog(true) }}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 14px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-small)', border: '1px solid #a7f3d0', backgroundColor: '#fff',
                   color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
               >
@@ -4116,17 +4116,17 @@ function ValidateTab({
 
       {/* 4. Results — Executive Summary */}
       {results && (
-        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ borderTop: "1px solid var(--workspace-border)", paddingTop: 'var(--workspace-space-16)', display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <button
                 type="button"
                 onClick={() => downloadValidationCSV(results)}
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
                 }}
               >
@@ -4138,9 +4138,9 @@ function ValidateTab({
                 disabled={downloadingResults}
                 title="Download the raw results (JSON + CSV): every replicate's extracted value for every document, for archival and cross-model comparison"
                 style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                  padding: '5px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                  padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                   color: '#374151', cursor: downloadingResults ? 'wait' : 'pointer',
                   opacity: downloadingResults ? 0.6 : 1,
                 }}
@@ -4160,42 +4160,42 @@ function ValidateTab({
 
           {/* Executive Summary Card */}
           <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
-            padding: '12px 16px', borderRadius: 8, backgroundColor: '#f9fafb',
-            border: '1px solid #e5e7eb',
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--workspace-space-12)',
+            padding: "var(--workspace-space-12) var(--workspace-space-16)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#f9fafb',
+            border: "1px solid var(--workspace-border)",
           }}>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Mean Accuracy</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Mean Accuracy</div>
               <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: _scoreColor(results.executive_summary.mean_accuracy) }}>
                 {results.executive_summary.mean_accuracy !== null ? `${Math.round(results.executive_summary.mean_accuracy * 100)}%` : 'N/A'}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Mean Consistency</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Mean Consistency</div>
               <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: _scoreColor(results.executive_summary.mean_consistency) }}>
                 {Math.round(results.executive_summary.mean_consistency * 100)}%
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Perfect Fields</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Perfect Fields</div>
               <div style={{ fontSize: 'var(--workspace-font-page-title)', fontWeight: 700, color: '#202124' }}>
                 {results.executive_summary.perfect_fields_count}/{results.executive_summary.total_fields_count}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Std Dev</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Std Dev</div>
               <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#374151' }}>
                 {results.executive_summary.run_to_run_std_dev.toFixed(2)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Best Run</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Best Run</div>
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#059669' }}>
                 Src {results.executive_summary.best_run.source_index + 1}, Run {results.executive_summary.best_run.run_index + 1} ({results.executive_summary.best_run.correct} correct)
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 2 }}>Worst Run</div>
+              <div style={{ fontSize: 'var(--workspace-font-meta)', color: '#5f6368', marginBottom: 'var(--workspace-space-2)' }}>Worst Run</div>
               <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#dc2626' }}>
                 Src {results.executive_summary.worst_run.source_index + 1}, Run {results.executive_summary.worst_run.run_index + 1} ({results.executive_summary.worst_run.correct} correct)
               </div>
@@ -4216,11 +4216,11 @@ function ValidateTab({
             results.aggregate_consistency < 0.95
           )) && (
             <div style={{
-              border: '1px solid #fde68a', borderRadius: 8, padding: '12px 16px',
+              border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-medium)', padding: "var(--workspace-space-12) var(--workspace-space-16)",
               backgroundColor: '#fffbeb',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)' }}>
                   <Sparkles aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
                   <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
                 </div>
@@ -4230,9 +4230,9 @@ function ValidateTab({
                     onClick={handleGetSuggestions}
                     disabled={loadingSuggestions}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-                      borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
+                      display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+                      padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
+                      borderRadius: 'var(--workspace-radius-small)', border: '1px solid #fde68a', backgroundColor: '#fff',
                       color: '#92400e', cursor: 'pointer',
                     }}
                   >
@@ -4241,7 +4241,7 @@ function ValidateTab({
                 )}
               </div>
               {loadingSuggestions && (
-                <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--workspace-font-control)', color: '#92400e', marginTop: 8 }}>
+                <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', fontSize: 'var(--workspace-font-control)', color: '#92400e', marginTop: 'var(--workspace-space-8)' }}>
                   <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
                   Analyzing validation results...
                 </div>
@@ -4249,7 +4249,7 @@ function ValidateTab({
               {suggestions && (
                 <div
                   className="chat-markdown"
-                  style={{ fontSize: 'var(--workspace-font-control)', color: '#78350f', lineHeight: 1.6, marginTop: 8 }}
+                  style={{ fontSize: 'var(--workspace-font-control)', color: '#78350f', lineHeight: 1.6, marginTop: 'var(--workspace-space-8)' }}
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(suggestions) as string) }}
                 />
               )}
@@ -4258,14 +4258,14 @@ function ValidateTab({
 
           {/* 5. Per-Run Reproducibility */}
           {results.executive_summary.per_run_reproducibility.length > 0 && (
-            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 12, backgroundColor: '#fff' }}>
-              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 8 }}>Per-Run Reproducibility</div>
+            <div style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-12)', backgroundColor: '#fff' }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', marginBottom: 'var(--workspace-space-8)' }}>Per-Run Reproducibility</div>
               <table style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#5f6368', fontWeight: 600 }}>Run #</th>
+                  <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
+                    <th style={{ textAlign: 'left', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#5f6368', fontWeight: 600 }}>Run #</th>
                     {results.executive_summary.per_run_reproducibility.map(pr => (
-                      <th key={pr.source_label} style={{ textAlign: 'center', padding: '4px 6px', color: '#5f6368', fontWeight: 600, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <th key={pr.source_label} style={{ textAlign: 'center', padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#5f6368', fontWeight: 600, maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {pr.source_label}
                       </th>
                     ))}
@@ -4274,15 +4274,15 @@ function ValidateTab({
                 <tbody>
                   {Array.from({ length: numRuns }).map((_, runIdx) => (
                     <tr key={runIdx} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={{ padding: '4px 6px', color: '#374151', fontWeight: 500 }}>Run {runIdx + 1}</td>
+                      <td style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", color: '#374151', fontWeight: 500 }}>Run {runIdx + 1}</td>
                       {results.executive_summary.per_run_reproducibility.map(pr => {
                         const correct = pr.runs[runIdx] ?? 0
                         const total = items.length
                         const ratio = total > 0 ? correct / total : 0
                         return (
-                          <td key={pr.source_label} style={{ padding: '4px 6px', textAlign: 'center' }}>
+                          <td key={pr.source_label} style={{ padding: "var(--workspace-space-4) var(--workspace-space-6)", textAlign: 'center' }}>
                             <span style={{
-                              padding: '1px 6px', borderRadius: 4, fontSize: 'var(--workspace-font-meta)',
+                              padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', fontSize: 'var(--workspace-font-meta)',
                               backgroundColor: _scoreBg(ratio), color: _scoreColor(ratio),
                             }}>
                               {correct}
@@ -4299,15 +4299,15 @@ function ValidateTab({
 
           {/* 6. Per-Source Expandable Details */}
           {results.sources.map((sr, si) => (
-            <div key={si} style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+            <div key={si} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', overflow: 'hidden' }}>
               <button
                 type="button"
                 onClick={() => setExpandedSource(expandedSource === `${si}` ? null : `${si}`)}
                 aria-expanded={expandedSource === `${si}`}
                 aria-controls={`source-detail-${si}`}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '10px 14px', border: 'none', backgroundColor: '#fafafa',
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+                  padding: "var(--workspace-space-12) var(--workspace-space-16)", border: 'none', backgroundColor: '#fafafa',
                   cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                 }}
               >
@@ -4316,26 +4316,26 @@ function ValidateTab({
                   : <ChevronRight style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} aria-hidden="true" />
                 }
                 <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#202124', flex: 1 }}>{sr.source_label}</span>
-                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_accuracy), color: _scoreColor(sr.overall_accuracy) }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(sr.overall_accuracy), color: _scoreColor(sr.overall_accuracy) }}>
                   {sr.overall_accuracy !== null ? `${Math.round(sr.overall_accuracy * 100)}% acc` : 'N/A'}
                 </span>
-                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_consistency), color: _scoreColor(sr.overall_consistency) }}>
+                <span style={{ fontSize: 'var(--workspace-font-meta)', padding: "var(--workspace-space-2) var(--workspace-space-8)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(sr.overall_consistency), color: _scoreColor(sr.overall_consistency) }}>
                   {Math.round(sr.overall_consistency * 100)}% cons
                 </span>
               </button>
 
               {expandedSource === `${si}` && (
-                <div id={`source-detail-${si}`} style={{ padding: '0 14px 14px' }}>
-                  <table style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 8 }}>
+                <div id={`source-detail-${si}`} style={{ padding: "0 var(--workspace-space-16) var(--workspace-space-16)" }}>
+                  <table style={{ width: '100%', fontSize: 'var(--workspace-font-meta)', borderCollapse: 'collapse', marginTop: 'var(--workspace-space-8)' }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Field</th>
-                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Expected</th>
-                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Extracted</th>
-                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Distinct</th>
-                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Cons</th>
-                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Acc</th>
-                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Errors</th>
+                      <tr style={{ borderBottom: "1px solid var(--workspace-border)" }}>
+                        <th style={{ textAlign: 'left', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Field</th>
+                        <th style={{ textAlign: 'left', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Expected</th>
+                        <th style={{ textAlign: 'left', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Extracted</th>
+                        <th style={{ textAlign: 'center', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Distinct</th>
+                        <th style={{ textAlign: 'center', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Cons</th>
+                        <th style={{ textAlign: 'center', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Acc</th>
+                        <th style={{ textAlign: 'center', padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', fontWeight: 600 }}>Errors</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -4343,27 +4343,27 @@ function ValidateTab({
                         const errorEntries = Object.entries(f.error_types).filter(([, v]) => v > 0)
                         return (
                           <tr key={f.field_name} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                            <td style={{ padding: '6px 4px', color: '#202124', fontWeight: 500 }}>{f.field_name}</td>
-                            <td style={{ padding: '6px 4px', color: '#5f6368', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.expected ?? '-'}</td>
-                            <td style={{ padding: '6px 4px', color: '#202124', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#202124', fontWeight: 500 }}>{f.field_name}</td>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#5f6368', maxWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.expected ?? '-'}</td>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", color: '#202124', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {f.most_common_value ?? 'null'}
                             </td>
-                            <td style={{ padding: '6px 4px', textAlign: 'center', color: '#374151' }}>{f.distinct_value_count}</td>
-                            <td style={{ padding: '6px 4px', textAlign: 'center' }}>
-                              <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.consistency), color: _scoreColor(f.consistency), fontSize: 'var(--workspace-font-meta)' }}>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", textAlign: 'center', color: '#374151' }}>{f.distinct_value_count}</td>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", textAlign: 'center' }}>
+                              <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(f.consistency), color: _scoreColor(f.consistency), fontSize: 'var(--workspace-font-meta)' }}>
                                 {Math.round(f.consistency * 100)}%
                               </span>
                             </td>
-                            <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", textAlign: 'center' }}>
                               {f.accuracy !== null ? (
-                                <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.accuracy), color: _scoreColor(f.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
+                                <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(f.accuracy), color: _scoreColor(f.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
                                   {Math.round(f.accuracy * 100)}%
                                 </span>
                               ) : (
                                 <span style={{ color: '#6b7280', fontSize: 'var(--workspace-font-meta)' }}>N/A</span>
                               )}
                             </td>
-                            <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 'var(--workspace-font-meta)' }}>
+                            <td style={{ padding: "var(--workspace-space-6) var(--workspace-space-4)", textAlign: 'center', fontSize: 'var(--workspace-font-meta)' }}>
                               {errorEntries.length > 0
                                 ? errorEntries.map(([t, c]) => `${t}:${c}`).join(', ')
                                 : <span style={{ color: '#6b7280' }}>-</span>
@@ -4382,24 +4382,24 @@ function ValidateTab({
           {/* 7. Challenging Fields */}
           {results.challenging_fields.length > 0 && (
             <div style={{
-              border: '1px solid #fde68a', borderRadius: 8, padding: 12,
+              border: '1px solid #fde68a', borderRadius: 'var(--workspace-radius-medium)', padding: 'var(--workspace-space-12)',
               backgroundColor: '#fffbeb',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-8)' }}>
                 <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
                 <span style={{ fontSize: 'var(--workspace-font-control)', fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
                 {results.challenging_fields.map((cf, i) => (
-                  <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div key={i} style={{ fontSize: 'var(--workspace-font-meta)', color: '#78350f', display: 'flex', gap: 'var(--workspace-space-8)', alignItems: 'center' }}>
                     <span style={{ fontWeight: 600 }}>{cf.field_name}</span>
                     <span style={{ color: '#92400e' }}>({cf.source_label})</span>
                     {cf.accuracy !== null && (
-                      <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.accuracy), color: _scoreColor(cf.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
+                      <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(cf.accuracy), color: _scoreColor(cf.accuracy), fontSize: 'var(--workspace-font-meta)' }}>
                         {Math.round(cf.accuracy * 100)}% acc
                       </span>
                     )}
-                    <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(cf.consistency), color: _scoreColor(cf.consistency), fontSize: 'var(--workspace-font-meta)' }}>
+                    <span style={{ padding: "1px var(--workspace-space-6)", borderRadius: 'var(--workspace-radius-small)', backgroundColor: _scoreBg(cf.consistency), color: _scoreColor(cf.consistency), fontSize: 'var(--workspace-font-meta)' }}>
                       {Math.round(cf.consistency * 100)}% cons
                     </span>
                     <span style={{ fontSize: 'var(--workspace-font-meta)', color: '#92400e' }}>({cf.most_common_error})</span>
@@ -4411,11 +4411,11 @@ function ValidateTab({
 
           {/* 8. Error Type Summary */}
           {Object.keys(results.error_type_summary).length > 0 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap' }}>
               {Object.entries(results.error_type_summary).map(([type, count]) => (
                 <span key={type} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', fontSize: 'var(--workspace-font-meta)', borderRadius: 6,
+                  display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
+                  padding: "var(--workspace-space-4) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)',
                   backgroundColor: type === 'missing' ? '#fef2f2' : type === 'wrong_value' ? '#fef2f2' : type === 'format_difference' ? '#fffbeb' : '#eff6ff',
                   color: type === 'missing' ? '#dc2626' : type === 'wrong_value' ? '#dc2626' : type === 'format_difference' ? '#d97706' : '#1d4ed8',
                   fontWeight: 600,
@@ -4448,17 +4448,17 @@ function ValidateTab({
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            backgroundColor: '#fff', borderRadius: 12, padding: 24, maxWidth: 440, width: '90%',
+            backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)', padding: 'var(--workspace-space-24)', maxWidth: 440, width: '90%',
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
           }}>
-            <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#202124', marginBottom: 8 }}>
+            <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 700, color: '#202124', marginBottom: 'var(--workspace-space-8)' }}>
               Auto-populate expected values?
             </div>
-            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368', lineHeight: 1.6, marginBottom: 20 }}>
+            <div style={{ fontSize: 'var(--workspace-font-control)', color: '#5f6368', lineHeight: 1.6, marginBottom: 'var(--workspace-space-20)' }}>
               Run extraction on {pendingDocs.length === 1 ? 'this document' : `these ${pendingDocs.length} documents`} and
               use the results as expected values. You can review and correct them afterwards.
             </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', justifyContent: 'flex-end' }}>
               <button
                 type="button"
                 disabled={autoFilling}
@@ -4468,8 +4468,8 @@ function ValidateTab({
                   addDocuments(docs, false)
                 }}
                 style={{
-                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-medium)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
                   color: '#374151', cursor: 'pointer',
                 }}
               >
@@ -4484,8 +4484,8 @@ function ValidateTab({
                   addDocuments(docs, true)
                 }}
                 style={{
-                  padding: '8px 16px', fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
-                  borderRadius: 8, border: 'none',
+                  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
+                  borderRadius: 'var(--workspace-radius-medium)', border: 'none',
                   backgroundColor: 'var(--color-panel-dark)', color: '#fff',
                   cursor: autoFilling ? 'not-allowed' : 'pointer',
                   opacity: autoFilling ? 0.6 : 1,
@@ -4523,7 +4523,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
         <XAxis dataKey="date" tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} interval="preserveStartEnd" />
         <YAxis domain={[0, 100]} tick={{ fontSize: 'var(--workspace-font-meta)', fill: '#6b7280' }} />
         <Tooltip
-          contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 6, border: '1px solid #e5e7eb' }}
+          contentStyle={{ fontSize: 'var(--workspace-font-meta)', borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)" }}
           formatter={(value, name) => {
             const label = name === 'score' ? 'Quality' : 'Adjusted'
             return [`${Number(value ?? 0)}%`, label]
@@ -4548,11 +4548,11 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
   }
 
   const kvStyle: React.CSSProperties = {
-    display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 12px', fontSize: 'var(--workspace-font-meta)',
+    display: 'grid', gridTemplateColumns: 'auto 1fr', gap: "var(--workspace-space-2) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)',
   }
   const labelStyle: React.CSSProperties = { color: '#6b7280', fontWeight: 500 }
   const valStyle: React.CSSProperties = { color: '#374151' }
-  const sectionStyle: React.CSSProperties = { fontWeight: 600, color: '#4b5563', fontSize: 'var(--workspace-font-meta)', marginTop: 6, marginBottom: 2 }
+  const sectionStyle: React.CSSProperties = { fontWeight: 600, color: '#4b5563', fontSize: 'var(--workspace-font-meta)', marginTop: 'var(--workspace-space-6)', marginBottom: 'var(--workspace-space-2)' }
 
   const mode = (config.mode as string) || 'one_pass'
   const onePass = config.one_pass as Record<string, unknown> | undefined
@@ -4563,7 +4563,7 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
   const bool = (v: unknown) => v ? 'Yes' : 'No'
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
       <div style={kvStyle}>
         <span style={labelStyle}>Mode</span>
         <span style={valStyle}>{mode}</span>
@@ -4674,8 +4674,8 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 24px',
-        borderBottom: '1px solid #e5e7eb',
+        padding: "var(--workspace-space-16) var(--workspace-space-24)",
+        borderBottom: "1px solid var(--workspace-border)",
         backgroundColor: '#fff',
         flexShrink: 0,
       }}
@@ -4691,8 +4691,8 @@ function PanelHeader({ title, onClose }: { title: string; onClose: () => void })
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          padding: 4,
-          borderRadius: 4,
+          padding: 'var(--workspace-space-4)',
+          borderRadius: 'var(--workspace-radius-small)',
           color: '#5f6368',
           display: 'flex',
         }}

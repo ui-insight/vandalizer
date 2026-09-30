@@ -62,20 +62,20 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
-          backgroundColor: 'var(--workspace-canvas)', borderRadius: 12, padding: 24, width: 440,
+          backgroundColor: 'var(--workspace-canvas)', borderRadius: 'var(--workspace-radius-large)', padding: 'var(--workspace-space-24)', width: 440,
           border: '1px solid var(--workspace-border)', maxHeight: '85vh', overflowY: 'auto',
         }}
       >
-        <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 6 }}>
+        <div style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)' }}>
           Create Knowledge Base
         </div>
-        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '0 0 16px', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-16)", lineHeight: 1.5 }}>
           A knowledge base groups documents and URLs so you can chat with them as one
           searchable corpus. A clear title and short description help your team (and
           future-you) understand what it covers.
         </p>
 
-        <label htmlFor="create-kb-title" style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 4 }}>
+        <label htmlFor="create-kb-title" style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-4)' }}>
           Title
         </label>
         <input
@@ -88,13 +88,13 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
           aria-invalid={!!error}
           aria-describedby={error ? 'create-kb-error' : undefined}
           style={{
-            width: '100%', padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
-            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
-            color: 'var(--workspace-text)', marginBottom: 14, boxSizing: 'border-box',
+            width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+            color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-16)', boxSizing: 'border-box',
           }}
         />
 
-        <label htmlFor="create-kb-description" style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 4 }}>
+        <label htmlFor="create-kb-description" style={{ display: 'block', fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: 'var(--workspace-muted)', marginBottom: 'var(--workspace-space-4)' }}>
           Description
         </label>
         <textarea
@@ -104,20 +104,20 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
           placeholder="What is in this knowledge base, and what should it be used for?"
           rows={4}
           style={{
-            width: '100%', padding: '8px 10px', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
-            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 6,
-            color: 'var(--workspace-text)', marginBottom: 6, resize: 'vertical',
+            width: '100%', padding: "var(--workspace-space-8) var(--workspace-space-12)", fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
+            backgroundColor: 'var(--workspace-surface)', border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
+            color: 'var(--workspace-text)', marginBottom: 'var(--workspace-space-6)', resize: 'vertical',
             boxSizing: 'border-box', lineHeight: 1.5,
           }}
         />
-        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: '0 0 18px' }}>
+        <p style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-20)" }}>
           You can edit this later, but adding it now makes the KB easier to find in your
           grid and helps teammates decide whether to use it.
         </p>
 
         {error && (
           <div id="create-kb-error" role="alert" style={{
-            padding: '8px 12px', borderRadius: 6, marginBottom: 12,
+            padding: "var(--workspace-space-8) var(--workspace-space-12)", borderRadius: 'var(--workspace-radius-small)', marginBottom: 'var(--workspace-space-12)',
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
             border: '1px solid rgba(239, 68, 68, 0.25)',
@@ -126,14 +126,14 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', justifyContent: 'flex-end' }}>
           <button
             onClick={onClose}
             disabled={creating}
             style={{
-              padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--workspace-muted)', backgroundColor: 'transparent',
-              border: '1px solid var(--workspace-border)', borderRadius: 6,
+              border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
               cursor: creating ? 'default' : 'pointer',
               opacity: creating ? 0.6 : 1,
             }}
@@ -144,11 +144,11 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
             onClick={handleSubmit}
             disabled={!canSubmit}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
+              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
+              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
               color: 'var(--highlight-text-color, #000)',
               backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 6,
+              border: 'none', borderRadius: 'var(--workspace-radius-small)',
               cursor: canSubmit ? 'pointer' : 'default',
               opacity: canSubmit ? 1 : 0.5,
             }}

@@ -46,14 +46,14 @@ export function ExtractionOptimizationHistoryPanel({
   return (
     <div style={{
       backgroundColor: 'var(--workspace-surface)',
-      border: '1px solid var(--workspace-border)', borderRadius: 8,
+      border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-medium)',
       overflow: 'hidden',
     }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '10px 14px', background: 'transparent', border: 'none',
+          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
+          padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'transparent', border: 'none',
           fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
         }}
@@ -69,18 +69,18 @@ export function ExtractionOptimizationHistoryPanel({
       </button>
 
       {open && (
-        <div style={{ padding: '0 12px 12px 12px' }}>
+        <div style={{ padding: "0 var(--workspace-space-12) var(--workspace-space-12) var(--workspace-space-12)" }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: 'var(--workspace-muted)' }}>
+            <div style={{ textAlign: 'center', padding: 'var(--workspace-space-16)', color: 'var(--workspace-muted)' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)', padding: 'var(--workspace-space-8)' }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ padding: '12px 8px' }}>
-              <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-8)" }}>
+              <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-text)', fontWeight: 600, marginBottom: 'var(--workspace-space-6)' }}>
                 No prior tuning runs for this extraction
               </div>
               <div style={{ fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)', lineHeight: 1.55 }}>
@@ -96,7 +96,7 @@ export function ExtractionOptimizationHistoryPanel({
             </div>
           )}
           {items != null && filtered.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
               {filtered.map(run => (
                 <HistoryRow key={run.uuid} run={run} onSelect={onSelect} />
               ))}
@@ -120,10 +120,10 @@ function HistoryRow({
       onClick={() => onSelect?.(run.uuid)}
       disabled={!onSelect}
       style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        padding: '7px 10px', textAlign: 'left',
+        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+        padding: "7px var(--workspace-space-12)", textAlign: 'left',
         background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
-        borderRadius: 5, cursor: onSelect ? 'pointer' : 'default',
+        borderRadius: 'var(--workspace-radius-small)', cursor: onSelect ? 'pointer' : 'default',
         fontFamily: 'inherit', color: 'var(--workspace-text)',
       }}
       onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = 'var(--workspace-accent-ink)')}

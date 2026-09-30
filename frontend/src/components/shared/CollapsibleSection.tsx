@@ -46,15 +46,15 @@ export function CollapsibleSection({
   const Chevron = open ? ChevronDown : ChevronRight
 
   return (
-    <section data-testid={testId} style={{ border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
+    <section data-testid={testId} style={{ border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', backgroundColor: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-12) var(--workspace-space-12)" }}>
         <button
           type="button"
           onClick={toggle}
           aria-expanded={open}
           aria-controls={bodyId}
           style={{
-            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8,
+            flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
             fontFamily: 'inherit', textAlign: 'left', color: '#202124',
           }}
@@ -64,7 +64,7 @@ export function CollapsibleSection({
           {summary && (
             <span
               style={{
-                fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400, marginLeft: 4,
+                fontSize: 'var(--workspace-font-meta)', color: '#6b7280', fontWeight: 400, marginLeft: 'var(--workspace-space-4)',
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}
             >
@@ -74,7 +74,7 @@ export function CollapsibleSection({
         </button>
         {headerRight}
       </div>
-      <div id={bodyId} hidden={!open} style={{ padding: '4px 12px 14px', borderTop: '1px solid #f3f4f6' }}>
+      <div id={bodyId} hidden={!open} style={{ padding: "var(--workspace-space-4) var(--workspace-space-12) var(--workspace-space-16)", borderTop: '1px solid #f3f4f6' }}>
         {children}
       </div>
     </section>
