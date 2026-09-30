@@ -40,6 +40,17 @@ jobs:
         with:
           version: v0.74.0
 
+      # ...and `helm-lint`, which pipes `helm template` into kubeconform.
+      # helm is preinstalled on ubuntu-latest; kubeconform is not. Same pin
+      # and checksum as ci.yaml's helm-lint job.
+      - name: Install kubeconform
+        run: |
+          curl -fsSL -o kubeconform.tgz \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz
+          echo "95f14e87aa28c09d5941f11bd024c1d02fdc0303ccaa23f61cef67bc92619d73  kubeconform.tgz" | sha256sum -c -
+          tar xzf kubeconform.tgz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+
       - name: Run release validation
         run: make release-check
 
