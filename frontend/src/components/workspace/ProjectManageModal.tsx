@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { X, Users, Trash2, Link2, UserMinus, LogOut, Pencil } from 'lucide-react'
@@ -73,7 +74,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
     return () => { memberRequest.current += 1 }
   }, [open, loadMembers])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape' || e.defaultPrevented || savePending.current) return

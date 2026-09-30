@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useId, type KeyboardEvent, type ReactNode } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Send, Square, X, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'

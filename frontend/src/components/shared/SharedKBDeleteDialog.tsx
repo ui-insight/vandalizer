@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from './usePanelEffect'
+import { useState } from 'react'
+import { FocusTrap } from './PanelFocusTrap'
 import { AlertTriangle, X, Loader2, Users, Trash2 } from 'lucide-react'
 
 export type SharedKBDeleteChoice = 'transfer' | 'unshare_and_delete'
@@ -14,7 +15,7 @@ interface Props {
 export function SharedKBDeleteDialog({ open, kbTitle, onCancel, onChoose }: Props) {
   const [busy, setBusy] = useState<SharedKBDeleteChoice | null>(null)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && busy === null) onCancel()

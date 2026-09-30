@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
@@ -10,7 +11,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { QualityBadge } from './QualityBadge'
 import { CatalogUsage } from './CatalogUsage'
 import { CatalogSignals, CatalogEvidence } from './CatalogSignals'
@@ -162,7 +163,7 @@ export function ItemDetailModal({
     : item.kind === 'knowledge_base' ? 'kb'
     : null
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !adoptingRef.current) onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
@@ -499,6 +500,7 @@ function CollectionLink({
 // ---------------------------------------------------------------------------
 
 export function ExploreTab() {
+  const [collectionsOpen, setCollectionsOpen] = useState(false)
   const { user } = useAuth()
   const { toast } = useToast()
   const { activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
@@ -626,9 +628,11 @@ export function ExploreTab() {
 
   return (
     <>
-      <div className="flex flex-1 min-h-0">
+      <div className="explore-workspace">
+        <button type="button" className="explore-collections-toggle" aria-expanded={collectionsOpen} aria-controls="explore-collections" onClick={() => setCollectionsOpen(open => !open)}>{collectionsOpen ? 'Hide collections' : 'Browse collections'}</button>
+        <div className="explore-body flex flex-1 min-h-0">
         {/* Sidebar: Collections */}
-        <div className="w-56 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-3 hidden md:block">
+        <div id="explore-collections" className="explore-collections w-56 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-3" data-open={collectionsOpen}>
           <button
             aria-pressed={!selectedCollectionId}
             onClick={() => setSelectedCollectionId(null)}
@@ -681,8 +685,8 @@ export function ExploreTab() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6 max-w-5xl mx-auto">
+        <div className="min-w-0 flex-1 overflow-y-auto">
+          <div className="explore-content p-6 max-w-5xl mx-auto">
             {/* Hero header (no filters active) */}
             {showHero && !activeCollection && (
               <div className="mb-8">
@@ -721,7 +725,7 @@ export function ExploreTab() {
 
             {/* Search + Filters */}
             <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <div className="relative flex-1 min-w-0 basis-[200px] max-w-sm">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                 <input
                   type="text"
@@ -733,7 +737,7 @@ export function ExploreTab() {
                 />
               </div>
 
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 {kindFilters.map(([val, label]) => (
                   <button
                     key={val}
@@ -911,6 +915,7 @@ export function ExploreTab() {
         </div>
       </div>
 
+      </div>
       {/* Item detail modal */}
       {detailItem && (
         <ItemDetailModal

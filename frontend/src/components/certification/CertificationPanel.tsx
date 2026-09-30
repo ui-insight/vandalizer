@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   AppWindow,

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useState } from 'react'
 import { X, Search, Loader2 } from 'lucide-react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { importCatalogItems } from '../../api/library'
 import type { CatalogPreviewItem } from '../../api/library'
 import { useToast } from '../../contexts/ToastContext'
@@ -39,7 +40,7 @@ export function CatalogImportDialog({
   const [importing, setImporting] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }

@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { type ReactNode } from 'react'
 import {
   FolderKanban, FolderOpen, Database, Workflow, Zap, Users,
   Sparkles, ArrowRight, FileText, X, type LucideIcon,
@@ -15,7 +16,7 @@ import {
  * reopen it after projects exist.
  */
 export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!onClose) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

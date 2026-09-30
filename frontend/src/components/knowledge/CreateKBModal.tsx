@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Loader2 } from 'lucide-react'
 import { isDuplicateName } from '../../utils/nameValidation'
 
@@ -21,7 +22,7 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
     titleRef.current?.focus()
   }, [])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }

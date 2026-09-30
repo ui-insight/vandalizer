@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Plus, Trash2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { claimVerificationRequest, releaseVerificationRequest, setExaminerAdditions } from '../../api/library'
 import type { VerificationRequest, ExaminerBaselineAdditions } from '../../types/library'
@@ -88,7 +89,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
     }
   }, [request.uuid, request.claimed_by_user_id, currentUserId])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

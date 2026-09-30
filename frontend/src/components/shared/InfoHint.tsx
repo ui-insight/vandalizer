@@ -1,5 +1,6 @@
+import { usePanelEffect } from './usePanelEffect'
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from './panelPortal'
 
 interface InfoHintProps {
   /** Tooltip body. Plain text or nodes. */
@@ -53,7 +54,7 @@ export function InfoHint({ content, label = 'More information', theme = 'dark' }
     reposition()
   }, [open, reposition])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node

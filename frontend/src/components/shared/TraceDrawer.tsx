@@ -1,5 +1,5 @@
-import { FocusTrap } from 'focus-trap-react'
-import { useEffect } from 'react'
+import { usePanelEffect } from './usePanelEffect'
+import { FocusTrap } from './PanelFocusTrap'
 import { X } from 'lucide-react'
 import type { PerQueryResult } from '../../api/knowledge'
 
@@ -24,7 +24,7 @@ interface Props {
  */
 export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props) {
   // Close on Escape.
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)

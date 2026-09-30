@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 
 export interface ShareTeamOption {
@@ -50,7 +51,7 @@ export function ShareWithTeamDialog({ itemName, teamName, teams, defaultTeamId, 
 
   const isBusy = busy || submitting
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !isBusy && !inFlight.current) onCancel() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

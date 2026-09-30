@@ -345,9 +345,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { currentTeam, loading: teamsLoading } = useTeams()
 
   // ── URL-derived state ───────────────────────────────────────────────────
-  const workspaceMode: WorkspaceMode =
-    search.mode ??
-    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge', 'projects'])
+  // An old history entry without a mode keeps its original fallback; a later
+  // section choice must not rewrite what browser Back means.
+  const [initialWorkspaceMode] = useState<WorkspaceMode>(() => getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge', 'projects']))
+  const workspaceMode: WorkspaceMode = search.mode ?? initialWorkspaceMode
 
   const openWorkflowId: string | null = search.workflow ?? null
   const openWorkflowShareToken: string | null = search.workflow_share_token ?? null
@@ -422,10 +423,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [extractionOpenSignal, setExtractionOpenSignal] = useState(0)
 
   const updateSearch = useCallback(
-    (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
+    (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState, replace = true) => {
       navigate({
         search: (prev) => updater({ ...emptyWorkspaceSearch(), ...prev }),
-        replace: true,
+        replace,
       })
     },
     [navigate],
@@ -435,11 +436,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
     setStoredRaw('workspace:mode', mode)
-    updateSearch((prev) => ({ ...prev, mode: mode === 'chat' ? undefined : mode }))
+    updateSearch((prev) => ({ ...prev, mode }), false)
   }, [updateSearch])
 
   const setActiveRightTab = useCallback((tab: RightTab) => {
-    updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }))
+    updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }), false)
   }, [updateSearch])
 
   const openWorkflow = useCallback((id: string, sessionId?: string) => {
@@ -451,7 +452,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workflow_share_token: undefined,
       extraction: undefined,
       automation: undefined,
-    }))
+    }), false)
   }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
@@ -470,7 +471,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       ? { values: initialResults, sources: initialSources, crossFieldSets: initialCrossFieldSets, documentWarnings: initialDocumentWarnings }
       : null
     setExtractionOpenSignal(prev => prev + 1)
-    updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
+    updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }), false)
   }, [updateSearch])
 
   const consumeExtractionResults = useCallback((): PendingExtractionResults | null => {
@@ -484,7 +485,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [updateSearch])
 
   const openAutomation = useCallback((id: string) => {
-    updateSearch((prev) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined }))
+    updateSearch((prev) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined }), false)
   }, [updateSearch])
 
   const closeAutomation = useCallback(() => {
@@ -506,7 +507,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const resetToHome = useCallback(() => {
     projectScopeVersion.current += 1
-    updateSearch(() => emptyWorkspaceSearch())
+    updateSearch(() => ({ ...emptyWorkspaceSearch(), mode: 'chat' }))
     setStoredRaw('workspace:mode', 'chat')
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
@@ -565,7 +566,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setStoredRaw('workspace:mode', 'chat')
-    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+    updateSearch((prev) => ({ ...prev, mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch, clearChatAttachments])
 
   const attachKBs = useCallback((kbs: AttachedKB[]) => {
@@ -598,7 +599,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setStoredRaw('workspace:mode', 'chat')
-    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+    updateSearch((prev) => ({ ...prev, mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch, clearChatAttachments])
 
   const deactivateProject = useCallback(() => {
@@ -636,7 +637,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const clearParams = (openChat: boolean) => navigate({
       search: (prev) => ({
         ...emptyWorkspaceSearch(), ...prev, kb: undefined, docs: undefined, folders: undefined,
-        ...(openChat ? { mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined } : {}),
+        ...(openChat ? { mode: 'chat', workflow: undefined, extraction: undefined, automation: undefined, tab: undefined } : {}),
       }),
       replace: true,
     })
@@ -722,7 +723,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             // opens inside the scoped project rather than being wiped.
             search: () => ({
               ...emptyWorkspaceSearch(),
-              mode: requestedMode === 'chat' ? undefined : requestedMode,
+              mode: requestedMode,
               workflow: project.role === 'viewer' ? undefined : search.workflow,
               extraction: project.role === 'viewer' ? undefined : search.extraction,
               automation: project.role === 'viewer' ? undefined : search.automation,

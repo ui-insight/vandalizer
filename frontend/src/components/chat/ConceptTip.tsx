@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useState, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { HelpCircle } from 'lucide-react'
 
@@ -22,7 +23,7 @@ export function ConceptTip({ term, children }: ConceptTipProps) {
   const triggerRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
       if (

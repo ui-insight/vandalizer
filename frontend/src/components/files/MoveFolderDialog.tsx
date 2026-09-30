@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Folder as FolderIcon, Home, Users } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import type { Folder } from '../../types/document'

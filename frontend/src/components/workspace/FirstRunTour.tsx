@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
 const STEPS = [

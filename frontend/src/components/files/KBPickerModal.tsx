@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Library, Plus, Loader2 } from 'lucide-react'
 import { listKnowledgeBasesV2, createKnowledgeBase } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'

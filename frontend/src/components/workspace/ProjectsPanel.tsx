@@ -1,3 +1,4 @@
+import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, FolderKanban, HelpCircle, MoreHorizontal, Copy } from 'lucide-react'
@@ -16,6 +17,9 @@ import { ProjectsExplainer } from '../projects/ProjectsExplainer'
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
+  const visible = usePanelVisible()
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
   const { projects, loading, error, refresh, create, duplicate } = useProjects()
   const { toast } = useToast()
   const [newName, setNewName] = useState('')
@@ -41,11 +45,11 @@ export function ProjectsPanel() {
   // Switch the stored mode to chat *first* so the drawer doesn't linger via the
   // localStorage fallback while the (async) project scope resolves.
   const openProject = (uuid: string) => {
-    localStorage.setItem('workspace:mode', 'chat')
+    try { localStorage.setItem('workspace:mode', 'chat') } catch { /* URL navigation remains available. */ }
     navigate({
       to: '/',
       search: {
-        mode: undefined,
+        mode: 'chat',
         tab: undefined,
         workflow: undefined,
         extraction: undefined,
@@ -66,7 +70,8 @@ export function ProjectsPanel() {
       const project = await create(newName.trim())
       if (mounted.current) {
         setNewName('')
-        openProject(project.uuid)
+        if (visibleRef.current) openProject(project.uuid)
+        else toast(`Created “${project.title}”`, 'success', { label: 'Open project', onClick: () => openProject(project.uuid) })
       }
     } catch (error) {
       setCreateError(`${error instanceof Error ? error.message : 'Could not create project'}. Your name is preserved; retry Create.`)
@@ -93,7 +98,7 @@ export function ProjectsPanel() {
   }
 
   return (
-    <div className="relative h-full overflow-auto bg-white">
+    <div role="region" aria-label="Projects list" className="relative h-full overflow-auto bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 px-5 py-4">
         <FolderKanban className="h-5 w-5 text-gray-400" />
         <h2 className="text-base font-semibold text-gray-900">Projects</h2>

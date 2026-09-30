@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 
 interface AddUrlsModalProps {
@@ -14,7 +15,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
   const [allowedDomains, setAllowedDomains] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !submittedRef.current) onClose()
     }

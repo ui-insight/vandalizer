@@ -13,6 +13,24 @@ const setup = () => renderHook(() => useWorkspace(), { wrapper: WorkspaceProvide
 beforeEach(() => { localStorage.clear(); vi.clearAllMocks(); mocks.search = {}; mocks.teamsLoading = false; mocks.team = { uuid: 'team-1' } })
 
 describe('Project scope boundaries', () => {
+  it('records deliberate section/tool navigation and keeps old mode-less entries stable', () => {
+    const { result, rerender } = setup()
+    expect(result.current.workspaceMode).toBe('chat')
+    act(() => result.current.setWorkspaceMode('files'))
+    let options = mocks.navigate.mock.lastCall![0]
+    expect(options.replace).toBe(false)
+    expect(options.search({}).mode).toBe('files')
+    rerender()
+    expect(result.current.workspaceMode).toBe('chat')
+    act(() => result.current.setWorkspaceMode('chat'))
+    options = mocks.navigate.mock.lastCall![0]
+    expect(options.search({}).mode).toBe('chat')
+    act(() => result.current.openWorkflow('workflow-1'))
+    expect(mocks.navigate.mock.lastCall![0].replace).toBe(false)
+    act(() => result.current.resetToHome())
+    expect(mocks.navigate.mock.lastCall![0].search({}).mode).toBe('chat')
+  })
+
   it('clamps stored panel sizes and keeps navigation usable when storage writes fail', () => {
     localStorage.setItem('workspace:panelSplit', '1000')
     const { result } = setup()

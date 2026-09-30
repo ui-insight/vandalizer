@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 147,
+  "completed_items": 148,
   "total_items": 169,
-  "unique_states": 1094,
-  "capture_executions": 1330,
+  "unique_states": 1129,
+  "capture_executions": 1434,
   "mobile_grade": 8,
   "areas": [
     {
@@ -23,7 +23,7 @@
       "baseline_ux": 6.5,
       "ui": 8,
       "ux": 8,
-      "evidence": "../2026-09-28-projects-restored-layout/projects-empty-detail-768.png",
+      "evidence": "../2026-09-30-navigation-project-final/projects-empty-detail-768.png",
       "note": "Large lists, long titles, roles and counts remain readable. Creation, detail loading and edits recover without losing drafts. Empty/read-only details explain the next action. Scope transitions and stale-response guards pass fixture and component checks; live permissions remain unverified."
     },
     {
@@ -15727,6 +15727,1203 @@
       "observations": [
         "320\u00d7480, 768\u00d7500 and 1440\u00d7600: generation choices and payload, trial details, full comparison values/deltas with retry, apply acknowledgement/failure/retry and revert. Dialog actions fit; Escape restores generation/trial/comparison focus. Synthetic responses; no backend/model execution."
       ]
+    },
+    {
+      "directory": "2026-09-30-navigation-retention-complete",
+      "capturedAt": "2026-09-30T18:06:32.984Z",
+      "sourceFingerprint": "cff68c82f61d451ad833e36ac4f9f53fce39cb2147677ccda34e3403752840b4",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/certification/CelebrationOverlay.tsx\n M frontend/src/components/certification/CertificationPanel.tsx\n M frontend/src/components/chat/AttachKBModal.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ChatMessage.tsx\n M frontend/src/components/chat/ConceptTip.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/extractions/ExtractionTrialExplainerModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/DocumentSearchBar.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/KBPickerModal.tsx\n M frontend/src/components/files/MoveFileDialog.tsx\n M frontend/src/components/files/MoveFolderDialog.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/OrganizationHelp.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/ShareWithTeamDialog.tsx\n M frontend/src/components/library/VerificationSubmitModal.tsx\n M frontend/src/components/library/VerifiedCatalog.tsx\n M frontend/src/components/projects/ProjectsExplainer.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/SharedKBDeleteDialog.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/support/SupportChatPanel.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/AutomationsExplainer.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/FirstRunTour.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/KnowledgeExplainer.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/SaveWorkflowOutputDialog.tsx\n M frontend/src/components/workspace/WorkflowTrialExplainerModal.tsx\n M frontend/src/components/workspace/WorkspaceLayout.tsx\n M frontend/src/contexts/WorkspaceContext.projects.test.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/pages/Workspace.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/navigation-retention.mjs\n?? frontend/src/components/shared/PanelFocusTrap.tsx\n?? frontend/src/components/shared/PanelVisibility.test.tsx\n?? frontend/src/components/shared/PanelVisibility.tsx\n?? frontend/src/components/shared/panelPortal.tsx\n?? frontend/src/components/shared/usePanelEffect.ts\n?? frontend/src/pages/Workspace.test.tsx",
+      "commit": "ec4bdd1570c8a367ad8cdc489c8fa6a74961f3c2",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "navigation-library-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-browser-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-project-draft-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-collections-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-pane-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-hidden-library-portal-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-restored-library-portal-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-library-browser-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-project-draft-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-explore-collections-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-explore-pane-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-hidden-library-portal-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-restored-library-portal-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-library-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-library-browser-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-project-draft-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-knowledge-draft-back-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-automation-filter-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-knowledge-modal-restored-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-chat-and-file-retained-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-collections-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-explore-pane-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-hidden-library-portal-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-restored-library-portal-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "navigation-background-project-create-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "navigation-created-project-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Retained Library filters/80-row scroll/editor Back+Forward; project draft/search/sort/scroll; Knowledge selected questions and unsaved answer/modal; automation filters; file selection and chat draft at 320/768/1440px. Hidden modal releases keyboard focus. Synthetic APIs, no real writes or executions."
+      ]
+    },
+    {
+      "directory": "2026-09-30-navigation-file-library-regression",
+      "capturedAt": "2026-09-30T17:57:22.912Z",
+      "sourceFingerprint": "639371175d3fbb7087715bdd81ddf1afe8b78762f967c2cd53f09665e9ca5c5a",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/certification/CertificationPanel.tsx\n M frontend/src/components/chat/AttachKBModal.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/KBPickerModal.tsx\n M frontend/src/components/files/MoveFileDialog.tsx\n M frontend/src/components/files/MoveFolderDialog.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/OrganizationHelp.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/ShareWithTeamDialog.tsx\n M frontend/src/components/library/VerificationSubmitModal.tsx\n M frontend/src/components/library/VerifiedCatalog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/SharedKBDeleteDialog.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/support/SupportChatPanel.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/FirstRunTour.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/SaveWorkflowOutputDialog.tsx\n M frontend/src/components/workspace/WorkspaceLayout.tsx\n M frontend/src/contexts/WorkspaceContext.projects.test.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/pages/Workspace.tsx\n?? frontend/scripts/visual-review/navigation-retention.mjs\n?? frontend/src/components/shared/PanelFocusTrap.tsx\n?? frontend/src/components/shared/PanelVisibility.test.tsx\n?? frontend/src/components/shared/PanelVisibility.tsx\n?? frontend/src/components/shared/panelPortal.tsx",
+      "commit": "ec4bdd1570c8a367ad8cdc489c8fa6a74961f3c2",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-30-navigation-project-final",
+      "capturedAt": "2026-09-30T18:02:26.513Z",
+      "sourceFingerprint": "66c562f7174dd1ec9afc46a46be8141cbba39e43588a74ec7a980580b8b6b220",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/src/components/certification/CertificationPanel.tsx\n M frontend/src/components/chat/AttachKBModal.tsx\n M frontend/src/components/chat/ChatInput.tsx\n M frontend/src/components/chat/ContextLimitDialog.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/DocumentUsageDialog.tsx\n M frontend/src/components/files/KBPickerModal.tsx\n M frontend/src/components/files/MoveFileDialog.tsx\n M frontend/src/components/files/MoveFolderDialog.tsx\n M frontend/src/components/files/RawTextModal.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/knowledge/DocumentPickerModal.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.tsx\n M frontend/src/components/knowledge/ImportTestQueriesModal.tsx\n M frontend/src/components/knowledge/KBSourceInspectorModal.tsx\n M frontend/src/components/knowledge/TrialExplainerModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/library/CatalogImportDialog.tsx\n M frontend/src/components/library/ExaminerValidationDrawer.tsx\n M frontend/src/components/library/ExploreTab.tsx\n M frontend/src/components/library/LibraryItemRow.tsx\n M frontend/src/components/library/OrganizationHelp.tsx\n M frontend/src/components/library/RetroactiveBaselineDialog.tsx\n M frontend/src/components/library/ShareWithTeamDialog.tsx\n M frontend/src/components/library/VerificationSubmitModal.tsx\n M frontend/src/components/library/VerifiedCatalog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/DocumentPickerDialog.tsx\n M frontend/src/components/shared/InfoHint.tsx\n M frontend/src/components/shared/SharedKBDeleteDialog.tsx\n M frontend/src/components/shared/TermDef.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/support/SupportChatPanel.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/components/workspace/CredentialQuickCreateModal.tsx\n M frontend/src/components/workspace/FirstRunTour.tsx\n M frontend/src/components/workspace/ItemPickerModal.tsx\n M frontend/src/components/workspace/LibraryTab.tsx\n M frontend/src/components/workspace/ProjectManageModal.tsx\n M frontend/src/components/workspace/ProjectsPanel.tsx\n M frontend/src/components/workspace/RightPanel.test.tsx\n M frontend/src/components/workspace/RightPanel.tsx\n M frontend/src/components/workspace/SaveWorkflowOutputDialog.tsx\n M frontend/src/components/workspace/WorkspaceLayout.tsx\n M frontend/src/contexts/WorkspaceContext.projects.test.tsx\n M frontend/src/contexts/WorkspaceContext.tsx\n M frontend/src/pages/Workspace.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/navigation-retention.mjs\n?? frontend/src/components/shared/PanelFocusTrap.tsx\n?? frontend/src/components/shared/PanelVisibility.test.tsx\n?? frontend/src/components/shared/PanelVisibility.tsx\n?? frontend/src/components/shared/panelPortal.tsx\n?? frontend/src/pages/Workspace.test.tsx",
+      "commit": "ec4bdd1570c8a367ad8cdc489c8fa6a74961f3c2",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "projects-load-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-many-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-no-results-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-create-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "projects-empty-detail-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-members-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-title-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-description-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-status-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-scoped-chat-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-exited-chat-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-viewer-detail-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-access-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "projects-load-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-many-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-no-results-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-create-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "projects-empty-detail-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-members-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-title-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-description-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-status-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-scoped-chat-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-exited-chat-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-viewer-detail-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-access-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "projects-load-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-many-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-no-results-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-create-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "projects-empty-detail-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-members-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-title-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-description-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-status-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-scoped-chat-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-exited-chat-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-viewer-detail-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "projects-access-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
     }
   ]
 }

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Sparkles, X } from 'lucide-react'
 
 interface Props {
@@ -15,7 +16,7 @@ const OPTIONS = [
 export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
   const [choice, setChoice] = useState<'quick' | 'standard' | 'exhaustive'>('standard')
   const submitted = useRef(false)
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.stopPropagation(); onClose() } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

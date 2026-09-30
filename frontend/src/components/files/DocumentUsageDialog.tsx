@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Library, ListChecks, Workflow as WorkflowIcon, Folder, Loader2, ChevronRight } from 'lucide-react'
 import { fetchDocumentUsage, type DocumentUsage } from '../../api/files'
 

@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Search, FileText, Loader2, Check, Upload, FolderIcon } from 'lucide-react'
 import { searchDocuments, type SearchResult } from '../../api/documents'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
@@ -94,7 +95,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
   }, [])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !submitRef.current) onClose()
     }

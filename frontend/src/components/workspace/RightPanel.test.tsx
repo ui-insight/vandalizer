@@ -113,4 +113,19 @@ describe('RightPanel tab switching', () => {
     expect(screen.getByTestId('workflow-editor-marker')).not.toBe(first)
     expect(screen.getByTestId('library-marker')).toBe(library)
   })
+  it('retains the Library node across assistant and editor round trips', () => {
+    h.tab = 'library'
+    const { rerender } = render(<RightPanel />)
+    const library = screen.getByTestId('library-marker')
+    h.tab = 'assistant'; rerender(<RightPanel />)
+    expect(library).not.toBeVisible()
+    h.tab = 'library'; rerender(<RightPanel />)
+    expect(screen.getByTestId('library-marker')).toBe(library)
+    h.workflowId = 'workflow'; rerender(<RightPanel />)
+    expect(library).not.toBeVisible()
+    h.workflowId = null; rerender(<RightPanel />)
+    expect(screen.getByTestId('library-marker')).toBe(library)
+    expect(library).toBeVisible()
+  })
+
 })

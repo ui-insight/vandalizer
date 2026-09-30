@@ -1,3 +1,4 @@
+import { RetainedPanel } from '../shared/PanelVisibility'
 import { MessageSquare, BookOpen } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { AssistantTab } from './AssistantTab'
@@ -49,13 +50,9 @@ export function RightPanel() {
         {/* Tab content - matches Flask .tab-content */}
         <div className="flex-1 overflow-hidden bg-white">
           {/* Keep the Assistant mounted and just hide it when the Library tab
-              is open — see the keep-mounted comment above. Library mounts on
-              demand per tab switch but survives editor open/close via the
-              hidden wrapper. */}
-          <div className={cn('h-full', activeRightTab !== 'assistant' && 'hidden')}>
-            <AssistantTab />
-          </div>
-          {activeRightTab === 'library' && <LibraryTab />}
+              is open. Visited Library content also survives tab/editor switches. */}
+          <RetainedPanel active={activeRightTab === 'assistant' && !editor} eager><AssistantTab /></RetainedPanel>
+          <RetainedPanel eager={activeRightTab === 'library'} active={activeRightTab === 'library' && !editor}><LibraryTab /></RetainedPanel>
         </div>
       </div>
     </div>

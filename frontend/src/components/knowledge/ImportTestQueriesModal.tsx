@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useRef, useState } from 'react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Upload, X, FileSpreadsheet, Download, Loader2 } from 'lucide-react'
 import { importKBTestQueries, type KBTestQueryImportResult } from '../../api/knowledge'
 
@@ -36,7 +37,7 @@ export function ImportTestQueriesModal({ kbUuid, onImported, onClose }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const inFlight = useRef(false)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !inFlight.current) onClose()
     }

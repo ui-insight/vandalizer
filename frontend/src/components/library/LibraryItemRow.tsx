@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
 import {
   MoreHorizontal,
   Pin,

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -1386,7 +1386,7 @@ export function LibraryTab() {
           </div>
 
           {/* Items list */}
-          <div style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
+          <div role="region" aria-label="Saved Library items" style={{ flexGrow: 1, overflowY: 'auto', minHeight: 0, padding: 0 }}>
             <div className="library-recovery-feedback">
             {error && <div role="alert" className="library-feedback">{error} <button type="button" onClick={() => void refresh()}>Retry libraries</button></div>}
             {itemsError && <div role="alert" className="library-feedback">Items unavailable. {itemsError} <button type="button" onClick={() => void refreshItems()}>Retry items</button></div>}

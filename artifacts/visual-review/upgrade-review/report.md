@@ -2,7 +2,7 @@
 
 September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: 147/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**Implemented locally: 148/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
 
 The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
 
@@ -29,6 +29,16 @@ This backend/worker/frontend change is local only and requires a coordinated rel
 - Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
 - Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
 - Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
+
+## Retained navigation state — September 30
+
+**148/169 checklist items implemented locally.** SYS-08 is complete for the reviewed workspace navigation flows; changes are not deployed.
+
+- Visited source panels and Library retain drafts, selected questions, filters, scroll and pending work across section/tool switches. Browser Back/Forward now tracks deliberate section, tab and editor navigation; old mode-less history entries keep a stable initial fallback. Explicit home/project activation lands in Chat.
+- Hidden panels are inert. Their focus traps and portaled dialogs do not capture focus or cover the active view, and global keyboard listeners pause while hidden. Returning restores the same dialog and its choices. Retained views reset at account/team boundaries; project-scoped Knowledge/Automations reset when project scope changes.
+- Creating a project while switching to Files completes without taking over navigation, and offers an explicit Open project action. Storage-write failure does not block project opening. Explore responds to the Library pane width; narrow panes expose a collections toggle instead of squeezing content behind the sidebar.
+- Verification: 181 frontend tests across 32 files pass; TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and three pre-existing dependency warnings. The 104 selected captures cover retained state (35), file/Library workflow regression at five widths (30), and project creation/recovery/scope/viewer journeys (39). They have zero axe findings, page overflow, uncaught errors or unmatched requests. Browser Back/Forward, exact retained drafts/scroll, hidden portal and Escape behavior, delayed project creation, file selection, workflow failure/retry and scope clearing are asserted. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-navigation-retention-complete`, `2026-09-30-navigation-file-library-regression`, and `2026-09-30-navigation-project-final`. Draft retention is in tab memory, not a promise to save unsent drafts across reload. Project scope remains an explicit workspace context until changed/exited. API data and workflow results are synthetic; live permissions, execution and assistive-technology devices are not certified.
 
 ## Short-screen validation review — September 30
 
@@ -188,7 +198,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 | Area | Baseline UI/UX | Current UI/UX | Evidence |
 |---|---:|---:|---|
 | File browser | 6/6 | 8/8 | [files-return-from-document-1440](../2026-09-28-files-restored-layout/files-return-from-document-1440.png) |
-| Projects | 6.5/6.5 | 8/8 | [projects-empty-detail-768](../2026-09-28-projects-restored-layout/projects-empty-detail-768.png) |
+| Projects | 6.5/6.5 | 8/8 | [projects-empty-detail-768](../2026-09-30-navigation-project-final/projects-empty-detail-768.png) |
 | Automations screen and editor | 6/6 | 8/8 | [automation-summary-editor-1440](../2026-09-28-automation-summary-review/automation-summary-editor-1440.png) |
 | Automation creation wizard | 7.5/5.5 | 8/8 | [wizard-schedule-review-320](../2026-09-28-wizard-mobile-final/wizard-schedule-review-320.png) |
 | Knowledge bases | 6/5.5 | 8/8 | [knowledge-project-later-page-320](../2026-09-29-knowledge-project-final/knowledge-project-later-page-320.png) |
@@ -214,7 +224,7 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
 - Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
 - Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-- Final evidence: 1094 distinct states / 1330 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
+- Final evidence: 1129 distinct states / 1434 capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
 - No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
 - All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
 - Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
@@ -327,6 +337,9 @@ UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable wit
 - [2026-09-30-validation-questions-short](../2026-09-30-validation-questions-short/manifest.json): 23 states; source `19c339b27e1acf78528c3e53711c265777f0eae7a3eeea27c7a40b27b2064ac9`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-validation-history-short](../2026-09-30-validation-history-short/manifest.json): 18 states; source `19c339b27e1acf78528c3e53711c265777f0eae7a3eeea27c7a40b27b2064ac9`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 - [2026-09-30-validation-dialogs-final](../2026-09-30-validation-dialogs-final/manifest.json): 36 states; source `ea93a730a60c7a33d73d6403a7e0b2330efb65e6a656c65585373f937a656775`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-navigation-retention-complete](../2026-09-30-navigation-retention-complete/manifest.json): 35 states; source `cff68c82f61d451ad833e36ac4f9f53fce39cb2147677ccda34e3403752840b4`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-navigation-file-library-regression](../2026-09-30-navigation-file-library-regression/manifest.json): 30 states; source `639371175d3fbb7087715bdd81ddf1afe8b78762f967c2cd53f09665e9ca5c5a`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
+- [2026-09-30-navigation-project-final](../2026-09-30-navigation-project-final/manifest.json): 39 states; source `66c562f7174dd1ec9afc46a46be8141cbba39e43588a74ec7a980580b8b6b220`; fixture `9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af`; production; Chromium 148.0.7778.96.
 
 ## Section notes
 

@@ -1,6 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import './comparison-layout.css'
-import { useEffect } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 import type { OptimizationTrial } from '../../api/knowledge'
 import { scoreColor } from '../shared/TrialsTable'
@@ -33,7 +33,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
 export function TrialExplainerModal({ trial, onClose }: Props) {
   // Escape-to-close. Effect runs unconditionally (hook order stays stable);
   // the listener is a no-op while the modal is closed.
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!trial) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Retained navigation state — September 30
+
+**148/169 checklist items implemented locally.** SYS-08 is complete for the reviewed workspace navigation flows; changes are not deployed.
+
+- Visited source panels and Library retain drafts, selected questions, filters, scroll and pending work across section/tool switches. Browser Back/Forward now tracks deliberate section, tab and editor navigation; old mode-less history entries keep a stable initial fallback. Explicit home/project activation lands in Chat.
+- Hidden panels are inert. Their focus traps and portaled dialogs do not capture focus or cover the active view, and global keyboard listeners pause while hidden. Returning restores the same dialog and its choices. Retained views reset at account/team boundaries; project-scoped Knowledge/Automations reset when project scope changes.
+- Creating a project while switching to Files completes without taking over navigation, and offers an explicit Open project action. Storage-write failure does not block project opening. Explore responds to the Library pane width; narrow panes expose a collections toggle instead of squeezing content behind the sidebar.
+- Verification: 181 frontend tests across 32 files pass; TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and three pre-existing dependency warnings. The 104 selected captures cover retained state (35), file/Library workflow regression at five widths (30), and project creation/recovery/scope/viewer journeys (39). They have zero axe findings, page overflow, uncaught errors or unmatched requests. Browser Back/Forward, exact retained drafts/scroll, hidden portal and Escape behavior, delayed project creation, file selection, workflow failure/retry and scope clearing are asserted. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-navigation-retention-complete`, `2026-09-30-navigation-file-library-regression`, and `2026-09-30-navigation-project-final`. Draft retention is in tab memory, not a promise to save unsent drafts across reload. Project scope remains an explicit workspace context until changed/exited. API data and workflow results are synthetic; live permissions, execution and assistive-technology devices are not certified.
+
 ## Short-screen validation review — September 30
 
 **147/169 checklist items implemented locally.** VAL-17 is complete for the reviewed validation flows; changes are not deployed.
@@ -344,7 +354,7 @@ Unchecked items remain open; checked items refer to local implementation, not a 
 - [ ] **SYS-05 · P2 · Improve:** Make the active section and current project context unmistakable, including when opening an item from chat or the Library.
 - [ ] **SYS-06 · P2 · Improve:** Use consistent placement for the page title, description, primary action, search, filters and secondary actions.
 - [ ] **SYS-07 · P2 · Improve:** Establish one coherent vocabulary for Files, Projects, Automations, Knowledge, Library and Explore; distinguish location from ownership/sharing scope.
-- [ ] **SYS-08 · P2 · Verify:** Back navigation, section switches and opening/closing contextual panels preserve the intended selection, draft and scroll position.
+- [x] **SYS-08 · P2 · Verify:** Back navigation, section switches and opening/closing contextual panels preserve the intended selection, draft and scroll position.
 
 Acceptance: the active task owns the visual hierarchy; supporting panels are discoverable without dominating; navigation never silently discards work.
 

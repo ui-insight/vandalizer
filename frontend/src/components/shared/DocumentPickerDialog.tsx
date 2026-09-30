@@ -1,5 +1,6 @@
+import { usePanelEffect } from './usePanelEffect'
 import { useCallback, useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from './PanelFocusTrap'
 import { X, Search, Loader2, FileText } from 'lucide-react'
 import { searchDocuments } from '../../api/documents'
 
@@ -24,7 +25,7 @@ export function DocumentPickerDialog({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const excludeRef = useCallback((uuid: string) => excludeUuids.includes(uuid), [excludeUuids.join(',')])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

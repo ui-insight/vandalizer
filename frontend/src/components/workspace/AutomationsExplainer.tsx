@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { X, FolderSearch, Zap, FileCheck, Sparkles, type LucideIcon } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 
 export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!onClose) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

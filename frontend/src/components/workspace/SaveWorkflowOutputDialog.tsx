@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useMemo, useState } from 'react'
 import { describeFileSummary, summarizeFilePayload } from './outputFilePayload'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Folder } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import { saveResultToFolder, type SaveOutputFormat } from '../../api/workflows'
@@ -48,7 +49,7 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
       .finally(() => setLoading(false))
   }, [activeProjectRootFolder])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

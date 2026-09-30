@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { X } from 'lucide-react'
 import type { WorkflowOptimizationTrial } from '../../api/workflows'
 import { scoreColor } from '../shared/TrialsTable'
@@ -27,7 +27,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
  * each step did.
  */
 export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!trial) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

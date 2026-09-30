@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { CircleHelp, Folder, Pin, Star, X } from 'lucide-react'
 
 const ORGANIZATION_OPTIONS = [

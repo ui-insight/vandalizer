@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { marked } from 'marked'
 import { pollStatus, retryExtraction } from '../../api/documents'

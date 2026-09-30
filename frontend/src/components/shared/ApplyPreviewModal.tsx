@@ -1,5 +1,6 @@
+import { usePanelEffect } from './usePanelEffect'
 import { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from './PanelFocusTrap'
 import { AlertTriangle, CheckCircle2, MinusCircle, X } from 'lucide-react'
 
 /** Generic per-item entry — matches ``optimization_common.build_apply_preview``. */
@@ -64,7 +65,7 @@ export function ApplyPreviewModal({
     })
   }, [preview.items])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !applying) onCancel() }
     document.addEventListener('keydown', onKeyDown)

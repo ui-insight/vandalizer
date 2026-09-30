@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { BookOpen, Check, Loader2, Search, X } from 'lucide-react'
 import { listKnowledgeBasesV2 } from '../../api/knowledge'
 import type { KnowledgeBase, KBScope } from '../../types/knowledge'

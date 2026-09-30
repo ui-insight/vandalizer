@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useState } from 'react'
 import { describeSourceCurrency, formatCurrencyDateTime } from './sourceCurrency'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
 import { getKBSource, setKBSourceAmends, setKBSourceReference } from '../../api/knowledge'
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
@@ -50,7 +51,7 @@ export function KBSourceInspectorModal({ kbUuid, source, otherSources = [], onCl
   }, [kbUuid, source.uuid, attempt])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }

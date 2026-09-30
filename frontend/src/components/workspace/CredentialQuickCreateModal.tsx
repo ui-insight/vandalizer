@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 import { createCredential, testCredentialDraft } from '../../api/credentials'
 import { CredentialTestPanel } from '../credentials/CredentialTestPanel'
@@ -83,7 +84,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
     }
   }, [open, initialType])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

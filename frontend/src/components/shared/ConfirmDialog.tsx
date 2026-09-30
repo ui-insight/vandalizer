@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from './usePanelEffect'
+import { useState } from 'react'
+import { FocusTrap } from './PanelFocusTrap'
 import { AlertTriangle, X, Loader2 } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -25,7 +26,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !busy) onCancel()

@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import type { Library, LibraryItemKind } from '../../types/library'
 import { addItem, listItems } from '../../api/library'
 
@@ -35,7 +36,7 @@ export function AddToLibraryDialog({ libraries, itemId, itemName, kind, onClose,
     return () => { active = false }
   }, [selectedLibraryId, itemId, kind])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape' && !savingRef.current) onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

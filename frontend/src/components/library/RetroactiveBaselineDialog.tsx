@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useState } from 'react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { pinRetroactiveBaseline } from '../../api/library'
 import type { CatalogCoverageItem } from '../../types/library'
@@ -40,7 +41,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

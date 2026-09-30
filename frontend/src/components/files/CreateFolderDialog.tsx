@@ -1,5 +1,5 @@
 import { useRef, useState, type FormEvent } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
 import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 

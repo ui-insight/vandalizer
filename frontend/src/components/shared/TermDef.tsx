@@ -1,5 +1,6 @@
-import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { usePanelEffect } from './usePanelEffect'
+import { useState, useRef, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from './panelPortal'
 
 type TermKey =
   | 'judge'
@@ -108,7 +109,7 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
     reposition()
   }, [open, reposition])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
       const t = e.target as Node

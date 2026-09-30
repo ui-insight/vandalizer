@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Scissors, Minimize2, Trash2, X, Loader2, Sparkles } from 'lucide-react'
 import type { SuggestedModel } from '../../types/chat'
 

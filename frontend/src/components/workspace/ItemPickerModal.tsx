@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Search, X, Workflow, FileText, Users, Compass, Loader2, Pin, Star } from 'lucide-react'
 import { listLibraries, listItems, listVerifiedItems } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -75,7 +76,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
   }, [])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         // Consume Escape before closing: a parent wizard may re-render and

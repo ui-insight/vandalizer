@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail, CalendarClock } from 'lucide-react'
 import { createAutomation, updateAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
@@ -207,7 +208,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, scheduleConfig, actionType, actionId, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate, canAdvance])
 
   // Keyboard: Escape requests close; Enter in a text field advances a step.
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (discardOpen || docPickerOpen || showPicker || e.defaultPrevented || e.isComposing) return
       if (e.key === 'Escape' && !creating) { e.preventDefault(); requestClose() }

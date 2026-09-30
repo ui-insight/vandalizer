@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { createPortal } from '../shared/panelPortal'
 import {
   ArrowLeft,
   Check,
@@ -1531,7 +1532,7 @@ export function SupportChatPanel({
   }, [])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

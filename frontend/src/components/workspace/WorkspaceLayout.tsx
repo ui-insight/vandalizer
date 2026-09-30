@@ -1,4 +1,5 @@
-import { FocusTrap } from 'focus-trap-react'
+import { RetainedPanel } from '../shared/PanelVisibility'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { fitPanelSplit, panelSplitBounds, readCompactPanelChoices, saveCompactPanelChoices } from '../../utils/workspaceLayout'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -179,8 +180,10 @@ export function WorkspaceLayout() {
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
-            <div className={isProjects || isAutomations || isKnowledge ? 'hidden' : 'h-full'}><LeftPanel /></div>
-            {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : null}
+            <RetainedPanel eager active={!isProjects && !isAutomations && !isKnowledge && !collapseLeft}><LeftPanel /></RetainedPanel>
+            <RetainedPanel active={isProjects && !collapseLeft}><ProjectsPanel /></RetainedPanel>
+            <RetainedPanel key={`automations:${activeProjectUuid ?? 'all'}`} active={isAutomations && !collapseLeft}><AutomationsPanel activeIds={automationActivity.activeIds} /></RetainedPanel>
+            <RetainedPanel key={`knowledge:${activeProjectUuid ?? 'all'}`} active={isKnowledge && !collapseLeft}><KnowledgePanel /></RetainedPanel>
           </div>
 
           {/* Resizer — hidden when the left panel is collapsed */}
@@ -196,7 +199,7 @@ export function WorkspaceLayout() {
           )}
 
           <div role="region" aria-label="Tools and assistant" className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
-            <div style={{ flex: 1, minHeight: 0 }}><RightPanel /></div>
+            <div style={{ flex: 1, minHeight: 0 }}><RetainedPanel eager active={!showLeftOnly}><RightPanel /></RetainedPanel></div>
           </div>
           </div>
         </main>

@@ -1,3 +1,4 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight, Eye, FileText } from 'lucide-react'
 import { submitChatFeedback } from '../../api/feedback'
@@ -229,7 +230,7 @@ export function ChatMessage({
 
   // Close the citation chooser on an outside click or Escape, so it never
   // strands itself over the next message.
-  useEffect(() => {
+  usePanelEffect(() => {
     if (citationMenu === null) return
     const onPointerDown = (e: MouseEvent) => {
       if (!citationsRef.current?.contains(e.target as Node)) setCitationMenu(null)

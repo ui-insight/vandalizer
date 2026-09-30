@@ -1,6 +1,7 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import './comparison-layout.css'
 import { useEffect, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Loader2, ArrowLeftRight } from 'lucide-react'
 import {
   getKBOptimization,
@@ -58,7 +59,7 @@ export function CompareRunsView({
   }, [open, kbUuid, currentRunUuid, otherRunUuid, attempt])
 
   // Close on Escape
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

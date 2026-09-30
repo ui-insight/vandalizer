@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
-import { FocusTrap } from 'focus-trap-react'
+import { usePanelEffect } from '../shared/usePanelEffect'
+import { useState } from 'react'
+import { createPortal } from '../shared/panelPortal'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload, Users, Eye } from 'lucide-react'
 import { submitForVerification } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -68,7 +69,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [intendedUseTags, setIntendedUseTags] = useState('')
   const skipValidation = intent === 'help'
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

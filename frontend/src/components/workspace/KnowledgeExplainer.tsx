@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { X, Layers, Search, BookOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 
 export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!onClose) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

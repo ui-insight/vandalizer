@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { X } from 'lucide-react'
 import type { ExtractionTrial } from '../../api/extractions'
 import { scoreColor } from '../shared/TrialsTable'
@@ -25,7 +25,7 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
  * and what each engine setting it used means and why it matters.
  */
 export function ExtractionTrialExplainerModal({ trial, onClose }: Props) {
-  useEffect(() => {
+  usePanelEffect(() => {
     if (!trial) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()

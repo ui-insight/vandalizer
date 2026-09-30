@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { usePanelEffect } from './usePanelEffect'
+import { useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from './PanelFocusTrap'
 import { Sparkles, X, ChevronRight, ChevronLeft } from 'lucide-react'
 import { WizardSteps } from './WizardSteps'
 
@@ -47,7 +48,7 @@ export function AutovalidateWizard<TOptions>({
   const [stepIndex, setStepIndex] = useState(0)
   const [options, setOptions] = useState<TOptions>(initialOptions)
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

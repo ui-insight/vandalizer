@@ -1,5 +1,6 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { FocusTrap } from 'focus-trap-react'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
 import { QualityContractBadge } from './QualityContractBadge'
 import { useToast } from '../../contexts/ToastContext'
@@ -63,7 +64,7 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
     listOrganizationsFlat().then(data => setAllOrgs(data.organizations)).catch(() => {})
   }, [])
 
-  useEffect(() => {
+  usePanelEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)

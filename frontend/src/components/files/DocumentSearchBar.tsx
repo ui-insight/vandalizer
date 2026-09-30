@@ -1,3 +1,4 @@
+import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef } from 'react'
 import { ChevronUp, ChevronDown, X } from 'lucide-react'
 
@@ -153,7 +154,7 @@ export function useFindInDocumentHotkey(
   onOpen: () => void,
   onClose: () => void,
 ) {
-  useEffect(() => {
+  usePanelEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const root = rootRef.current
       if (!root) return
