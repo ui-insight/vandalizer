@@ -23,3 +23,11 @@ Run the production visual-review recipes after changing shared tokens. Check nar
 Use `shared/ActionButton` for task commands. Choose `primary` for the next or final task action, `secondary` for alternatives, `quiet` for low-emphasis or icon-only actions, and `destructive` for a deliberate removal confirmation. Pass an accessible name for an icon-only button. Keep a verb or pending-state label visible while busy; use `loading` for the shared spinner or `aria-busy` when the caller renders its own progress content.
 
 Workspace controls and panel-aware portals share target-size and focus rules. Keep row actions reachable without hover. Use the visual-review harness's `smallControls` metric to find enabled controls below 24px; buttons normally use at least 36px. A clean metric does not replace checking for clipped or overlapping controls.
+
+Forms use `FieldLabel` with a visible Required or Optional marker and native/ARIA requirements on the control. Link helper and validation text with `aria-describedby`; reserve `aria-invalid` for invalid entries, not a service failure. Preserve valid drafts for retry.
+
+Use `workspace-status-badge` geometry and semantic foreground/background pairs for status and trust labels. Pair a word with an icon. Recorded execution, availability and measured quality remain separate concepts.
+
+Shared dialogs keep header/footer outside a scrollable body. Nested Escape must stop propagation, and closing a picker restores its exact trigger. Resize observers for asynchronously loaded editors attach when the content exists. Test arrow/Home/End navigation and doubled text; page-width assertions alone cannot detect overlapping controls.
+
+Live regions announce status or phase changes. Keep elapsed timers, streaming trial details and per-percentage upload updates outside the live region; progress bars still expose their current value on demand. Reduced-motion loading states retain visible text.

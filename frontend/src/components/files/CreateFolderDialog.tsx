@@ -1,3 +1,4 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { useRef, useState, type FormEvent } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -13,6 +14,8 @@ interface CreateFolderDialogProps {
 export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDialogProps) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
   const submitting = useRef(false)
 
@@ -21,9 +24,11 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
     if (submitting.current) return
     const err = getNameError(name, 'Folder name')
     if (err) {
-      setError(err)
+      setNameError(err)
+      nameRef.current?.focus()
       return
     }
+    setNameError(null)
     submitting.current = true
     setPending(true)
     setError(null)
@@ -55,19 +60,25 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
           </ActionButton>
         </div>
         <form onSubmit={handleSubmit}>
-          <label htmlFor="folder-name-input" className="sr-only">Folder name</label>
+          <FieldLabel htmlFor="folder-name-input" required>Folder name</FieldLabel>
           <input
             id="folder-name-input"
+            ref={nameRef}
+            aria-required="true"
+            aria-invalid={!!nameError}
+            aria-describedby={`folder-name-help${nameError ? ' folder-name-error' : ''}${error ? ' folder-save-error' : ''}`}
             autoFocus
             type="text"
             placeholder="Folder name"
             disabled={pending}
             value={name}
             maxLength={MAX_NAME_LENGTH}
-            onChange={(e) => { setName(e.target.value); if (error) setError(null) }}
+            onChange={(e) => { setName(e.target.value); if (error) setError(null); if (nameError) setNameError(null) }}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
           />
-          {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+          <FieldMessage id="folder-name-help">Up to {MAX_NAME_LENGTH} characters.</FieldMessage>
+          {nameError && <FieldMessage id="folder-name-error" error>{nameError}</FieldMessage>}
+          {error && <FieldMessage id="folder-save-error" error>{error}</FieldMessage>}
           <div className="mt-4 flex justify-end gap-2">
             <ActionButton variant="secondary"
               type="button"

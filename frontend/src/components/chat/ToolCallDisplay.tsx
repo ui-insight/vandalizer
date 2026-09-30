@@ -567,13 +567,13 @@ function CSVDownloadButton({ csv, filename }: { csv: string; filename: string })
       aria-label="Download CSV"
       style={{
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 20, height: 20, borderRadius: 'var(--workspace-radius-small)', border: 'none',
+        width: 36, height: 36, borderRadius: 'var(--workspace-radius-small)', border: 'none',
         background: 'transparent', cursor: 'pointer',
-        color: '#c4c9d1', transition: 'color 0.15s',
+        color: '#4b5563', transition: 'color 0.15s',
         flexShrink: 0,
       }}
     >
-      <Download size={11} />
+      <Download size={14} />
     </button>
   )
 }

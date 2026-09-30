@@ -1,156 +1,73 @@
-import { usePanelEffect } from './usePanelEffect'
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { FocusTrap } from './PanelFocusTrap'
-import { X, Search, Loader2, FileText } from 'lucide-react'
+import { X, Loader2, FileText } from 'lucide-react'
 import { searchDocuments } from '../../api/documents'
+import { ActionButton } from './ActionButton'
+import { FieldLabel, FieldMessage } from './FormField'
 
-export function DocumentPickerDialog({
-  onSelect,
-  onClose,
-  excludeUuids,
-  title = 'Add Documents',
-  zIndex = 1000,
-}: {
-  onSelect: (docs: { uuid: string; title: string }[]) => void
+type DocumentChoice = { uuid: string; title: string }
+
+export function DocumentPickerDialog({ onSelect, onClose, excludeUuids, title = 'Add Documents', zIndex = 1000 }: {
+  onSelect: (docs: DocumentChoice[]) => void
   onClose: () => void
   excludeUuids: string[]
-  /** Dialog heading — say where the documents come from when it isn't obvious. */
   title?: string
-  /** Stacking order — raise it when opening from inside another modal. */
   zIndex?: number
 }) {
+  const id = useId()
   const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{ uuid: string; title: string }[]>([])
-  const [searching, setSearching] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const excludeRef = useCallback((uuid: string) => excludeUuids.includes(uuid), [excludeUuids.join(',')])
-
-  usePanelEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  const [results, setResults] = useState<DocumentChoice[]>([])
+  const [searching, setSearching] = useState(true)
+  const [error, setError] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const [selected, setSelected] = useState<Map<string, DocumentChoice>>(new Map())
+  const excluded = JSON.stringify(excludeUuids)
 
   useEffect(() => {
+    let current = true
+    setSearching(true)
+    setError(false)
     const timer = setTimeout(() => {
-      setSearching(true)
-      searchDocuments(query, 30)
-        .then(res => {
-          setSearchResults(
-            res.items
-              .filter(d => !excludeRef(d.uuid))
-              .map(d => ({ uuid: d.uuid, title: d.title }))
-          )
-        })
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false))
+      searchDocuments(query, 30).then(res => {
+        if (current) setResults(res.items.filter(d => !JSON.parse(excluded).includes(d.uuid)).map(d => ({ uuid: d.uuid, title: d.title })))
+      }).catch(() => { if (current) setError(true) })
+        .finally(() => { if (current) setSearching(false) })
     }, 300)
-    return () => clearTimeout(timer)
-  }, [query, excludeRef])
+    return () => { current = false; clearTimeout(timer) }
+  }, [query, excluded, retry])
 
-  const toggleDoc = (uuid: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(uuid)) next.delete(uuid)
-      else next.add(uuid)
-      return next
-    })
-  }
-
-  const handleAdd = () => {
-    const docs = searchResults.filter(d => selected.has(d.uuid))
-    onSelect(docs)
-    onClose()
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex,
-    }}>
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
-      <div role="dialog" aria-modal="true" aria-label={title} style={{
-        backgroundColor: '#fff', borderRadius: 'var(--workspace-radius-large)', width: 480, maxHeight: '70vh',
-        display: 'flex', flexDirection: 'column', boxShadow: 'var(--workspace-shadow-dialog)',
+  return <div className="workspace-dialog-backdrop" style={{ zIndex }}>
+    <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, initialFocus: () => document.getElementById(`${id}-search`)!, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
+      <div role="dialog" aria-modal="true" aria-labelledby={`${id}-title`} className="workspace-dialog" style={{ width: 480 }} onKeyDown={event => {
+        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() }
       }}>
-        <div style={{ padding: "var(--workspace-space-16) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)", display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: '#202124' }}>{title}</span>
-          <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', color: '#5f6368', display: 'flex' }}>
-            <X style={{ width: 18, height: 18 }} />
-          </button>
+        <div className="workspace-dialog-header">
+          <h3 id={`${id}-title`}>{title}</h3>
+          <ActionButton variant="quiet" iconOnly aria-label="Close document picker" onClick={onClose}><X size={18} /></ActionButton>
         </div>
-        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20)", borderBottom: "1px solid var(--workspace-border)" }}>
-          <div style={{ position: 'relative' }}>
-            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-            <input
-              autoFocus
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search documents..."
-              style={{
-                width: '100%', fontSize: 'var(--workspace-font-control)', fontFamily: 'inherit',
-                border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-small)', padding: "var(--workspace-space-8) var(--workspace-space-12) var(--workspace-space-8) var(--workspace-space-32)",
-                boxSizing: 'border-box',
-              }}
-            />
-          </div>
+        <div className="workspace-dialog-body">
+          <FieldLabel htmlFor={`${id}-search`}>Search documents</FieldLabel>
+          <input id={`${id}-search`} value={query} onChange={e => setQuery(e.target.value)} placeholder="Search documents..." style={{ width: '100%', padding: 8, border: '1px solid var(--workspace-border)', borderRadius: 6 }} />
+          <p role="status" aria-atomic="true" className="workspace-field-message">{searching ? 'Searching documents…' : error ? 'Search unavailable.' : `${results.length} documents shown. ${selected.size} selected.`}</p>
+          {searching ? <Loader2 size={18} aria-hidden="true" className="animate-spin" /> : error ? <div>
+            <FieldMessage id={`${id}-error`} error>Your selections are preserved. Try searching again.</FieldMessage>
+            <ActionButton variant="secondary" onClick={() => setRetry(n => n + 1)}>Retry search</ActionButton>
+          </div> : results.length === 0 ? <p>No documents found. Try a different search.</p> : results.map(doc => <label key={doc.uuid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 0', borderBottom: '1px solid var(--workspace-border)' }}>
+            <input type="checkbox" checked={selected.has(doc.uuid)} onChange={() => setSelected(previous => {
+              const next = new Map(previous)
+              if (next.has(doc.uuid)) next.delete(doc.uuid)
+              else next.set(doc.uuid, doc)
+              return next
+            })} />
+            <FileText size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+            <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{doc.title}</span>
+          </label>)}
         </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: "var(--workspace-space-8) var(--workspace-space-20)", minHeight: 200, maxHeight: 400 }}>
-          {searching ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
-              <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite', display: 'inline-block' }} />
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 'var(--workspace-font-control)', padding: "var(--workspace-space-24) 0" }}>
-              {query ? 'No documents found.' : 'Type to search documents...'}
-            </div>
-          ) : (
-            searchResults.map(doc => (
-              <label key={doc.uuid} style={{
-                display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', padding: "var(--workspace-space-8) 0",
-                borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(doc.uuid)}
-                  onChange={() => toggleDoc(doc.uuid)}
-                />
-                <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                <span style={{ fontSize: 'var(--workspace-font-control)', color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {doc.title}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-        <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: "1px solid var(--workspace-border)", display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 'var(--workspace-radius-small)', border: "1px solid var(--workspace-border)", backgroundColor: '#fff',
-              color: '#374151', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAdd}
-            disabled={selected.size === 0}
-            style={{
-              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 'var(--workspace-radius-small)', border: 'none',
-              backgroundColor: selected.size > 0 ? 'var(--color-panel-dark)' : '#e5e7eb',
-              color: selected.size > 0 ? '#fff' : '#6b7280',
-              cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
-            }}
-          >
-            Add {selected.size > 0 ? `${selected.size} ` : ''}Selected
-          </button>
+        <div className="workspace-dialog-footer">
+          <ActionButton variant="secondary" onClick={onClose}>Cancel</ActionButton>
+          <ActionButton variant="primary" disabled={selected.size === 0} onClick={() => { onSelect([...selected.values()]); onClose() }}>Add {selected.size > 0 ? `${selected.size} ` : ''}Selected</ActionButton>
         </div>
       </div>
-      </FocusTrap>
-    </div>
-  )
+    </FocusTrap>
+  </div>
 }

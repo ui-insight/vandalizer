@@ -8,6 +8,8 @@ runs += ['2026-09-30-theme-knowledge', '2026-09-30-theme-validation-overlay', '2
 runs += ['2026-09-30-typography-baseline', '2026-09-30-typography-domains', '2026-09-30-typography-questions', '2026-09-30-typography-file-library', '2026-09-30-typography-headers', '2026-09-30-typography-context', '2026-09-30-typography-history', '2026-09-30-typography-dialogs', '2026-09-30-typography-chat-reading-final', '2026-09-30-typography-context-meter-final']
 runs += ['2026-09-30-spacing-responsive-final', '2026-09-30-spacing-baseline', '2026-09-30-spacing-domains', '2026-09-30-spacing-file-library', '2026-09-30-spacing-dialogs', '2026-09-30-spacing-headers']
 runs += ['2026-09-30-actions-baseline-release', '2026-09-30-actions-file-library-final', '2026-09-30-actions-source-intake-final', '2026-09-30-actions-dialogs-final', '2026-09-30-actions-keyboard-release']
+runs += ['2026-09-30-forms-source-intake-final', '2026-09-30-forms-wizard-final', '2026-09-30-forms-catalog-recovery', '2026-09-30-acceptance-baseline', '2026-09-30-acceptance-forms', '2026-09-30-acceptance-actions', '2026-09-30-domains-final', '2026-09-30-text-final', '2026-09-30-zoom-final', '2026-09-30-acceptance-library', '2026-09-30-acceptance-responsive']
+runs += ['2026-09-30-accessibility-verified']
 captures={}; manifests=[]
 for name in runs:
  p=base/name;m=json.loads((p/'manifest.json').read_text())
@@ -23,21 +25,8 @@ for c in captures.values():
  for a in json.loads((base/c['run']/(c['id']+'.axe.json')).read_text()):violations.append((c['id'],a['id'],a['impact']))
 assert not violations,violations
 score=json.loads((root/'frontend/scripts/visual-review/scorecard.json').read_text())
-updates={
- 'files':(8,8,'files-return-from-document-1440','Returning from a document preserves folder, search, sorting and selection. Load/search, rename/create/move and partial-delete failures have actionable retry; partial moves retry only failed files and refresh destination contents. Verified with the restored desktop source and Library panes.'),
- 'projects':(8,8,'projects-empty-detail-768','Large lists, long titles, roles and counts remain readable. Creation, detail loading and edits recover without losing drafts. Empty/read-only details explain the next action. Scope transitions and stale-response guards pass fixture and component checks; live permissions remain unverified.'),
- 'automations':(8,8,'automation-summary-editor-1440','List and editor share neutral surfaces and a readable trigger/input/action/output summary. The editor has explicit autosave state. Serialized saves preserve quick edits and failed drafts across panel navigation in tab memory; exact retries, description clearing and rename submission pass. Unsaved configuration cannot run. Combined search/type filters, clearing within project scope, list/pin retries and retained rows pass. Manual-run status retry checks the accepted event without relaunching; prior output survives a failed new start. Persisted history, pagination, failed details and reconnecting to a run after leaving the editor pass frontend fixtures and backend authorization tests; Stable launch identities, durable reservations and exact-request reconnect cover ambiguous responses and tab reload. Live broker delivery and execution remain unverified.'),
- 'automation-wizard':(8,8,'wizard-schedule-review-320','The reviewed folder/API/schedule wizard checklist is complete: required-field guidance, retained trigger drafts, readable picker selections and retry, current schedule previews, nested Escape isolation, consistent controls and short-screen review. API examples are keyboard-scrollable. M365, real credentials and actual execution remain unverified.'),
- 'knowledge':(8,8,'knowledge-project-later-page-320','Knowledge ownership and explicit sharing retries preserve their intended state. Read-only bookmark detail/chat share the canonical KB; list and pin errors retry. Pagination includes later project matches and searchable bookmarks. Five availability states and validated quality remain distinct; live notifications, ingestion and model execution are unverified.'),
- 'validation':(8,8,'validation-history-run-card-320','Saved history shows comparable question sets, scoring mode, grader and answer model, keeps all 30 rows accessible, and opens/exports the intended saved result. History/export errors are retryable. Manual apply/revert now retains errors in the review, resets acknowledgment, refreshes the summary and fits short screens. Composite quality, AI-only accuracy and proposed/applied/reverted settings are distinct. Task-correlated status and recovery are verified across supported tabs; reload and competing-window resumption now pass fixture checks; cross-KB restoration passes fixture checks; live worker behavior remains unverified.'),
- 'catalog':(8,8,'catalog-save-success','Destination, checking, failure/retry, saved and already-saved states lead to an Open action. KB adoption preserves errors and browsing context; long details remain usable at 320px, tablet and desktop widths. Combined filters, clearing, empty/error states and pagination recovery pass. Rating origin, date, samples and limitations are explicit. Scope/role variants remain open.'),
- 'library':(8,8,'library-mixed-types-return-1440','Folder-aware search, type filters, sorting, favorites, pins, retained errors and exact-target retries pass. Folder create/rename/move/delete preserve failed drafts and restore items after deletion. Mixed long names, 120-item lists, unavailable-item recovery and focus-contained prompt previews pass at mobile/tablet/desktop widths. The file-and-Library workflow remains intact; live permissions and execution remain unverified.'),
- 'chat':(8,8,'composer-queue-error-draft-768','Model loading/default-save recovery, keyboard selection and focus return, Enter/Shift+Enter/IME, touch queueing, retained failed drafts and selected-model request payloads pass. First-response identity supports queueing and preserves context after Stop. Reading/scroll and source scope checks remain in the earlier evidence; live execution, queue consumption and assistive-technology devices are unverified.'),
- 'onboarding':(8,8,'onboarding-evidence-checked-mobile','A mobile first session now exercises upload → scoped question → source preview. One progress guide stays visible, with concise contextual guidance. The optional tour now fits short screens and restores focus; first/returning/dismissed sessions do not reopen it automatically.'),
- 'uploads':(8,8,'chat-upload-error','Successful siblings survive failures, transfer retry/cancel are explicit, and scope preservation is asserted. Live ingestion and all supported intake paths remain unverified.'),
- 'chat-kb':(8,8,'chat-citation-preview-mobile','Readable citation chips open a passage preview beside the answer; the submitted KB UUID is asserted. Missing/inaccessible/failed source recovery, full document/URL navigation, return position and multi-KB/document scope combinations pass fixture checks. Live retrieval and permissions remain unverified.'),
- 'agent':(8,8,'agent-partial-completion-mobile','Approvals and artifact shortcuts are clear. Stopped or interrupted tool calls show completion not confirmed, ended plans stop spinning, and retries retain prior work. Explicit protocol states, keyboard decisions, failed-step recovery and same-session workflow status retries pass across mobile/tablet/desktop. Partial results and long final output remain available; live execution and assistive-technology devices are unverified.'),
-}
+final_grades=json.loads((out/'final-grades.json').read_text())
+updates={a['id']:(a['ui'],a['ux'],a['evidence'],a['rationale']) for a in final_grades['areas']}
 rows=[]; json_rows=[]
 for area in score['areas']:
  ui,ux,evidence,note=updates[area['id']];c=captures[evidence];url=f"../{c['run']}/{evidence}.png"
@@ -45,351 +34,46 @@ for area in score['areas']:
  json_rows.append({'id':area['id'],'name':area['name'],'baseline_ui':area['ui'],'baseline_ux':area['ux'],'ui':ui,'ux':ux,'evidence':url,'note':note})
 total=sum(len(m['captures']) for _,m in manifests)
 completed=json.loads((out/'completed-items.json').read_text())
-intro=f'''# Vandalizer UX upgrade — implementation progress
+intro=f'''# Vandalizer visual and UX review — final local acceptance
 
-September 29, 2026 · [Tracking issue #964](https://github.com/ui-insight/vandalizer/issues/964)
+September 30, 2026 · [Issue #964](https://github.com/ui-insight/vandalizer/issues/964)
 
-**Implemented locally: {len(completed)}/169 checklist items. Every reviewed section now has a working UI/UX grade of 8/8; exhaustive acceptance remains open.** These are working grades of reviewed frontend states, not completion certificates. Implementation is checkpointed locally and has not been deployed. Earlier dated entries describe their state at the time of review. All A1–A14 have implementation in this pass; their broader acceptance checks remain part of the unchecked backlog.
+**{len(completed)}/169 checklist items implemented and reviewed locally.** All 13 reviewed areas meet the original minimum of 8/10 for UI and UX; mobile independently meets 8/8. These are judgments of the reviewed frontend and fixture-backed interactions, not live-service certification. Nothing has been pushed or deployed.
 
-The first pass fixes upload scope loss, wizard Enter dismissal, the StrictMode validation lifecycle, mobile overflow and Library row clipping. It adds the approved project search/sort, automation outcome summaries, upload retry/cancel, artifact links, draft confirmation, shorter validation wizard, Sources/Validation views, guided first-task cues, contextual assistant launcher, explicit activation choices, final recap, attached-KB health and structured approvals.
+## Before and after
 
-The September 26 recovery pass adds catalog save/adoption feedback, honest optimization metric/provenance labels, deliberate apply/revert with inline retry, and retained partial agent output through stop and retry. Long dialogs and actions are exercised at 320px, tablet and desktop widths.
+{final_grades['method']}
 
-The follow-up reduces Knowledge/Library mobile density, synchronizes validation summaries, exposes saved expected answers, makes citation previews readable, preserves failed bulk deletions for retry, and serializes automation saves with explicit failure recovery. New journeys exercise source inspection, onboarding, cancellation and keyboard saved views.
-
-The September 28 wizard pass completes WIZ-04/05/06/10/12. It preserves folder settings across trigger switches while submitting only the active configuration, fixes an unsupported default workflow output format, adds required-field guidance, and makes action-picker errors recoverable. Escape closes only the nested picker. Schedule previews hide stale results, recover from failures and handle an empty upcoming-run list honestly. Long selections and final actions fit narrow/short screens, and API examples support keyboard scrolling. Selected controls use consistent accents with checked contrast; mobile checkboxes retain their size.
-
-The September 28 history pass completes VAL-15 for recorded KB runs. All 30 timeline entries are accessible, with question-set changes, scoring mode, model attribution, source, date and run ID readable without hover. Missing scores are labeled unavailable. Open results uses the selected persisted snapshot and keeps exports tied to that UUID. History and export failures have explicit retry; previously loaded rows survive a refresh failure. Saved-run grading details are separate from next-run settings, and the scoring-mode control fits 320px screens. This history pass was followed by the task lifecycle work below.
-
-The September 28 task lifecycle pass completes VAL-12 for supported Sources/Validation/Test questions/History switches. Status follows the requested task instead of inferring completion from a new history row. Queued, running, delayed, retrying, failed and completed states remain visible across tabs. Start requests use a durable ownership/idempotency receipt; reconnect after a lost response reuses the same request and options. Unconfirmed outcomes keep another check disabled, while confirmed failure permits an explicit new check. Workers attach task identity to saved results and skip already-persisted checks on retry; a sparse unique index limits each task to one saved result. Status reads check current KB access and task ownership, return sanitized failure messages, and can recover a saved result after Celery result expiry. Question-list text contrast/size and toolbar wrapping were corrected after browser review.
-
-This backend/worker/frontend change is local only and requires a coordinated release. Server-backed discovery now restores checks and results after reload/reopening; competing windows resume the active task. Dedicated cross-KB navigation now restores the original run without another start. An unconfirmed dispatch stays blocked until status can be confirmed; it is never automatically re-enqueued. Browser results are synthetic and backend tests use mocks; no live Mongo index creation, Redis broker, worker delivery or LLM check was exercised.
-
-## Implementation progress — September 28, validation setup and resumption
-
-**101/169 checklist items implemented locally (VAL-03/05/06/07/08 completed in this pass).** Changes are uncommitted and not deployed.
-
-- Quick checks and tuning previews show full questions, expected answers and source expectations. Preflight explains no-KB comparison versus answer/retrieval grading, missing expected answers, sample limits, grader, approximate duration and available token/cost information without promising improvement.
-- Server-backed discovery restores queued checks and completed results after reopening/reload. A per-user/KB active-task index makes competing windows resume one accepted task. Discovery failures keep new submissions locked; recovery retains the task mode and selected question IDs. Unconfirmed dispatch is never automatically re-enqueued.
-- Add/edit/delete failures preserve question drafts or selection. Successful additions clear stale filters; partial batch deletion retains the remaining selection. Large sets initially render 50 questions while select-all covers the full filtered set. Imports validate CSV/XLSX and the server's 5 MB limit, preserve the file on failure, expose partial row/source errors and prevent resubmitting a completed import.
-- The tuning wizard keeps its title and final action visible while content scrolls. Step labels wrap at word boundaries on narrow screens; imports fit 320px and short viewports.
-- Validation: 45 frontend tests across 5 files; 128 lifecycle/knowledge-route backend tests and 56 import/ID backend tests pass. Production build/TypeScript, touched-file ESLint/Ruff pass. 29 recovery/setup and 23 question-management browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Large-set selection covers 251 questions in the browser and partial deletion covers 2,001 questions in component tests.
-- Evidence: `artifacts/visual-review/2026-09-28-resumption-final` and `artifacts/visual-review/2026-09-28-questions-final`. Selected gallery: 300 states / 392 captures. Earlier diagnostics are retained and superseded. Representative screenshots were inspected directly.
-- Limits: coordinated frontend/API/worker release required. Browser responses are synthetic; backend tests use mocks. Live Mongo index creation, Redis/broker/worker delivery and model execution remain unverified. Dedicated cross-KB navigation now restores the original run without another start. Broader role/theme/zoom/source/catalog acceptance remains open.
-
-## Consistent actions and usable controls — September 30
-
-**157/169 checklist items implemented locally.** VIS-04 and ACC-11 are complete for the reviewed task surfaces; changes are not deployed.
-
-- Shared ActionButton styles cover primary, secondary, quiet and destructive actions in folder/rename dialogs, Knowledge creation and URL intake, Library saving, automation/tuning wizards, apply review, confirmation and test generation. Hover, disabled, pending and keyboard-focus states use the same rules; labels remain visible while a request is pending.
-- Workspace and portaled buttons, menus, selects and summaries have a 36px minimum target. Native checkboxes/radios have a 24px minimum and retain their surrounding labels/rows. Existing row actions stay available without hover. Focus uses a dark outline with a white separation ring that remains visible on light and dark surfaces.
-- The target audit found the error-toast dismiss button outside the workspace styles. Notifications now share control sizing, fit narrow viewports and scroll when several persistent errors accumulate; optional toast actions also have a usable target.
-- Verification: 38 component/toast tests across eight files, TypeScript, production build, touched-file ESLint and diff checks pass. The 163 selected browser captures cover all 55 baseline states, file/Library workflow recovery at five widths (30), source intake/retry (24), short validation dialogs (36), and keyboard action states at three widths (18). Each selected capture has zero axe findings, overflow, uncaught errors, unmatched requests or enabled controls below the audited 24px minimum. Buttons use 36px; the audit does not treat inline prose links as standalone controls.
-- Keyboard checks exercise file selection, primary focus/hover, the disabled Creating state, disabled wizard progression and destructive draft review with return to editing. Synthetic folder creation is held pending and released explicitly; exactly one request is recorded per submission. Representative screenshots inspected directly. This is not completion of the broader focus-order, nested-dialog or assistive-technology acceptance items.
-
-## Shared task spacing and surfaces — September 30
-
-**155/169 checklist items implemented locally.** VIS-03 is complete for the reviewed task surfaces; changes are not deployed.
-
-- Task lists, cards, editors and dialogs use a shared spacing scale, 6/8/12px corner radii, neutral border token and dialog elevation. Nearby one-off gap/padding values align to that scale. File rows have a 44px minimum rhythm and continue growing with their content; Library rows retain room for metadata and actions.
-- Added `docs/workspace-style-guide.md` to document text/color roles, spacing, surface geometry and verification expectations for subsequent changes. Compact controls retain their distinct size; the new tokens do not impose fixed content heights.
-- Verification: TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and 11 existing hook-dependency warnings. The 229 selected production-browser captures cover the five-width responsive matrix, all baseline states, file/Library workflow execution and recovery, shared section headers, short validation dialogs, and workflow/extraction tuning. All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly.
-- The responsive recipe now uses the approved Files/Assistant pane controls instead of the removed Ask assistant launcher. Source and tools remain available together on desktop and retain their mobile state. Browser APIs are synthetic; final action/form, accessibility and regrading acceptance remain open.
-
-## Readable task typography — September 30
-
-**154/169 checklist items implemented locally.** VIS-02 is complete for the reviewed task surfaces; changes are not deployed.
-
-- Workspace typography now uses shared rem-based sizes: 12px metadata, 13px controls, 14px body copy and 16/18/20px title levels at the default browser size. Essential 9–11px labels, counts, timestamps, provenance and trial explanations use the metadata size. Existing large tutorial/illustration text is separate from task typography.
-- Document text keeps its own zoom multiplier using the shared body size. Context usage percentages now fit in a 44px control, including 100%; warning and error text use readable semantic colors. The new context-state review also corrected white text on amber memory/retry actions.
-- Verification: TypeScript, production build and diff checks pass; touched-file ESLint has zero errors and 11 existing hook-dependency warnings. Eight document-recovery/context-meter tests across two files pass. The 306 selected captures cover all 55 baseline states, workflow/extraction validation (39), questions (23), file/Library tasks (30), section headers (27), project/tool context (33), saved history (18), short dialogs (36), source reading/recovery (33), and all four context-meter states (12). All selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
-- The small-text metric now excludes zero-size text deliberately replaced by a named compact-table sort icon. Citation return still asserts the prior reading position, allowing only the physical scroll-limit clamp when a closed preview shortens content; observed returns preserve the exact prior position. Fixtures are synthetic. Broader spacing, action, form, accessibility and final regrading acceptance remain open.
-
-## Shared workspace theme — September 30
-
-**153/169 checklist items implemented locally.** VIS-01 is complete for the reviewed task surfaces; changes are not deployed.
-
-- Knowledge lists, sources, question management, validation history/results and workflow/extraction tuning use the same neutral canvas, surfaces, borders and readable text as Files, Projects, Library and Automations. Navigation retains its dark treatment; selection and primary actions use the configured brand accent. Shared information, success, warning and error colors have readable foregrounds and soft backgrounds.
-- Removed decorative purple/blue treatment from validation chrome and controls. Contrast checks caught and corrected comparison labels, selected-budget descriptions, catalog usage metadata and the empty-history action. Existing status meanings, source/tool navigation and layout are preserved.
-- Direct screenshot inspection found the desktop pane divider could draw over the shared tuning wizard. The wizard now uses the retained-panel-aware overlay layer. The nested extraction test-generation dialog fits narrow screens, has a named close control and contains focus; Escape returns to its trigger without closing the parent wizard.
-- Verification: TypeScript, production build, touched-file ESLint and diff checks pass. All 172 focused tests across 29 files pass. The full suite has 1,191 passing tests and three Landing failures; the same three failures reproduce on committed HEAD before these changes. No unrelated Landing changes were made.
-- The 278 selected browser captures cover Knowledge availability/sharing, source intake, questions, short-screen tuning, apply/revert review, saved history, workflow/extraction setup, nested generation, catalog recovery and retained workspace context. Selected captures have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative mobile and desktop screenshots inspected directly. API responses are synthetic; live execution and assistive-technology devices remain unverified. Typography, controls, broader accessibility and final regrading remain open.
-
-## More room for task content — September 30
-
-**152/169 checklist items implemented locally.** VIS-06 is complete for the reviewed task surfaces; changes are not deployed.
-
-- Compact source modes use one Files/Projects/Automations/Knowledge, Library and Assistant control row. The redundant Assistant/Library row is hidden only where those choices are already present; desktop and Chat retain their tabs. Existing panel, editor and conversation state survives this change.
-- Saved-scope explanations are shorter, header controls have less excess spacing, and long mobile project names receive the full available line width. Project chat keeps the full project name in the workspace context once, uses a concise task heading and shows source availability beside the composer. The previous header pass also removed the squeezed Explore decoration and repeated promotion.
-- Long-project review found obsolete conversation bottom padding could push Send below a short viewport. The conversation now scrolls within its available height and the composer keeps its required space. Send reachability is asserted with the full project context visible at 320×568, 768×600 and 1440×900.
-- Verification: 43 frontend tests across five files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing ChatPanel dependency warning. The 158 selected captures cover compact headers/menus (27), project/tool context (33), navigation retention (35), file/Library workflows (30), and conversation/source reading recovery (33). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly; retained drafts, source/tool switching, workflow failure/retry and citation recovery pass.
-- Evidence: `2026-09-30-density-headers`, `2026-09-30-density-composer-context`, `2026-09-30-density-navigation-release`, `2026-09-30-density-file-library`, and `2026-09-30-density-chat-reading`. APIs/results are synthetic. Theme, broader accessibility and final regrading acceptance remain open.
-
-## Consistent section headers — September 30
-
-**151/169 checklist items implemented locally.** SYS-06 is complete for the reviewed workspace sections; changes are not deployed.
-
-- Files, Projects, Automations, Knowledge and Library share a heading/action component with consistent title sizing, spacing and wrapping. Primary actions sit in the header, with the project name/Create form kept together; scope, search and filters follow the heading. About controls retain their descriptive accessible names without using a full question in the header.
-- Files puts Add next to its title and opens search beneath it. The document toolbar keeps the full wrapping filename and reachable source actions. Folder breadcrumbs wrap long project/folder names. Explore retains its purpose guidance while removing the decorative gradient icon and repeated sharing promotion that crowded narrow panes.
-- Verification: 47 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing LeftPanel dependency warning. The 92 selected captures cover section headers/search/menus (27), retained navigation (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Mobile, tablet and desktop screenshots inspected directly.
-- Evidence: `2026-09-30-headers-evidence`, `2026-09-30-headers-retention`, and `2026-09-30-headers-file-library`. Browser APIs/results are synthetic. Theme, broader density, keyboard and final regrading acceptance remain open; this is not a claim that the remaining visual items are complete.
-
-## Workspace location and saved scopes — September 30
-
-**150/169 checklist items implemented locally.** SYS-05 and SYS-07 are complete for the reviewed workspace flows; changes are not deployed.
-
-- Open workflow, extraction and automation editors identify their type and offer an explicit return to Library or Assistant. The active project is a named region with its full title and reachable management/exit actions; opening a project from the picker correctly marks Chat active.
-- Knowledge and Library use Mine, Team and Explore consistently, with explanations separating saved/owned items, team scope and discovery. Sharing actions use “Share with everyone” and point to Explore. Existing permissions and sharing behavior are unchanged.
-- Long project names exposed a short-screen list collapse. Library and Knowledge now preserve useful list space and let their controls scroll when needed; the Knowledge list is keyboard-scrollable even when empty. Long-list scroll retention remains intact.
-- Verification: 49 frontend tests across four files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and four pre-existing dependency warnings. The 95 selected captures cover context/scope and tool return (30), retained navigation state (35), and file/Library workflow regression at five widths (30). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
-- Evidence: `2026-09-30-context-release`, `2026-09-30-context-retention-final`, and `2026-09-30-context-file-library-final`. Browser APIs/results are synthetic; live execution, permissions and assistive-technology devices are not certified. Broader visual/accessibility acceptance remains open.
-
-## Retained navigation state — September 30
-
-**148/169 checklist items implemented locally.** SYS-08 is complete for the reviewed workspace navigation flows; changes are not deployed.
-
-- Visited source panels and Library retain drafts, selected questions, filters, scroll and pending work across section/tool switches. Browser Back/Forward now tracks deliberate section, tab and editor navigation; old mode-less history entries keep a stable initial fallback. Explicit home/project activation lands in Chat.
-- Hidden panels are inert. Their focus traps and portaled dialogs do not capture focus or cover the active view, and global keyboard listeners pause while hidden. Returning restores the same dialog and its choices. Retained views reset at account/team boundaries; project-scoped Knowledge/Automations reset when project scope changes.
-- Creating a project while switching to Files completes without taking over navigation, and offers an explicit Open project action. Storage-write failure does not block project opening. Explore responds to the Library pane width; narrow panes expose a collections toggle instead of squeezing content behind the sidebar.
-- Verification: 181 frontend tests across 32 files pass; TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and three pre-existing dependency warnings. The 104 selected captures cover retained state (35), file/Library workflow regression at five widths (30), and project creation/recovery/scope/viewer journeys (39). They have zero axe findings, page overflow, uncaught errors or unmatched requests. Browser Back/Forward, exact retained drafts/scroll, hidden portal and Escape behavior, delayed project creation, file selection, workflow failure/retry and scope clearing are asserted. Representative screenshots inspected directly.
-- Evidence: `2026-09-30-navigation-retention-complete`, `2026-09-30-navigation-file-library-regression`, and `2026-09-30-navigation-project-final`. Draft retention is in tab memory, not a promise to save unsent drafts across reload. Project scope remains an explicit workspace context until changed/exited. API data and workflow results are synthetic; live permissions, execution and assistive-technology devices are not certified.
-
-## Short-screen validation review — September 30
-
-**147/169 checklist items implemented locally.** VAL-17 is complete for the reviewed validation flows; changes are not deployed.
-
-- Generation, trial details, question traces, comparisons and apply review fit short/narrow viewports. Long questions and score values wrap; Generate and Apply stay visible while details scroll. Comparison errors offer retry, and apply errors remain visible with the acknowledgment preserved.
-- Trial and question sorting controls have accessible names. Scrollable details are keyboard reachable; dialogs contain focus and Escape returns to their trigger. Comparison and trace layers sit above the Knowledge header, with an explicit occlusion assertion after direct screenshot review found the overlap.
-- Verification: six frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. The 106 selected browser captures cover setup/resumption (29), question editing/import/large sets (23), saved history/export (18), and dialogs/apply/revert (36) at 320×480, 768×500 and 1440×600. All have zero axe findings, page overflow, uncaught errors or unmatched requests. Exact generation coverage, existing-task recovery, saved-run exports without launching validation, apply/retry/revert counts and focus return are asserted. Representative screenshots inspected directly.
-- Evidence: `2026-09-30-validation-resumption-short`, `2026-09-30-validation-questions-short`, `2026-09-30-validation-history-short`, and `2026-09-30-validation-dialogs-final`. The earlier dialog run exposed header overlap despite passing axe and is superseded. APIs/results are synthetic; live worker/model behavior and assistive-technology devices are not certified. Broader theme/accessibility acceptance remains open.
-
-## Saved panel choices and responsive sizing — September 29
-
-**146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.
-
-- Stored panel sizes reject malformed/nonfinite values and fit useful source/tool widths without replacing the preferred desktop split. Narrower windows temporarily dock Activity; expanding it opens a focus-contained drawer. Returning to a wide window restores the preferred rail and split.
-- Mobile source/tool choices are remembered separately by section within the browser session, including reload with an open editor. The project context bar uses the fitted rail width. A desktop-only split control is hidden on compact screens where it cannot display two panes.
-- The divider supports arrows, Home/End, pointer dragging and reset. Interrupted drags restore normal document interaction. Failed preference writes do not prevent workspace navigation. Activity closes on navigation; New chat hands focus to the composer, while Escape restores the drawer trigger.
-- Verification: 19 frontend tests across four files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirteen panel-preference captures plus thirty file/Library regression states have zero axe findings, overflow, uncaught errors or unmatched requests. Invalid/restored values, viewport fitting, keyboard sizing, drawer focus, reload, project alignment and unavailable storage are asserted. Opening a file, running its Library workflow through failure/retry and returning to that file pass at 320/390/768/1024/1440px; representative screenshots inspected directly.
-- Evidence: `2026-09-29-panel-preferences-final` and `2026-09-29-panel-file-library-regression`. APIs and run results are synthetic; live execution and assistive-technology devices are not certified. The wider navigation, theme and accessibility acceptance remains open.
-
-## Agent state and workflow recovery — September 29
-
-**145/169 checklist items implemented locally.** AGT-04/07/09 are complete for the reviewed supported protocol states; changes are not deployed.
-
-- Tool results explicitly label awaiting approval, queued/running, failed, canceled, completed and unconfirmed work. A sent approval or cancellation remains a request until the subsequent response establishes its outcome; blocked decisions stay actionable. Persisted tool results without interleaved segments expose the same approval controls.
-- Failed tools show their step, available recovery hint and an action to review recovery without repeating completed changes. Existing artifacts and Knowledge context survive that follow-up. Plan rows distinguish completed, running, planned and unconfirmed work, and stopped work no longer appears active.
-- Workflow status failures retain the last known state and completed step results. Check workflow status reconnects to the same session without relaunching. Paused runs link to the exact runner; canceled and completed results remain explicit. Long structured output is not truncated, and clipboard failures no longer report success.
-- Narrow approval previews stack their labels and values; controls support keyboard and practical touch targets. State changes have concise status announcements; scrollable output is keyboard reachable.
-- Verification: 42 frontend tests across seven files, TypeScript and production build pass. ESLint reports zero errors and one existing ChatPanel dependency warning. Forty-two browser states at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. Exact workflow session reads, no launch writes during reconnect, keyboard decisions, retained KB context, partial results and Stop are asserted; representative screenshots inspected directly.
-- Evidence: `2026-09-29-agent-recovery-evidence`; recipe: `frontend/scripts/visual-review/agent-recovery.mjs`. APIs and streams are synthetic. Live execution, model adherence to recovery instructions and assistive-technology devices are not certified. Status checks never infer server cancellation from a local Stop.
-
-## Optional tour and first actions — September 29
-
-**142/169 checklist items implemented locally.** ONB-06/07 are complete for the reviewed onboarding flows; changes are not deployed.
-
-- The tour opens only from the home invitation, so first visits, returning users and dismissed sessions are not interrupted. It can be restarted deliberately and does not depend on browser storage. Updated guidance describes the working Files/Library panes and source verification.
-- Dialog focus starts at the step title, remains contained, follows Back/Next, and returns to the trigger on Skip, completion, Close or Escape. The body scrolls while the title bar and footer remain reachable on short screens.
-- Conversation and upload actions now precede secondary cards. The sample demo disclosure and its evidence are near the top. A selected Knowledge base still replaces first-session home with scoped guidance.
-- Verification: 18 frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. Thirty browser captures at 320/768-short/1440px have zero axe findings, overflow, uncaught errors or unmatched requests. First-action and sample-disclosure reachability, all tour steps, keyboard containment/return, reload without interruption, and returning/scoped users are asserted; representative screenshots inspected directly.
-- Evidence: `2026-09-29-onboarding-tour-evidence`; recipe: `frontend/scripts/visual-review/onboarding-tour.mjs`. Browser APIs use fixtures. Real demo execution and assistive-technology device behavior are not certified.
-
-## Explore purpose and usage — September 29
-
-**140/169 checklist items implemented locally.** EXP-05 is complete for the reviewed catalog flows; changes are not deployed.
-
-- Cards and details lead with purpose, item type, required input and intended output. Prompt templates have the correct label and share the Extractions & prompts filter. Displayed published descriptions participate in search.
-- Workflow summaries distinguish text, documents, fixed documents and no-input configuration, with full output-step names in details. Missing definitions or output steps remain explicit. Knowledge availability and answer evidence are separate from catalog quality signals.
-- Summaries derive from published definitions without exposing private document identifiers, destinations or verification-submission instructions. Card titles and tags are separate keyboard controls.
-- Verification: 17 frontend tests and 77 backend tests pass (two existing backend skips). TypeScript, production build, ESLint, Ruff and diff checks pass. Sixty-six browser states cover usage details and filter/retry regression at 320/768/1440px with zero axe findings, overflow, uncaught errors or unmatched requests. Primary actions and focus return are asserted; representative screenshots inspected directly.
-- Evidence: `2026-09-29-catalog-usage-final` and `2026-09-29-catalog-filter-regression`. Browser APIs use fixtures and backend persistence is mocked; live execution and permissions are not certified.
-
-## Chat composer and model recovery — September 29
-
-**139/169 checklist items implemented locally.** CHAT-10 is complete for the reviewed composer flows; changes are not deployed.
-
-- The model picker distinguishes loading, failure and an empty configured list, offers retry, fits short screens, contains focus and returns it on Escape or selection. Radio options support arrow/Home/End keys; long model names and metadata remain readable. Retry no longer dismisses the picker when its content changes.
-- A selected model applies to this chat immediately. Default saves are serialized, a late preference read cannot overwrite a deliberate choice, and save failures keep the selected model with explicit retry. Context-window metadata follows the loaded model list.
-- Whitespace cannot send; Enter sends, Shift+Enter adds a line and IME confirmation does not submit. Touch users can Queue while Stop remains available. Pending submissions prevent duplicates and preserve any newly typed draft; a queue failure keeps the attempted message and does not mark the active response failed.
-- The accepted conversation/activity IDs are captured from response headers before streaming finishes, so the first response supports queueing and Stop retains the identity for the next turn.
-- Verification: 23 frontend/API tests across six files, TypeScript and production build pass. ESLint has zero errors and one existing ChatPanel dependency warning. All 26 browser states at 320/768-short/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Focus containment/return, selected-model request payloads, first-turn queueing and post-Stop activity identity are asserted; representative screenshots inspected directly.
-- Evidence: `2026-09-29-chat-composer-evidence`; recipe: `frontend/scripts/visual-review/chat-composer.mjs`. APIs and streams use fixtures. Live model execution, queue consumption, ambiguous server-side queue acceptance and assistive-technology device behavior are not certified; broader agent/accessibility acceptance stays open.
-
-## Knowledge ownership, sharing and availability — September 29
-
-**138/169 checklist items implemented locally.** KB-11/12 are complete for the reviewed Knowledge flows; changes are not deployed.
-
-- Read-only cards omit Edit/Delete, and bookmarks open and chat with the same canonical KB. Lists are cached separately by account/team; changing either clears an open detail. Failed list/project-pin reads show retry instead of an empty workspace. Building lists refresh while processing continues.
-- Sharing sends an explicit desired state, so retrying a lost acknowledgement does not reverse the setting. The dialog retains its note after failure and prevents duplicate submissions or dismissal while saving. API responses include the owning team; first sharing assigns a real team destination. Team-owned KBs cannot be unshared and lost from both Mine and Team. Legacy clients may still use toggle semantics.
-- Pagination counts organization-visible KBs before applying offsets. Bookmarks occupy only their page slots, search uses their displayed catalog name, and local project filtering/sorting includes later pages. Empty, building, partial, all-failed and validated states distinguish indexed availability from measured answer quality; empty and team badge contrast was corrected.
-- Verification: 39 frontend tests across four files and 114 backend tests across two files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. Forty-six browser states at 320/768/1440px cover list recovery, all five availability states, lost-share response/retry, sharing/ownership permissions, canonical bookmark detail/chat a 205-row list, and failed project pins recovering the pinned KB from the second page. The narrow project context bar wraps its title and actions into readable rows. No axe findings, page overflow, uncaught errors or unmatched requests in the selected run; representative screenshots inspected directly.
-- Evidence: `2026-09-29-knowledge-states-evidence` and `2026-09-29-knowledge-project-final`; recipe: `frontend/scripts/visual-review/knowledge-sharing.mjs`. Browser APIs are fixtures and backend persistence is mocked. Live team notification delivery, Mongo behavior, ingestion and model execution are not certified. Explicit sharing retries preserve the state; concurrent independent administrators are not an exactly-once notification guarantee. The wider shared-theme and accessibility acceptance items remain open.
-
-## Library recovery and item opening — September 28
-
-**136/169 checklist items implemented locally.** LIB-06/07/08/09 are complete for the reviewed Library flows; changes are not deployed.
-
-- Search includes matching tools stored in folders, trims whitespace and combines with type filters. Recent, pinned and favorite work remains reachable through the saved views, with create and catalog entry points retained. Folder-only, genuinely empty and no-result states explain the next action.
-- Item/folder/library failures are visible and retryable. Loaded rows survive refresh failures; late searches, old scopes and mutations cannot replace another scope. Favorite, pin, copy and move actions expose pending/success/failure feedback and keep the exact failed target for retry. Folder create/rename errors preserve names, Enter submits once, and deletion failures retain the folder and its contents. Successful folder deletion returns its items to the root.
-- Folder navigation and actions are separate keyboard controls. Item menus use an inline folder choice that fits narrow screens, close with Escape and restore focus. Long names wrap, metadata retains contrast on hover, and 120-item mixed lists stay accessible. Older extraction entries without a type label or separate UUID open correctly.
-- Workflow/extraction load failures distinguish unavailable content and offer retry. Editor instances are keyed to the item while the Library and file pane remain in place. Prompt content failures disable use/edit until a successful retry; stale reads cannot replace another preview. Long previews fit short screens, contain keyboard focus, allow keyboard scrolling and return focus on Escape.
-- Verification: 48 frontend regression tests across six files, TypeScript, production build and touched-file lint pass (four existing editor hook-dependency warnings, no lint errors). The final browser set covers 51 Library recovery states, 21 opening/long-content states at 320/768/1440px, and 30 repeated file → Library → run-on-the-selected-file states at 320/390/768/1024/1440px. All have zero axe findings, page overflow, uncaught errors or unmatched fixture requests; representative screenshots inspected directly.
-- Evidence: `2026-09-28-library-recovery-evidence`, `2026-09-28-library-opening-evidence`, and `2026-09-28-file-library-regression`. APIs and execution use fixtures; live permissions and backend/model execution remain unverified. Broader shared theme, zoom and cross-surface acceptance remain open.
-
-## Automation edit and launch recovery — September 28
-
-**132/169 checklist items implemented locally.** AUTO-08 is complete for the reviewed editor and manual-run flows; changes are not deployed.
-
-- Failed edits survive panel navigation in a user/automation-scoped save queue. Exact retries, pause/re-enable, description clearing, rename cancellation, IME Enter and duplicate-submit prevention pass. Unsaved configuration cannot launch. Drafts remain in tab memory and are discarded on reload, as the error message explains.
-- Manual launches carry a stable request ID, reserved in a durable server receipt before dispatch. Reconnect repeats the same identity and document selection; a competing reservation returns the existing run. Lost responses can recover the owned event, while uncertain dispatch is never automatically queued again. Manage permission is checked before receipt access. Confirmed validation rejection permits corrected input; an uncertain outcome keeps the original intent locked.
-- The browser retains launch IDs across editor switches and tab reloads. Accepted status failures retry only that event, and a deliberate run after completion receives a new ID. Completion no longer claims that every output destination received delivery.
-- Verification: 24 frontend tests across two files and 93 backend tests across five files pass. TypeScript, production build, touched-file ESLint/Ruff and diff checks pass. The 18 edit states plus 18 launch states and 21 repeated manual-run states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly.
-- Evidence: `2026-09-28-automation-save-review`, `2026-09-28-automation-launch-evidence`, and `2026-09-28-automation-run-reconnect`. Browser APIs use fixtures and backend persistence is mocked. The frontend/API update and new unique Mongo receipt index need coordinated release; live broker delivery, model execution and output destinations are unverified. A reservation without a recoverable event remains locked for investigation rather than risking duplicate effects. Earlier clients without request IDs retain their existing behavior.
-
-## Automation summaries and shared surfaces — September 28
-
-**131/169 checklist items implemented locally.** AUTO-02 and AUTO-05 are complete; changes are not deployed.
-
-- Cards and editors share a readable Trigger / Input / Action / Output summary. It resolves source/destination folder paths, distinguishes scheduled selections from API or Microsoft 365 intake, names the chosen action and reports configured storage, notifications, webhooks and follow-up delivery without exposing endpoint credentials. Missing names or configuration remain explicit; folder-name failures retry, and old team responses cannot replace current names.
-- Automation browsing and editing now use the same neutral surfaces, borders, readable metadata and brand selection treatment. Trigger labels are neutral; status keeps its own meaning. A concise empty state replaces the full promotional panel. Desktop file/section and Library/Assistant navigation is preserved.
-- Verification: 20 frontend tests across four files, TypeScript, production build and touched-file ESLint pass. The 21 summary/theme states plus 27 repeated filter/scope recovery states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched fixture requests. Long names, all trigger families, output destinations, folder-name failure/retry and empty content were inspected directly.
-- Evidence: `2026-09-28-automation-summary-review` and `2026-09-28-automation-filter-light`; recipe: `frontend/scripts/visual-review/automation-summaries.mjs`. APIs and execution are fixtures. This completes the automation surface items, not the wider VIS checklist or live delivery verification.
-
-## Automation history — September 28
-
-**129/169 checklist items implemented locally.** AUTO-09 is complete; the issue remains open and changes are not deployed.
-
-- Run history is reachable from each automation editor. It lists persisted workflow/task and extraction runs with status, timestamps, error details and recorded output. Older pages use a stable time/ID cursor; loading and pagination failures retry without discarding loaded entries.
-- Opening a queued/running event polls that event sequentially. Failed detail reads retry the same ID, and late responses cannot replace another automation or selected run. Reopening the editor or reloading can reconnect through history without launching another run. Preparing a new run is an explicit separate action using the current configuration; read-only users can inspect results but cannot prepare a run.
-- The new read endpoint authorizes the automation before either history query, uses existing scope/time/ID indexes, bounds each collection read, and fetches large outputs only through the authorized detail endpoint.
-- Verification: 26 frontend tests across three files and 82 backend tests across five files pass. TypeScript, production build, touched-file ESLint and Ruff pass. All 30 browser states at 320/768/1440px have zero axe findings, page overflow, uncaught errors or unmatched fixture requests. Keyboard opening, focus return, 25-row pagination, failed details, editor reopen, reload, reader access and empty history are exercised; representative screenshots were inspected directly.
-- Evidence: `2026-09-28-automation-history-final`; recipe: `frontend/scripts/visual-review/automation-history.mjs`. Browser APIs/execution are synthetic; backend tests use mocked persistence. Live Mongo/worker/output-delivery behavior and ambiguous launch failure handling are not certified. AUTO-08 remains open.
-
-## Automation filtering and recovery — September 28
-
-**128/169 checklist items implemented locally.** AUTO-07 is complete; broader automation acceptance remains open. These changes are not deployed.
-
-- Search trims whitespace and combines with trigger filters. Clearing resets search and type while retaining the current project scope. Counts reflect that scope, filters expose their selected state, and existing M365 items remain filterable even when new M365 creation is disabled.
-- Unavailable lists and project pins have an explicit retry rather than a false empty state. Refresh failures preserve loaded rows and filters; the error banner scrolls with the list so retained rows remain reachable on short screens. Earlier list/pin requests and late pin mutations cannot overwrite a newer response or another project's pins.
-- Automation cards expose separate open and pin controls, avoiding nested interactive controls.
-- Verification: 14 focused list/pin tests across four files, TypeScript, Vite production build and touched-file ESLint pass. The 27 production browser states at 320/768/1440px cover combined filters, empty results, clearing, M365 filtering, list and pin failures/retry, retained rows, project counts and a truly empty list. All have zero axe findings, page overflow, page errors or unmatched fixture requests; representative screenshots were inspected directly.
-- Evidence: `2026-09-28-automation-filters-final`; recipe: `frontend/scripts/visual-review/automation-filters.mjs`. The preceding manual-run recovery commit is `fd7ba849`, with 18 focused tests and 21 browser states. AUTO-08/09 stay open for broader lifecycle/history work. All browser APIs and execution are synthetic; live permissions and worker delivery remain unverified.
-
-
-## Automation manual-run recovery — September 28
-
-Progress toward AUTO-08/09; the broader automation acceptance items remain open. The completed checklist count stays at 127/169.
-
-Document search now distinguishes loading, failure/retry and no results, retains its query on failure, ignores stale responses and supports keyboard selection. Pending/accepted runs lock their document selection and block duplicate starts. Status requests run sequentially; a failed status read explicitly explains that the accepted run may still finish and offers a retry of that same event. Late responses cannot update another automation. Collapsing and reopening Run now preserves its accepted run; previous output remains clearly labeled if a new launch fails.
-
-Verification: 18 focused manual-run/autosave tests, TypeScript, Vite production build and touched-file ESLint pass. The production browser journey covers keyboard document choice, search failure/empty state, start failure, status retry without relaunch, panel close/reopen, failed/completed outcomes and retained output at 320/768/1440px. All 21 captured states have zero axe findings, page overflow, uncaught page errors or unmatched fixture requests. Representative screenshots were inspected directly.
-
-Evidence: `2026-09-28-automation-run-evidence`; recipe: `frontend/scripts/visual-review/automation-run-recovery.mjs`. API responses and execution are synthetic. Accepted-run recovery after leaving the editor/reloading, ambiguous launch failures, full history and live worker/output delivery remain unverified; this pass does not close AUTO-08/09.
-
-## Files and Projects recovery — September 28
-
-**127/169 checklist items implemented locally.** This pass completes FILE-08/09/10 and PROJ-04/06/07/08; it is not deployed.
-
-- Files retain folder location, search, sorting and selection when returning from a document. Failed loads/searches retry; rename/create/move failures preserve their target and draft. Partial moves retry only failed files and refresh the destination. Prior upload and deletion evidence covers processing and partial-delete recovery.
-- Projects show readable titles, descriptions, state, role and counts, with search across large lists and incremental display. Creation and detail loading have retry; failed title, description and status edits retain changes. Empty projects explain what belongs there and offer files/chat actions; viewers see read-only details.
-- Project entry and exit update file, chat and KB scope together. Late lookups or refreshes cannot restore an old project. Initial team loading no longer clears a newly opened project, and opening Projects outside a project preserves general-work attachments.
-- Verification: 50 focused Projects/navigation tests pass. The earlier Files suite passed 37 tests across six files. TypeScript and production build pass; touched Projects files have no lint errors and one existing hook-dependency warning. The restored layout passes 39 Projects and 33 Files browser states at 320/768/1440px, with zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly.
-- Evidence: `2026-09-28-projects-restored-layout` and `2026-09-28-files-restored-layout`. The separate file → Library → workflow navigation journey remains selected.
-- Limits: browser APIs, execution and permissions are fixtures; live backend/model behavior is not certified. The remaining acceptance checklist stays open.
-
-## Navigation correction — September 28
-
-The user reported that the full-width section layout broke opening a file and running a Library item on it. This was a regression in the earlier visual refresh. Desktop sections now retain the document/section pane beside Assistant and Library, including while a workflow or extraction is open. Compact screens expose explicit pane controls and preserve both the file and tool while switching. Clicking the active Chat navigation item no longer resets the conversation or attachments.
-
-Verification: 22 tests across four layout/navigation/Library files, TypeScript and the production build pass. The production browser journey covers open file → Library → workflow → failed run → retry → output → return at 320, 390, 768, 1024 and 1440px. Both run attempts must submit exactly the opened document UUID. All 30 captured states have zero axe findings, page overflow, page errors or unmatched fixture requests. Representative screenshots were inspected directly. The workflow editor's drag handle now uses its existing keyboard move controls as the accessible alternative, and completion text has readable contrast.
-
-Evidence: `2026-09-28-file-library-evidence`; recipe: `frontend/scripts/visual-review/file-library-workflow.mjs`. API execution and results are synthetic; this establishes the frontend journey and request targeting, not live workflow/model execution. Earlier section grades do not establish cross-pane task coverage. The broader acceptance checklist remains open, with no new items marked complete in this correction.
-
-## Working grades
-
-UI/UX, out of 10. The original rubric is unchanged: 8 is strong, 7 is usable with polish needed. Scores are authored judgments from screenshot inspection and exercised frontend behavior; untested journeys remain explicitly open.
-
-| Area | Baseline UI/UX | Current UI/UX | Evidence |
+| Area | Baseline UI/UX | Final UI/UX | Inspected evidence |
 |---|---:|---:|---|
-'''+ '\n'.join(rows)+'''
+'''+'\n'.join(rows)+f'''
 
-**Mobile working grade: 8/10, up from 3/10.** The reviewed layouts, Library filtering, source inspection, onboarding, approvals and validation drilldowns now meet the strong/usably polished bar. This is a judgment of the exercised frontend states, not coverage of every mobile subflow. All section working grades now reach 8. The unchecked acceptance backlog remains open; these grades do not imply every workflow has been verified.
+**Mobile: baseline 3 → final UI 8 / UX 8.** {final_grades['mobile']['rationale']}
 
-## Verification
+[Original rubric and findings](../2026-09-25/report.md) · [Complete checklist](../../../docs/ui-ux-upgrade-checklist.md) · [Dated implementation and verification log](../../../docs/ui-ux-implementation-progress.md) · [Per-area judgments](final-grades.json)
 
-- Production build and TypeScript: pass. Existing bundle-size and mixed static/dynamic import warnings remain.
-- Latest lifecycle tests: 32 frontend tests across 4 files and 207 backend tests across 5 files pass. Backend tests report HTTPX cookie deprecations and an AsyncMock coroutine warning. Production build/TypeScript, changed-file ESLint/Ruff and diff checks pass. 26 final browser states at 320/768/1440px have zero axe findings, page overflow, page errors or unmatched requests.
-- Latest history tests: 19 pass across 5 files. Production build/TypeScript and touched-file ESLint pass; 18 final browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. The oldest run opens by keyboard and exports CSV/Excel/JSON with its exact UUID without starting a validation.
-- Latest wizard tests: 12 pass across 3 files. Touched-file ESLint has no findings; TypeScript and production build pass. The 53 new wizard/API states have 72 captures across the main, API, and final mobile runs. Failed diagnostic runs are preserved and excluded from the selected gallery.
-- September 26 focused frontend tests: 55 pass across 11 files, covering catalog saves, interrupted streams/retry, apply review, score semantics, citations and existing catalog/trust/progress behavior. Prior 56-test autosave/validation/UI and 32-test upload/wizard passes remain recorded separately; counts overlap and are not cumulative.
-- Knowledge backend: 131 tests pass, including score metric/provenance regressions and existing knowledge/optimization routes. Composite quality is no longer subtracted from raw AI-only answer accuracy; scoring and execution are unchanged.
-- Broader frontend run before the final copy/layout refinements: 961 passed, 3 failed. All three are landing-page signup tests. The same three failures reproduce in an isolated archive of the unchanged baseline HEAD (1 passed / 3 failed), so they are pre-existing.
-- Automation backend tests: 58 pass, including persisted latest-event resolution, authorized-ID query scoping, API serialization, and existing automation routes. These use mocks; no live database or automation runs were used.
-- Changed TypeScript files: ESLint has zero errors and eight existing hook-dependency warnings in the expanded changed-file set. `git diff --check` passes.
-'''+f'''- Final evidence: {len(captures)} distinct states / {total} capture executions across the recorded production passes. Later targeted captures supersede the same IDs from earlier passes. Manifests retain each source/fixture fingerprint; later targeted checks supersede the same state from earlier builds. The latest context pass also verifies the upload-ready contrast fix.
-- No unmatched API requests or uncaught page errors in the included runs. No page-level horizontal overflow in selected captures. Zero axe violations in the latest selected evidence for every state (earlier failing captures are retained, not deleted).
-- All six main screens were captured at 320, 390, 768, 1280 and 1440px. The mobile validation final action was scrolled into view and captured. The automation editor was opened and closed on mobile.
-- Upload → next request and Enter → exactly one wizard step are failing assertions. Agent completion checks require an artifact link and removal of actionable approval; a later failed turn must not retain the old completed plan.
-- The validation completion regression also passed on the development server with StrictMode enabled in `upgrade-validation-refined`.
+## Final repairs and verification
 
-## Coverage labels and limitations
+- Shared form labels distinguish required and optional entries. Field errors have linked descriptions and focus; server failures preserve valid drafts for retry.
+- Text and icons identify recorded run status. Project/trust badges share geometry and semantic colors while availability and measured quality remain distinct.
+- Shared pickers retain selections across search and retry, ignore stale responses, fit short screens, contain focus and isolate Escape. Knowledge creation keeps a stable header/footer. Destructive confirmation initially focuses the safe action.
+- A screenshot audit caught doubled-text tab and header overlap that page-width/axe checks did not detect. Both editor resize observers now attach after loading, compact tabs are named, workflow tabs support arrow/Home/End navigation, and the header wraps or collapses labels without covering the logo. Direct reinspection confirmed the repair.
+- File timestamps clear row actions; Library descriptions wrap; the Explore detail header uses neutral task styling. The empty supporting Assistant is compact while Files and Library/tool navigation retain the approved parallel-pane behavior.
+- Upload announcements expose state changes separately from percentage bars. Validation announcements exclude elapsed seconds, tokens and trial streaming; status/phase changes remain polite and atomic. Reduced-motion loading states retain text.
+- The final browser evidence includes the 55 original baseline states, viewport matrix, keyboard focus and menu/dialog actions, nested generation/picker Escape, short-form validation and retry, file-to-Library execution/error/retry/return at 200% equivalent zoom, and separately doubled text. Earlier selected evidence covers 120 Library items, 251 validation questions, long content, role/scope restrictions, resumption and failure recovery.
+- Production build and TypeScript pass. Touched-file ESLint has zero errors; existing hook-dependency warnings are recorded in the implementation log. The full frontend suite has 1,199 passing tests across 176 passing files, with only the same three pre-existing Landing signup failures (one file). Focused regressions and announcement checks pass.
 
-**Visually inspected:** representative before/after screens, mobile layouts, final wizard review, source health, approval cards and editor actions. All captured states have snapshots and axe output, but a screenshot's presence does not mean every hidden or scrolled interaction was manually inspected.
+**Selected evidence:** {len(captures)} distinct states across {total} captures. Every selected capture has its image, accessible tree and axe output; latest selected states have zero axe violations and no horizontal page overflow. Manifests record source/fixture fingerprints and browser versions. Superseded diagnostic runs remain local and are excluded from acceptance.
 
-**Frontend interaction tested, with fixtures:** selection/upload scope, upload retry, wizard keyboard progression, validation setup/results/history/drilldowns, summary refresh across tab changes, automation save failure/retry, partial bulk deletion/retry, agent approval/cancellation, first-session upload-to-evidence, valid citation previews, catalog save/adoption and already-saved behavior, optimizer apply/error/retry/revert, interrupted streams and partial-artifact retry, long details at 320/768/1440px, project no-results recovery, contextual assistant open/close, mobile saved-view keyboard selection and narrow dialogs. Scores, source lists and chat/tool output are synthetic. The follow-up fixture returns the persisted answer-accuracy/baseline/lift contract after validation. Browser and component assertions confirm that the parent summary refetches without leaving Validation. Scores remain synthetic.
+## Resolved original findings
 
-**Unit/API tested, with mocks:** transfer abort and late-response suppression; partial upload recovery; wizard saved-draft retry; event-history aggregation and route serialization.
+UX-01 upload scope is retained and asserted in outgoing requests. UX-02 responsive overflow and UX-04 Library clipping are repaired. UX-03 wizard Enter preserves and advances the draft. UX-05 active work receives primary hierarchy with a compact supporting Assistant. UX-06 source completeness and textual operational state are explicit. UX-07 accessible names, structure, contrast and keyboard checks pass in the reviewed surfaces. UX-08 activation has a complete review and explicit disabled/enabled choices. UX-09 validation has a shorter task-oriented path and bounded estimates. UX-10 approvals and progress are scoped to the operation, with retained artifacts and recovery.
 
-**Live integration verified:** none. No real model, retrieval, upload ingestion, source refresh, optimizer apply/revert or autonomous tool execution was run. Citation fixtures do not establish grounding quality. Alternate roles, white-label colors, 200% zoom, large data sets, cross-browser behavior M365 setup, live API authentication and actual scheduled execution remain open.
+## Limits and release handoff
 
-## Sources and uploads
-
-**112/169 checklist items implemented locally (FILE-03, KB-08/09/10, UP-04–08, QA-05/06 completed in this pass).** Changes are uncommitted and not deployed.
-
-- Source rows identify type, readiness and recorded freshness. Refresh, reprocess, rename, inspect and remove preserve errors for retry, block duplicate requests and update only the intended KB. Late responses cannot reopen or overwrite a different KB. Viewers receive read-only provenance.
-- Source intake preserves selected documents, folders, URLs and crawl settings on failure. Mixed processing outcomes and duplicate URLs have accurate feedback. Narrow dialogs keep titles and final actions visible. Backend document registration validates the entire selection before inserting sources, preventing a missing later document from leaving earlier sources undispatched.
-- Files, chat and document pickers read the same server upload policy. Unsupported and oversized files fail independently; successful siblings and message drafts survive. Transfer blocks sending, processing explains the queued question, and cancellation/removal suppress delayed reattachment. Picker and drop paths are exercised.
-- Validation scope switching now has dedicated browser assertions: leaving one running KB for another and returning restores the original task and question subset without starting another check.
-- Validation: 72 source/upload frontend tests across 10 files, followed by 30 intake tests across 3 files (overlapping suites, not additive); 28 file-route backend tests and 109 registration/knowledge-route tests pass. Production build/TypeScript and touched-file Ruff pass; lint has no errors and one existing ChatPanel dependency warning. Backend output includes HTTPX cookie deprecations.
-- Evidence: `2026-09-28-sources-release` (35), `2026-09-28-uploads-evidence` (28), `2026-09-28-validation-scope` (6), and `2026-09-28-source-intake-final` (24): 93 additional production captures at 320/768/1440px, zero axe findings, page overflow, page errors or unmatched requests. Representative screenshots inspected directly. Selected gallery: 393 states / 485 captures.
-- Limits: browser APIs are synthetic and backend tests use mocks. Live upload/indexing, source retrieval, Mongo/Redis/worker behavior and model execution remain unverified. Catalog, broader roles/themes/zoom and the unchecked acceptance backlog remain open.
-
-## Implementation progress — September 28, catalog filters and evidence
-
-**114/169 checklist items implemented locally (EXP-06/07 completed in this pass).** Changes are uncommitted and not deployed.
-
-- Both catalog surfaces combine search, kind, quality and sorting predictably. Clearing restores the full population (the KB catalog retains its KB scope). Failed queries show unavailable results instead of a false empty result. Collections have their own retry.
-- Older requests cannot overwrite newer filters; pending pagination cannot append to a different query. Duplicate pagination is blocked. Failed pagination preserves current results and retries the same offset.
-- Details show rating origin, sample count, validation date, recorded runs and relevant limitations. Missing quality is distinct from a measured zero; author-provided ratings and pending regressions remain explicit. Cards show recorded validation dates, quality labels wrap, and collection counts respect visible items.
-- Validation: 26 frontend tests across 4 files, production build/TypeScript and touched-file ESLint pass. 36 filter/recovery and 12 quality-evidence production browser states at 320/768/1440px have zero axe findings, overflow, page errors or unmatched requests. Representative screenshots inspected directly.
-- Evidence: `2026-09-28-catalog-filters-evidence` and `2026-09-28-catalog-evidence-review`. Selected gallery: 441 states / 533 captures. Earlier blocked locator diagnostics are retained and excluded.
-- Limits: browser APIs use fixtures. Broader catalog permission/scope variants and item input/output descriptions remain open; recorded quality does not establish performance on the user's own material.
-
-## Implementation progress — September 28, chat reading and source navigation
-
-**120/169 checklist items implemented locally (CHAT-06/07/09 and CKB-04/05/06 completed in this pass).** Changes are uncommitted and not deployed.
-
-- Drafts survive Assistant/Library/Files switches. Multi-KB plus document attachments, detachment, replacement from the KB list and deliberate new conversations submit the expected identifiers. The KB picker retries failed loading without discarding search/selection; New chat is keyboard-accessible.
-- Incoming response content preserves a reader's position. Return to latest runs after layout and respects reduced motion. Long responses, lists, links, tables and code fit narrow views; tables/code have keyboard scroll targets. The composer wraps memory/export/send controls. Copy failures report an error, and IME confirmation Enter does not send prematurely.
-- Citation menus support keyboard movement and preserve estimated page labels. Opening a cited document preserves attachment scope and restores the conversation position on return (within 8px for menu/layout changes). URL citations open the exact intended URL in a separate tab. Unlinked citations identify missing originals and a recovery route.
-- Missing, inaccessible, failed and unavailable source previews have distinct recovery. Extraction retry retains its error, prevents duplicate submission and stops polling/applying results after a document switch. Retry controls use readable contrast; saved citation text is identified as potentially older than the original.
-- Validation: 54 frontend tests across 9 files pass, including late extraction acceptance after navigation. Production build/TypeScript pass. Touched-file lint has zero errors and four existing hook-dependency warnings. 33 reading/source and 18 scope browser states at 320/768/1440px have zero axe findings, page overflow, page errors or unmatched requests. Screenshots inspected directly; earlier clipping and contrast failures are retained and superseded.
-- Evidence: `2026-09-28-chat-navigation-evidence` and `2026-09-28-chat-scope-final`. Selected gallery: 492 states / 584 captures.
-- Limits: browser APIs, external URL content and streamed responses are synthetic. No real model, retrieval, document processing, file access permissions or clipboard integration was certified. Broader model-selection, assistive-technology, role/theme/zoom and remaining acceptance items stay open.
-
-## Remaining acceptance work
-
-1. Exercise validation with a live worker/broker; reload, reopen, cross-KB and competing-window fixture checks pass. Catalog filter combinations now pass; alternate role/scope variants remain open.
-2. Extend agent failure protocols; source repair/intake, citation document/URL navigation and scope fixture checks pass.
-3. Extend automation run failure and scope-switching recovery. A failed save after navigating away still needs a persistent draft recovery policy; in-editor retry and close-before-save are covered.
-4. Cover long content, larger lists, restricted roles, full keyboard focus journeys and 200% zoom. Regrade each section and mobile independently.
-
-## Evidence manifests
-
-'''+ '\n'.join(f"- [{name}](../{name}/manifest.json): {len(m['captures'])} states; source `{m['sourceFingerprint']}`; fixture `{m['fixtureFingerprint']}`; {m['buildMode']}; Chromium {m['browserVersion']}." for name,m in manifests)
-intro+='\n\n## Section notes\n\n'+'\n\n'.join(f"**{a['name']}:** {a['note']}" for a in json_rows)+'\n'
+'''+'\n'.join('- '+item for item in final_grades['limitations'])+'\n\n## Per-area assessment\n\n'+'\n\n'.join(f"**{a['name']} — UI {a['ui']}, UX {a['ux']}:** {a['note']}" for a in json_rows)+'\n\n## Evidence manifests\n\n'+'\n'.join(f"- [{name}](../{name}/manifest.json): {len(m['captures'])} captures; source `{m['sourceFingerprint']}`; {m['buildMode']}; Chromium {m['browserVersion']}." for name,m in manifests)+'\n'
 (out/'report.md').write_text(intro)
-(out/'review-summary.json').write_text(json.dumps({'status':'reviewed UI/UX grades reach 8; exhaustive acceptance remains open','completed_items':len(completed),'total_items':169,'unique_states':len(captures),'capture_executions':total,'mobile_grade':8,'areas':json_rows,'axe_latest_violations':violations,'runs':[{'directory':name,**m} for name,m in manifests]},indent=2)+'\n')
+(out/'review-summary.json').write_text(json.dumps({'status':'169-item local implementation and visual acceptance complete; live-service and deployment limits apply','completed_items':len(completed),'total_items':169,'unique_states':len(captures),'capture_executions':total,'mobile_grade':8,'mobile':final_grades['mobile'],'grading_method':final_grades['method'],'limitations':final_grades['limitations'],'areas':json_rows,'axe_latest_violations':violations,'runs':[{'directory':name,**m} for name,m in manifests]},indent=2)+'\n')
 esc=html.escape
 cards=[]
 for id,c in captures.items():
@@ -403,7 +87,7 @@ for id in ['files-mobile','library-mobile','chat-home','knowledge-detail','wizar
   pairs.append(f'<section><h2>{esc(id)}</h2><div class="pair"><figure><figcaption>Before</figcaption><a href="../2026-09-25/{id}.png"><img loading="lazy" src="../2026-09-25/{id}.png" alt="Before: {esc(id)}"></a></figure><figure><figcaption>After</figcaption><a href="../{new["run"]}/{new["id"]}.png"><img loading="lazy" src="../{new["run"]}/{new["id"]}.png" alt="After: {esc(id)}"></a></figure></div></section>')
 html_rows=''.join(f'<tr><td>{esc(a["name"])}</td><td>{a["baseline_ui"]}/{a["baseline_ux"]}</td><td>{a["ui"]}/{a["ux"]}</td></tr>' for a in json_rows)
 page='''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vandalizer UX upgrade review</title><style>*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#242c35;font:16px/1.6 system-ui}main{max-width:1240px;margin:auto;padding:32px 20px}h1{font-size:36px;line-height:1.2}h2{margin-top:32px}a{color:#175c82}section,article{background:white;border:1px solid #d4dce3;border-radius:12px;padding:18px;margin:20px 0}table{border-collapse:collapse;width:100%;background:white}th,td{padding:9px 14px;text-align:left;border-bottom:1px solid #d4dce3}.pair{display:grid;grid-template-columns:1fr 1fr;gap:20px}figure{margin:0}figcaption{font-weight:700;margin-bottom:8px}img{max-width:100%;height:auto;max-height:650px;object-fit:contain;object-position:top;display:block}input{font:inherit;padding:10px 14px;width:100%;border:1px solid #8b99a8;border-radius:8px}.gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}.gallery article{margin:0}.gallery img{height:280px;width:100%;object-fit:contain}.gallery h3{font-size:15px}.gallery p{font-size:13px}[hidden]{display:none!important}:focus-visible{outline:3px solid #1b6ba5;outline-offset:3px}@media(max-width:700px){.pair{grid-template-columns:1fr}h1{font-size:28px}}</style><main>'''
-page+=f'<h1>Vandalizer UX upgrade</h1><p><strong>Implementation progress · {len(completed)}/169 items implemented locally</strong></p><p>All reviewed UI/UX working grades reach 8. The unchecked acceptance backlog remains open; fixture-backed frontend evidence does not certify live execution.</p><p><a href="report.md">Full report and limits</a> · <a href="review-summary.json">Machine-readable evidence</a> · <a href="https://github.com/ui-insight/vandalizer/issues/964">Issue #964</a></p><table><thead><tr><th>Area</th><th>Before UI/UX</th><th>Current UI/UX</th></tr></thead><tbody>{html_rows}</tbody></table><p>Mobile: 3 → 8. Latest selected evidence: {len(captures)} states, zero axe violations; overall acceptance remains open.</p>'
+page+=f'<h1>Vandalizer UX upgrade</h1><p><strong>Final local acceptance · {len(completed)}/169 items</strong></p><p>All reviewed areas meet the original UI and UX target of 8. Grades follow direct screenshot inspection and exercised interactions; fixture-backed evidence does not certify live execution. Changes are local, not deployed.</p><p><a href="report.md">Full report and limits</a> · <a href="review-summary.json">Machine-readable evidence</a> · <a href="https://github.com/ui-insight/vandalizer/issues/964">Issue #964</a></p><table><thead><tr><th>Area</th><th>Before UI/UX</th><th>Current UI/UX</th></tr></thead><tbody>{html_rows}</tbody></table><p>Mobile: 3 → 8. Latest selected evidence: {len(captures)} states, zero axe violations. See the report for the review method and release limits.</p>'
 page+=''.join(pairs)+f'<h2>Evidence gallery</h2><label for="filter">Find a screen</label><input id="filter" type="search" placeholder="Try mobile, wizard, knowledge…"><p id="count" role="status">{len(captures)} screens</p><div class="gallery">'+''.join(cards)+'</div></main>'
 page+='''<script>const f=document.getElementById('filter'),cards=[...document.querySelectorAll('[data-screen]')];f.addEventListener('input',()=>{const q=f.value.toLowerCase();for(const c of cards)c.hidden=!c.dataset.screen.includes(q);document.getElementById('count').textContent=cards.filter(c=>!c.hidden).length+' screens'});</script></html>'''
 (out/'index.html').write_text(page)

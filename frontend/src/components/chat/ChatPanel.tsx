@@ -798,8 +798,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const homeActionsDisabled = isLoadingHistory || attachLoading || !!processingDoc
-  const showFirstSessionHome = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
-  const showReturningHome = !effectiveFirstSession
+  const showFirstSessionHome = workspaceMode === 'chat' && effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
+  const showReturningHome = workspaceMode === 'chat' && !effectiveFirstSession
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
@@ -808,12 +808,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     && !activeProjectUuid
     && !activeKBUuid
     && !hasDocContext
+  const showSupportingHome = workspaceMode !== 'chat' && !hasDocContext && !activeKBUuid && !activeProjectUuid && messages.length === 0 && !isStreaming && !isLoadingHistory && !onboardingLoading
   const showContextualEmptyState = (!effectiveFirstSession || hasDocContext || !!activeKBUuid || !!activeProjectUuid)
     && messages.length === 0
     && !isStreaming
     && !onboardingLoading
     && !isLoadingHistory
     && !showReturningHome
+    && !showSupportingHome
 
   return (
     <div
@@ -920,7 +922,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: "var(--workspace-space-20) var(--workspace-space-20) var(--workspace-space-24)", position: 'relative' }}
       >
-        {/* First-session: compact value-prop banner with rotating taglines */}
+        {showSupportingHome && <div className="supporting-assistant-home">
+          <h2>Ask about your work</h2>
+          <p>Select files or a knowledge base, then ask a question. Your current work stays open.</p>
+          <button type="button" onClick={focusChat}>Start a conversation</button>
+          <button type="button" onClick={() => setShowAttachKB(true)}>Choose a knowledge base</button>
+        </div>}
+        {/* First-session guidance in the main Chat workspace. */}
         {showFirstSessionHome && (
           <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
             <FirstSessionHome

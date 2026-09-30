@@ -8,7 +8,7 @@ import { ActionButton } from '../shared/ActionButton'
  * we never bake "extract once" bias into ground truth.
  */
 import { createPortal } from '../shared/panelPortal'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Loader2, FileText, Check, AlertCircle } from 'lucide-react'
 import {
@@ -40,6 +40,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
   const [step, setStep] = useState<Step>('pick')
   const [coverage, setCoverage] = useState<TestCaseCoverage>('standard')
   const [showPicker, setShowPicker] = useState(false)
+  const pickerTrigger = useRef<HTMLElement | null>(null)
   const [errors, setErrors] = useState<Array<{ document_uuid: string; reason: string }>>([])
   const [proposals, setProposals] = useState<ProposedTestCase[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -112,7 +113,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
         position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}>
-        <FocusTrap active={!showPicker} focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, initialFocus: '#generate-test-cases-title' }}>
+        <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, initialFocus: () => pickerTrigger.current?.isConnected ? pickerTrigger.current : document.getElementById('generate-test-cases-title')! }}>
         <div role="dialog" aria-modal="true" aria-labelledby="generate-test-cases-title" onKeyDown={event => {
           if (event.key === 'Escape' && !showPicker) { event.preventDefault(); event.stopPropagation(); onClose() }
         }} style={{
@@ -138,7 +139,7 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
             <PickStep
               coverage={coverage}
               onCoverage={setCoverage}
-              onPick={() => setShowPicker(true)}
+              onPick={() => { pickerTrigger.current = document.activeElement as HTMLElement; setShowPicker(true) }}
             />
           )}
 

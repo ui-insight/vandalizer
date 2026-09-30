@@ -283,7 +283,7 @@ export function WorkflowEditorPanel() {
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [loading])
 
   const editingStep = editingStepId
     ? workflow?.steps.find(s => s.id === editingStepId) ?? null
@@ -919,7 +919,7 @@ export function WorkflowEditorPanel() {
       </div>
 
       {/* ===== TAB BAR ===== */}
-      <div ref={tabBarRef} role="tablist" aria-label="Workflow editor sections" style={{ display: 'flex', borderBottom: "1px solid var(--workspace-border)", padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
+      <div ref={tabBarRef} role="tablist" aria-label="Workflow editor sections" style={{ display: 'flex', flexWrap: 'wrap', borderBottom: "1px solid var(--workspace-border)", padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
           const TabIcon = tab.icon
           const badge = tab.key === 'input' ? inputBadge : 0
@@ -941,6 +941,15 @@ export function WorkflowEditorPanel() {
               tabIndex={activeTab === tab.key ? 0 : -1}
               onClick={() => setActiveTab(tab.key)}
               title={tab.label}
+              aria-label={tab.label}
+              onKeyDown={event => {
+                const index = TABS.findIndex(item => item.key === tab.key)
+                const next = event.key === 'ArrowRight' ? (index + 1) % TABS.length : event.key === 'ArrowLeft' ? (index + TABS.length - 1) % TABS.length : event.key === 'Home' ? 0 : event.key === 'End' ? TABS.length - 1 : -1
+                if (next < 0) return
+                event.preventDefault()
+                setActiveTab(TABS[next].key)
+                tabBarRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+              }}
               style={{
                 padding: tabsCompact ? '12px 12px' : '12px 20px', fontSize: 'var(--workspace-font-control)',
                 fontWeight: activeTab === tab.key ? 700 : 500,

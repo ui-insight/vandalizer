@@ -1,3 +1,4 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { useRef, useState, type FormEvent } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -13,6 +14,8 @@ interface RenameDialogProps {
 export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogProps) {
   const [name, setName] = useState(currentName)
   const [error, setError] = useState<string | null>(null)
+  const [nameError, setNameError] = useState<string | null>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
   const submitting = useRef(false)
 
@@ -21,9 +24,11 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
     if (submitting.current) return
     const err = getNameError(name)
     if (err) {
-      setError(err)
+      setNameError(err)
+      nameRef.current?.focus()
       return
     }
+    setNameError(null)
     submitting.current = true
     setPending(true)
     setError(null)
@@ -56,18 +61,24 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
         </div>
         <p className="mb-3 break-words text-sm text-gray-600">Renaming: {currentName}</p>
         <form onSubmit={handleSubmit}>
-          <label htmlFor="rename-input" className="sr-only">New name</label>
+          <FieldLabel htmlFor="rename-input" required>New name</FieldLabel>
           <input
             id="rename-input"
+            ref={nameRef}
+            aria-required="true"
+            aria-invalid={!!nameError}
+            aria-describedby={`rename-name-help${nameError ? ' rename-name-error' : ''}${error ? ' rename-save-error' : ''}`}
             autoFocus
             type="text"
             disabled={pending}
             value={name}
             maxLength={MAX_NAME_LENGTH}
-            onChange={(e) => { setName(e.target.value); if (error) setError(null) }}
+            onChange={(e) => { setName(e.target.value); if (error) setError(null); if (nameError) setNameError(null) }}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
           />
-          {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+          <FieldMessage id="rename-name-help">Up to {MAX_NAME_LENGTH} characters.</FieldMessage>
+          {nameError && <FieldMessage id="rename-name-error" error>{nameError}</FieldMessage>}
+          {error && <FieldMessage id="rename-save-error" error>{error}</FieldMessage>}
           <div className="mt-4 flex justify-end gap-2">
             <ActionButton variant="secondary"
               type="button"

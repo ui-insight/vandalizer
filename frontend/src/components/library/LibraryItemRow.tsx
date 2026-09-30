@@ -157,9 +157,7 @@ export function LibraryItemRow({ item, scope, busy = false, onPin, onFavorite, o
               fontSize: 'var(--workspace-font-meta)',
               color: '#5f6368',
               marginTop: 'var(--workspace-space-2)',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
+              whiteSpace: 'normal', overflowWrap: 'anywhere',
             }}
           >
             {item.description}

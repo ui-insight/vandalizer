@@ -1,5 +1,4 @@
 import { ActionButton } from './ActionButton'
-import { usePanelEffect } from './usePanelEffect'
 import { useState } from 'react'
 import { FocusTrap } from './PanelFocusTrap'
 import { AlertTriangle, X, Loader2 } from 'lucide-react'
@@ -27,15 +26,6 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [busy, setBusy] = useState(false)
 
-  usePanelEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !busy) onCancel()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy, onCancel])
-
   if (!open) return null
 
   const handleConfirm = async () => {
@@ -49,7 +39,7 @@ export function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 flex items-center justify-center bg-black/50"
+      className="workspace-dialog-backdrop"
       style={{ zIndex: 1000 }}
       onClick={(e) => {
         if (e.target === e.currentTarget && !busy) onCancel()
@@ -57,14 +47,16 @@ export function ConfirmDialog({
     >
       {/* Escape + outside-click are handled above; the trap only confines Tab
           focus to the dialog and restores focus to the trigger on close. */}
-      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, fallbackFocus: '#confirm-dialog-title', tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl"
+        className="workspace-dialog"
+        style={{ width: 448 }}
+        onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (!busy) onCancel() } }}
       >
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="workspace-dialog-header">
           <div className="flex items-start gap-3">
             {destructive && (
               <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-red-50">
@@ -73,6 +65,7 @@ export function ConfirmDialog({
             )}
             <h3
               id="confirm-dialog-title"
+              tabIndex={-1}
               className="text-lg font-medium text-gray-900"
               style={{ marginTop: destructive ? 6 : 0 }}
             >
@@ -90,14 +83,14 @@ export function ConfirmDialog({
           </ActionButton>
         </div>
 
-        <div className="mb-5 text-sm text-gray-600">{message}</div>
+        <div className="workspace-dialog-body text-sm text-gray-600">{message}</div>
 
-        <div className="flex justify-end gap-2">
+        <div className="workspace-dialog-footer">
           <ActionButton variant="secondary"
             type="button"
             onClick={onCancel}
             disabled={busy}
-
+            autoFocus={destructive}
           >
             {cancelLabel}
           </ActionButton>
@@ -105,7 +98,7 @@ export function ConfirmDialog({
             type="button"
             onClick={handleConfirm}
             disabled={busy}
-            autoFocus
+            autoFocus={!destructive}
 
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}

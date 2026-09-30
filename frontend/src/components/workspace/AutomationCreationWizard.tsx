@@ -1,3 +1,4 @@
+import { FieldLabel } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -308,9 +309,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 What would you like to call this automation?
               </div>
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-                <label htmlFor="wizard-name" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Name <span style={{ color: '#ef4444' }}>*</span>
-                </label>
+                <FieldLabel htmlFor="wizard-name" required>Name</FieldLabel>
                 <input
                   id="wizard-name"
                   ref={nameRef}
@@ -328,9 +327,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 <p id="wizard-name-help" className="wizard-field-help">Required. Give this automation a name you can recognize later.</p>
               </div>
               <div>
-                <label htmlFor="wizard-description" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Description <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
-                </label>
+                <FieldLabel htmlFor="wizard-description" optional>Description</FieldLabel>
                 <input
                   id="wizard-description"
                   type="text"
@@ -430,9 +427,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 testId="folder-watch-folder"
               >
               <div style={{ paddingTop: 'var(--workspace-space-8)' }}>
-                <label htmlFor="wizard-watch-folder" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Watch Folder <span style={{ color: '#ef4444' }}>*</span>
-                </label>
+                <FieldLabel htmlFor="wizard-watch-folder" required>Watch Folder</FieldLabel>
                 {foldersLoading ? (
                   <div style={{ padding: "var(--workspace-space-12) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', color: '#555e68' }}>Loading folders...</div>
                 ) : (
@@ -537,9 +532,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               </div>
 
               <div style={{ marginBottom: 'var(--workspace-space-16)' }}>
-                <label htmlFor="wizard-exclude" style={{ fontSize: 'var(--workspace-font-meta)', fontWeight: 600, color: '#555e68', display: 'block', marginBottom: 'var(--workspace-space-6)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Exclude Patterns <span style={{ color: '#555e68', fontWeight: 400 }}>(optional)</span>
-                </label>
+                <FieldLabel htmlFor="wizard-exclude" optional>Exclude Patterns</FieldLabel>
                 <input
                   id="wizard-exclude"
                   type="text"

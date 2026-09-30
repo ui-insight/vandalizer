@@ -16,12 +16,13 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
  const buildMode=process.env.REVIEW_BUILD || 'development';
  const out=resolve(output); await mkdir(out,{recursive:true});
  const browser=await chromium.launch({headless:true,...(process.env.REVIEW_CHROMIUM?{executablePath:process.env.REVIEW_CHROMIUM}:{})});
- const context=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:1,reducedMotion:'reduce'});
+ const context=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:process.env.REVIEW_ZOOM === '2' ? 2 : 1,reducedMotion:'reduce'});
  const state={empty:false,first:false}, unmatched=new Set(), captures=[], errors=[], observations=[];
  await installFixtures(context,state,unmatched);
  // Every navigation starts from the same layout and scope. Interactions within
  // a scenario retain state; separate scenarios cannot inherit a project or KB.
  await context.addInitScript(reset=>{if(reset){localStorage.clear();sessionStorage.clear()}localStorage.setItem('vandalizer:first-run-tour-dismissed','1')},resetStorage);
+ if(process.env.REVIEW_TEXT_SCALE==='2')await context.addInitScript(()=>document.addEventListener('DOMContentLoaded',()=>{document.documentElement.style.fontSize='32px'}));
  const page=await context.newPage(); page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message)});
  page.on('console',m=>{if(m.type()==='error')console.error('CONSOLE',m.text())});
  page.on('requestfailed',r=>console.error('REQUEST FAILED',r.url(),r.failure()));
@@ -44,6 +45,6 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
   await flush();
   return snapshot;
  }
- async function flush() {await writeFile(resolve(out,'manifest.json'),JSON.stringify({capturedAt:new Date().toISOString(),sourceFingerprint,fixtureFingerprint,buildMode,workingTree:execFileSync('git',['status','--short'],{encoding:'utf8'}).trim(),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),baseURL,browserVersion:browser.version(),mode:'synthetic API fixtures; current source served locally; no backend or model execution',captures,unmatched:[...unmatched],errors,observations},null,2))}
+ async function flush() {await writeFile(resolve(out,'manifest.json'),JSON.stringify({capturedAt:new Date().toISOString(),sourceFingerprint,fixtureFingerprint,buildMode,zoomEquivalent:process.env.REVIEW_ZOOM==='2'?2:1,textScale:process.env.REVIEW_TEXT_SCALE==='2'?2:1,reducedMotion:'reduce',workingTree:execFileSync('git',['status','--short'],{encoding:'utf8'}).trim(),commit:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),baseURL,browserVersion:browser.version(),mode:'synthetic API fixtures; current source served locally; no backend or model execution',captures,unmatched:[...unmatched],errors,observations},null,2))}
  return {browser,context,page,state,unmatched,captures,errors,observations,out,capture,flush,baseURL};
 }

@@ -2,15 +2,30 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**157/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**169/169 items are complete locally.** Every reviewed area and mobile meets the original minimum of 8/10 for UI and UX. The final acceptance below supersedes earlier working grades and open backlogs. Changes are not pushed or deployed; live-service limits remain explicit.
 
-- [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
+- [Before/after gallery and final grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
 - [Machine-readable results and provenance](../artifacts/visual-review/upgrade-review/review-summary.json)
 - [Remaining checklist](ui-ux-upgrade-checklist.md)
 
 
 
+
+## Final local acceptance — September 30
+
+**169/169 checklist items complete locally.** This finishes VIS-05/07/08, ACC-05/09/10/12/13 and QA-04/07/12/13. The original UI/UX rubric was reapplied after direct screenshot inspection: all 13 areas meet at least 8/8, and mobile independently meets 8/8. These are reviewed frontend judgments, not live-service certification. Nothing is pushed or deployed.
+
+- Forms share required/optional labels, linked help, field validation and retry feedback. Empty/duplicate/invalid entries focus the field; server failures preserve valid drafts. Knowledge creation retains its title/actions on short screens and stays open while saving.
+- Recorded run statuses use text and icons; project/trust badges share geometry and semantic colors. Availability and measured quality remain distinct. Long extraction titles and Library descriptions wrap; file dates clear row actions. Explore detail uses neutral styling, and the supporting Assistant stays compact beside active work.
+- Shared document pickers fit narrow/short screens, retain selections across searches and failure/retry, and ignore stale responses. Nested Escape closes only the top layer and returns to the exact trigger. Confirmation focuses the safe action; Knowledge help contains/restores focus and has corrected contrast.
+- Direct doubled-text inspection exposed overlapping editor tabs despite passing page-width checks. Both editor resize observers now attach after loading; workflow tabs support arrow/Home/End keys and compact tabs have accessible names. Header controls remain separate from the logo. Fresh screenshots and hit-target assertions confirm the repair.
+- Upload status announcements exclude changing percentages, while progress bars retain their values. Validation announces status/phase changes separately from timers, token counts and streamed trial details. Reduced-motion loading states retain text; DOM behavior is tested, not screen-reader speech.
+- Verification: production build, TypeScript and diff checks pass. Touched-file ESLint has zero errors and five existing hook-dependency warnings. Full frontend run: **1,199 passed, three pre-existing Landing signup failures**, across 176 passing files and one failing file. The same three failures were reproduced on the unchanged baseline earlier; no Landing changes were made. Focused form/picker/chat/upload/announcement regressions pass.
+- **361 new selected captures** include all 55 baseline states, the five-width workspace matrix, form guidance/retry, wizard/source/catalog recovery, keyboard actions, nested workflow/extraction validation dialogs, 120-item Library recovery, short forms/help dialogs, reduced motion, and the file-to-Library task at equivalent 200% zoom and doubled text. All new selected captures have zero axe findings, horizontal page overflow, uncaught errors or unmatched requests. Final gallery: **1,306 distinct states / 3,116 captures**. Diagnostic failures are retained locally and excluded from acceptance. Earlier evidence includes 251 validation questions and role/scope variants.
+- Zoom method: 1440×900 and 1280×900 browser-layout equivalents use 720×450 and 640×450 CSS viewports with device scale 2. Separate 1440/768px runs double root text to 32px. This does not claim native browser-zoom UI or assistive-device testing.
+- Final report: [before/after grades and limits](../artifacts/visual-review/upgrade-review/report.md), [interactive gallery](../artifacts/visual-review/upgrade-review/index.html), and [independent per-area judgments](../artifacts/visual-review/upgrade-review/final-grades.json). Report generation validates all local targets; browser verification checks filtering, clearing, mobile overflow and page errors.
+- Release limits: API/model results are synthetic; live Mongo indexes, broker/worker delivery, ingestion, retrieval, permissions and model execution still require the coordinated release validation described in earlier entries. This issue's local implementation/visual-review scope is complete. Stop after committing; do not start another issue.
 
 ## Consistent actions and usable controls — September 30
 

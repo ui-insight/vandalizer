@@ -3,6 +3,18 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { UploadProgress } from './UploadProgress'
 
 describe('UploadProgress', () => {
+  it('announces state changes without announcing every percentage update', () => {
+    const item = { id: 1, fileName: 'doc.pdf', progress: 10, done: false }
+    const { rerender } = render(<UploadProgress uploads={[item]} onDismiss={vi.fn()} />)
+    expect(screen.getByRole('status')).toHaveTextContent('doc.pdf: Uploading')
+    rerender(<UploadProgress uploads={[{ ...item, progress: 50 }]} onDismiss={vi.fn()} />)
+    expect(screen.getByRole('status')).toHaveTextContent('doc.pdf: Uploading')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '50')
+    expect(screen.getByRole('status')).not.toContainElement(screen.getByRole('progressbar'))
+    rerender(<UploadProgress uploads={[{ ...item, progress: 100, done: true }]} onDismiss={vi.fn()} />)
+    expect(screen.getByRole('status')).toHaveTextContent('doc.pdf: Upload complete')
+  })
+
   it('renders nothing when there are no uploads', () => {
     const { container } = render(<UploadProgress uploads={[]} onDismiss={vi.fn()} />)
     expect(container).toBeEmptyDOMElement()

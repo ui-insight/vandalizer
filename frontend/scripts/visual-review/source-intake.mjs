@@ -63,7 +63,7 @@ try {
     await urls.getByRole('textbox', { name: 'URLs to add, one per line' }).fill('https://example.org/policies\nhttps://example.org/new')
     await urls.getByRole('checkbox', { name: 'Enable crawling' }).check()
     await urls.getByRole('spinbutton', { name: 'Max pages' }).fill('7')
-    await urls.getByRole('textbox', { name: 'Allowed domains (optional)' }).fill('example.org')
+    await urls.getByRole('textbox', { name: 'Allowed domains' }).fill('example.org')
     fail = 'add_urls'; await urls.getByRole('button', { name: 'Add URLs', exact: true }).click()
     await urls.getByRole('alert').waitFor()
     await shot(`source-intake-url-error-${width}`, urls.getByRole('button', { name: 'Add URLs', exact: true }))

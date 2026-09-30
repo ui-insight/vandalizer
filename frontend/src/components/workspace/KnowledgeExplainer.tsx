@@ -1,17 +1,8 @@
-import { usePanelEffect } from '../shared/usePanelEffect'
+import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X, Layers, Search, BookOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 
 export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
-  usePanelEffect(() => {
-    if (!onClose) return
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [onClose])
-
   return (
     <>
       <style>{`
@@ -37,7 +28,12 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
         .kb-explainer-glow { animation: kbExplainerGlow 4s ease-in-out infinite; }
       `}</style>
 
+      <FocusTrap active={!!onClose} focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true }}>
       <div
+        role={onClose ? 'dialog' : undefined}
+        aria-modal={onClose ? true : undefined}
+        aria-label={onClose ? 'About knowledge bases' : undefined}
+        onKeyDown={event => { if (onClose && event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose() } }}
         className="kb-explainer-root"
         tabIndex={0}
         style={{
@@ -115,7 +111,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <Card
               icon={BookOpen}
               title="Cite"
-              body="Every answer points back to the exact document and page it came from. No black boxes."
+              body="Open available source references to check the original passage. Missing or incomplete sources can limit an answer."
             />
           </Section>
 
@@ -128,7 +124,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <UseCase
               accent="var(--workspace-info)"
               question="Is salary cap waivable on a K award?"
-              answer="Federal regulations KB returns the answer with a citation to 2 CFR §200.305 and the relevant NIH NOT-OD notice."
+              answer="Search a knowledge base of current sponsor guidance, then inspect the cited policy before making a decision."
             />
             <UseCase
               accent="var(--workspace-info)"
@@ -141,7 +137,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               answer="Internal SOPs KB answers from your office's playbook so new staff stop opening tickets for the same questions."
             />
             <UseCase
-              accent="#f472b6"
+              accent="var(--workspace-info)"
               question="What did we tell DCAA about Q3 indirect costs?"
               answer="Audit response KB surfaces the exact correspondence and exhibits, searchable months after the fact."
             />
@@ -152,7 +148,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <Step num="1" title="Create a knowledge base" body="Name it after the question you want answered (e.g. 'NIH grant policies')." />
             <Step num="2" title="Add sources" body="Pick documents from your library, paste URLs, or point it at a website to crawl." />
             <Step num="3" title="Wait for it to build" body="Sources are chunked and indexed in the background. Status updates live." />
-            <Step num="4" title="Open chat and ask" body="Ask in plain English. You'll get answers with citations to the source documents." />
+            <Step num="4" title="Open chat and ask" body="Ask in plain English, then inspect available citations against your source documents." />
           </Section>
 
           {/* CTA */}
@@ -174,6 +170,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
           )}
         </div>
       </div>
+      </FocusTrap>
     </>
   )
 }
@@ -192,7 +189,7 @@ function Section({
         {title}
       </h2>
       {subtitle && (
-        <p style={{ fontSize: 'var(--workspace-font-control)', color: '#aeb7c9', margin: "0 0 var(--workspace-space-16)" }}>{subtitle}</p>
+        <p style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', margin: "0 0 var(--workspace-space-16)" }}>{subtitle}</p>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-12)', marginTop: subtitle ? 0 : 14 }}>
         {children}

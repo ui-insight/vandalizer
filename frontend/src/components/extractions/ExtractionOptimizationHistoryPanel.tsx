@@ -11,7 +11,7 @@ import {
   listExtractionOptimizationHistory,
   type ExtractionOptimizationRunSummary,
 } from '../../api/extractions'
-import { StatusDot } from '../shared/StatusDot'
+import { StatusBadge } from '../shared/StatusBadge'
 
 interface Props {
   searchSetUuid: string
@@ -52,7 +52,7 @@ export function ExtractionOptimizationHistoryPanel({
       <button
         onClick={() => setOpen(o => !o)}
         style={{
-          display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
+          display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)', width: '100%',
           padding: "var(--workspace-space-12) var(--workspace-space-16)", background: 'transparent', border: 'none',
           fontFamily: 'inherit', cursor: 'pointer', color: 'var(--workspace-text)',
           textAlign: 'left',
@@ -120,7 +120,7 @@ function HistoryRow({
       onClick={() => onSelect?.(run.uuid)}
       disabled={!onSelect}
       style={{
-        display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)',
+        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)',
         padding: "7px var(--workspace-space-12)", textAlign: 'left',
         background: 'var(--workspace-canvas)', border: '1px solid var(--workspace-border)',
         borderRadius: 'var(--workspace-radius-small)', cursor: onSelect ? 'pointer' : 'default',
@@ -129,11 +129,11 @@ function HistoryRow({
       onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = 'var(--workspace-accent-ink)')}
       onMouseLeave={e => onSelect && (e.currentTarget.style.borderColor = 'var(--workspace-border)')}
     >
-      <StatusDot status={run.status} />
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <StatusBadge status={run.status} />
+      <div style={{ flex: '1 1 160px', minWidth: 0 }}>
         <div style={{
           fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          overflowWrap: 'anywhere',
         }}>
           {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
           <span style={{ color: 'var(--workspace-muted)' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
@@ -142,7 +142,7 @@ function HistoryRow({
         {run.judge_model && (
           <div style={{
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+            overflowWrap: 'anywhere', marginTop: 1,
           }}>
             judge: {run.judge_model}
           </div>
@@ -150,7 +150,7 @@ function HistoryRow({
         {run.error_message && run.status === 'failed' && (
           <div style={{
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-danger)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+            overflowWrap: 'anywhere', marginTop: 1,
           }}>
             {run.error_message}
           </div>

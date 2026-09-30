@@ -1,0 +1,108 @@
+{
+  "review_date": "2026-09-30",
+  "method": "Independent Codex judgments after direct screenshot inspection and fixture-backed interaction checks, using the original 0\u201310 rubric. UI considers hierarchy, spacing, typography, consistency, contrast and layout. UX considers discoverability, progression, feedback, recovery and scope clarity. 8 means strong; 9\u201310 would require exceptional polish and evidence beyond this review. Checklist completion does not determine the grade.",
+  "areas": [
+    {
+      "id": "files",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "files",
+      "rationale": "Readable names, dates and persistent row actions establish a clear hierarchy. Selection, upload scope and partial-operation retry are exercised; the source stays available beside Library tools. Dense file tables remain utilitarian, so this is strong rather than exceptional."
+    },
+    {
+      "id": "projects",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "projects",
+      "rationale": "Clear project names, textual state, roles and counts make scope scannable. Search, creation, editing, empty states and retained failures have explicit next steps; long-title and viewer cases are covered by the project recovery evidence."
+    },
+    {
+      "id": "automations",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "automation-detail",
+      "rationale": "Neutral cards and a trigger/input/action/output summary connect configuration to behavior. Saved-state, failed-save retry, history and exact-request reconnect are explicit. Configuration remains substantial, even with grouped settings."
+    },
+    {
+      "id": "automation-wizard",
+      "ui": 8,
+      "ux": 8.5,
+      "evidence": "wizard-5-activation",
+      "rationale": "Required guidance, retained choices and a complete final review create a coherent sequence. Save disabled and Create & enable are distinct; nested pickers and short-screen actions are tested. API and scheduling details remain technical but optional to other trigger paths."
+    },
+    {
+      "id": "knowledge",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "knowledge-detail",
+      "rationale": "Availability, source coverage and measured quality are visibly separate. Source failures show a next action, while ownership, sharing and catalog transitions retain context. Source and validation controls remain information-dense but readable."
+    },
+    {
+      "id": "validation",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "validation-wizard-budget",
+      "rationale": "Questions, expected answers, comparison and budget review now form a bounded path. Sample limitations, unavailable cost estimates, explicit apply/revert and saved history prevent misleading conclusions. Advanced tuning still requires domain knowledge."
+    },
+    {
+      "id": "catalog",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "catalog-detail",
+      "rationale": "A neutral detail header leads into input/output suitability and dated validation evidence. Missing metadata is explicit. Save/retry/already-saved/Open states preserve browsing context; catalog usefulness still depends on contributor descriptions."
+    },
+    {
+      "id": "library",
+      "ui": 8,
+      "ux": 8.5,
+      "evidence": "library-mobile",
+      "rationale": "Names and descriptions get usable width, with visible row actions and consistent scope/filter controls. Large lists, exact-item retry and the file-to-tool workflow are exercised. Desktop parallel panes and mobile state retention preserve the central task."
+    },
+    {
+      "id": "chat",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "chat-home",
+      "rationale": "Readable conversation and a stable composer are supported by source chips and contextual controls. The supporting Assistant is compact beside active work. Queueing, failed drafts, model selection and reading-position recovery are tested; the main home still offers several starting paths."
+    },
+    {
+      "id": "onboarding",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "chat-onboarding",
+      "rationale": "Conversation, upload and sample entry points are concrete. Source wording is bounded, the optional tour does not repeatedly reopen, and an upload-to-question-to-evidence journey is covered. The first screen retains secondary learning choices below its primary actions."
+    },
+    {
+      "id": "uploads",
+      "ui": 8,
+      "ux": 8.5,
+      "evidence": "chat-upload-error",
+      "rationale": "Successful files remain attached through refresh and sibling failures. Persistent failure text, retry/cancel controls and visible ready state make recovery clear. Request assertions establish the intended document UUID; frontend evidence does not establish live ingestion."
+    },
+    {
+      "id": "chat-kb",
+      "ui": 8,
+      "ux": 8.5,
+      "evidence": "chat-kb-answer",
+      "rationale": "Full source scope, coverage and readable citation chips connect the question to inspectable evidence. Missing/failed sources, preview return and multiple-source requests are exercised. Citation correctness against a live retriever remains outside this visual review."
+    },
+    {
+      "id": "agent",
+      "ui": 8,
+      "ux": 8,
+      "evidence": "chat-agent-error",
+      "rationale": "Action-specific approval, operation-scoped status, retained partial results and artifact links make progress and recovery understandable. Failed/unconfirmed operations do not masquerade as success. Long output remains navigable; real agent execution is not certified."
+    }
+  ],
+  "mobile": {
+    "ui": 8,
+    "ux": 8,
+    "rationale": "Navigation and pane switching preserve source/tool state at 320/390px. Dialog actions remain reachable at 320\u00d7480; larger lists scroll, and controls retain labels or accessible names. Two-pane work becomes explicit pane switching on phones. Very short screens require scrolling; this is not a claim of native mobile or assistive-device certification."
+  },
+  "limitations": [
+    "Browser APIs and model output are synthetic. No live broker, worker, model, retrieval or permission certification.",
+    "200% browser-zoom layout is simulated with half-size CSS viewports and device scale 2; doubled root text size is checked separately. Native browser zoom UI and screen-reader speech output were not exercised.",
+    "Three pre-existing Landing signup tests fail; workspace-focused checks pass.",
+    "Changes are local and require the coordinated release described in the implementation log. Nothing is pushed or deployed by this review."
+  ]
+}

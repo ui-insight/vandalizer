@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   send: vi.fn(),
   uploading: false,
   workspace: {
+    workspaceMode: 'chat',
+    focusChat: vi.fn(),
     selectedDocUuids: [] as string[],
     selectedDocNames: {} as Record<string, string>,
     selectedFolderUuids: [] as string[],
@@ -55,6 +57,7 @@ function renderPanel() {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.uploading = false
+  mocks.workspace.workspaceMode = 'chat'
   mocks.workspace.selectedDocUuids = []
   mocks.workspace.selectedDocNames = {}
   mocks.workspace.selectedFolderUuids = []
@@ -78,6 +81,15 @@ function expectDocumentRequest() {
 }
 
 describe('Show me what you can do', () => {
+  it('keeps supporting Assistant guidance compact beside Files', () => {
+    mocks.workspace.workspaceMode = 'files'
+    renderPanel()
+    expect(screen.getByRole('heading', { name: 'Ask about your work' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Try sample demo' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Start a conversation' }))
+    expect(mocks.workspace.focusChat).toHaveBeenCalledOnce()
+  })
+
   it('uses the uploaded document instead of starting sample onboarding', async () => {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'Upload document' }))

@@ -4,7 +4,7 @@ import {
   listKBOptimizationHistory,
   type KBOptimizationRunSummary,
 } from '../../api/knowledge'
-import { StatusDot } from '../shared/StatusDot'
+import { StatusBadge } from '../shared/StatusBadge'
 import { scoreColor } from '../shared/TrialsTable'
 import { CompareRunsView } from './CompareRunsView'
 
@@ -140,7 +140,7 @@ function HistoryRow({
           fontFamily: 'inherit', color: 'var(--workspace-text)', textAlign: 'left',
         }}
       >
-        <StatusDot status={run.status} />
+        <StatusBadge status={run.status} />
         <div style={{ flex: '1 1 160px', minWidth: 0 }}>
           <div style={{
             fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)',

@@ -1,3 +1,4 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
 import { WorkspaceSectionHeader } from '../shared/WorkspaceSectionHeader'
 import { usePanelVisible } from '../shared/PanelVisibility'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -109,8 +110,13 @@ export function ProjectsPanel() {
           About
         </button>} description={loading ? 'Loading…' : error ? 'Unavailable' : `${projects.length} projects`}>
 
+        <div>
+        <FieldLabel htmlFor="new-project-name" required>New project name</FieldLabel>
         <div className="flex gap-2">
           <input
+            id="new-project-name"
+            aria-required="true"
+            aria-describedby={createError ? 'project-create-error' : undefined}
             type="text"
             value={newName}
             disabled={creating}
@@ -130,7 +136,8 @@ export function ProjectsPanel() {
           </button>
         </div>
 
-        {createError && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{createError}</p>}
+        {createError && <FieldMessage id="project-create-error" error>{createError}</FieldMessage>}
+        </div>
         {projects.length > 0 && <div className="project-list-tools">
           <input type="search" aria-label="Search projects" placeholder="Search projects…" value={search} onChange={e => { setSearch(e.target.value); setVisibleLimit(40) }} />
           <select aria-label="Sort projects" value={sort} onChange={e => { setSort(e.target.value); setVisibleLimit(40) }}><option value="updated">Recently updated</option><option value="name">Name A–Z</option></select>

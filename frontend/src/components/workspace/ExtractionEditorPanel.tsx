@@ -160,7 +160,7 @@ export function ExtractionEditorPanel() {
     })
     observer.observe(el)
     return () => observer.disconnect()
-  }, [])
+  }, [loading])
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
@@ -700,16 +700,14 @@ export function ExtractionEditorPanel() {
               }}
             />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
               <span
                 style={{
                   fontSize: 'var(--workspace-font-section-title)',
                   fontWeight: 600,
                   color: '#202124',
                   letterSpacing: '-0.01em',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  minWidth: 0, overflowWrap: 'anywhere',
                 }}
               >
                 {searchSet.title}
@@ -828,6 +826,7 @@ export function ExtractionEditorPanel() {
         style={{
           display: 'flex',
           gap: 0,
+          flexWrap: 'wrap',
           borderBottom: "1px solid var(--workspace-border)",
           paddingLeft: tabsCompact ? 8 : 24,
           flexShrink: 0,
@@ -866,6 +865,7 @@ export function ExtractionEditorPanel() {
                 tabBarRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
               }}
               title={label}
+              aria-label={label}
               style={{
                 padding: tabsCompact ? '10px 12px' : '10px 16px',
                 fontSize: 'var(--workspace-font-control)',

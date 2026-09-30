@@ -70,11 +70,12 @@ export function OptimizationProgressCard<TConfig>({
   const elapsedSeconds = useElapsedSeconds(run.elapsed_seconds, run.started_at, run.status)
 
   return (
-    <div role="status" aria-live="polite" style={{
+    <div style={{
       padding: 'var(--workspace-space-16)', background: 'var(--workspace-canvas)',
       border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 'var(--workspace-radius-medium)',
     }}>
-      {/* Header */}
+      <span className="sr-only" role="status" aria-atomic="true">{run.status === 'queued' ? queuedLabel : runningLabel}. {run.phase}{run.cancel_requested ? '. Cancellation requested.' : ''}</span>
+      {/* Timer, token counters and trial streaming are deliberately outside the live region. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)' }}>
         <Loader2 size={16} aria-hidden="true" style={{ color: 'var(--workspace-info)', animation: 'spin 1s linear infinite' }} />
         <span style={{ fontSize: 'var(--workspace-font-body)', fontWeight: 600, color: 'var(--workspace-text)' }}>
@@ -101,7 +102,7 @@ export function OptimizationProgressCard<TConfig>({
       {/* Progress message */}
       <div style={{
         padding: "var(--workspace-space-12) var(--workspace-space-12)", marginBottom: 'var(--workspace-space-12)',
-        backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 'var(--workspace-radius-small)',
+        backgroundColor: 'var(--workspace-surface)', borderRadius: 'var(--workspace-radius-small)',
         fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-text)', minHeight: 20,
       }}>
         {run.progress_message || 'Initializing…'}

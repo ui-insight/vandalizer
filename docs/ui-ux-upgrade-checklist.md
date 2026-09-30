@@ -8,7 +8,7 @@ Target: every reviewed area earns **at least 8/10 for visual UI and 8/10 for UX*
 
 Baseline: review dated September 25, 2026, commit `560ccd5decc8d01df8fd3fa68a96d0c617f1a3f9`; 55 distinct captured states. [Baseline report](../artifacts/visual-review/2026-09-25/report.md).
 
-This is the complete implementation and verification backlog for the reviewed scope. It is not a claim that every untested interaction is broken, nor an exhaustive audit of the backend. Implementation is underway. Checked items are implemented and verified to the extent recorded in the baseline and follow-up evidence; the overall 8/10 acceptance gate remains open.
+This is the complete implementation and verification backlog for the reviewed scope. It is not a claim that every untested interaction is broken, nor an exhaustive audit of the backend. Local implementation and the visual/UX acceptance review are complete. All 169 items have evidence recorded in the final report and dated progress log; every reviewed area and mobile meet the 8/10 target. This does not certify live backend/model execution or deployment.
 
 ## How to read the list
 
@@ -39,10 +39,10 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 - [x] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
 - [x] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
 - [x] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
-- [ ] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.
+- [x] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.
 - [x] **VIS-06 · P2 · Fix:** Give important names and task content more space than decoration, promotional copy and low-value metadata.
-- [ ] **VIS-07 · P2 · Improve:** Use consistent status badges with text and appropriate icons; reserve color for meaning rather than decoration.
-- [ ] **VIS-08 · P2 · Verify:** Long names, multiline descriptions and translated/browser-enlarged text wrap sensibly without hiding actions.
+- [x] **VIS-07 · P2 · Improve:** Use consistent status badges with text and appropriate icons; reserve color for meaning rather than decoration.
+- [x] **VIS-08 · P2 · Verify:** Long names, multiline descriptions and translated/browser-enlarged text wrap sensibly without hiding actions.
 
 Acceptance: screens look like parts of one product, with consistent hierarchy and readable information at normal zoom and enlarged text.
 
@@ -52,15 +52,15 @@ Acceptance: screens look like parts of one product, with consistent hierarchy an
 - [x] **ACC-02 · P1 · Fix:** Replace desktop-only sidebar/list arrangements with usable narrow-screen layouts, particularly Library and Files.
 - [x] **ACC-03 · P2 · Improve:** Make workspace panels stack, collapse or switch predictably on small screens while keeping the active task reachable.
 - [x] **ACC-04 · P2 · Verify:** No unintended page-level horizontal scrolling at 320, 390, 768, 1280 and 1440px. Explicitly contained wide data may scroll when appropriate.
-- [ ] **ACC-05 · P2 · Verify:** Dialogs and pickers fit short and narrow viewports; their titles, content and final actions remain reachable.
+- [x] **ACC-05 · P2 · Verify:** Dialogs and pickers fit short and narrow viewports; their titles, content and final actions remain reachable.
 - [x] **ACC-06 · P2 · Fix:** Add descriptive accessible names to the Projects create button, KB sort select and any other unnamed controls identified by the harness.
 - [x] **ACC-07 · P2 · Fix:** Remove nested interactive structures in KB cards and source rows; make row opening and secondary actions separate keyboard targets.
 - [x] **ACC-08 · P2 · Fix:** Correct measured low contrast in timestamps, counts, tags and secondary metadata. Target 4.5:1 for normal text and 3:1 for large text and essential UI graphics.
-- [ ] **ACC-09 · P2 · Verify:** Keyboard focus is visible and follows a logical order through navigation, tables, cards, menus, tabs and dialogs.
-- [ ] **ACC-10 · P2 · Verify:** Dialogs set focus appropriately, contain focus while open, close with Escape when appropriate and restore focus to their trigger.
+- [x] **ACC-09 · P2 · Verify:** Keyboard focus is visible and follows a logical order through navigation, tables, cards, menus, tabs and dialogs.
+- [x] **ACC-10 · P2 · Verify:** Dialogs set focus appropriately, contain focus while open, close with Escape when appropriate and restore focus to their trigger.
 - [x] **ACC-11 · P2 · Improve:** Make row actions usable without hover, and make small controls practical touch targets without crowding their neighbors.
-- [ ] **ACC-12 · P2 · Verify:** Upload, processing, validation and tool-state changes are announced appropriately without flooding assistive technology.
-- [ ] **ACC-13 · P2 · Verify:** Essential tasks remain usable at 200% zoom and with reduced motion; loading indicators do not rely exclusively on animation.
+- [x] **ACC-12 · P2 · Verify:** Upload, processing, validation and tool-state changes are announced appropriately without flooding assistive technology.
+- [x] **ACC-13 · P2 · Verify:** Essential tasks remain usable at 200% zoom and with reduced motion; loading indicators do not rely exclusively on animation.
 
 Acceptance: the six main mobile screens and their critical flows independently earn 8/10; no unresolved serious or critical automated accessibility findings in the reviewed states; keyboard and focus checks pass. Automated checks alone do not establish accessibility conformance.
 
@@ -261,16 +261,16 @@ Acceptance: users can tell what is proposed, what was approved, what is running,
 - [x] **QA-01 · P1 · Improve:** Convert the two recorded critical interaction observations into failing regression assertions for upload scope and wizard keyboard progression.
 - [x] **QA-02 · P2 · Improve:** Preserve baseline screenshots and scores; write post-change evidence to a separate run directory.
 - [x] **QA-03 · P2 · Improve:** Record commit, relevant working-tree changes, runtime/build mode, browser version, viewport and fixture version so uncommitted UI changes are distinguishable from the baseline commit.
-- [ ] **QA-04 · P2 · Verify:** Re-capture all 55 baseline states and update locators only to reflect intended UI changes, never to conceal a failing task.
+- [x] **QA-04 · P2 · Verify:** Re-capture all 55 baseline states and update locators only to reflect intended UI changes, never to conceal a failing task.
 - [x] **QA-05 · P2 · Improve:** Add coverage for final automation review, alternate wizard branches, narrow dialogs, source recovery, validation result drilldown and supported apply/revert states.
 - [x] **QA-06 · P2 · Improve:** Add scope-switching, upload partial failure, agent cancellation/interruption and valid citation-inspection scenarios.
-- [ ] **QA-07 · P2 · Verify:** Cover the viewport matrix, essential keyboard journeys, 200% zoom, long content and realistic larger lists.
+- [x] **QA-07 · P2 · Verify:** Cover the viewport matrix, essential keyboard journeys, 200% zoom, long content and realistic larger lists.
 - [x] **QA-08 · P2 · Verify:** Re-run axe; resolve serious/critical findings and review remaining contrast, naming and interaction-structure findings individually.
 - [x] **QA-09 · P2 · Verify:** Run appropriate component/browser regression checks, frontend typecheck/lint and a production build; identify pre-existing failures separately from new regressions.
 - [x] **QA-10 · P2 · Verify:** Use the production build for the final screenshot pass; verify the specific StrictMode lifecycle repair in development as well.
 - [x] **QA-11 · P2 · Improve:** Maintain explicit coverage labels: visually inspected, frontend interaction tested, fixture-backed, and live integration verified where actually exercised.
-- [ ] **QA-12 · P2 · Verify:** Inspect screenshots directly and regrade every area against the original rubric; do not automatically award 8 because a checklist item was implemented.
-- [ ] **QA-13 · P2 · Verify:** Publish before/after scores, evidence, resolved findings and remaining limitations in the updated report; verify all report links and gallery behavior.
+- [x] **QA-12 · P2 · Verify:** Inspect screenshots directly and regrade every area against the original rubric; do not automatically award 8 because a checklist item was implemented.
+- [x] **QA-13 · P2 · Verify:** Publish before/after scores, evidence, resolved findings and remaining limitations in the updated report; verify all report links and gallery behavior.
 
 Acceptance: every reviewed section independently reaches at least 8 for both UI and UX, mobile reaches at least 8, no P1 remains, and no serious/critical accessibility finding remains unexplained and unresolved in the graded states. If any section falls short, iterate on it rather than averaging the shortfall away.
 

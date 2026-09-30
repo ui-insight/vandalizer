@@ -45,6 +45,14 @@ try{
      const generate=dialog.getByRole('button',{name:'+ Generate more from documents',exact:true});await generate.click()
      const nested=page.getByRole('dialog',{name:'Generate test cases',exact:true});await nested.waitFor()
      await shot(`theme-extraction-generation-${width}`)
+     const pick=nested.getByRole('button',{name:'Pick documents',exact:true});await pick.click()
+     const picker=page.getByRole('dialog').filter({has:page.getByRole('textbox',{name:'Search documents',exact:true})})
+     await picker.getByRole('checkbox').first().waitFor()
+     for(let tab=0;tab<12;tab++){await page.keyboard.press('Tab');assert.equal(await picker.evaluate(e=>e.contains(document.activeElement)),true)}
+     await shot(`theme-extraction-document-picker-${width}`)
+     await page.keyboard.press('Escape');await picker.waitFor({state:'hidden'});assert.equal(await nested.isVisible(),true)
+     await page.waitForTimeout(50);assert.equal(await pick.evaluate(e=>e===document.activeElement),true)
+
      await page.keyboard.press('Escape');await nested.waitFor({state:'hidden'});assert.equal(await dialog.isVisible(),true)
      assert.equal(await generate.evaluate(e=>e===document.activeElement),true)
     }

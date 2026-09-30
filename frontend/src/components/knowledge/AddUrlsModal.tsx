@@ -1,3 +1,4 @@
+import { FieldLabel, FieldMessage } from '../shared/FormField'
 import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useRef, useState } from 'react'
@@ -15,6 +16,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
   const [allowedDomains, setAllowedDomains] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [urlError, setUrlError] = useState<string | null>(null)
+  const urlsRef = useRef<HTMLTextAreaElement>(null)
 
   usePanelEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -36,7 +39,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
     const urls = rows.map(row => row.value.includes('://') ? row.value : `https://${row.value}`)
     if (urls.length > 0) {
       const invalid = urls.findIndex(value => { try { const url = new URL(value); return !['http:', 'https:'].includes(url.protocol) } catch { return true } })
-      if (invalid !== -1) { setError(`Line ${rows[invalid].line} needs a valid http:// or https:// URL.`); return }
+      if (invalid !== -1) { setUrlError(`Line ${rows[invalid].line} needs a valid http:// or https:// URL.`); urlsRef.current?.focus(); return }
+      setUrlError(null)
       submittedRef.current = true
       setSubmitted(true)
       setError(null)
@@ -84,13 +88,19 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           </ActionButton>
         </div>
         <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
-        <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
+        <div id="add-urls-help" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
           Paste one website URL per line; addresses without a scheme use https://. Adding queues retrieval; each source becomes usable after its text is indexed. Existing URLs are skipped; use Refresh on their source rows to fetch them again.
         </div>
+        <FieldLabel htmlFor="add-urls-input" required>URLs to add, one per line</FieldLabel>
         <textarea
+          id="add-urls-input"
+          ref={urlsRef}
+          aria-required="true"
+          aria-invalid={!!urlError}
+          aria-describedby={`add-urls-help${urlError ? ' add-urls-field-error' : ''}`}
           value={text}
           disabled={submitted}
-          onChange={e => setText(e.target.value)}
+          onChange={e => { setText(e.target.value); setUrlError(null) }}
           aria-label="URLs to add, one per line"
           placeholder={'https://example.com/page1\nhttps://example.com/page2'}
           rows={8}
@@ -101,6 +111,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
             resize: 'vertical', minHeight: 120, flexShrink: 0,
           }}
         />
+
+        {urlError && <FieldMessage id="add-urls-field-error" error>{urlError}</FieldMessage>}
 
         {/* Crawl toggle */}
         <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', cursor: 'pointer' }}>
@@ -120,9 +132,10 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
               The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)' }}>
-              <label htmlFor="add-urls-max-pages" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)', minWidth: 80 }}>Max pages</label>
+              <FieldLabel htmlFor="add-urls-max-pages" required>Max pages</FieldLabel>
               <input
                 id="add-urls-max-pages"
+                aria-required="true"
                 type="number"
                 disabled={submitted}
                 value={maxCrawlPages}
@@ -137,7 +150,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-4)' }}>
-              <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>Allowed domains (optional)</label>
+              <FieldLabel htmlFor="add-urls-allowed-domains" optional>Allowed domains</FieldLabel>
               <input
                 id="add-urls-allowed-domains"
                 type="text"
@@ -160,7 +173,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         )}
 
         </div>
-        {error && <div role="alert" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-danger)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{error}</div>}
+        {error && <FieldMessage id="add-urls-submit-error" error>{error}</FieldMessage>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)', flexShrink: 0 }}>
           <ActionButton variant="secondary"
             onClick={onClose}

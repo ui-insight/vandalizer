@@ -180,19 +180,19 @@ export function ItemDetailModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header bar */}
-        <div className={`px-6 py-5 bg-gradient-to-r ${kindConf?.heroBg || 'from-gray-600 to-gray-800'} text-white rounded-t-2xl`}>
+        <div className="px-6 py-5 bg-gray-50 text-gray-900 rounded-t-2xl border-b border-gray-200">
           <div className="flex items-start justify-between">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="h-5 w-5 text-white/80" />
-                <span className="text-xs font-medium text-white/70 uppercase tracking-wide">
+                <ShieldCheck className="h-5 w-5 text-gray-700" />
+                <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
                   Shared {kindConf?.label || item.kind}
                 </span>
               </div>
               <h2 className="text-xl font-bold">{item.display_name || item.name}</h2>
-              <p className="mt-1.5 text-sm text-white/80">{item.description || 'Purpose not described.'}</p>
+              <p className="mt-1.5 text-sm text-gray-700">{item.description || 'Purpose not described.'}</p>
             </div>
-            <button type="button" disabled={!!adopting} onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
+            <button type="button" disabled={!!adopting} onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-gray-200 text-gray-600 hover:text-gray-900">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -206,15 +206,15 @@ export function ItemDetailModal({
               regressionPending={item.regression_pending_review}
               variant="catalog"
             />
-            <CatalogSignals item={item} className="text-white/70" />
+            <CatalogSignals item={item} className="text-gray-600" />
             {item.validation_run_count > 0 && (
-              <span className="text-white/70">{item.validation_run_count} validation{item.validation_run_count !== 1 ? 's' : ''}</span>
+              <span className="text-gray-600">{item.validation_run_count} validation{item.validation_run_count !== 1 ? 's' : ''}</span>
             )}
             {item.kind === 'knowledge_base' && item.total_sources != null && (
-              <span className="text-white/70">{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
+              <span className="text-gray-600">{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
             )}
             {item.kind === 'knowledge_base' && item.total_chunks != null && (
-              <span className="text-white/70">{item.total_chunks.toLocaleString()} chunks</span>
+              <span className="text-gray-600">{item.total_chunks.toLocaleString()} chunks</span>
             )}
             {(item.submitted_by || item.credit || item.created_by) && (
               <AuthorChip author={item.submitted_by || item.credit || item.created_by} size="md" label="by" tone="on-dark" />
