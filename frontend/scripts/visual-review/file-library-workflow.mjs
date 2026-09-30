@@ -22,7 +22,7 @@ try{
   const file=page.getByRole('row',{name:'Document: Proposal narrative.pdf',exact:true});await file.click()
   await page.getByText('Synthetic review document.',{exact:false}).waitFor();await shot(`file-library-open-file-${width}`)
   if(width<768)await page.getByRole('button',{name:'Open Library panel',exact:true}).click()
-  else{assert.equal(await page.getByRole('button',{name:'Library',exact:true}).isVisible(),true);await page.getByRole('button',{name:'Library',exact:true}).click()}
+  else{assert.equal(await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).isVisible(),true);await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).click()}
   const item=page.getByRole('button',{name:'Open Proposal readiness review',exact:true});await item.waitFor()
   if(width>=768)assert.equal(await page.getByRole('button',{name:'Close document',exact:true}).isVisible(),true)
   await shot(`file-library-browse-${width}`);await item.click()

@@ -10,7 +10,7 @@ import { cn } from '../../lib/cn'
 
 const TABS = ['assistant', 'library'] as const
 
-export function RightPanel() {
+export function RightPanel({ hideTabs = false }: { hideTabs?: boolean }) {
   const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId, openAutomationId, closeWorkflow, closeExtraction, closeAutomation } = useWorkspace()
 
   // An open editor replaces the tab view visually, but everything underneath
@@ -40,8 +40,8 @@ export function RightPanel() {
         <div className="min-h-0 flex-1">{editor}</div>
       </div>}
       <div className={cn('flex min-h-0 flex-1 flex-col', editor && 'hidden')}>
-        {/* Tab bar - matches Flask .tab-menu */}
-        <div className="flex bg-panel-dark border-b border-[#cccccc48]">
+        {/* Compact source modes already expose these choices above both panes. */}
+        {!hideTabs && <div className="flex bg-panel-dark border-b border-[#cccccc48]">
           {TABS.map((tab) => (
             <button
               key={tab}
@@ -56,7 +56,7 @@ export function RightPanel() {
               {tab === 'assistant' ? <><MessageSquare className="h-4 w-4" /> Assistant</> : <><BookOpen className="h-4 w-4" /> Library</>}
             </button>
           ))}
-        </div>
+        </div>}
 
         {/* Tab content - matches Flask .tab-content */}
         <div className="flex-1 overflow-hidden bg-white">

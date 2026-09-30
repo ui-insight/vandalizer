@@ -157,7 +157,7 @@ export function ChatInput({
 
   return (
     <div
-      className="p-[15px] bg-white"
+      className="shrink-0 p-[15px] bg-white"
       style={{ boxShadow: '0 0px 23px -8px rgb(211, 211, 211)', zIndex: 500 }}
     >
       {/* Link input row */}

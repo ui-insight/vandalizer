@@ -751,7 +751,7 @@ export function LibraryTab() {
             </div>
       }>
         {/* Saved ownership views and shared discovery. */}
-        <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, marginTop: 2, marginBottom: 10 }}>
+        <div role="group" aria-label="Library views" className="library-scope-tabs" style={{ display: 'flex', gap: 0, margin: 0 }}>
           {([
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },

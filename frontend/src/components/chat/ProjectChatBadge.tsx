@@ -1,6 +1,5 @@
-import { FolderKanban, Sparkles, X } from 'lucide-react'
+import { BookOpen, X } from 'lucide-react'
 import { useProject } from '../../hooks/useProjects'
-import { ProjectStateBadge } from '../projects/ProjectStateBadge'
 
 /**
  * A chat-anchored chip shown above the input while a project is active. It tells
@@ -27,7 +26,9 @@ export function ProjectChatBadge({
   return (
     <div
       style={{
-        display: 'flex',
+        display: 'grid',
+        flexShrink: 0,
+        gridTemplateColumns: '14px minmax(0, 1fr) 36px',
         alignItems: 'center',
         gap: 8,
         padding: '6px 16px',
@@ -38,26 +39,20 @@ export function ProjectChatBadge({
         borderTop: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)',
       }}
     >
-      <FolderKanban size={14} />
-      <span>Project: {title}</span>
-      {project?.state && <ProjectStateBadge state={project.state} />}
-      {kbReady && (
-        <span
-          title="Answers are grounded in this project's knowledge base"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 3, opacity: 1, fontWeight: 500 }}
-        >
-          <Sparkles size={12} /> grounded in project KB
-        </span>
-      )}
-      <span style={{ flex: 1 }} />
+      <BookOpen size={14} aria-hidden="true" style={{ flexShrink: 0 }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '2px 8px', minWidth: 0 }}>
+        <span title={`Sources for ${title}`}>Project sources</span>
+        <span style={{ fontWeight: 400 }}>{project ? kbReady ? 'Knowledge available' : 'Knowledge not ready' : 'Checking availability…'}</span>
+      </div>
       <button
         onClick={onExit}
         title="Exit project scope"
+        aria-label="Exit project scope"
         style={{
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          padding: 2,
+          minWidth: 36, minHeight: 36, alignItems: 'center', justifyContent: 'center', padding: 2,
           display: 'flex',
           color: 'inherit',
           opacity: 1,

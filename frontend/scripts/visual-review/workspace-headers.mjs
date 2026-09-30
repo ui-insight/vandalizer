@@ -31,8 +31,10 @@ try{
   await nav('Knowledge').click();await source(width,'Knowledge');await header('Knowledge')
   await page.getByRole('searchbox',{name:'Search...',exact:true}).fill('Research')
   await shot(`headers-knowledge-${width}`)
-  if(width<768)await page.getByRole('button',{name:'Open Library panel',exact:true}).click();else await page.getByRole('button',{name:'Library',exact:true}).click()
-  const library=await header('Library');await shot(`headers-library-${width}`)
+  if(width<768)await page.getByRole('button',{name:'Open Library panel',exact:true}).click();else await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).click()
+  const library=await header('Library');
+  if(width<768){assert.equal(await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).count(),1);assert.equal(await page.getByRole('button',{name:/^(?:Open )?Assistant(?: panel)?$/}).count(),1)}
+  await shot(`headers-library-${width}`)
   await library.getByRole('button',{name:'New',exact:true}).click()
   await page.getByRole('button',{name:'New Workflow',exact:true}).waitFor()
   await shot(`headers-library-new-${width}`)

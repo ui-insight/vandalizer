@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**151/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**152/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## More room for task content — September 30
+
+**152/169 checklist items implemented locally.** VIS-06 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Compact source modes use one Files/Projects/Automations/Knowledge, Library and Assistant control row. The redundant Assistant/Library row is hidden only where those choices are already present; desktop and Chat retain their tabs. Existing panel, editor and conversation state survives this change.
+- Saved-scope explanations are shorter, header controls have less excess spacing, and long mobile project names receive the full available line width. Project chat keeps the full project name in the workspace context once, uses a concise task heading and shows source availability beside the composer. The previous header pass also removed the squeezed Explore decoration and repeated promotion.
+- Long-project review found obsolete conversation bottom padding could push Send below a short viewport. The conversation now scrolls within its available height and the composer keeps its required space. Send reachability is asserted with the full project context visible at 320×568, 768×600 and 1440×900.
+- Verification: 43 frontend tests across five files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing ChatPanel dependency warning. The 158 selected captures cover compact headers/menus (27), project/tool context (33), navigation retention (35), file/Library workflows (30), and conversation/source reading recovery (33). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly; retained drafts, source/tool switching, workflow failure/retry and citation recovery pass.
+- Evidence: `2026-09-30-density-headers`, `2026-09-30-density-composer-context`, `2026-09-30-density-navigation-release`, `2026-09-30-density-file-library`, and `2026-09-30-density-chat-reading`. APIs/results are synthetic. Theme, broader accessibility and final regrading acceptance remain open.
 
 ## Consistent section headers — September 30
 

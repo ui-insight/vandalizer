@@ -28,7 +28,7 @@ await page.route('**/api/projects',async route=>{
 })
 const nav = name => page.getByRole('navigation',{name:'Workspace navigation'}).getByRole('button',{name,exact:true})
 async function source(width) { if(width<768){const toggle=page.getByRole('button',{name:/^(Files|Projects|Automations|Knowledge) panel$/});if(await toggle.count() && await toggle.getAttribute('aria-pressed')==='false')await toggle.click()} }
-async function library(width) {if(width<768)await page.getByRole('button',{name:'Open Library panel',exact:true}).click();else await page.getByRole('button',{name:'Library',exact:true}).click()}
+async function library(width) {if(width<768)await page.getByRole('button',{name:'Open Library panel',exact:true}).click();else await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).click()}
 async function shot(id){await review.capture(id);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),id+': overflow');assert.deepEqual(JSON.parse(await readFile(resolve(review.out,id+'.axe.json'),'utf8')),[],id+': accessibility');console.log('Captured '+id)}
 try {
  for(const [width,height] of [[320,568],[768,600],[1440,900]]) {
@@ -41,9 +41,9 @@ try {
   await saved.getByRole('button',{name:'Open Research workflow 30',exact:true}).scrollIntoViewIfNeeded()
   const scroll=await saved.evaluate(e=>e.scrollTop)
   assert.ok(scroll>0)
-  await page.getByRole('button',{name:'Assistant',exact:true}).click()
+  await page.getByRole('button',{name:/^(?:Open )?Assistant(?: panel)?$/}).click()
   await page.getByRole('textbox',{name:'Message input'}).fill('Draft with the selected proposal file')
-  await page.getByRole('button',{name:'Library',exact:true}).click()
+  await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).click()
   assert.equal(await search.inputValue(),'Research')
   assert.equal(await saved.evaluate(e=>e.scrollTop),scroll)
   await shot(`navigation-library-restored-${width}`)
@@ -55,7 +55,7 @@ try {
   assert.equal(await saved.evaluate(e=>e.scrollTop),scroll)
   await shot(`navigation-library-browser-back-${width}`)
   await page.goForward();await page.getByRole('button',{name:'Close workflow',exact:true}).click()
-  await page.getByRole('button',{name:'Assistant',exact:true}).click()
+  await page.getByRole('button',{name:/^(?:Open )?Assistant(?: panel)?$/}).click()
   assert.equal(await page.getByRole('textbox',{name:'Message input'}).inputValue(),'Draft with the selected proposal file')
   await nav('Projects').click();await source(width)
   await page.getByRole('textbox',{name:'New project name'}).fill('Unsubmitted project draft')
@@ -110,10 +110,10 @@ try {
   assert.equal(await page.getByRole('checkbox',{name:'Select test query: When is the proposal due?',exact:true}).isChecked(),true)
   await nav('Files').click();await source(width)
   assert.equal(await page.getByRole('checkbox',{name:'Select Proposal narrative.pdf',exact:true}).isChecked(),true)
-  await library(width);await page.getByRole('button',{name:'Assistant',exact:true}).click()
+  await library(width);await page.getByRole('button',{name:/^(?:Open )?Assistant(?: panel)?$/}).click()
   assert.equal(await page.getByRole('textbox',{name:'Message input'}).inputValue(),'Draft with the selected proposal file')
   await shot(`navigation-chat-and-file-retained-${width}`)
-  await page.getByRole('button',{name:'Library',exact:true}).click()
+  await page.getByRole('button',{name:/^(?:Open )?Library(?: panel)?$/}).click()
   await page.getByRole('button',{name:'Explore',exact:true}).click()
   const collectionsToggle=page.getByRole('button',{name:'Browse collections',exact:true})
   if(await collectionsToggle.isVisible()) {

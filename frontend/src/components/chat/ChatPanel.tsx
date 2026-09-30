@@ -817,7 +817,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   return (
     <div
-      className="flex h-full flex-col"
+      className="flex h-full min-h-0 flex-col"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -917,8 +917,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         aria-label="Conversation"
         tabIndex={0}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto hide-scrollbar"
-        style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
+        className="min-h-0 flex-1 overflow-y-auto hide-scrollbar"
+        style={{ padding: '20px 20px 24px', position: 'relative' }}
       >
         {/* First-session: compact value-prop banner with rotating taglines */}
         {showFirstSessionHome && (
@@ -987,7 +987,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         ? `Preparing ${processingCount} documents…`
                         : stageCopy(bannerProcessingDoc.status).title
                       : activeProjectUuid
-                        ? `Chat with ${activeProjectTitle ?? 'this project'}`
+                        ? 'Ask about this project'
                         : activeKBUuid
                           ? `Knowledge Base: ${activeKBTitle}`
                           : hasDocContext

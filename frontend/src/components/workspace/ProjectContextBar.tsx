@@ -34,7 +34,7 @@ export function ProjectContextBar({ onOpenManage, railWidth: fittedRailWidth }: 
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: '1 1 240px', minWidth: 0 }}>
         <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)', flexShrink: 0 }} />
-        <span style={{ color: '#59616b', fontWeight: 500 }}>Project</span>
+        <span className="project-context-label" style={{ color: '#59616b', fontWeight: 500 }}>Project</span>
         <span style={{ color: '#111', fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere', flex: 1 }}>{activeProjectTitle}</span>
         {activeProjectRole === 'viewer' && (
           <span style={{ color: '#59616b', fontSize: 12 }}>Read only</span>

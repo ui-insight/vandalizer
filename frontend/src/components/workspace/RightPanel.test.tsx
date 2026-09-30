@@ -37,6 +37,18 @@ describe('RightPanel tab switching', () => {
     h.automationId = null
   })
 
+  it('retains the active content when compact navigation takes over the tab controls', () => {
+    h.tab = 'library'
+    const { rerender } = render(<RightPanel />)
+    const library = screen.getByTestId('library-marker')
+    rerender(<RightPanel hideTabs />)
+    expect(screen.queryByRole('button', { name: 'Library' })).toBeNull()
+    expect(screen.getByTestId('library-marker')).toBe(library)
+    rerender(<RightPanel />)
+    expect(screen.getByRole('button', { name: 'Library' })).toBeVisible()
+    expect(screen.getByTestId('library-marker')).toBe(library)
+  })
+
   it('shows only the Assistant on the assistant tab', () => {
     h.tab = 'assistant'
     render(<RightPanel />)

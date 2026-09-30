@@ -34,7 +34,7 @@ try {
     workflowError = true; extractionError = true; promptError = true
     await page.setViewportSize({ width, height }); await page.goto(review.baseURL + '/?mode=files')
     if (width < 768) await page.getByRole('button', { name: 'Open Library panel', exact: true }).click()
-    else await page.getByRole('button', { name: 'Library', exact: true }).click()
+    else await page.getByRole('button', { name:/^(?:Open )?Library(?: panel)?$/ }).click()
     await page.getByRole('textbox', { name: 'Search library' }).waitFor()
     await chooseKind('workflow', 'Workflows')
     assert.equal(await page.locator('.library-item-row').count(), 1)

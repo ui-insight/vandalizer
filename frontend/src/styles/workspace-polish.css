@@ -232,7 +232,7 @@
 .workspace-section-title h2, .workspace-document-header h2 { margin: 0; font-size: 20px; line-height: 1.35; font-weight: 650; letter-spacing: -.02em; overflow-wrap: anywhere; }
 .workspace-section-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
 .workspace-section-header button { min-height: 36px; }
-.workspace-section-controls { display: flex; flex-direction: column; min-width: 0; gap: 12px; margin-top: 12px; }
+.workspace-section-controls { display: flex; flex-direction: column; min-width: 0; gap: 8px; margin-top: 12px; }
 .workspace-section-description { margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: var(--workspace-muted); }
 .workspace-section-header .project-list-tools { margin-top: 0; }
 .workspace-section-header[data-dark="true"] { background: #1e1e1e; color: #e5e5e5; border-color: #3a3a3a; }
@@ -244,3 +244,5 @@
 .workspace-file-search input { min-width: 0; flex: 1; padding: 8px; border: 1px solid var(--workspace-border); border-radius: 6px; background: var(--workspace-surface); color: var(--workspace-text); font: inherit; font-size: 14px; }
 .file-browser > .workspace-section-header { margin: 0 -24px 12px; }
 @media (max-width: 767px) { .file-browser > .workspace-section-header { margin-inline: -12px; } }
+
+@media (max-width: 767px) { .project-context-label { display: none; } }

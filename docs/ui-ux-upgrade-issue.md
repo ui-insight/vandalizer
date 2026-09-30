@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## More room for task content — September 30
+
+**152/169 checklist items implemented locally.** VIS-06 is complete for the reviewed task surfaces; changes are not deployed.
+
+- Compact source modes use one Files/Projects/Automations/Knowledge, Library and Assistant control row. The redundant Assistant/Library row is hidden only where those choices are already present; desktop and Chat retain their tabs. Existing panel, editor and conversation state survives this change.
+- Saved-scope explanations are shorter, header controls have less excess spacing, and long mobile project names receive the full available line width. Project chat keeps the full project name in the workspace context once, uses a concise task heading and shows source availability beside the composer. The previous header pass also removed the squeezed Explore decoration and repeated promotion.
+- Long-project review found obsolete conversation bottom padding could push Send below a short viewport. The conversation now scrolls within its available height and the composer keeps its required space. Send reachability is asserted with the full project context visible at 320×568, 768×600 and 1440×900.
+- Verification: 43 frontend tests across five files, TypeScript, production build and diff checks pass. Touched-file ESLint has zero errors and one pre-existing ChatPanel dependency warning. The 158 selected captures cover compact headers/menus (27), project/tool context (33), navigation retention (35), file/Library workflows (30), and conversation/source reading recovery (33). All have zero axe findings, page overflow, uncaught errors or unmatched requests. Representative screenshots inspected directly; retained drafts, source/tool switching, workflow failure/retry and citation recovery pass.
+- Evidence: `2026-09-30-density-headers`, `2026-09-30-density-composer-context`, `2026-09-30-density-navigation-release`, `2026-09-30-density-file-library`, and `2026-09-30-density-chat-reading`. APIs/results are synthetic. Theme, broader accessibility and final regrading acceptance remain open.
+
 ## Consistent section headers — September 30
 
 **151/169 checklist items implemented locally.** SYS-06 is complete for the reviewed workspace sections; changes are not deployed.
@@ -384,7 +394,7 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 - [ ] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
 - [ ] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
 - [ ] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.
-- [ ] **VIS-06 · P2 · Fix:** Give important names and task content more space than decoration, promotional copy and low-value metadata.
+- [x] **VIS-06 · P2 · Fix:** Give important names and task content more space than decoration, promotional copy and low-value metadata.
 - [ ] **VIS-07 · P2 · Improve:** Use consistent status badges with text and appropriate icons; reserve color for meaning rather than decoration.
 - [ ] **VIS-08 · P2 · Verify:** Long names, multiline descriptions and translated/browser-enlarged text wrap sensibly without hiding actions.
 

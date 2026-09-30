@@ -63,7 +63,7 @@ async function open(width) {
   await page.goto(review.baseURL + '/?mode=files')
   await page.getByRole('navigation', { name: 'Workspace navigation' }).waitFor()
   if (width < 768) await page.getByRole('button', { name: 'Open Library panel', exact: true }).click()
-  else await page.getByRole('button', { name: 'Library', exact: true }).click()
+  else await page.getByRole('button', { name:/^(?:Open )?Library(?: panel)?$/ }).click()
   await page.getByRole('textbox', { name: 'Search library' }).waitFor()
 }
 try {

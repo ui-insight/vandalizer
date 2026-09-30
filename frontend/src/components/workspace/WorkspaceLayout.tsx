@@ -156,8 +156,8 @@ export function WorkspaceLayout() {
         >
           {isCompact && !isChat && (
             <div role="group" aria-label="Workspace panels" className="flex shrink-0 flex-wrap gap-1 border-b border-gray-200 bg-white p-2">
-              <button type="button" aria-pressed={showLeftOnly} onClick={() => choosePanel(workspaceMode, 'source')} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
-                {isProjects ? 'Projects panel' : isAutomations ? 'Automations panel' : isKnowledge ? 'Knowledge panel' : 'Files panel'}
+              <button type="button" aria-label={isProjects ? 'Projects panel' : isAutomations ? 'Automations panel' : isKnowledge ? 'Knowledge panel' : 'Files panel'} aria-pressed={showLeftOnly} onClick={() => choosePanel(workspaceMode, 'source')} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
+                {isProjects ? 'Projects' : isAutomations ? 'Automations' : isKnowledge ? 'Knowledge' : 'Files'}
               </button>
               <button type="button" aria-label={hasEditor ? 'Open tool panel' : 'Open Library panel'} aria-pressed={!showLeftOnly && (hasEditor || activeRightTab === 'library')} onClick={() => { choosePanel(workspaceMode, 'tools'); if (!hasEditor) setActiveRightTab('library') }} className="rounded border border-gray-300 px-2 py-2 text-sm aria-pressed:bg-gray-900 aria-pressed:text-white">
                 {hasEditor ? 'Tool' : 'Library'}
@@ -199,7 +199,7 @@ export function WorkspaceLayout() {
           )}
 
           <div role="region" aria-label="Tools and assistant" className={showLeftOnly ? 'hidden' : 'overflow-hidden min-w-0 flex-1 relative flex flex-col'} style={{ zIndex: 11 }}>
-            <div style={{ flex: 1, minHeight: 0 }}><RetainedPanel eager active={!showLeftOnly}><RightPanel /></RetainedPanel></div>
+            <div style={{ flex: 1, minHeight: 0 }}><RetainedPanel eager active={!showLeftOnly}><RightPanel hideTabs={isCompact && !isChat} /></RetainedPanel></div>
           </div>
           </div>
         </main>
