@@ -8,7 +8,7 @@
 #    ./setup.sh --repair       Diagnose and fix a broken deployment
 #    ./setup.sh --upgrade      Scan origin for new code & catalog, apply what's outdated
 #    ./setup.sh --redeploy     Rebuild and restart from current code (no git pull)
-#    ./setup.sh --seed         Update verified catalog (add/refresh, retire dropped items with your OK)
+#    ./setup.sh --seed         Update catalog (add/refresh, retire dropped items with your OK)
 #    ./setup.sh --reset-catalog  Wipe catalog metadata and re-seed from current version
 #    ./setup.sh --reingest     Re-ingest all knowledge base content into ChromaDB
 #    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
@@ -916,7 +916,7 @@ bootstrap() {
   configure_telemetry "$ORG_NAME"
 
   echo ""
-  echo -e "  ${SYM_NEURAL}  ${BOLD}Verified catalog${RESET}"
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Catalog${RESET}"
   echo -e "  ${DIM}     The bootstrap will also seed research administration content:${RESET}"
   echo -e "  ${DIM}       •  Verified workflows (e.g. proposal review, compliance checks)${RESET}"
   echo -e "  ${DIM}       •  Extraction templates (structured data extraction configs)${RESET}"
@@ -986,7 +986,7 @@ runpy.run_path('bootstrap_install.py', run_name='__main__')
 
   # Check for catalog seeding
   if echo "$bootstrap_output" | grep -qi "seed\|catalog\|workflow\|verified"; then
-    echo -e "  ${SYM_CHECK}  Verified catalog seeded"
+    echo -e "  ${SYM_CHECK}  Catalog seeded"
 
     # Extract counts from bootstrap output if available
     local wf_created ss_created kb_created
@@ -1207,7 +1207,7 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --repair${RESET}        ${DIM}Diagnose & fix issues${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --upgrade${RESET}       ${DIM}Pull, backup, rebuild${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --redeploy${RESET}      ${DIM}Rebuild current code${RESET}       ${MAGENTA}${BOLD}║${RESET}"
-  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --seed${RESET}          ${DIM}Update verified catalog${RESET}    ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --seed${RESET}          ${DIM}Update catalog${RESET}             ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --cron-setup${RESET}    ${DIM}Schedule auto-updates${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --reset-email${RESET}   ${DIM}Reconfigure email${RESET}        ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
@@ -1448,9 +1448,9 @@ repair() {
       "db.getSiblingDB('${MONGO_DB}').workflow.countDocuments({verified: true})" 2>/dev/null || echo "-1")
 
     if [[ "$wf_count" -ge 11 ]]; then
-      echo -e "  ${SYM_CHECK}  Verified catalog is seeded"
+      echo -e "  ${SYM_CHECK}  Catalog is seeded"
     elif [[ "$wf_count" -ge 0 ]]; then
-      echo -e "  ${SYM_CROSS}  Verified catalog is incomplete or missing"
+      echo -e "  ${SYM_CROSS}  Catalog is incomplete or missing"
       need_bootstrap=true
     fi
   fi
@@ -1870,7 +1870,7 @@ prompt_org_name_if_unset() {
   echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Institution${RESET}"
   echo -e "  ${DIM}     No institution/organization name is set for this deployment.${RESET}"
-  echo -e "  ${DIM}     Used for branding and creator credit on verified catalog items.${RESET}"
+  echo -e "  ${DIM}     Used for branding and creator credit on catalog items.${RESET}"
   echo -e "  ${DIM}     Leave blank to skip (set it later in Admin → Theme).${RESET}"
   echo ""
   local ORG_NAME=""
@@ -2103,10 +2103,10 @@ scan_and_upgrade() {
 }
 
 # ---------------------------------------------------------------------------
-# Update verified catalog: re-run seed script against running deployment
+# Update catalog: re-run seed script against running deployment
 # ---------------------------------------------------------------------------
 update_catalog() {
-  section "S" "Update Verified Catalog"
+  section "S" "Update Catalog"
 
   echo -e "  ${DIM}     Re-seeding verified workflows, extractions, and knowledge bases.${RESET}"
   echo -e "  ${DIM}     New items are added and existing ones refreshed. Items dropped from${RESET}"
@@ -2195,9 +2195,9 @@ update_catalog() {
     applied=$(echo "$seed_output" | grep -E '^Catalog version: ' | head -1 | sed 's/^Catalog version: //' | tr -d '[:space:]')
     if [[ -n "$applied" ]]; then
       echo "$applied" > "$CATALOG_VERSION_HOST_FILE"
-      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated to ${applied}.${RESET}"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Catalog updated to ${applied}.${RESET}"
     else
-      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated.${RESET}"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Catalog updated.${RESET}"
     fi
   else
     while IFS= read -r line; do
@@ -2325,7 +2325,7 @@ auto_update() {
   fi
 
   if [[ $cat_outdated -eq 1 ]]; then
-    echo "[${stamp}] Updating verified catalog..." >> "$AUTO_UPDATE_LOG"
+    echo "[${stamp}] Updating catalog..." >> "$AUTO_UPDATE_LOG"
     if ! update_catalog >> "$AUTO_UPDATE_LOG" 2>&1; then
       echo "[${stamp}] ERROR: catalog update failed." >> "$AUTO_UPDATE_LOG"
       return 1
@@ -2490,11 +2490,11 @@ remove_cron() {
 }
 
 # ---------------------------------------------------------------------------
-# Reset verified catalog: wipe catalog metadata (preserving underlying
+# Reset catalog: wipe catalog metadata (preserving underlying
 # Workflow/SearchSet/KnowledgeBase rows), then re-seed from current version.
 # ---------------------------------------------------------------------------
 reset_catalog() {
-  section "X" "Reset Verified Catalog"
+  section "X" "Reset Catalog"
 
   local current_version
   current_version=$(catalog_version_local)
@@ -2556,9 +2556,9 @@ reset_catalog() {
     applied=$(echo "$seed_output" | grep -E '^Catalog version: ' | head -1 | sed 's/^Catalog version: //' | tr -d '[:space:]')
     if [[ -n "$applied" ]]; then
       echo "$applied" > "$CATALOG_VERSION_HOST_FILE"
-      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog reset to ${applied}.${RESET}"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Catalog reset to ${applied}.${RESET}"
     else
-      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog reset.${RESET}"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Catalog reset.${RESET}"
     fi
     echo -e "  ${DIM}     Backup at: ${LAST_BACKUP_DIR:-backups/}${RESET}"
   else
@@ -2764,8 +2764,8 @@ catalog_menu() {
     echo -e "  ${VIOLET}┌─${RESET} ${BOLD}${WHITE}CATALOG${RESET} ${DIM}─────────────────────────────────────────${RESET}"
     echo -e "  ${VIOLET}└──────────────────────────────────────────────${RESET}"
     echo ""
-    echo -e "  ${DIM}  1)${RESET} ${CYAN}Update verified catalog${RESET}    ${DIM}— additive seed, keeps modifications${RESET}"
-    echo -e "  ${DIM}  2)${RESET} ${CYAN}Reset verified catalog${RESET}     ${YELLOW}⚠ destructive${RESET} ${DIM}— wipe catalog & re-seed${RESET}"
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Update catalog${RESET}    ${DIM}— additive seed, keeps modifications${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Reset catalog${RESET}     ${YELLOW}⚠ destructive${RESET} ${DIM}— wipe catalog & re-seed${RESET}"
     echo -e "  ${DIM}  3)${RESET} ${CYAN}Re-ingest knowledge bases${RESET}  ${DIM}— rebuild ChromaDB chunks${RESET}"
     echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
     _submenu_prompt
@@ -2939,7 +2939,7 @@ main() {
       echo -e "    ${CYAN}--repair${RESET}         Diagnose and fix a broken deployment"
       echo -e "    ${CYAN}--upgrade${RESET}        Scan origin for new code & catalog, apply what's outdated"
       echo -e "    ${CYAN}--redeploy${RESET}       Rebuild and restart from current code (no git pull)"
-      echo -e "    ${CYAN}--seed${RESET}           Update verified catalog with new seed data"
+      echo -e "    ${CYAN}--seed${RESET}           Update catalog with new seed data"
       echo -e "    ${CYAN}--reset-catalog${RESET}  Wipe catalog metadata and re-seed (preserves underlying entities)"
       echo -e "    ${CYAN}--reingest${RESET}       Re-ingest all knowledge base content into ChromaDB"
       echo -e "    ${CYAN}--reset-email${RESET}    Reconfigure email provider (SMTP or Resend)"

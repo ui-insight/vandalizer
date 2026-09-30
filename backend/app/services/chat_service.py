@@ -42,6 +42,7 @@ from app.services.context_budget import (
     resolve_context_window,
     token_safety_margin,
 )
+from app.services.kb_answer_grounding import unsupported_figures
 from app.services.model_routing import (
     RoutingDecision,
     choose_document_model,
@@ -2348,7 +2349,24 @@ async def chat_stream(
                             "content": "",
                             "sources": derived,
                         }) + "\n"
-
+                # A KB answer's dollar amounts and percentages must come from
+                # what the model was shown: the KB snippets, any attached
+                # document, the question, or what its tools returned (an
+                # agentic search_knowledge_base call retrieves passages beyond
+                # the pre-fetched snippets). One that doesn't came from the
+                # model's memory, which may predate the current regulation.
+                unsupported = (
+                    unsupported_figures(assistant_message, "\n".join(
+                        [s.text for s in (*doc_segments, *attachment_segments)]
+                        + [message]
+                        + [
+                            r["content"] if isinstance(r["content"], str)
+                            else json.dumps(r["content"], default=str)
+                            for r in streamed_tool_results
+                        ]
+                    ))
+                    if active_kbs else []
+                )
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -2362,7 +2380,14 @@ async def chat_stream(
                         agent_run.result
                     ),
                     plan_state=deps.plan_state if deps is not None else None,
+                    unsupported_figures=unsupported or None,
                 )
+                if unsupported:
+                    yield json.dumps({
+                        "kind": "grounding_warning",
+                        "content": "",
+                        "unsupported_figures": unsupported,
+                    }) + "\n"
 
                 # Ground truth has just arrived. The planner's belief and what
                 # the model charged are both in hand exactly once per request —
@@ -3870,6 +3895,7 @@ async def _finalize(
     citations: Optional[list[dict]] = None,
     context_anchor_tokens: int = 0,
     plan_state: Optional[list[dict]] = None,
+    unsupported_figures: Optional[list[str]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -3881,6 +3907,7 @@ async def _finalize(
         tool_results=tool_results,
         segments=segments,
         citations=citations,
+        unsupported_figures=unsupported_figures,
     )
 
     # Stamp the usage anchor for next turn's cheap context estimate (uplift

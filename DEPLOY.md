@@ -116,7 +116,7 @@ docker compose up -d redis mongo chromadb
 
 This section covers what you need to know when deploying Vandalizer for real users in a university environment.
 
-**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the verified catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
+**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
 
 ### Resource Requirements
 
@@ -330,7 +330,7 @@ Docling-Serve deployments additionally get:
 
 - **Request Timeout** and **Use async conversion API** — async submits the job to `/v1/convert/file/async` and polls for the result, which avoids timeouts on large scanned PDFs where OCR takes minutes.
 
-**Test Connection** probes the service (for Docling-Serve, its `/health` endpoint) and reports the exact convert URL uploads will use.
+**Test Connection** converts a generated one-page PDF through the same client ingestion uses, and reports each step: the exact convert URL uploads will be POSTed to, credentials, the live conversion and its latency, and how much text came back. A failure comes with a classified cause (an HTTP 500 is a fault in the OCR service; a 401 points at the key; a 422 at the provider selector), and a `200 OK` with an empty body counts as a failure. The setup checklist on **Admin → System Config** runs the same live probe after it loads, so a broken OCR service shows as a red "Not working" row without anyone clicking Test.
 
 Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyMuPDF. This works for digitally-created PDFs but produces poor results on scanned documents.
 
@@ -442,7 +442,7 @@ Then confirm these manually:
 
 - [ ] Login works with the bootstrap admin credentials
 - [ ] At least one LLM provider is configured under Admin → System Config → Models
-- [ ] OCR endpoint is configured under Admin → System Config → Endpoints (if processing scanned PDFs)
+- [ ] OCR endpoint is configured under Admin → System Config → Endpoints and **Test Connection** passes (if processing scanned PDFs)
 - [ ] File upload completes successfully
 - [ ] Extraction workflow runs to completion (confirms Celery workers are connected)
 - [ ] Chat with a document works (confirms RAG pipeline end-to-end)

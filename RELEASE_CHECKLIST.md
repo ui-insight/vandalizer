@@ -8,12 +8,14 @@ Use this checklist before tagging a release that outside operators are expected 
 - Write down any operator actions required for this release:
   - `backend/.env` changes
   - `compose.yaml` changes
+  - Helm chart (`charts/vandalizer/`) changes
   - backup/restore expectations
   - upgrade or rollback caveats
+- Set `appVersion` in [charts/vandalizer/Chart.yaml](charts/vandalizer/Chart.yaml) to the new tag (e.g. `"v4.14.0"`): it is the chart's default image tag, so a stale value installs the previous release. If anything under `charts/vandalizer/` changed, also bump the chart's own `version:` (semver, independent of the app version).
 - Review config and deployment drift since the previous release:
 
 ```bash
-git diff <previous-tag>..HEAD -- backend/.env.example compose.yaml README.md DEPLOY.md OPERATIONS.md
+git diff <previous-tag>..HEAD -- .env.example backend/.env.example compose.yaml charts/vandalizer README.md DEPLOY.md OPERATIONS.md
 ```
 
 ## 2. Run Release Validation
@@ -25,7 +27,7 @@ make backend-install frontend-install
 make release-check
 ```
 
-`make release-check` includes `make security-gate`, which needs [Trivy](https://trivy.dev) on the PATH (`brew install trivy`). The `Release` GitHub workflow installs it itself.
+`make release-check` includes `make security-gate`, which needs [Trivy](https://trivy.dev) on the PATH (`brew install trivy`), and `make helm-lint` (helm lint plus strict kubeconform over each `charts/vandalizer/ci/*-values.yaml`), which needs `helm` and `kubeconform` on the PATH (`brew install helm kubeconform`) and network access for the CRD schemas. It also builds the `vandalizer-frontend-unprivileged` image the chart uses. The `Release` GitHub workflow installs Trivy and kubeconform itself.
 
 Optional but recommended while the backend analysis backlog is still being cleaned up:
 
@@ -69,10 +71,10 @@ When the candidate is approved, first **stamp the CHANGELOG**: rename `## [Unrel
 # ./scripts/cut_release.sh --patch   # hotfix:  v4.9.0 -> v4.9.1
 ```
 
-The script computes the next SemVer tag on the `v4.x` line (default minor bump; `--major`/`--patch` for the others), refuses to run if the tree is dirty or out of sync with origin, warns if the CHANGELOG has no section for the new tag, and pushes an annotated tag. Pushing the tag triggers the release workflow, which will:
+The script computes the next SemVer tag on the `v4.x` line (default minor bump; `--major`/`--patch` for the others), refuses to run if the tree is dirty or out of sync with origin, warns if the CHANGELOG has no section for the new tag or if `charts/vandalizer/Chart.yaml`'s `appVersion` does not match it, and pushes an annotated tag. Pushing the tag triggers the release workflow, which will:
 
 - rerun `make release-check`
-- publish versioned backend and frontend GHCR images
+- publish versioned backend, frontend, and frontend-unprivileged GHCR images
 - create the GitHub release entry for the tag
 
 ## 6. Finalize Operator Notes

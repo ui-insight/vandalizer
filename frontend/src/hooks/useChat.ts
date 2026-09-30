@@ -101,6 +101,7 @@ export function useChat() {
   const abortRef = useRef<AbortController | null>(null)
   const citationsRef = useRef<Citation[]>([])
   const lastSendArgsRef = useRef<SendArgs | null>(null)
+  const unsupportedFiguresRef = useRef<string[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuids?: string[], includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
@@ -130,6 +131,7 @@ export function useChat() {
       toolResultsRef.current = []
       segmentsRef.current = []
       citationsRef.current = []
+      unsupportedFiguresRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -169,6 +171,9 @@ export function useChat() {
         }
         if (citationsRef.current.length) {
           assistantMsg.citations = citationsRef.current
+        }
+        if (unsupportedFiguresRef.current.length) {
+          assistantMsg.unsupported_figures = unsupportedFiguresRef.current
         }
         setMessages((prev) => [...prev, assistantMsg])
       }
@@ -281,6 +286,8 @@ export function useChat() {
                 }
                 citationsRef.current = merged
               }
+            } else if (chunk.kind === 'grounding_warning') {
+              unsupportedFiguresRef.current = chunk.unsupported_figures ?? []
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,

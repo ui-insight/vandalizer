@@ -10,6 +10,10 @@
     "collections": [
       "compliance",
       "reference-knowledge"
+    ],
+    "retired_source_urls": [
+      "https://www.cfo.gov/resources/uniform-guidance/",
+      "https://www.grants.gov/web/grants/learn-grants/grant-policies.html"
     ]
   },
   "items": [

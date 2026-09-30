@@ -234,6 +234,12 @@ class TestDeleteLibrary:
 
 
 class TestAddItem:
+    @pytest.fixture(autouse=True)
+    def _no_run_history(self):
+        # add_item applies run-based last_used_at, which queries ActivityEvent.
+        with patch("app.services.library_service._apply_run_based_last_used", AsyncMock()):
+            yield
+
     @pytest.mark.asyncio
     async def test_adds_workflow_item(self):
         lib = _make_library()
@@ -373,6 +379,12 @@ class TestAddItem:
 
 
 class TestAddItemIdempotency:
+    @pytest.fixture(autouse=True)
+    def _no_run_history(self):
+        # add_item applies run-based last_used_at, which queries ActivityEvent.
+        with patch("app.services.library_service._apply_run_based_last_used", AsyncMock()):
+            yield
+
     @pytest.mark.asyncio
     async def test_returns_existing_bookmark_instead_of_duplicating(self):
         # Creation paths bookmark server-side now, so a client that also calls
@@ -1457,3 +1469,50 @@ class TestCloneKnowledgeBaseKind:
                 await _clone_underlying_object(
                     item, "user-1", team_id=None, user=_make_user()
                 )
+
+
+# ---------------------------------------------------------------------------
+# _apply_run_based_last_used
+# ---------------------------------------------------------------------------
+
+
+class TestApplyRunBasedLastUsed:
+    @pytest.mark.asyncio
+    async def test_overwrites_workflow_and_extraction_but_not_prompt(self):
+        wf_id = "65f0000000000000000000a1"
+        ran_at = datetime.datetime(2026, 8, 15)
+        items = [
+            {"kind": "workflow", "item_id": wf_id, "item_uuid": None, "set_type": None, "last_used_at": "2026-09-20T00:00:00+00:00"},
+            {"kind": "search_set", "item_id": "x", "item_uuid": "ss-never", "set_type": "extraction", "last_used_at": "2026-09-20T00:00:00+00:00"},
+            {"kind": "search_set", "item_id": "y", "item_uuid": "ss-prompt", "set_type": "prompt", "last_used_at": "2026-09-20T00:00:00+00:00"},
+        ]
+        user = _make_user()
+        collection = MagicMock()
+        collection.aggregate.return_value.to_list = AsyncMock(
+            return_value=[{"_id": PydanticObjectId(wf_id), "last": ran_at}],
+        )
+        with patch("app.services.library_service.ActivityEvent") as MockAE:
+            MockAE.get_motor_collection.return_value = collection
+            from app.services.library_service import _apply_run_based_last_used
+
+            await _apply_run_based_last_used(items, user)
+
+        match = collection.aggregate.call_args[0][0][0]["$match"]
+        assert match["user_id"] == user.user_id
+        assert items[0]["last_used_at"] == "2026-08-15T00:00:00+00:00"
+        assert items[1]["last_used_at"] is None
+        assert items[2]["last_used_at"] == "2026-09-20T00:00:00+00:00"
+
+    @pytest.mark.asyncio
+    async def test_knowledge_bases_alone_send_no_query(self):
+        # A KB has set_type None; treating it as an extraction sent `$or: []`,
+        # which MongoDB rejects — a 500 on any listing of only KBs.
+        items = [{"kind": "knowledge_base", "item_id": "k", "item_uuid": "kb-1",
+                  "set_type": None, "last_used_at": "2026-09-20T00:00:00+00:00"}]
+        with patch("app.services.library_service.ActivityEvent") as MockAE:
+            from app.services.library_service import _apply_run_based_last_used
+
+            await _apply_run_based_last_used(items, _make_user())
+
+        MockAE.get_motor_collection.assert_not_called()
+        assert items[0]["last_used_at"] == "2026-09-20T00:00:00+00:00"

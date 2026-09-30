@@ -9,6 +9,9 @@ export interface ChatMessage {
   tool_results?: ToolResultInfo[]
   segments?: StreamSegment[]
   citations?: Citation[]
+  /** KB answers only: dollar amounts / percentages in the answer that no
+   *  retrieved snippet states — likely recalled from the model's memory. */
+  unsupported_figures?: string[]
   /** Documents in scope when this turn was asked — `{uuid, title}` each, with
    *  a final `{truncated: n}` when the selection was larger than is recorded.
    *  Present on user turns; assistant turns carry `citations` instead. */
@@ -200,6 +203,7 @@ export interface StreamChunk {
     | 'plan_update'
     | 'queue_consumed'
     | 'sources'
+    | 'grounding_warning'
   content: string
   duration?: number
   tool_name?: string
@@ -228,6 +232,8 @@ export interface StreamChunk {
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]
+  // grounding_warning only: figures in the finished answer no snippet states.
+  unsupported_figures?: string[]
 }
 
 export interface SuggestedModel {

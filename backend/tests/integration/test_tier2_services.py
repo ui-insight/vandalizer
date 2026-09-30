@@ -189,6 +189,63 @@ class TestLibraryItemUpdateWithRealDB:
 
 
 # ---------------------------------------------------------------------------
+# library_service.get_library_items — "last used" for workflows/extractions
+# comes from the viewer's own run history, never from opening the item.
+# ---------------------------------------------------------------------------
+
+class TestLibraryLastUsedFromRunsWithRealDB:
+    async def test_last_used_reflects_runs_not_clicks(self, mongo_client):
+        from app.models.activity import ActivityEvent, ActivityType
+        from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
+        from app.models.search_set import SearchSet
+        from app.models.user import User
+        from app.models.workflow import Workflow
+        from app.services.library_service import get_library_items
+
+        user = User(user_id="runner", email="r@example.com", name="R")
+        await user.insert()
+        clicked_at = datetime.datetime(2026, 9, 20, tzinfo=datetime.timezone.utc)
+
+        never_run = Workflow(name="Opened Only", user_id="runner", steps=[], space="default")
+        ran = Workflow(name="Ran", user_id="runner", steps=[], space="default")
+        teammate_ran = Workflow(name="Teammate Ran", user_id="runner", steps=[], space="default")
+        for wf in (never_run, ran, teammate_ran):
+            await wf.insert()
+        extraction = SearchSet(title="Terms", uuid="ss-terms", status="active", set_type="extraction", user_id="runner")
+        prompt = SearchSet(title="Summarize", uuid="ss-prompt", status="active", set_type="prompt", user_id="runner")
+        await extraction.insert()
+        await prompt.insert()
+
+        # Every item carries a click-era stamp; only the prompt's should survive.
+        items = [
+            LibraryItem(item_id=never_run.id, kind=LibraryItemKind.WORKFLOW, added_by_user_id="runner", last_used_at=clicked_at),
+            LibraryItem(item_id=ran.id, kind=LibraryItemKind.WORKFLOW, added_by_user_id="runner", last_used_at=clicked_at),
+            LibraryItem(item_id=teammate_ran.id, kind=LibraryItemKind.WORKFLOW, added_by_user_id="runner", last_used_at=clicked_at),
+            LibraryItem(item_id=extraction.id, kind=LibraryItemKind.SEARCH_SET, added_by_user_id="runner", last_used_at=clicked_at),
+            LibraryItem(item_id=prompt.id, kind=LibraryItemKind.SEARCH_SET, added_by_user_id="runner", last_used_at=clicked_at),
+        ]
+        for it in items:
+            await it.insert()
+        lib = Library(scope=LibraryScope.PERSONAL, title="Mine", owner_user_id="runner", items=[i.id for i in items])
+        await lib.insert()
+
+        older = datetime.datetime(2026, 8, 1, tzinfo=datetime.timezone.utc)
+        newer = datetime.datetime(2026, 8, 15, tzinfo=datetime.timezone.utc)
+        for started in (older, newer):
+            await ActivityEvent(type=ActivityType.WORKFLOW_RUN.value, user_id="runner", workflow=ran.id, started_at=started).insert()
+        await ActivityEvent(type=ActivityType.WORKFLOW_RUN.value, user_id="someone-else", workflow=teammate_ran.id, started_at=newer).insert()
+        await ActivityEvent(type=ActivityType.SEARCH_SET_RUN.value, user_id="runner", search_set_uuid="ss-terms", started_at=older).insert()
+
+        result = {r["name"]: r["last_used_at"] for r in await get_library_items(str(lib.id), user)}
+
+        assert result["Opened Only"] is None
+        assert result["Ran"] == newer.isoformat()
+        assert result["Teammate Ran"] is None
+        assert result["Terms"] == older.isoformat()
+        assert result["Summarize"] == clicked_at.isoformat()
+
+
+# ---------------------------------------------------------------------------
 # quality_service.detect_stale_items — was: 1 skipped test in
 # test_quality_service.py (Beanie query operators not supported on MagicMock).
 # ---------------------------------------------------------------------------

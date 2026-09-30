@@ -10,6 +10,9 @@
     "collections": [
       "federal-agency",
       "reference-knowledge"
+    ],
+    "retired_source_urls": [
+      "https://basicresearch.defense.gov/about/frequently-asked-questions/"
     ]
   },
   "items": [

@@ -459,7 +459,31 @@ class TestCitationPersistence:
         )
         assert "citations" not in msg.to_dict()
 
+    def test_chat_message_to_dict_carries_unsupported_figures(self):
+        from app.models.chat import ChatMessage, ChatRole
+
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="It is $750,000.",
+            unsupported_figures=["$750,000"],
+        )
+        assert msg.to_dict()["unsupported_figures"] == ["$750,000"]
+        bare = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer", unsupported_figures=None,
+        )
+        assert "unsupported_figures" not in bare.to_dict()
+
     @pytest.mark.asyncio
+    async def test_finalize_passes_unsupported_figures_to_add_message(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        await _finalize(
+            conversation, "It is $750,000.", [], None, None, "user-1",
+            unsupported_figures=["$750,000"],
+        )
+        _, kwargs = conversation.add_message.await_args
+        assert kwargs["unsupported_figures"] == ["$750,000"]
+
     def _finalize_conversation(self):
         """MagicMock with concrete post-turn bookkeeping fields — _finalize
         reads resume/anchor state, and bare Mock attributes are truthy."""

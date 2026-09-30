@@ -48,6 +48,19 @@ _BLANK_PAGE_INK_THRESHOLD = 250
 _UNREAD_PAGE_MAX_CHARS = 40
 _UNREAD_PAGE_IMAGE_COVERAGE = 0.5
 
+# When the fast path's full parse flags at most this many pages, only those
+# pages go to OCR, one request each, and the pages it read stay as read. More
+# than this and the whole document goes to OCR in one request, as before.
+_MAX_PAGES_OCR_ONE_BY_ONE = 10
+
+# The whole-document OCR coverage check. A page whose text layer has at least
+# _COVERAGE_MIN_WORDS words found on no other page, fewer than
+# _COVERAGE_MIN_FRACTION of which appear anywhere in the OCR text, is a page
+# OCR left out.
+_COVERAGE_MIN_WORDS = 15
+_COVERAGE_MIN_FRACTION = 0.2
+_COVERAGE_WORD_RE = re.compile(r"[a-z0-9]{3,}")
+
 
 # A table cell that is exactly the pandas/openpyxl NaN sentinel, and nothing
 # else. Anchored to cell boundaries so real words survive: a blind
@@ -1181,6 +1194,46 @@ def _local_markdown_extract_from_pdf(
     caller falls through to the existing OCR-first flow unchanged. This
     function never raises.
     """
+    parsed = _fast_path_parse(pdf_path, classification)
+    if parsed is None:
+        return None
+    result, problem = parsed
+    if problem:
+        logger.info(
+            "pdf-inspector fast path declined for %s: page(s) %s need OCR "
+            "or came back empty but are not blank",
+            pdf_path, [n + 1 for n in problem],
+        )
+        return None
+
+    joined = _join_pages({p.page + 1: p.markdown or "" for p in result.pages})
+    if joined is None:
+        return None
+    text, markers = joined
+
+    logger.info(
+        "pdf-inspector fast path: extracted %d chars from %s locally, "
+        "skipping OCR (confidence=%.2f, tables_on_pages=%s)",
+        len(text), pdf_path, classification.confidence, result.pages_with_tables,
+    )
+    return text, markers
+
+
+def _fast_path_parse(pdf_path: str, classification):
+    """pdf-inspector's full parse and the 0-indexed pages it did not read.
+
+    None when the document is not a fit for the fast path at all: no
+    classification, not confidently text-based, pages flagged by the
+    classifier up front, or a parse that failed. Never raises.
+
+    The classification is a lightweight pass; the full parse can still flag
+    a page ("text here is unreliable, use OCR") and hands it back with empty
+    Markdown. Skipping it dropped the page from the document without a word
+    (support ticket: a budget ledger's totals page). So a flagged page, or an
+    empty one that is not blank, is a problem page the caller must read some
+    other way. ``pages_needing_ocr`` on the parse result is 1-indexed, unlike
+    the classifier's.
+    """
     if classification is None:
         return None
 
@@ -1202,56 +1255,158 @@ def _local_markdown_extract_from_pdf(
         logger.warning("pdf-inspector extraction failed for %s: %s", pdf_path, e)
         return None
 
-    # The classification above is a lightweight pass; the full parse can still
-    # flag a page ("text here is unreliable, use OCR") and hands it back with
-    # empty Markdown. Skipping it dropped the page from the document without a
-    # word (support ticket: a budget ledger's totals page). A flagged page, or
-    # an empty one that is not blank, sends the whole document down the OCR
-    # path instead — the same answer the classifier gets when it flags a page
-    # up front — where OCR reads it, PyMuPDF backs OCR up, and a page neither
-    # can read is reported. ``pages_needing_ocr`` here is 1-indexed, unlike
-    # the classifier's.
-    flagged = sorted(
-        set(getattr(result, "pages_needing_ocr", None) or [])
-        | {p.page + 1 for p in result.pages if getattr(p, "needs_ocr", False)}
+    flagged = (
+        {n - 1 for n in (getattr(result, "pages_needing_ocr", None) or [])}
+        | {p.page for p in result.pages if getattr(p, "needs_ocr", False)}
     )
-    if flagged:
-        logger.info(
-            "pdf-inspector fast path declined for %s: page(s) %s need OCR",
-            pdf_path, flagged,
-        )
-        return None
-    empty = [p.page for p in result.pages if not (p.markdown or "").strip()]
-    if empty and not _pages_are_blank(pdf_path, empty):
-        logger.info(
-            "pdf-inspector fast path declined for %s: page(s) %s came back "
-            "empty but are not blank", pdf_path, [n + 1 for n in empty],
-        )
-        return None
+    empty = {p.page for p in result.pages if not (p.markdown or "").strip()}
+    # A blank page is not a problem even when flagged: there is nothing to
+    # read, and OCR's vision model invents text for a blank page.
+    problem = sorted(
+        n for n in flagged | empty if not _pages_are_blank(pdf_path, [n])
+    )
+    return result, problem
 
+
+def _join_pages(page_texts: dict[int, str]) -> tuple[str, list[dict]] | None:
+    """Join 1-indexed page texts in page order, with a marker per page that
+    has text. None when the whole is too short to count as a reading."""
     parts: list[str] = []
     markers: list[dict] = []
     cursor = 0
-    for page in result.pages:
-        page_text = page.markdown or ""
+    for number in sorted(page_texts):
+        page_text = page_texts[number]
         if not page_text.strip():
-            continue  # blank, checked above
-        markers.append({"char_offset": cursor, "kind": "page", "value": page.page + 1})
+            continue
+        markers.append({"char_offset": cursor, "kind": "page", "value": number})
         if parts:
             cursor += 1
         parts.append(page_text)
         cursor += len(page_text)
-
     text = "\n".join(parts)
     if len(text.strip()) < MIN_PDF_TEXT_LENGTH:
         return None
-
-    logger.info(
-        "pdf-inspector fast path: extracted %d chars from %s locally, "
-        "skipping OCR (confidence=%.2f, tables_on_pages=%s)",
-        len(text), pdf_path, classification.confidence, result.pages_with_tables,
-    )
     return text, markers
+
+
+def _single_page_pdf(pdf_path: str, page_index: int, out_path: str) -> None:
+    """Write 0-indexed page ``page_index`` of ``pdf_path`` as its own PDF."""
+    import pymupdf
+
+    with pymupdf.open(pdf_path) as src, pymupdf.open() as one:
+        one.insert_pdf(src, from_page=page_index, to_page=page_index)
+        one.save(out_path)
+
+
+def _fast_path_with_page_ocr(
+    pdf_path: str, classification, report: dict, *,
+    local_on_ocr_outage: bool = False,
+    on_stage: Callable[[str], None] | None = None,
+) -> tuple[str, list[dict]] | None:
+    """The fast path's reading, with only the pages it could not read sent
+    to OCR.
+
+    Declining the whole fast path over one flagged page sent the entire file
+    to OCR and threw away the pages already read — and the OCR service then
+    dropped a different page, silently (support ticket: a 3-page budget
+    ledger whose 27-row expense page vanished once its totals page was
+    fixed). Here the pages read locally stay exactly as read, each problem
+    page goes to OCR on its own, and a page OCR returns nothing for falls
+    back to its PyMuPDF text layer; a page no reader gets text from is named
+    in ``report["unread_pages"]``.
+
+    None — the caller then takes the whole-document OCR path — when the
+    document is not a fast-path fit, has no problem pages (the plain fast
+    path handles it), has too many to OCR one by one, or has nothing the
+    fast path read. An OCR outage propagates for the task's retry unless
+    ``local_on_ocr_outage`` says this is the last attempt, in which case the
+    problem pages are read locally and named as unread where that fails.
+    """
+    parsed = _fast_path_parse(pdf_path, classification)
+    if parsed is None:
+        return None
+    result, problem = parsed
+    read_pages = {
+        p.page: p.markdown or "" for p in result.pages if p.page not in problem
+    }
+    if (
+        not problem
+        or len(problem) > _MAX_PAGES_OCR_ONE_BY_ONE
+        or not any(t.strip() for t in read_pages.values())
+    ):
+        return None
+
+    import tempfile
+
+    import pymupdf
+
+    from app.services import ocr_client
+
+    _report_stage(on_stage, "ocr")
+    logger.info(
+        "pdf-inspector fast path for %s: keeping %d page(s) read locally, "
+        "sending page(s) %s to OCR", pdf_path, len(read_pages),
+        [n + 1 for n in problem],
+    )
+
+    page_texts = {n + 1: t for n, t in read_pages.items()}
+    unread: list[int] = []
+    outage = False
+    with tempfile.TemporaryDirectory() as tmp, pymupdf.open(pdf_path) as doc:
+        for n in problem:
+            ocr_text = ""
+            if not outage:
+                one_page = os.path.join(tmp, f"page-{n + 1}.pdf")
+                try:
+                    _single_page_pdf(pdf_path, n, one_page)
+                    ocr_text = ocr_extract_text_from_pdf(one_page, report={})
+                except ocr_client.OcrUnavailableError:
+                    if not local_on_ocr_outage:
+                        raise
+                    outage = True
+                except Exception as e:  # noqa: BLE001 — degrade to the text layer
+                    logger.warning(
+                        "OCR of page %d of %s raised, using its text layer: %s",
+                        n + 1, pdf_path, e,
+                    )
+            if ocr_text.strip():
+                page_texts[n + 1] = ocr_text
+                continue
+            # OCR is down or read nothing: the text layer is the backup, as it
+            # is for the whole-document path, and a page it cannot read either
+            # is named rather than dropped.
+            page = doc[n]
+            local = _pymupdf_page_text(page)
+            if outage:
+                # The fast path flagged this page and OCR never saw it, so its
+                # text layer is unvetted: hold it to the quality bar the
+                # whole-document outage fallback uses, and name the page either
+                # way so the stored warning says OCR still owes it a reading
+                # and Retry extraction knows to re-read it.
+                from app.config import Settings
+                from app.utils.extraction_quality import nonletter_ratio
+
+                if local.strip() and nonletter_ratio(local) <= Settings().extraction_max_nonletter_ratio:
+                    page_texts[n + 1] = local
+                unread.append(n + 1)
+                continue
+            if local.strip():
+                page_texts[n + 1] = local
+            if _page_has_unread_content(page, local):
+                unread.append(n + 1)
+
+    joined = _join_pages(page_texts)
+    if joined is None:
+        return None
+    if unread:
+        logger.warning(
+            "PDF %s: page(s) %s show content no reader could read — they are "
+            "missing from the extracted text", pdf_path, unread,
+        )
+        report["unread_pages"] = unread
+    if outage:
+        report["ocr_unavailable_local_fallback"] = True
+    return joined
 
 
 def _pages_are_blank(pdf_path: str, pages: list[int]) -> bool:
@@ -1270,6 +1425,52 @@ def _pages_are_blank(pdf_path: str, pages: list[int]) -> bool:
         logger.warning("Could not check %s for blank pages: %s", pdf_path, e)
         return False
     return True
+
+
+def _pages_missing_from_ocr(pdf_path: str, ocr_text: str) -> list[int]:
+    """1-indexed pages whose text layer is substantial but barely appears in
+    ``ocr_text`` — pages the OCR service left out of its conversion.
+
+    OCR returns one string with no page boundaries, and nothing checked it
+    covered every page: a service that skipped a page produced a document
+    stored as complete with that page gone (support ticket: 27 expense rows
+    missing, chat denying an account the PDF shows). Only pages with a real
+    text layer can be checked; a scanned page has nothing to compare against.
+    Callers skip this when the classifier distrusts the text layer, since
+    glyph-ID mojibake would never match. Never raises.
+    """
+    ocr_words = set(_COVERAGE_WORD_RE.findall(ocr_text.lower()))
+    try:
+        import pymupdf
+
+        with pymupdf.open(pdf_path) as doc:
+            page_words = [
+                set(_COVERAGE_WORD_RE.findall(_pymupdf_page_text(page).lower()))
+                for page in doc
+            ]
+    except Exception as e:  # noqa: BLE001 — a coverage check must never fail a read
+        logger.warning("Could not check OCR page coverage for %s: %s", pdf_path, e)
+        return []
+    # Only words no other page has: ledger pages share their column headers,
+    # account labels and even amounts, so a page OCR skipped still "matched" a
+    # third of its words through the pages OCR did read.
+    counts: dict[str, int] = {}
+    for words in page_words:
+        for w in words:
+            counts[w] = counts.get(w, 0) + 1
+    missing: list[int] = []
+    for i, words in enumerate(page_words, start=1):
+        own = {w for w in words if counts[w] == 1}
+        if len(own) < _COVERAGE_MIN_WORDS:
+            continue
+        if len(own & ocr_words) / len(own) < _COVERAGE_MIN_FRACTION:
+            missing.append(i)
+    if missing:
+        logger.warning(
+            "PDF %s: OCR text is missing page(s) %s that the text layer shows",
+            pdf_path, missing,
+        )
+    return missing
 
 
 def _text_layer_untrustworthy(classification) -> bool:
@@ -1465,6 +1666,11 @@ def _read_pdf_text_and_markers(
     fast_path = None
     if not (force_ocr or ocr_required):
         fast_path = _local_markdown_extract_from_pdf(file_path, classification)
+        if fast_path is None:
+            fast_path = _fast_path_with_page_ocr(
+                file_path, classification, report,
+                local_on_ocr_outage=local_on_ocr_outage, on_stage=on_stage,
+            )
     if fast_path is not None:
         return fast_path
 
@@ -1539,6 +1745,10 @@ def _read_pdf_text_and_markers(
                 file_path,
             )
             return ocr_text, []
+        if not _text_layer_untrustworthy(classification):
+            missing = _pages_missing_from_ocr(file_path, ocr_text)
+            if missing:
+                report["unread_pages"] = missing
         num_pages = pdf_page_count(file_path)
         return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
     untrustworthy = _text_layer_untrustworthy(classification)

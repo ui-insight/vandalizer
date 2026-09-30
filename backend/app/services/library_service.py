@@ -11,6 +11,7 @@ from beanie import PydanticObjectId
 from beanie.operators import In
 from bson import ObjectId as BsonObjectId
 
+from app.models.activity import ActivityEvent, ActivityType
 from app.models.library import (
     Library,
     LibraryFolder,
@@ -293,7 +294,9 @@ async def add_item(
         "kind": LibraryItemKind(kind).value,
     })
     if existing:
-        return await _attach_author(await _dereference_item(existing))
+        return await _attach_author(
+            await _single_with_run_based_last_used(await _dereference_item(existing), user)
+        )
 
     now = datetime.datetime.now(datetime.timezone.utc)
     li = LibraryItem(
@@ -313,7 +316,9 @@ async def add_item(
     lib.updated_at = now
     await lib.save()
 
-    return await _attach_author(await _dereference_item(li))
+    return await _attach_author(
+        await _single_with_run_based_last_used(await _dereference_item(li), user)
+    )
 
 
 async def has_bookmark(item_id: PydanticObjectId, kind: LibraryItemKind) -> bool:
@@ -516,7 +521,9 @@ async def update_item(
         item.favorited = favorited
     if updates:
         await item.set(updates)
-    return await _attach_author(await _dereference_item(item))
+    return await _attach_author(
+        await _single_with_run_based_last_used(await _dereference_item(item), user)
+    )
 
 
 async def touch_item(item_id: str, user: User) -> bool:
@@ -608,8 +615,90 @@ async def get_library_items(
 
             results.append(deref)
 
+    await _apply_run_based_last_used(results, user)
     await _attach_authors(results)
     return results
+
+
+def _runs_last_used(item: dict) -> bool:
+    """Whether an item's "last used" comes from run history.
+
+    Workflows and extractions are *used* by running them, and opening one only
+    to look at or edit it is not a use — so their stored ``last_used_at`` (the
+    click-stamped value older clients wrote on open) is ignored. Prompts and
+    formatters have no run record; their explicit "Use in Assistant" action
+    still stamps ``last_used_at`` via :func:`touch_item`.
+    """
+    if item["kind"] == LibraryItemKind.WORKFLOW.value:
+        return True
+    if item["kind"] != LibraryItemKind.SEARCH_SET.value:
+        return False  # knowledge bases have no run record either
+    return (item.get("set_type") or "extraction") == "extraction"
+
+
+async def _single_with_run_based_last_used(deref: dict | None, user: User) -> dict | None:
+    """One dereferenced item with its run-based ``last_used_at`` applied.
+
+    Add/pin/note/tag responses replace the item in the client's list, so they
+    must carry the same "last used" the list does — otherwise a never-run
+    workflow opened before this change jumps up "Recently used" when pinned.
+    """
+    if deref:
+        await _apply_run_based_last_used([deref], user)
+    return deref
+
+
+async def _apply_run_based_last_used(items: list[dict], user: User) -> None:
+    """Overwrite ``last_used_at`` on workflow/extraction items with the start
+    time of this user's most recent run of the underlying object.
+
+    Per-user on purpose: "Recently used" in a team library should order by
+    when *you* last ran something, not a teammate. Items the user has never
+    run get ``None`` (rendered "Never").
+    """
+    run_based = [i for i in items if _runs_last_used(i)]
+    if not run_based:
+        return
+    workflow_ids = [
+        PydanticObjectId(i["item_id"])
+        for i in run_based
+        if i["kind"] == LibraryItemKind.WORKFLOW.value
+    ]
+    search_set_uuids = [
+        i["item_uuid"]
+        for i in run_based
+        if i["kind"] == LibraryItemKind.SEARCH_SET.value and i.get("item_uuid")
+    ]
+    or_clauses: list[dict] = []
+    if workflow_ids:
+        or_clauses.append({
+            "type": ActivityType.WORKFLOW_RUN.value,
+            "workflow": {"$in": workflow_ids},
+        })
+    if search_set_uuids:
+        or_clauses.append({
+            "type": ActivityType.SEARCH_SET_RUN.value,
+            "search_set_uuid": {"$in": search_set_uuids},
+        })
+    if not or_clauses:
+        # MongoDB rejects an empty $or; nothing to look up anyway.
+        for item in run_based:
+            item["last_used_at"] = None
+        return
+    pipeline = [
+        {"$match": {"user_id": user.user_id, "$or": or_clauses}},
+        {"$group": {
+            "_id": {"$ifNull": ["$workflow", "$search_set_uuid"]},
+            "last": {"$max": "$started_at"},
+        }},
+    ]
+    collection = ActivityEvent.get_motor_collection()
+    rows = await collection.aggregate(pipeline).to_list(length=None)
+    last_run = {str(r["_id"]): r["last"] for r in rows}
+
+    for item in run_based:
+        key = item["item_id"] if item["kind"] == LibraryItemKind.WORKFLOW.value else item.get("item_uuid")
+        item["last_used_at"] = _iso_utc(last_run.get(key or ""))
 
 
 # ---------------------------------------------------------------------------

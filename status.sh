@@ -374,9 +374,9 @@ else
       "Set DEFAULT_TEAM_NAME when running bootstrap_install.py to auto-assign new users to a shared team"
   fi
 
-  # --- Verified catalog ---
+  # --- Catalog ---
   echo ""
-  echo -e "  ${BOLD}${BLUE}Verified Catalog${RESET}"
+  echo -e "  ${BOLD}${BLUE}Catalog${RESET}"
   echo -e "  ${DIM}────────────────${RESET}"
 
   SEED_PROBLEM=false
@@ -455,7 +455,7 @@ else
 
   # One combined recommendation if anything is missing
   if [[ "$SEED_PROBLEM" == true ]]; then
-    RECOMMENDATIONS+=("Seed the verified catalog: ${BOOTSTRAP_CMD}")
+    RECOMMENDATIONS+=("Seed the catalog: ${BOOTSTRAP_CMD}")
     RECOMMENDATIONS+=("Or run standalone: $COMPOSE_CMD exec api python -m scripts.seed_catalog")
   fi
 fi

@@ -37,7 +37,7 @@ See the [Agentic Chat User Guide](docs/AGENTIC_CHAT_USER_GUIDE.md) to get starte
 - **Certification** - A built-in Vandal Workflow Architect program (11 modules) that teaches the platform in chat and grades progress against your real workspace artifacts
 - **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
 - **Custom Branding** - White-label the deployment with your institution's name, logo, icon, brand color, and branded email — set in the admin UI, applied at runtime with no redeploy
-- **Self-Hosted** - Run on your own infrastructure with full control over your data. A single server with 16 GB of RAM is sufficient; see the [Deployment Guide](DEPLOY.md) for details on local LLM/OCR hosting options for fully air-gapped installations.
+- **Self-Hosted** - Run on your own infrastructure with full control over your data. A single server with 16 GB of RAM is sufficient; see the [Deployment Guide](DEPLOY.md) for details on local LLM/OCR hosting options for fully air-gapped installations, and for deploying to Kubernetes with the bundled [Helm chart](charts/vandalizer/README.md).
 
 ## Prerequisites
 
@@ -103,13 +103,13 @@ docker compose exec \
 ./status.sh
 ```
 
-The status script checks Docker services, API health, environment config, admin accounts, the verified catalog, and storage volumes — and gives actionable recommendations for anything that's missing or misconfigured.
+The status script checks Docker services, API health, environment config, admin accounts, the seeded catalog, and storage volumes — and gives actionable recommendations for anything that's missing or misconfigured.
 
 Log in at `http://localhost` with the admin credentials you provided to the bootstrap command.
 
 Bootstrap notes:
 
-- The bootstrap script also seeds the **verified catalog** — pre-built workflows and extraction templates for common grant types (NSF, NIH, DOD, DOE) — so they're available immediately in the Explore system.
+- The bootstrap script also seeds the catalog's **Starter examples** — pre-built workflows and extraction templates for common grant types (NSF, NIH, DOD, DOE) — so they're available immediately under the **Everyone** tab in the Library and Knowledge Bases.
 - If `CONFIG_ENCRYPTION_KEY` is not set in `.env`, the bootstrap script auto-generates one and prints it. Copy it into your `.env` to persist it across restarts — it is used to encrypt LLM API keys stored in MongoDB.
 - `DEFAULT_TEAM_NAME` is optional. If omitted, users will start in their personal team only.
 - New users always get a personal team. When a default team is configured, they also auto-join it on first registration or SSO login.
@@ -276,6 +276,7 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 - [Long-Document Model Routing](docs/long-document-model-routing.md)
 - [Authorization Matrix](AUTHORIZATION_MATRIX.md)
 - [Deployment Guide](DEPLOY.md)
+- [Helm Chart](charts/vandalizer/README.md) — Kubernetes deployment
 - [Operations Guide](OPERATIONS.md)
 - [Release Checklist](RELEASE_CHECKLIST.md)
 - [Contributing Guide](CONTRIBUTING.md)
