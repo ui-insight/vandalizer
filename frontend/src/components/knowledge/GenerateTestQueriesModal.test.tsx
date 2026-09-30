@@ -7,8 +7,8 @@ it('submits the selected coverage once and exposes its checked state',()=>{
  expect(screen.getByRole('radio',{name:/Standard/})).toBeChecked()
  fireEvent.click(screen.getByRole('radio',{name:/Exhaustive/}))
  expect(screen.getByRole('radio',{name:/Exhaustive/})).toBeChecked()
- fireEvent.click(screen.getByRole('button',{name:'Generate',exact:true}))
- fireEvent.click(screen.getByRole('button',{name:'Generate',exact:true}))
+ fireEvent.click(screen.getByRole('button',{name:'Generate'}))
+ fireEvent.click(screen.getByRole('button',{name:'Generate'}))
  expect(confirm).toHaveBeenCalledExactlyOnceWith('exhaustive')
 })
 it('closes on Escape without starting generation',()=>{

@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**146/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**147/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,15 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Short-screen validation review — September 30
+
+**147/169 checklist items implemented locally.** VAL-17 is complete for the reviewed validation flows; changes are not deployed.
+
+- Generation, trial details, question traces, comparisons and apply review fit short/narrow viewports. Long questions and score values wrap; Generate and Apply stay visible while details scroll. Comparison errors offer retry, and apply errors remain visible with the acknowledgment preserved.
+- Trial and question sorting controls have accessible names. Scrollable details are keyboard reachable; dialogs contain focus and Escape returns to their trigger. Comparison and trace layers sit above the Knowledge header, with an explicit occlusion assertion after direct screenshot review found the overlap.
+- Verification: six frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. The 106 selected browser captures cover setup/resumption (29), question editing/import/large sets (23), saved history/export (18), and dialogs/apply/revert (36) at 320×480, 768×500 and 1440×600. All have zero axe findings, page overflow, uncaught errors or unmatched requests. Exact generation coverage, existing-task recovery, saved-run exports without launching validation, apply/retry/revert counts and focus return are asserted. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-validation-resumption-short`, `2026-09-30-validation-questions-short`, `2026-09-30-validation-history-short`, and `2026-09-30-validation-dialogs-final`. The earlier dialog run exposed header overlap despite passing axe and is superseded. APIs/results are synthetic; live worker/model behavior and assistive-technology devices are not certified. Broader theme/accessibility acceptance remains open.
 
 ## Paused validation screen work — September 29
 

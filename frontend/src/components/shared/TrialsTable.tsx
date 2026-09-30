@@ -63,26 +63,25 @@ export function TrialRow<TConfig>({
   const score = trial.score ?? 0
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 8,
-      padding: '6px 10px', fontSize: 11, color: '#ddd',
+      display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8,
+      padding: '8px 10px', fontSize: 12, color: '#ddd',
       backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
       borderRadius: 4,
     }}>
       <span style={{
         width: 6, height: 6, borderRadius: '50%',
-        backgroundColor: unscored ? '#666' : scoreColor(score),
+        backgroundColor: unscored ? '#aaa' : scoreColor(score),
       }} />
       <span style={{
-        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap', color: '#aaa',
+        flex: '1 1 160px', minWidth: 0, overflowWrap: 'anywhere', color: '#ccc',
       }}>
         {summariseConfig(trial.config)}
       </span>
       {trial.lift_vs_default != null && (
         <span style={{
-          fontSize: 10,
+          fontSize: 12,
           color: trial.lift_vs_default > 0 ? '#22c55e'
-            : trial.lift_vs_default < 0 ? '#ef4444' : '#666',
+            : trial.lift_vs_default < 0 ? '#ef4444' : '#aaa',
         }}>
           {trial.lift_vs_default > 0 ? '+' : ''}{(trial.lift_vs_default * 100).toFixed(0)}pts
         </span>
@@ -144,7 +143,7 @@ export function TrialsTable<TTrial>({
       padding: 14, backgroundColor: '#1f1f1f',
       border: '1px solid #2e2e2e', borderRadius: 8,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
           {title} ({trials.length})
         </span>
@@ -157,7 +156,7 @@ export function TrialsTable<TTrial>({
               onChange={e => setSortKey(e.target.value)}
               style={{
                 background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
-                borderRadius: 4, padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
+                borderRadius: 4, padding: '4px 6px', minHeight: 36, maxWidth: '100%', fontSize: 12, fontFamily: 'inherit',
               }}
             >
               {sortOptions.map(o => (
@@ -168,7 +167,7 @@ export function TrialsTable<TTrial>({
         )}
       </div>
       {caption && (
-        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+        <div style={{ marginTop: -6, marginBottom: 10, fontSize: 12, color: '#888', lineHeight: 1.5 }}>
           {caption}
         </div>
       )}

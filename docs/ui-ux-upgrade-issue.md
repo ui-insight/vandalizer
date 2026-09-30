@@ -4,6 +4,15 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Short-screen validation review — September 30
+
+**147/169 checklist items implemented locally.** VAL-17 is complete for the reviewed validation flows; changes are not deployed.
+
+- Generation, trial details, question traces, comparisons and apply review fit short/narrow viewports. Long questions and score values wrap; Generate and Apply stay visible while details scroll. Comparison errors offer retry, and apply errors remain visible with the acknowledgment preserved.
+- Trial and question sorting controls have accessible names. Scrollable details are keyboard reachable; dialogs contain focus and Escape returns to their trigger. Comparison and trace layers sit above the Knowledge header, with an explicit occlusion assertion after direct screenshot review found the overlap.
+- Verification: six frontend tests across three files, TypeScript, production build, touched-file ESLint and diff checks pass. The 106 selected browser captures cover setup/resumption (29), question editing/import/large sets (23), saved history/export (18), and dialogs/apply/revert (36) at 320×480, 768×500 and 1440×600. All have zero axe findings, page overflow, uncaught errors or unmatched requests. Exact generation coverage, existing-task recovery, saved-run exports without launching validation, apply/retry/revert counts and focus return are asserted. Representative screenshots inspected directly.
+- Evidence: `2026-09-30-validation-resumption-short`, `2026-09-30-validation-questions-short`, `2026-09-30-validation-history-short`, and `2026-09-30-validation-dialogs-final`. The earlier dialog run exposed header overlap despite passing axe and is superseded. APIs/results are synthetic; live worker/model behavior and assistive-technology devices are not certified. Broader theme/accessibility acceptance remains open.
+
 ## Saved panel choices and responsive sizing — September 29
 
 **146/169 checklist items implemented locally.** SYS-04 is complete for the reviewed panel flows; changes are not deployed.
@@ -464,7 +473,7 @@ Acceptance: users can tell what information is usable, what needs repair and wha
 - [x] **VAL-14 · P2 · Verify:** Per-question results expose expected answer, actual answer, supporting source and failure reason without requiring users to interpret raw data.
 - [x] **VAL-15 · P2 · Verify:** History can identify comparable runs, show configuration/provenance and open/export the intended result accurately.
 - [x] **VAL-16 · P2 · Verify:** Manual apply remains the deliberate default; review the proposed change, apply result and available revert behavior. The initial review did not exercise these operations.
-- [ ] **VAL-17 · P2 · Verify:** All validation views and wizard actions remain usable on narrow and short screens, with no hidden primary action.
+- [x] **VAL-17 · P2 · Verify:** All validation views and wizard actions remain usable on narrow and short screens, with no hidden primary action.
 
 Acceptance: a user can set up a meaningful check, understand what it costs and measures, interpret the result and deliberately choose whether to apply an improvement. Fixture scores do not establish real model accuracy.
 

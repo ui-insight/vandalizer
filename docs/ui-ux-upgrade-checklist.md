@@ -158,7 +158,7 @@ Acceptance: users can tell what information is usable, what needs repair and wha
 - [x] **VAL-14 · P2 · Verify:** Per-question results expose expected answer, actual answer, supporting source and failure reason without requiring users to interpret raw data.
 - [x] **VAL-15 · P2 · Verify:** History can identify comparable runs, show configuration/provenance and open/export the intended result accurately.
 - [x] **VAL-16 · P2 · Verify:** Manual apply remains the deliberate default; review the proposed change, apply result and available revert behavior. The initial review did not exercise these operations.
-- [ ] **VAL-17 · P2 · Verify:** All validation views and wizard actions remain usable on narrow and short screens, with no hidden primary action.
+- [x] **VAL-17 · P2 · Verify:** All validation views and wizard actions remain usable on narrow and short screens, with no hidden primary action.
 
 Acceptance: a user can set up a meaningful check, understand what it costs and measures, interpret the result and deliberately choose whether to apply an improvement. Fixture scores do not establish real model accuracy.
 

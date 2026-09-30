@@ -69,7 +69,7 @@ export function TrialQueryDeltas({
       padding: 14, backgroundColor: '#1f1f1f',
       border: '1px solid #2e2e2e', borderRadius: 8,
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>
           {title} ({rows.length})
         </span>
@@ -80,7 +80,7 @@ export function TrialQueryDeltas({
           onChange={e => setSortKey(e.target.value as SortKey)}
           style={{
             background: '#1a1a1a', color: '#e5e5e5', border: '1px solid #333',
-            borderRadius: 4, padding: '2px 6px', fontSize: 11, fontFamily: 'inherit',
+            borderRadius: 4, padding: '4px 6px', fontSize: 12, minHeight: 36, maxWidth: '100%', fontFamily: 'inherit',
           }}
         >
           <option value="delta-desc">Biggest wins</option>
@@ -94,7 +94,6 @@ export function TrialQueryDeltas({
         display: 'flex', flexDirection: 'column', gap: 3,
         maxHeight: 360, overflowY: 'auto',
       }}>
-        <HeaderRow />
         {rows.map(({ optimized: o, baseline: b, delta }) => (
           <Row
             key={o.query_uuid}
@@ -117,28 +116,6 @@ export function TrialQueryDeltas({
   )
 }
 
-function HeaderRow() {
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr 60px 60px 70px',
-      gap: 6, padding: '4px 8px',
-      fontSize: 9, color: '#666',
-      textTransform: 'uppercase', letterSpacing: 0.5,
-    }}>
-      <span>Query</span>
-      <span style={{ textAlign: 'right' }}>Default</span>
-      <span style={{ textAlign: 'right' }}>Optimized</span>
-      <span
-        style={{ textAlign: 'right', cursor: 'help' }}
-        title="Difference in percentage points (optimized minus default), not a relative % change."
-      >
-        Δ pts
-      </span>
-    </div>
-  )
-}
-
 function Row({
   optimized, baseline, delta, onOpen,
 }: {
@@ -151,7 +128,7 @@ function Row({
   const bScore = baseline?.score ?? null
   const deltaPts = delta != null ? delta * 100 : null
   const deltaColor =
-    deltaPts == null ? '#666'
+    deltaPts == null ? '#aaa'
     : deltaPts > 5 ? '#22c55e'
     : deltaPts < -5 ? '#ef4444'
     : '#888'
@@ -160,10 +137,9 @@ function Row({
     <button
       onClick={onOpen}
       style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 60px 60px 70px',
+        display: 'flex', flexDirection: 'column',
         gap: 6, padding: '6px 8px',
-        fontSize: 11, color: '#ddd',
+        fontSize: 12, color: '#ddd',
         backgroundColor: '#1a1a1a',
         border: '1px solid #262626',
         borderRadius: 4, cursor: 'pointer',
@@ -173,25 +149,28 @@ function Row({
       onMouseLeave={e => (e.currentTarget.style.borderColor = '#262626')}
       title={optimized.query}
     >
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#ddd' }}>
+      <span style={{ overflowWrap: 'anywhere', lineHeight: 1.5, color: '#ddd' }}>
         {optimized.query}
       </span>
-      <span style={{ textAlign: 'right', color: bScore != null ? scoreColor(bScore) : '#444' }}>
+      <span style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
+      <span style={{ color: bScore != null ? scoreColor(bScore) : '#aaa' }}>
+        Default:
         {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '-'}
       </span>
-      <span style={{ textAlign: 'right', color: scoreColor(oScore), fontWeight: 600 }}>
-        {(oScore * 100).toFixed(0)}%
+      <span style={{ color: scoreColor(oScore), fontWeight: 600 }}>
+        Optimized:         {(oScore * 100).toFixed(0)}%
       </span>
       <span style={{
         textAlign: 'right', color: deltaColor, fontWeight: 600,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
       }}>
-        {deltaPts == null ? '-' : (
+        Change: {deltaPts == null ? 'Not available' : (
           <>
             {deltaPts > 5 ? <ArrowUpRight size={10} /> : deltaPts < -5 ? <ArrowDownRight size={10} /> : null}
-            {deltaPts > 0 ? '+' : ''}{deltaPts.toFixed(0)}
+            {deltaPts > 0 ? '+' : ''}{deltaPts.toFixed(0)} points
           </>
         )}
+      </span>
       </span>
     </button>
   )

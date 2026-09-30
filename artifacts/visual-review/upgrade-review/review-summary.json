@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 146,
+  "completed_items": 147,
   "total_items": 169,
-  "unique_states": 988,
-  "capture_executions": 1224,
+  "unique_states": 1094,
+  "capture_executions": 1330,
   "mobile_grade": 8,
   "areas": [
     {
@@ -14485,6 +14485,1248 @@
       "unmatched": [],
       "errors": [],
       "observations": []
+    },
+    {
+      "directory": "2026-09-30-validation-resumption-short",
+      "capturedAt": "2026-09-30T17:43:16.713Z",
+      "sourceFingerprint": "19c339b27e1acf78528c3e53711c265777f0eae7a3eeea27c7a40b27b2064ac9",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/validation-dialogs.mjs\n M frontend/src/components/knowledge/GenerateTestQueriesModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx",
+      "commit": "9ccff46f53f61b0bd6dd85e572aa66b4eb63af59",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-question-preview-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-answer-only-preflight-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-running-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-completion-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-tuning-questions-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-preview-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-baseline-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-budget-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "validation-tuning-final-review-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 2
+        },
+        {
+          "id": "validation-question-preview-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-answer-only-preflight-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-running-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-completion-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-tuning-questions-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-preview-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-baseline-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-budget-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "validation-tuning-final-review-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 2
+        },
+        {
+          "id": "validation-question-preview-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-answer-only-preflight-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-running-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-completion-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-tuning-questions-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-preview-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-baseline-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-tuning-budget-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "validation-tuning-final-review-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 2
+        },
+        {
+          "id": "validation-resume-discovery-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-restored-subset-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Reload restores exact task and completed result with no POST; competing windows converge on one synthetic accepted task. Failed discovery blocks new submissions; reconnect restores subset and mode. Full expectations, sample caveats, time, grader and cost limits reviewed at 320/768/1440px. Synthetic API fixtures; no live broker, Mongo index or model execution."
+      ]
+    },
+    {
+      "directory": "2026-09-30-validation-questions-short",
+      "capturedAt": "2026-09-30T17:43:07.714Z",
+      "sourceFingerprint": "19c339b27e1acf78528c3e53711c265777f0eae7a3eeea27c7a40b27b2064ac9",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/validation-dialogs.mjs\n M frontend/src/components/knowledge/GenerateTestQueriesModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx",
+      "commit": "9ccff46f53f61b0bd6dd85e572aa66b4eb63af59",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-question-add-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-add-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-add-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-edit-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-selected-scope-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-delete-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-format-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-import-partial-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-large-set-selection-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-question-large-set-preview-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Question add/edit/delete failures preserve drafts/selection, successful creation clears stale search, selected-run preview preserves exact edited scope. Import rejects unsupported extension, retries preserved file and displays row errors plus unmatched source labels; completed import cannot be resubmitted. 320/768/1440px; fixtures only."
+      ]
+    },
+    {
+      "directory": "2026-09-30-validation-history-short",
+      "capturedAt": "2026-09-30T17:43:02.992Z",
+      "sourceFingerprint": "19c339b27e1acf78528c3e53711c265777f0eae7a3eeea27c7a40b27b2064ac9",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/validation-dialogs.mjs\n M frontend/src/components/knowledge/GenerateTestQueriesModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx",
+      "commit": "9ccff46f53f61b0bd6dd85e572aa66b4eb63af59",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-history-comparison-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-run-card-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-oldest-export-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-export-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-opened-result-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-comparison-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-run-card-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-oldest-export-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-export-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-opened-result-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-comparison-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-run-card-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-oldest-export-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-export-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-opened-result-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-load-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-history-load-recovered-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 1
+        },
+        {
+          "id": "validation-history-empty-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "30 saved runs remain available at 320/768/1440px. Oldest saved run opened by keyboard and exported as CSV, Excel and JSON using its exact UUID; no validation POST. History and export 503 errors recover explicitly. All responses synthetic; delayed/failed task lifecycle remains unverified."
+      ]
+    },
+    {
+      "directory": "2026-09-30-validation-dialogs-final",
+      "capturedAt": "2026-09-30T17:45:01.802Z",
+      "sourceFingerprint": "ea93a730a60c7a33d73d6403a7e0b2330efb65e6a656c65585373f937a656775",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/validation-dialogs.mjs\n M frontend/src/components/knowledge/CompareRunsView.tsx\n M frontend/src/components/knowledge/GenerateTestQueriesModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.test.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/TraceDrawer.tsx\n M frontend/src/components/shared/TrialQueryDeltas.tsx\n M frontend/src/components/shared/TrialsTable.tsx",
+      "commit": "9ccff46f53f61b0bd6dd85e572aa66b4eb63af59",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-generation-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-trial-details-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-optimization-history-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-recovered-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-deltas-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-retry-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 3
+        },
+        {
+          "id": "validation-generation-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-trial-details-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-optimization-history-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-recovered-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-deltas-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-retry-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 3
+        },
+        {
+          "id": "validation-generation-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-generation-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0
+        },
+        {
+          "id": "validation-trial-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-trial-details-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-question-trace-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-optimization-history-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-recovered-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-comparison-deltas-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        },
+        {
+          "id": "validation-apply-retry-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 3
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "320\u00d7480, 768\u00d7500 and 1440\u00d7600: generation choices and payload, trial details, full comparison values/deltas with retry, apply acknowledgement/failure/retry and revert. Dialog actions fit; Escape restores generation/trial/comparison focus. Synthetic responses; no backend/model execution."
+      ]
     }
   ]
 }

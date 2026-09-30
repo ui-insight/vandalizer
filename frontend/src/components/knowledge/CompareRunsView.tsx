@@ -72,7 +72,7 @@ export function CompareRunsView({
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 70,
+        position: 'fixed', inset: 0, zIndex: 1000,
         display: 'flex', justifyContent: 'center', alignItems: 'center',
         backgroundColor: 'rgba(0,0,0,0.55)', padding: 12,
       }}

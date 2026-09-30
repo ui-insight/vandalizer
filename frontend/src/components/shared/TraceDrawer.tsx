@@ -1,3 +1,4 @@
+import { FocusTrap } from 'focus-trap-react'
 import { useEffect } from 'react'
 import { X } from 'lucide-react'
 import type { PerQueryResult } from '../../api/knowledge'
@@ -35,22 +36,23 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 80,
+        position: 'fixed', inset: 0, zIndex: 1000,
         display: 'flex', justifyContent: 'flex-end',
         backgroundColor: 'rgba(0,0,0,0.55)',
       }}
       onClick={onClose}
     >
-      <div
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
+      <div role="dialog" aria-modal="true" aria-label="Question trace"
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(680px, 92vw)', height: '100%',
           backgroundColor: '#161616', borderLeft: '1px solid #2e2e2e',
-          padding: 20, overflowY: 'auto',
-          display: 'flex', flexDirection: 'column', gap: 14,
+          overflow: 'hidden', overflowWrap: 'anywhere',
+          display: 'flex', flexDirection: 'column',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 20px', flexShrink: 0, borderBottom: '1px solid #444' }}>
           <h3 style={{ margin: 0, fontSize: 14, color: '#fff', flex: 1 }}>
             Trace
           </h3>
@@ -58,7 +60,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
             onClick={onClose}
             style={{
               background: 'transparent', border: 'none', color: '#888',
-              cursor: 'pointer', padding: 4, fontFamily: 'inherit',
+              cursor: 'pointer', padding: 4, minWidth: 36, minHeight: 36, fontFamily: 'inherit',
             }}
             aria-label="Close"
           >
@@ -66,6 +68,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           </button>
         </div>
 
+        <div role="region" aria-label="Question trace details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
         <Section label="Query">
           <Body body={optimized.query} />
         </Section>
@@ -91,7 +94,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
 
         {(optimized.retrieved_sources?.length ?? 0) > 0 && (
           <Section label="Retrieved sources">
-            <div style={{ fontSize: 11, color: '#888' }}>
+            <div style={{ fontSize: 12, color: '#888' }}>
               {(optimized.retrieved_sources || []).join(', ')}
             </div>
           </Section>
@@ -101,7 +104,7 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
           <Section label="Default-config answer" muted>
             <Body body={baseline.actual_answer} muted />
             {baseline.reasoning && (
-              <div style={{ marginTop: 6, fontSize: 11, color: '#777' }}>
+              <div style={{ marginTop: 6, fontSize: 12, color: '#aaa' }}>
                 <em>Judge:</em> {baseline.reasoning}
               </div>
             )}
@@ -113,7 +116,9 @@ export function TraceDrawer({ open, onClose, optimized, baseline, noKb }: Props)
             <Body body={noKb.actual_answer} muted />
           </Section>
         )}
+        </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
@@ -144,12 +149,12 @@ function ScoreCell({
       backgroundColor: primary ? 'rgba(34, 197, 94, 0.06)' : '#1f1f1f',
       border: `1px solid ${primary ? 'rgba(34, 197, 94, 0.3)' : '#2e2e2e'}`,
     }}>
-      <div style={{ fontSize: 9, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
+      <div style={{ fontSize: 12, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 700, color, marginTop: 2 }}>
         {(score * 100).toFixed(0)}%
       </div>
       {verdict && (
-        <div style={{ fontSize: 10, color: '#888', marginTop: 2 }}>{verdict}</div>
+        <div style={{ fontSize: 12, color: '#888', marginTop: 2 }}>{verdict}</div>
       )}
     </div>
   )
@@ -161,7 +166,7 @@ function Section({ label, muted = false, children }: {
   return (
     <div>
       <div style={{
-        fontSize: 10, color: muted ? '#666' : '#888',
+        fontSize: 12, color: muted ? '#aaa' : '#888',
         textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
       }}>{label}</div>
       {children}

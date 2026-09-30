@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react'
 import { FocusTrap } from 'focus-trap-react'
 import { AlertTriangle, CheckCircle2, MinusCircle, X } from 'lucide-react'
 
@@ -50,6 +50,8 @@ interface Props {
 export function ApplyPreviewModal({
   open, preview, itemNoun, itemNounPlural, onConfirm, onCancel, applying, error,
 }: Props) {
+  const errorRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => { if (error) errorRef.current?.scrollIntoView({ block: 'nearest' }) }, [error])
   const [ack, setAck] = useState(false)
   const requiresAck = preview.significant_regressions > 0
   const canConfirm = (!requiresAck || ack) && !applying
@@ -86,12 +88,12 @@ export function ApplyPreviewModal({
       }}
       onClick={() => { if (!applying) onCancel() }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: import.meta.env.MODE === 'test' ? 'none' : 'full' } }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: 'min(640px, 92vw)',
-          maxHeight: '88vh', overflowY: 'auto',
+          maxHeight: 'calc(100dvh - 24px)', overflow: 'hidden', overflowWrap: 'anywhere',
           background: '#1a1a1a',
           border: '1px solid #2e2e2e',
           borderRadius: 10,
@@ -100,7 +102,7 @@ export function ApplyPreviewModal({
         }}
       >
         <header style={{
-          padding: '14px 18px',
+          padding: '12px 18px', flexShrink: 0,
           borderBottom: '1px solid #2e2e2e',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
@@ -115,13 +117,14 @@ export function ApplyPreviewModal({
             disabled={applying}
             style={{
               background: 'transparent', border: 'none', color: '#aeb5bf',
-              cursor: applying ? 'not-allowed' : 'pointer', padding: 4,
+              cursor: applying ? 'not-allowed' : 'pointer', padding: 4, minWidth: 36, minHeight: 36,
             }}
           >
             <X size={16} />
           </button>
         </header>
 
+        <div role="region" aria-label="Apply review details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto' }}>
         {/* Summary chips */}
         <div style={{ padding: '14px 18px 8px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           <SummaryChip
@@ -159,52 +162,24 @@ export function ApplyPreviewModal({
               No per-{itemNoun} detail available for this run.
             </div>
           ) : (
-            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ color: '#aeb5bf', textAlign: 'left' }}>
-                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
-                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
-                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Proposed</th>
-                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sortedItems.map((item, idx) => (
-                  <tr
-                    key={item.item_id || idx}
-                    style={{
-                      borderTop: '1px solid #262626',
-                      color: '#e5e5e5',
-                      background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined,
-                    }}
-                  >
-                    <td style={{ padding: '6px 8px', overflowWrap: 'anywhere' }}>
-                      {item.label || item.item_id || `Item ${idx + 1}`}
-                    </td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {(item.baseline * 100).toFixed(0)}
-                    </td>
-                    <td style={{ padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
-                      {(item.winner * 100).toFixed(0)}
-                    </td>
-                    <td style={{
-                      padding: '6px 8px', textAlign: 'right', fontVariantNumeric: 'tabular-nums',
-                      color: item.within_noise ? '#888'
-                        : item.is_regression ? (item.significant ? '#fca5a5' : '#f97316')
-                        : '#22c55e',
-                    }}>
-                      {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)}
-                      {item.significant && !item.within_noise ? '*' : ''}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {sortedItems.map((item, idx) => (
+                <li key={item.item_id || idx} style={{ padding: 12, color: '#e5e5e5', border: '1px solid #444', borderRadius: 6, background: item.significant && item.is_regression ? 'rgba(239,68,68,0.06)' : undefined }}>
+                  <p style={{ margin: '0 0 8px', fontSize: 13, lineHeight: 1.5 }}>{item.label || item.item_id || `${capitalize(itemNoun)} ${idx + 1}`}</p>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px', fontSize: 12, fontVariantNumeric: 'tabular-nums' }}>
+                    <span>Current: <strong>{(item.baseline * 100).toFixed(0)}</strong></span>
+                    <span>Proposed: <strong>{(item.winner * 100).toFixed(0)}</strong></span>
+                    <span style={{ color: item.within_noise ? '#aaa' : item.is_regression ? '#fca5a5' : '#86efac' }}>Change: {item.delta > 0 ? '+' : ''}{(item.delta * 100).toFixed(1)} points</span>
+                    {item.significant && !item.within_noise && <span>{item.is_regression ? 'Significant regression' : 'Significant improvement'}</span>}
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
 
         {/* Acknowledgement + actions */}
-        <footer style={{
+        <div style={{
           padding: '12px 18px',
           borderTop: '1px solid #2e2e2e',
           display: 'flex', flexDirection: 'column', gap: 10,
@@ -228,13 +203,16 @@ export function ApplyPreviewModal({
               </span>
             </label>
           )}
-          {error && <p role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 13, lineHeight: 1.5, color: '#fecaca', background: '#3d1c1c', borderRadius: 6 }}>{error} Review the result and try again.</p>}
+          {error && <p ref={errorRef} role="alert" style={{ margin: '0 0 12px', padding: 10, fontSize: 13, lineHeight: 1.5, color: '#fecaca', background: '#3d1c1c', borderRadius: 6 }}>{error} Review the result and try again.</p>}
+        </div>
+        </div>
+        <footer style={{ flexShrink: 0, padding: '12px 18px', borderTop: '1px solid #444' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button
               onClick={onCancel}
               disabled={applying}
               style={{
-                padding: '6px 14px', fontSize: 12, fontWeight: 500,
+                minHeight: 36, padding: '6px 14px', fontSize: 14, fontWeight: 500,
                 color: '#bbb', background: 'transparent',
                 border: '1px solid #3a3a3a', borderRadius: 6,
                 cursor: applying ? 'not-allowed' : 'pointer',
@@ -246,7 +224,7 @@ export function ApplyPreviewModal({
               onClick={onConfirm}
               disabled={!canConfirm}
               style={{
-                padding: '6px 14px', fontSize: 12, fontWeight: 600,
+                minHeight: 36, padding: '6px 14px', fontSize: 14, fontWeight: 600,
                 color: canConfirm ? 'var(--highlight-text-color, #000)' : '#aaa',
                 background: canConfirm
                   ? 'var(--highlight-color, #eab308)'

@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { ApplyPreviewModal } from './ApplyPreviewModal'
+beforeAll(() => { HTMLElement.prototype.scrollIntoView = vi.fn() })
 vi.mock('focus-trap-react', () => ({ FocusTrap: ({ children }: { children: React.ReactNode }) => children }))
 const preview = { total: 1, will_change: 1, improvements: 0, regressions: 1, significant_regressions: 1, net_delta: -0.2, noise_sigma: 0.01, items: [] }
 describe('apply review', () => {

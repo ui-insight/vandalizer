@@ -10,7 +10,7 @@ state.validationQueries = true
 state.optimization = true
 let failComparison = false
 const generation = []
-const trial = { trial_id:'review-trial', config:optimization.best_config, score:0.8, judge_score:0.85, lift_vs_default:0.15, num_queries_judged:3, tokens_used:4200, status:'completed', duration_seconds:34, per_query_results:queries.map(q=>({ query_uuid:q.uuid, query:q.query+' Include the required documents, source references and submission requirements.', score:0.8, judge_score:0.8 })) }
+const trial = { trial_id:'review-trial', config:optimization.best_config, score:0.8, judge_score:0.85, lift_vs_default:0.15, num_queries_judged:3, tokens_used:4200, status:'completed', duration_seconds:34, per_query_results:queries.map(q=>({ query_uuid:q.uuid, query:q.query+' Include the required documents, source references and submission requirements.', score:0.8, judge_score:0.8, actual_answer:'The research office reviews the full proposal and required attachments before submission. '.repeat(6), reasoning:'The answer includes the expected approval and source details.', retrieved_sources:['Proposal narrative.pdf'], missing_facts:['Include the internal approval deadline.'], hallucinated_facts:[] })) }
 const current = { ...optimization, trials:[trial], judge_model:'Evaluation model with a deliberately long descriptive name for reproducible comparisons', judge_prompt_version:'kb-judge-reviewed-questions-and-expected-source-references-v1', test_query_snapshot:{ query_uuids:queries.map(q=>q.uuid), total:3, expected_answer_hashes:{} } }
 const previous = { ...current, uuid:'opt-earlier', optimized_score:0.6, trials:[{...trial,score:0.6,per_query_results:trial.per_query_results.map(q=>({...q,score:0.6}))}] }
 const run = () => ({...current,applied_at:state.optimizationApplied?'2026-09-29T12:00:00Z':null,reverted_at:state.optimizationReverted?'2026-09-29T12:01:00Z':null})
@@ -24,6 +24,13 @@ async function visibleControl(locator) {
   assert.ok(box && box.width>=24 && box.height>=24 && box.x>=0 && box.y>=0 && box.x+box.width<=viewport.width && box.y+box.height<=viewport.height, 'Dialog action must fit without scrolling the page')
 }
 async function shot(id) {
+  const dialog = page.getByRole('dialog')
+  if (await dialog.count()) {
+    assert.equal(await dialog.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return [.25, .5, .75].every(ratio => element.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height * ratio)))
+    }), true, `${id}: dialog content must not be covered by the page header`)
+  }
   await review.capture(id)
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`${id}: overflow`)
   assert.deepEqual(JSON.parse(await readFile(resolve(review.out,`${id}.axe.json`),'utf8')),[],`${id}: accessibility`)
@@ -68,6 +75,14 @@ try {
     await detail.getByText(/The overall quality score blends/).scrollIntoViewIfNeeded()
     await shot(`validation-trial-details-end-${width}-short`)
     await closeWithKeyboard(detail,trialTrigger)
+    const traceTrigger=page.getByRole('button',{name:/When is the proposal due.*Optimized:/})
+    await traceTrigger.focus();await page.keyboard.press('Enter')
+    const trace=page.getByRole('dialog',{name:'Question trace'})
+    await visibleControl(trace.getByRole('button',{name:'Close',exact:true}))
+    await shot(`validation-question-trace-${width}-short`)
+    await trace.getByText('Proposal narrative.pdf',{exact:true}).scrollIntoViewIfNeeded()
+    await shot(`validation-question-trace-end-${width}-short`)
+    await closeWithKeyboard(trace,traceTrigger)
     await page.getByRole('button',{name:'Previous runs'}).click()
     const compare=page.getByRole('button',{name:'Compare',exact:true})
     await compare.scrollIntoViewIfNeeded()
