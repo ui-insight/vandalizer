@@ -17,3 +17,9 @@ Use `--workspace-radius-small` (6px) for controls, `-medium` (8px) for cards and
 ## Verification
 
 Run the production visual-review recipes after changing shared tokens. Check narrow and short screens, long names, menus, nested dialogs and source/tool navigation. Inspect screenshots directly as well as checking contrast and overflow; axe cannot detect every occlusion or poor layout. Preserve failed runs as diagnostics and only select completed, clean runs in the gallery.
+
+## Actions
+
+Use `shared/ActionButton` for task commands. Choose `primary` for the next or final task action, `secondary` for alternatives, `quiet` for low-emphasis or icon-only actions, and `destructive` for a deliberate removal confirmation. Pass an accessible name for an icon-only button. Keep a verb or pending-state label visible while busy; use `loading` for the shared spinner or `aria-busy` when the caller renders its own progress content.
+
+Workspace controls and panel-aware portals share target-size and focus rules. Keep row actions reachable without hover. Use the visual-review harness's `smallControls` metric to find enabled controls below 24px; buttons normally use at least 36px. A clean metric does not replace checking for clipped or overlapping controls.

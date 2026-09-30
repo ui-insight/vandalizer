@@ -1,9 +1,9 @@
 {
   "status": "reviewed UI/UX grades reach 8; exhaustive acceptance remains open",
-  "completed_items": 155,
+  "completed_items": 157,
   "total_items": 169,
-  "unique_states": 1240,
-  "capture_executions": 2592,
+  "unique_states": 1258,
+  "capture_executions": 2755,
   "mobile_grade": 8,
   "areas": [
     {
@@ -113,7 +113,7 @@
       "baseline_ux": 3,
       "ui": 8,
       "ux": 8,
-      "evidence": "../2026-09-30-spacing-baseline/chat-upload-error.png",
+      "evidence": "../2026-09-30-actions-baseline-release/chat-upload-error.png",
       "note": "Successful siblings survive failures, transfer retry/cancel are explicit, and scope preservation is asserted. Live ingestion and all supported intake paths remain unverified."
     },
     {
@@ -30382,6 +30382,2073 @@
       "errors": [],
       "observations": [
         "Shared section headings, primary actions, search/filter placement, file Add and Library New menus at 320/768/1440px. Existing task behavior is covered by companion file/Library and navigation-retention regressions. No live API writes."
+      ]
+    },
+    {
+      "directory": "2026-09-30-actions-baseline-release",
+      "capturedAt": "2026-09-30T19:54:04.912Z",
+      "sourceFingerprint": "fd9d2d85192ce2c4604bf815e231dcc0270b3ce67f3ecc9b46ca5fd6917b1c39",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/PanelVisibility.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/contexts/ToastContext.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/actions-keyboard.mjs\n?? frontend/src/components/shared/ActionButton.tsx",
+      "commit": "789a0ed44b40ba79cb0ea6815deead564744997d",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "chat-home",
+          "note": "",
+          "url": "http://127.0.0.1:4173/",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "files",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "projects",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "automations",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "library",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "files-selected",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "files-context-menu",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "project-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "automation-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-1-name",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-2-trigger",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-3-folder",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-4-action",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-action-picker",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-5-activation",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-description-before-enter",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "wizard-description-enter",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-validation",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-queries",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-run",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-history",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-wizard-questions",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-wizard-preview",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-wizard-baseline",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-wizard-budget",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-results",
+          "note": "Synthetic scored results; summary refreshed from KB detail endpoint, no model grading performed.",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-history-populated",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "catalog",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "catalog-detail",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-catalog",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-add-menu",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-file-attached",
+          "note": "Synthetic upload and processing response; no backend ingestion.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-file-request",
+          "note": "Inspect manifest observation upload-chat-scope for the document UUIDs actually submitted.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-upload-error",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-upload-retried",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-kb-attached",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-kb-answer",
+          "note": "Synthetic response and citations; does not evaluate model accuracy.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-agent-confirmation",
+          "note": "Synthetic tool stream; backend execution is not exercised.",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-agent-complete",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-agent-error",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-onboarding",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "files-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "projects-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "automations-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "library-empty",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "automation-editor-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations&automation=auto-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "chat-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=chat",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "files-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "projects-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=projects",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "automations-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "knowledge-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "library-mobile",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?tab=library&mode=chat",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        {
+          "id": "wizard-description-enter",
+          "expected": "Advance to the next step without dismissing the wizard",
+          "actual": "New Automation\nStep 2 of 5 \u00b7 Trigger\nWhat will trigger this automation?\nFolder Watch\nTrigger when files are added to a folder\nAPI Endpoint\nTrigger via HTTP POST request\nSchedule\nRun daily, weekly or monthly at a set time\n\nEach trigger keeps its settings while you edit. Only the selected trigger is used when you create.\n\nBack\nNext"
+        },
+        {
+          "id": "upload-chat-scope",
+          "expected": [
+            "doc-upload"
+          ],
+          "actual": [
+            "doc-upload"
+          ],
+          "uploadPresentInFixture": true
+        },
+        {
+          "id": "agent-confirm",
+          "actual": "Yes, go ahead"
+        }
+      ]
+    },
+    {
+      "directory": "2026-09-30-actions-file-library-final",
+      "capturedAt": "2026-09-30T19:53:23.768Z",
+      "sourceFingerprint": "fd9d2d85192ce2c4604bf815e231dcc0270b3ce67f3ecc9b46ca5fd6917b1c39",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/PanelVisibility.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/contexts/ToastContext.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/actions-keyboard.mjs\n?? frontend/src/components/shared/ActionButton.tsx",
+      "commit": "789a0ed44b40ba79cb0ea6815deead564744997d",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "file-library-open-file-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-browse-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-tool-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-complete-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-return-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-open-file-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-browse-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-tool-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-error-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-complete-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-return-1024",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 1024,
+            "height": 768
+          },
+          "pageWidth": 1024,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-open-file-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-browse-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-tool-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-complete-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-return-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 768,
+            "height": 700
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-open-file-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-browse-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-tool-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-error-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-complete-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-return-390",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "pageWidth": 390,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-open-file-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-browse-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-tool-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-run-complete-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library&workflow=workflow-1",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "file-library-return-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files&tab=library",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": []
+    },
+    {
+      "directory": "2026-09-30-actions-source-intake-final",
+      "capturedAt": "2026-09-30T19:53:37.491Z",
+      "sourceFingerprint": "fd9d2d85192ce2c4604bf815e231dcc0270b3ce67f3ecc9b46ca5fd6917b1c39",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/PanelVisibility.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/contexts/ToastContext.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/actions-keyboard.mjs\n?? frontend/src/components/shared/ActionButton.tsx",
+      "commit": "789a0ed44b40ba79cb0ea6815deead564744997d",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "source-intake-search-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-document-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-documents-queued-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-mixed-processing-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-mixed-result-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-unavailable-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-folder-error-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-search-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-document-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-documents-queued-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-mixed-processing-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-mixed-result-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-unavailable-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-folder-error-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-search-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-document-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-documents-queued-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-mixed-processing-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-mixed-result-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-url-unavailable-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "source-intake-folder-error-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Document search and source-registration failures retain query/selection/URL/crawl/folder settings. Retries preserve request payloads. Queued, mixed-ready/failed documents, new/skipped URLs and unavailable web sources have distinct outcomes. 320/768/1440px synthetic worker outcomes only."
+      ]
+    },
+    {
+      "directory": "2026-09-30-actions-dialogs-final",
+      "capturedAt": "2026-09-30T19:52:00.037Z",
+      "sourceFingerprint": "68780e51959b2bda7bb1443b6f90e21e37c6c5160072f98d8fe3189418e6438d",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/PanelVisibility.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/actions-keyboard.mjs\n?? frontend/src/components/shared/ActionButton.tsx",
+      "commit": "789a0ed44b40ba79cb0ea6815deead564744997d",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "validation-generation-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-generation-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-end-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-optimization-history-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-error-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-recovered-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-deltas-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-dialog-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-retry-320-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 320,
+            "height": 480
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-generation-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-generation-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-end-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-optimization-history-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-error-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-recovered-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-deltas-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-dialog-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-retry-768-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 768,
+            "height": 500
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-generation-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-generation-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-trial-details-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-question-trace-end-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-optimization-history-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-error-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-recovered-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-comparison-deltas-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-dialog-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "validation-apply-retry-1440-short",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=knowledge",
+          "viewport": {
+            "width": 1440,
+            "height": 600
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "320\u00d7480, 768\u00d7500 and 1440\u00d7600: generation choices and payload, trial details, full comparison values/deltas with retry, apply acknowledgement/failure/retry and revert. Dialog actions fit; Escape restores generation/trial/comparison focus. Synthetic responses; no backend/model execution."
+      ]
+    },
+    {
+      "directory": "2026-09-30-actions-keyboard-release",
+      "capturedAt": "2026-09-30T19:55:08.494Z",
+      "sourceFingerprint": "6d8d0c1a8539114d4d924f49ee397819c53b1019c392bec59d6035085f78c3d8",
+      "fixtureFingerprint": "9a5aac13801517e9ff72b27abb599e50599e903c7783bb15a5361837290197af",
+      "buildMode": "production",
+      "workingTree": "M frontend/scripts/visual-review/harness.mjs\n M frontend/src/components/extractions/GenerateTestCasesModal.tsx\n M frontend/src/components/files/CreateFolderDialog.tsx\n M frontend/src/components/files/RenameDialog.tsx\n M frontend/src/components/knowledge/AddUrlsModal.tsx\n M frontend/src/components/knowledge/CreateKBModal.tsx\n M frontend/src/components/library/AddToLibraryDialog.tsx\n M frontend/src/components/shared/ApplyPreviewModal.tsx\n M frontend/src/components/shared/AutovalidateWizard.tsx\n M frontend/src/components/shared/ConfirmDialog.tsx\n M frontend/src/components/shared/PanelVisibility.tsx\n M frontend/src/components/workspace/AutomationCreationWizard.tsx\n M frontend/src/contexts/ToastContext.tsx\n M frontend/src/styles/workspace-polish.css\n?? frontend/scripts/visual-review/actions-keyboard.mjs\n?? frontend/src/components/shared/ActionButton.tsx",
+      "commit": "789a0ed44b40ba79cb0ea6815deead564744997d",
+      "baseURL": "http://127.0.0.1:4173",
+      "browserVersion": "148.0.7778.96",
+      "mode": "synthetic API fixtures; current source served locally; no backend or model execution",
+      "captures": [
+        {
+          "id": "actions-file-selection-focus-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-keyboard-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-hover-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-folder-saving-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-wizard-disabled-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-destructive-review-320",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 320,
+            "height": 568
+          },
+          "pageWidth": 320,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-file-selection-focus-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-keyboard-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-hover-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-folder-saving-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-wizard-disabled-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-destructive-review-768",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 768,
+            "height": 600
+          },
+          "pageWidth": 768,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-file-selection-focus-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-keyboard-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-primary-hover-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-folder-saving-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=files",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-wizard-disabled-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        },
+        {
+          "id": "actions-destructive-review-1440",
+          "note": "",
+          "url": "http://127.0.0.1:4173/?mode=automations",
+          "viewport": {
+            "width": 1440,
+            "height": 900
+          },
+          "pageWidth": 1440,
+          "smallText": 0,
+          "smallControls": []
+        }
+      ],
+      "unmatched": [],
+      "errors": [],
+      "observations": [
+        "Keyboard file selection, primary hover/focus, pending and disabled actions, and destructive draft review are exercised at three sizes. All visible enabled controls in these states meet the 24px minimum; action buttons use 36px. Folder writes are synthetic and pending responses are explicitly released."
       ]
     }
   ]

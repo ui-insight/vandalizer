@@ -285,3 +285,39 @@
 /* Shared list rhythm; content can grow beyond the minimum row height. */
 .file-table td { height: var(--workspace-row-height); }
 .library-item-row { min-height: var(--workspace-row-height); }
+
+/* Shared task control geometry and keyboard states, including portaled dialogs. */
+:is(.workspace-shell, .workspace-portal) :where(button, [role="button"], [role="menuitem"], select, summary) {
+  min-width: var(--workspace-control-height);
+  min-height: var(--workspace-control-height);
+}
+:is(.workspace-shell, .workspace-portal) :where(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]), textarea) {
+  min-height: var(--workspace-control-height);
+}
+:is(.workspace-shell, .workspace-portal) :where(button, [role="button"], [role="menuitem"], a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--workspace-text) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px white !important;
+}
+:is(.workspace-shell, .workspace-portal) :where(button):disabled { cursor: not-allowed; }
+.workspace-action {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--workspace-space-6);
+  min-height: var(--workspace-control-height); min-width: var(--workspace-control-height);
+  padding: var(--workspace-space-6) var(--workspace-space-12);
+  border: 1px solid var(--workspace-border); border-radius: var(--workspace-radius-small);
+  background: var(--workspace-surface); color: var(--workspace-text);
+  font-family: inherit; font-size: var(--workspace-font-control); font-weight: 600; line-height: 1.4;
+  cursor: pointer; white-space: normal; overflow-wrap: anywhere;
+}
+.workspace-action[data-variant="primary"] { background: var(--highlight-color); color: var(--highlight-text-color); border-color: transparent; }
+.workspace-action[data-variant="quiet"] { background: transparent; color: var(--workspace-muted); border-color: transparent; }
+.workspace-action[data-variant="destructive"] { background: var(--workspace-danger); color: white; border-color: transparent; }
+.workspace-action[data-icon-only="true"] { padding: var(--workspace-space-6); flex-shrink: 0; }
+.workspace-action:not(:disabled):hover { background: var(--workspace-hover); color: var(--workspace-text); }
+.workspace-action[data-variant="primary"]:not(:disabled):hover { background: var(--highlight-hover); color: var(--highlight-text-color); }
+.workspace-action[data-variant="destructive"]:not(:disabled):hover { background: #7f1d1d; color: white; }
+.workspace-action:disabled { opacity: .55; cursor: not-allowed; }
+.workspace-action[aria-busy="true"] { cursor: progress; }
+
+:is(.workspace-shell, .workspace-portal) input:is([type="checkbox"], [type="radio"]) { min-width: 24px; min-height: 24px; flex-shrink: 0; }
+:is(.workspace-shell, .workspace-portal) button[aria-busy="true"] { cursor: progress; }

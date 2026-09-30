@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 import { useRef, useState, type FormEvent } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
 import { X } from 'lucide-react'
@@ -49,9 +50,9 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 id="create-folder-dialog-title" className="text-lg font-medium text-gray-900">{title || 'New Folder'}</h3>
-          <button disabled={pending} onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
+          <ActionButton variant="quiet" iconOnly disabled={pending} onClick={onClose} aria-label="Close" >
             <X className="h-5 w-5" />
-          </button>
+          </ActionButton>
         </div>
         <form onSubmit={handleSubmit}>
           <label htmlFor="folder-name-input" className="sr-only">Folder name</label>
@@ -68,21 +69,21 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
           />
           {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
-            <button
+            <ActionButton variant="secondary"
               type="button"
               disabled={pending}
               onClick={onClose}
-              className="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+
             >
               Cancel
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton variant="primary" aria-busy={pending}
               type="submit"
               disabled={pending}
-              className="rounded-md bg-highlight px-3 py-2 text-sm font-bold text-highlight-text hover:brightness-90"
+
             >
               {pending ? 'Creating…' : 'Create'}
-            </button>
+            </ActionButton>
           </div>
         </form>
       </div>

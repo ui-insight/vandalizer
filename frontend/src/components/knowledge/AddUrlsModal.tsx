@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -73,14 +74,14 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <span style={{ fontSize: 'var(--workspace-font-card-title)', fontWeight: 600, color: 'var(--workspace-text)' }}>Add URLs</span>
-          <button
+          <ActionButton variant="quiet" iconOnly
             onClick={onClose}
             aria-label="Close"
             disabled={submitted}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', display: 'flex' }}
+
           >
             <X size={18} style={{ color: 'var(--workspace-muted)' }} />
-          </button>
+          </ActionButton>
         </div>
         <div style={{ overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: 'var(--workspace-space-16)' }}>
         <div style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-muted)' }}>
@@ -161,30 +162,20 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         </div>
         {error && <div role="alert" style={{ fontSize: 'var(--workspace-font-control)', color: 'var(--workspace-danger)', lineHeight: 1.6, overflowWrap: 'anywhere' }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)', flexShrink: 0 }}>
-          <button
+          <ActionButton variant="secondary"
             onClick={onClose}
             disabled={submitted}
-            style={{
-              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-              color: 'var(--workspace-text)', backgroundColor: 'transparent',
-              border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
-            }}
+
           >
             Cancel
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton variant="primary" aria-busy={submitted}
             onClick={handleSubmit}
             disabled={!text.trim() || submitted}
-            style={{
-              padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-              color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 'var(--workspace-radius-small)',
-              cursor: text.trim() && !submitted ? 'pointer' : 'default',
-              opacity: text.trim() && !submitted ? 1 : 0.5,
-            }}
+
           >
             {submitted ? 'Adding…' : 'Add URLs'}
-          </button>
+          </ActionButton>
         </div>
       </div>
       </FocusTrap>

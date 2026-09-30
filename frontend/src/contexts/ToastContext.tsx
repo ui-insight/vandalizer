@@ -53,9 +53,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         <div
           role="region"
           aria-label="Notifications"
+          className="workspace-portal"
           style={{
             position: 'fixed', top: 16, right: 16, zIndex: 9999,
-            display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380,
+            display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 'min(380px, calc(100vw - 32px))', maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto',
           }}
         >
           {toasts.map(t => {
@@ -90,7 +91,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   <button
                     onClick={(e) => { e.stopPropagation(); t.action!.onClick(); dismiss(t.id) }}
                     style={{
-                      display: 'inline', marginLeft: 8,
+                      display: 'inline-flex', alignItems: 'center', marginLeft: 8,
                       background: 'none', border: 'none', padding: 0,
                       font: 'inherit', fontSize: 'inherit', fontWeight: 600,
                       color: 'inherit', textDecoration: 'underline', cursor: 'pointer',

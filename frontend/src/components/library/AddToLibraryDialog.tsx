@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -63,7 +64,7 @@ export function AddToLibraryDialog({ libraries, itemId, itemName, kind, onClose,
         <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6" role="dialog" aria-modal="true" aria-label="Save to Library">
           <div className="flex items-center justify-between mb-4 gap-3">
             <h3 className="text-lg font-semibold text-gray-900">Save to Library</h3>
-            <button type="button" disabled={saving} onClick={onClose} aria-label="Close" className="p-1 text-gray-600 rounded disabled:opacity-50"><X size={18} /></button>
+            <ActionButton variant="quiet" iconOnly type="button" disabled={saving} onClick={onClose} aria-label="Close" ><X size={18} /></ActionButton>
           </div>
           {itemName && <p className="text-sm font-medium text-gray-900 mb-2 break-words">{itemName}</p>}
           <p className="text-sm text-gray-600 mb-4">Save a reference to this shared item. Its owner's updates remain available; editing requires your own copy.</p>
@@ -77,8 +78,8 @@ export function AddToLibraryDialog({ libraries, itemId, itemName, kind, onClose,
           {done && <p role="status" className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">{saved ? 'Saved to' : 'Already saved in'} {selected?.title}.</p>}
           {error && <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error} Your destination is unchanged. Try saving again.</p>}
           <div className="flex flex-wrap justify-end gap-2 mt-6">
-            <button type="button" disabled={saving} onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50">{done ? 'Done' : 'Cancel'}</button>
-            {done ? onOpen && <button type="button" onClick={onOpen} className="px-4 py-2 text-sm font-bold text-highlight-text bg-highlight rounded-lg">Open {kind === 'workflow' ? 'workflow' : 'item'}</button> : <button type="button" onClick={handleSubmit} disabled={saving || checking || !selected} className="px-4 py-2 text-sm font-bold text-highlight-text bg-highlight rounded-lg disabled:opacity-50">{saving ? 'Saving…' : error ? 'Retry save' : 'Save'}</button>}
+            <ActionButton variant="secondary" type="button" disabled={saving} onClick={onClose} >{done ? 'Done' : 'Cancel'}</ActionButton>
+            {done ? onOpen && <ActionButton variant="primary" type="button" onClick={onOpen} >Open {kind === 'workflow' ? 'workflow' : 'item'}</ActionButton> : <ActionButton variant="primary" type="button" onClick={handleSubmit} disabled={saving || checking || !selected} >{saving ? 'Saving…' : error ? 'Retry save' : 'Save'}</ActionButton>}
           </div>
         </div>
       </FocusTrap>

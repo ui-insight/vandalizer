@@ -25,5 +25,5 @@ export function RetainedPanel({ active, children, eager = false }: { active: boo
 /** Portals do not inherit the source panel's DOM visibility. */
 export function PanelPortalVisibility({ children }: { children: ReactNode }) {
   const visible = usePanelVisible()
-  return <div hidden={!visible} inert={!visible} style={{ display: visible ? 'contents' : 'none' }}>{children}</div>
+  return <div className="workspace-portal" hidden={!visible} inert={!visible} style={{ display: visible ? 'contents' : 'none' }}>{children}</div>
 }

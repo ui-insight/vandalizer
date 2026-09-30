@@ -33,10 +33,14 @@ export async function createReview({output='artifacts/visual-review',baseURL='ht
   await writeFile(resolve(out,`${id}.txt`),snapshot);
   // Zero-size text is intentionally replaced by a named sort icon on compact tables.
   const metrics=await page.evaluate(()=>({viewport:{width:innerWidth,height:innerHeight},pageWidth:document.documentElement.scrollWidth,smallText:[...document.querySelectorAll('button,input,label,p,span')].filter(e=>e.getBoundingClientRect().width&&parseFloat(getComputedStyle(e).fontSize)>0&&parseFloat(getComputedStyle(e).fontSize)<12).length}));
+  const smallControls = await page.evaluate(() => [...document.querySelectorAll('button,[role=button],[role=menuitem],select,input[type=checkbox],input[type=radio]')].filter(e => {
+    const r = e.getBoundingClientRect();
+    return !e.disabled && !e.closest('[inert]') && e.checkVisibility({checkVisibilityCSS:true}) && r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight && (r.width < 24 || r.height < 24);
+  }).map(e => ({name:e.getAttribute('aria-label') || e.textContent?.trim().slice(0,80) || e.getAttribute('title') || e.tagName, width:e.getBoundingClientRect().width, height:e.getBoundingClientRect().height})));
   await page.addScriptTag({path:createRequire(import.meta.url).resolve('axe-core/axe.min.js')});
   const a11y=await page.evaluate(async()=>{const r=await axe.run(document,{runOnly:{type:'tag',values:['wcag2a','wcag2aa','wcag21aa']}});return r.violations.map(v=>({id:v.id,impact:v.impact,description:v.description,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))});
   await writeFile(resolve(out,`${id}.axe.json`),JSON.stringify(a11y,null,2));
-  captures.push({id,note,url:page.url(),...metrics});
+  captures.push({id,note,url:page.url(),...metrics,smallControls});
   await flush();
   return snapshot;
  }

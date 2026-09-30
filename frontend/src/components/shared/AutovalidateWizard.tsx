@@ -1,3 +1,4 @@
+import { ActionButton } from './ActionButton'
 import { createPortal } from './panelPortal'
 import { usePanelEffect } from './usePanelEffect'
 import { useState } from 'react'
@@ -88,14 +89,14 @@ export function AutovalidateWizard<TOptions>({
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-4)', flexShrink: 0 }}>
           <Sparkles size={18} aria-hidden="true" style={{ color: 'var(--workspace-accent-ink)' }} />
           <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: 'var(--workspace-text)' }}>{title}</h3>
-          <button
+          <ActionButton variant="quiet" iconOnly
             type="button"
             aria-label="Close"
             onClick={onClose}
-            style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
+            style={{ marginLeft: 'auto' }}
           >
             <X size={18} aria-hidden="true" />
-          </button>
+          </ActionButton>
         </div>
 
         {/* Step indicator */}
@@ -108,35 +109,22 @@ export function AutovalidateWizard<TOptions>({
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', marginTop: 'var(--workspace-space-16)', flexShrink: 0 }}>
-          <button onClick={isFirst ? onClose : prev} style={btn()}>
+          <ActionButton variant="secondary" onClick={isFirst ? onClose : prev} >
             {isFirst ? 'Cancel' : (<><ChevronLeft size={12} />Back</>)}
-          </button>
+          </ActionButton>
           {!isLast ? (
-            <button onClick={next} disabled={!canAdvance} style={btn(canAdvance, 'var(--highlight-color, #eab308)')}>
+            <ActionButton variant="primary" onClick={next} disabled={!canAdvance} >
               Next<ChevronRight size={12} />
-            </button>
+            </ActionButton>
           ) : (
-            <button onClick={confirm} disabled={!canAdvance} style={btn(canAdvance, 'var(--highlight-color, #eab308)')}>
+            <ActionButton variant="primary" onClick={confirm} disabled={!canAdvance} >
               <Sparkles size={12} />
               {typeof confirmLabel === 'function' ? confirmLabel(options) : confirmLabel}
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>
       </FocusTrap>
     </div>, document.body
   )
-}
-
-function btn(enabled: boolean = true, color?: string): React.CSSProperties {
-  return {
-    display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-4)',
-    padding: "var(--workspace-space-6) var(--workspace-space-12)", fontSize: 'var(--workspace-font-meta)', fontWeight: 600, fontFamily: 'inherit',
-    color: enabled ? color ? 'var(--highlight-text-color, #000)' : 'var(--workspace-text)' : 'var(--workspace-muted)',
-    backgroundColor: color ? color : 'var(--workspace-surface)',
-    border: `1px solid ${color || 'var(--workspace-border)'}`,
-    borderRadius: 'var(--workspace-radius-small)',
-    cursor: enabled ? 'pointer' : 'not-allowed',
-    opacity: enabled ? 1 : 0.5,
-  }
 }

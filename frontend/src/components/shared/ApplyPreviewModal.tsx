@@ -1,3 +1,4 @@
+import { ActionButton } from './ActionButton'
 import { usePanelEffect } from './usePanelEffect'
 import { useEffect, useLayoutEffect, useState, useMemo, useRef } from 'react'
 import { FocusTrap } from './PanelFocusTrap'
@@ -112,17 +113,14 @@ export function ApplyPreviewModal({
               Confirm apply
             </span>
           </div>
-          <button
+          <ActionButton variant="quiet" iconOnly
             aria-label="Close"
             onClick={onCancel}
             disabled={applying}
-            style={{
-              background: 'transparent', border: 'none', color: 'var(--workspace-muted)',
-              cursor: applying ? 'not-allowed' : 'pointer', padding: 'var(--workspace-space-4)', minWidth: 36, minHeight: 'var(--workspace-control-height)',
-            }}
+
           >
             <X size={16} />
-          </button>
+          </ActionButton>
         </header>
 
         <div role="region" aria-label="Apply review details" tabIndex={0} style={{ minHeight: 0, overflowY: 'auto' }}>
@@ -209,34 +207,20 @@ export function ApplyPreviewModal({
         </div>
         <footer style={{ flexShrink: 0, padding: "var(--workspace-space-12) var(--workspace-space-20)", borderTop: '1px solid var(--workspace-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)' }}>
-            <button
+            <ActionButton variant="secondary"
               onClick={onCancel}
               disabled={applying}
-              style={{
-                minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 500,
-                color: 'var(--workspace-muted)', background: 'transparent',
-                border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
-                cursor: applying ? 'not-allowed' : 'pointer',
-              }}
+
             >
               Cancel
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton variant="primary" aria-busy={applying}
               onClick={onConfirm}
               disabled={!canConfirm}
-              style={{
-                minHeight: 'var(--workspace-control-height)', padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-body)', fontWeight: 600,
-                color: canConfirm ? 'var(--highlight-text-color, #000)' : 'var(--workspace-muted)',
-                background: canConfirm
-                  ? 'var(--highlight-color, #eab308)'
-                  : 'var(--workspace-surface)',
-                border: '1px solid ' + (canConfirm ? 'var(--highlight-color, #eab308)' : 'var(--workspace-border)'),
-                borderRadius: 'var(--workspace-radius-small)',
-                cursor: canConfirm ? 'pointer' : 'not-allowed',
-              }}
+
             >
               {applying ? 'Applying…' : 'Apply'}
-            </button>
+            </ActionButton>
           </div>
         </footer>
       </div>

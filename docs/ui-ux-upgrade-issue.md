@@ -4,6 +4,16 @@ Bring every reviewed Vandalizer surface to **at least 8/10 for visual UI and 8/1
 
 This is the **single tracking issue** for the complete 169-item implementation/verification checklist and all 14 explicitly approved additions below. The additions map into the checklist; they are not a separate duplicate backlog. No product implementation is claimed complete by opening this issue.
 
+## Consistent actions and usable controls — September 30
+
+**157/169 checklist items implemented locally.** VIS-04 and ACC-11 are complete for the reviewed task surfaces; changes are not deployed.
+
+- Shared ActionButton styles cover primary, secondary, quiet and destructive actions in folder/rename dialogs, Knowledge creation and URL intake, Library saving, automation/tuning wizards, apply review, confirmation and test generation. Hover, disabled, pending and keyboard-focus states use the same rules; labels remain visible while a request is pending.
+- Workspace and portaled buttons, menus, selects and summaries have a 36px minimum target. Native checkboxes/radios have a 24px minimum and retain their surrounding labels/rows. Existing row actions stay available without hover. Focus uses a dark outline with a white separation ring that remains visible on light and dark surfaces.
+- The target audit found the error-toast dismiss button outside the workspace styles. Notifications now share control sizing, fit narrow viewports and scroll when several persistent errors accumulate; optional toast actions also have a usable target.
+- Verification: 38 component/toast tests across eight files, TypeScript, production build, touched-file ESLint and diff checks pass. The 163 selected browser captures cover all 55 baseline states, file/Library workflow recovery at five widths (30), source intake/retry (24), short validation dialogs (36), and keyboard action states at three widths (18). Each selected capture has zero axe findings, overflow, uncaught errors, unmatched requests or enabled controls below the audited 24px minimum. Buttons use 36px; the audit does not treat inline prose links as standalone controls.
+- Keyboard checks exercise file selection, primary focus/hover, the disabled Creating state, disabled wizard progression and destructive draft review with return to editing. Synthetic folder creation is held pending and released explicitly; exactly one request is recorded per submission. Representative screenshots inspected directly. This is not completion of the broader focus-order, nested-dialog or assistive-technology acceptance items.
+
 ## Shared task spacing and surfaces — September 30
 
 **155/169 checklist items implemented locally.** VIS-03 is complete for the reviewed task surfaces; changes are not deployed.
@@ -420,7 +430,7 @@ Acceptance: the active task owns the visual hierarchy; supporting panels are dis
 - [x] **VIS-01 · P2 · Fix:** Reconcile the light file/project/editor surfaces, dark automation/KB surfaces, blue wizard controls and purple validation controls into a consistent theme hierarchy.
 - [x] **VIS-02 · P2 · Improve:** Standardize page, section, card and metadata typography. Increase essential metadata that is currently too small to scan.
 - [x] **VIS-03 · P2 · Improve:** Use shared spacing, padding, row heights, border radii, borders and elevation across lists, cards and dialogs.
-- [ ] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
+- [x] **VIS-04 · P2 · Improve:** Standardize primary, secondary, quiet and destructive action styles, including disabled, hover, focus and loading states.
 - [ ] **VIS-05 · P2 · Improve:** Standardize form labels, optional/required indicators, help text, validation messages and error placement.
 - [x] **VIS-06 · P2 · Fix:** Give important names and task content more space than decoration, promotional copy and low-value metadata.
 - [ ] **VIS-07 · P2 · Improve:** Use consistent status badges with text and appropriate icons; reserve color for meaning rather than decoration.
@@ -440,7 +450,7 @@ Acceptance: screens look like parts of one product, with consistent hierarchy an
 - [x] **ACC-08 · P2 · Fix:** Correct measured low contrast in timestamps, counts, tags and secondary metadata. Target 4.5:1 for normal text and 3:1 for large text and essential UI graphics.
 - [ ] **ACC-09 · P2 · Verify:** Keyboard focus is visible and follows a logical order through navigation, tables, cards, menus, tabs and dialogs.
 - [ ] **ACC-10 · P2 · Verify:** Dialogs set focus appropriately, contain focus while open, close with Escape when appropriate and restore focus to their trigger.
-- [ ] **ACC-11 · P2 · Improve:** Make row actions usable without hover, and make small controls practical touch targets without crowding their neighbors.
+- [x] **ACC-11 · P2 · Improve:** Make row actions usable without hover, and make small controls practical touch targets without crowding their neighbors.
 - [ ] **ACC-12 · P2 · Verify:** Upload, processing, validation and tool-state changes are announced appropriately without flooding assistive technology.
 - [ ] **ACC-13 · P2 · Verify:** Essential tasks remain usable at 200% zoom and with reduced motion; loading indicators do not rely exclusively on animation.
 

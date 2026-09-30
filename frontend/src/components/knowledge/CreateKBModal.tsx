@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useEffect, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -127,35 +128,21 @@ export function CreateKBModal({ onClose, onCreate, existingTitles }: CreateKBMod
         )}
 
         <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', justifyContent: 'flex-end' }}>
-          <button
+          <ActionButton variant="secondary"
             onClick={onClose}
             disabled={creating}
-            style={{
-              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-              color: 'var(--workspace-muted)', backgroundColor: 'transparent',
-              border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)',
-              cursor: creating ? 'default' : 'pointer',
-              opacity: creating ? 0.6 : 1,
-            }}
+
           >
             Cancel
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton variant="primary" aria-busy={creating}
             onClick={handleSubmit}
             disabled={!canSubmit}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-              padding: "var(--workspace-space-6) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-              color: 'var(--highlight-text-color, #000)',
-              backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 'var(--workspace-radius-small)',
-              cursor: canSubmit ? 'pointer' : 'default',
-              opacity: canSubmit ? 1 : 0.5,
-            }}
+
           >
             {creating && <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} />}
             {creating ? 'Creating...' : 'Create'}
-          </button>
+          </ActionButton>
         </div>
       </div>
       </FocusTrap>

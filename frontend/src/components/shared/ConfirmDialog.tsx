@@ -1,3 +1,4 @@
+import { ActionButton } from './ActionButton'
 import { usePanelEffect } from './usePanelEffect'
 import { useState } from 'react'
 import { FocusTrap } from './PanelFocusTrap'
@@ -78,42 +79,38 @@ export function ConfirmDialog({
               {title}
             </h3>
           </div>
-          <button
+          <ActionButton variant="quiet" iconOnly
             type="button"
             onClick={onCancel}
             disabled={busy}
             aria-label="Close"
-            className="text-gray-400 hover:text-gray-600 disabled:opacity-40"
+
           >
             <X className="h-5 w-5" />
-          </button>
+          </ActionButton>
         </div>
 
         <div className="mb-5 text-sm text-gray-600">{message}</div>
 
         <div className="flex justify-end gap-2">
-          <button
+          <ActionButton variant="secondary"
             type="button"
             onClick={onCancel}
             disabled={busy}
-            className="rounded-md px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+
           >
             {cancelLabel}
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton variant={destructive ? 'destructive' : 'primary'} aria-busy={busy}
             type="button"
             onClick={handleConfirm}
             disabled={busy}
             autoFocus
-            className={
-              destructive
-                ? 'inline-flex items-center gap-2 rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50'
-                : 'inline-flex items-center gap-2 rounded-md bg-highlight px-3 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50'
-            }
+
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {confirmLabel}
-          </button>
+          </ActionButton>
         </div>
       </div>
       </FocusTrap>

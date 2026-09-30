@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 /**
  * Auto-generate test cases from documents — Phase 1B step 1 of the wizard
  * (used directly today; folded into the wizard in Phase 1C).
@@ -125,12 +126,12 @@ export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Prop
             <h3 id="generate-test-cases-title" tabIndex={-1} style={{ margin: 0, fontSize: 'var(--workspace-font-card-title)', color: '#1f2937' }}>
               {step === 'review' ? 'Review proposed test cases' : 'Generate test cases'}
             </h3>
-            <button
+            <ActionButton variant="quiet" iconOnly
               onClick={onClose} aria-label="Close test case generation"
-              style={{ marginLeft: 'auto', minWidth: 36, minHeight: 'var(--workspace-control-height)', flexShrink: 0, display: 'grid', placeItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-2)', color: 'var(--workspace-muted)' }}
+              style={{ marginLeft: 'auto' }}
             >
               <X size={18} />
-            </button>
+            </ActionButton>
           </div>
 
           {step === 'pick' && (
@@ -224,20 +225,13 @@ function PickStep({
           })}
         </div>
       </div>
-      <button
+      <ActionButton variant="primary"
         onClick={onPick}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-          padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-          color: 'var(--workspace-text)',
-          background: 'var(--workspace-canvas)',
-          border: '1px solid var(--workspace-accent-ink)',
-          borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
-        }}
+
       >
         <FileText size={14} />
         Pick documents
-      </button>
+      </ActionButton>
     </div>
   )
 }
@@ -273,7 +267,7 @@ function ReviewStep({
             ))}
           </div>
         </div>
-        <button onClick={onCancel} style={cancelBtnStyle}>Close</button>
+        <ActionButton variant="secondary" onClick={onCancel} >Close</ActionButton>
       </div>
     )
   }
@@ -282,13 +276,13 @@ function ReviewStep({
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-8)', marginBottom: 'var(--workspace-space-12)', fontSize: 'var(--workspace-font-meta)', color: 'var(--workspace-muted)' }}>
         <span><strong style={{ color: '#1f2937' }}>{selectedIds.size}</strong> of {proposals.length} selected</span>
-        <button
+        <ActionButton variant="quiet"
           onClick={onSelectAll}
-          style={{ ...linkBtnStyle, marginLeft: 'auto' }}
+          style={{ marginLeft: 'auto' }}
         >
           Select all
-        </button>
-        <button onClick={onSelectNone} style={linkBtnStyle}>Select none</button>
+        </ActionButton>
+        <ActionButton variant="quiet" onClick={onSelectNone} >Select none</ActionButton>
       </div>
 
       {errors.length > 0 && (
@@ -345,25 +339,15 @@ function ReviewStep({
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--workspace-space-8)', marginTop: 'var(--workspace-space-16)' }}>
-        <button onClick={onCancel} disabled={saving} style={cancelBtnStyle}>Cancel</button>
-        <button
-          onClick={onApprove}
+        <ActionButton variant="secondary" onClick={onCancel} disabled={saving} >Cancel</ActionButton>
+        <ActionButton variant="primary"
+          onClick={onApprove} aria-busy={saving}
           disabled={saving || selectedIds.size === 0}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-            padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-            color: 'var(--workspace-text)',
-            background: saving || selectedIds.size === 0
-              ? '#9ca3af'
-              : 'var(--workspace-canvas)',
-            border: '1px solid ' + (saving || selectedIds.size === 0 ? 'var(--workspace-border)' : 'var(--workspace-accent-ink)'),
-            borderRadius: 'var(--workspace-radius-small)',
-            cursor: saving || selectedIds.size === 0 ? 'not-allowed' : 'pointer',
-          }}
+
         >
           {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={14} />}
           {saving ? 'Saving…' : `Save ${selectedIds.size} test case${selectedIds.size === 1 ? '' : 's'}`}
-        </button>
+        </ActionButton>
       </div>
     </div>
   )
@@ -391,16 +375,4 @@ function Row({
       />
     </>
   )
-}
-
-const cancelBtnStyle: React.CSSProperties = {
-  padding: "var(--workspace-space-8) var(--workspace-space-16)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-  color: '#374151', background: '#fff',
-  border: '1px solid var(--workspace-border)', borderRadius: 'var(--workspace-radius-small)', cursor: 'pointer',
-}
-
-const linkBtnStyle: React.CSSProperties = {
-  padding: "var(--workspace-space-2) var(--workspace-space-8)", fontSize: 'var(--workspace-font-meta)', fontFamily: 'inherit',
-  color: 'var(--workspace-info)', background: 'transparent', border: 'none',
-  cursor: 'pointer', textDecoration: 'underline',
 }

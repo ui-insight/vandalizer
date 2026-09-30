@@ -1,3 +1,4 @@
+import { ActionButton } from '../shared/ActionButton'
 import { usePanelEffect } from '../shared/usePanelEffect'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { FocusTrap } from '../shared/PanelFocusTrap'
@@ -241,22 +242,6 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
     backgroundColor: '#fff', cursor: 'pointer',
   }
 
-  const btnPrimary = (enabled: boolean): React.CSSProperties => ({
-    display: 'flex', alignItems: 'center', gap: 'var(--workspace-space-6)',
-    padding: "9px var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 600, fontFamily: 'inherit',
-    border: 'none', borderRadius: 'var(--workspace-radius-medium)',
-    cursor: enabled ? 'pointer' : 'not-allowed',
-    backgroundColor: enabled ? 'var(--color-panel-dark)' : '#e5e7eb',
-    color: enabled ? '#fff' : '#9ca3af',
-    transition: 'background-color 0.15s',
-  })
-
-  const btnSecondary: React.CSSProperties = {
-    padding: "9px var(--workspace-space-20)", fontSize: 'var(--workspace-font-control)', fontWeight: 500, fontFamily: 'inherit',
-    border: "1px solid var(--workspace-border)", borderRadius: 'var(--workspace-radius-medium)', cursor: 'pointer',
-    backgroundColor: '#fff', color: '#374151',
-  }
-
   return (
     <div
       style={{
@@ -292,14 +277,14 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
               Step {step} of {totalSteps} · {stepLabels[step - 1]}
             </div>
           </div>
-          <button
+          <ActionButton variant="quiet" iconOnly
             type="button"
             onClick={requestClose}
             aria-label="Close"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 'var(--workspace-space-4)', borderRadius: 'var(--workspace-radius-small)', color: '#555e68', display: 'flex' }}
+
           >
             <X style={{ width: 18, height: 18 }} />
-          </button>
+          </ActionButton>
         </div>
 
         {/* Progress bar */}
@@ -815,24 +800,24 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
           {/* Buttons */}
           <div style={{ display: 'flex', gap: 'var(--workspace-space-8)', flexWrap: 'wrap', justifyContent: 'flex-end', width: '100%' }}>
             {step > 1 ? (
-              <button onClick={() => setStep(s => s - 1)} disabled={creating} style={btnSecondary}>
+              <ActionButton variant="secondary" onClick={() => setStep(s => s - 1)} disabled={creating} >
                 Back
-              </button>
+              </ActionButton>
             ) : (
-              <button onClick={requestClose} style={btnSecondary}>Cancel</button>
+              <ActionButton variant="secondary" onClick={requestClose} >Cancel</ActionButton>
             )}
 
             {step < totalSteps ? (
-              <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} style={btnPrimary(canAdvance())}>
+              <ActionButton variant="primary" onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} >
                 Next
-              </button>
+              </ActionButton>
             ) : (
               <>
-                <button type="button" onClick={() => handleCreate(false)} disabled={!canAdvance() || creating} style={btnSecondary}>Save disabled</button>
-                <button type="button" onClick={() => handleCreate(true)} disabled={!canAdvance() || creating} style={btnPrimary(canAdvance() && !creating)}>
+                <ActionButton variant="secondary" type="button" onClick={() => handleCreate(false)} disabled={!canAdvance() || creating} >Save disabled</ActionButton>
+                <ActionButton variant="primary" type="button" onClick={() => handleCreate(true)} disabled={!canAdvance() || creating} >
                   {creating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
                   Create &amp; enable
-                </button>
+                </ActionButton>
               </>
             )}
           </div>

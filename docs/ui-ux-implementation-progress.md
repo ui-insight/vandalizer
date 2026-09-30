@@ -2,7 +2,7 @@
 
 Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
-**155/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
+**157/169 items are implemented locally**, including VAL-12 in the September 28 task lifecycle pass, VAL-15 in the history pass and WIZ-04/05/06/10/12 in the wizard pass. This implementation is included in the local checkpoint commit; it is not deployed. Every reviewed section now has a working **8/8 UI/UX grade**, with reviewed mobile states at **8/10**. The unchecked acceptance backlog remains open; grades cover exercised frontend states.
 
 - [Before/after gallery and working grades](../artifacts/visual-review/upgrade-review/index.html)
 - [Full report and evidence limits](../artifacts/visual-review/upgrade-review/report.md)
@@ -11,6 +11,16 @@ Tracking issue: [#964](https://github.com/ui-insight/vandalizer/issues/964).
 
 
 
+
+## Consistent actions and usable controls — September 30
+
+**157/169 checklist items implemented locally.** VIS-04 and ACC-11 are complete for the reviewed task surfaces; changes are not deployed.
+
+- Shared ActionButton styles cover primary, secondary, quiet and destructive actions in folder/rename dialogs, Knowledge creation and URL intake, Library saving, automation/tuning wizards, apply review, confirmation and test generation. Hover, disabled, pending and keyboard-focus states use the same rules; labels remain visible while a request is pending.
+- Workspace and portaled buttons, menus, selects and summaries have a 36px minimum target. Native checkboxes/radios have a 24px minimum and retain their surrounding labels/rows. Existing row actions stay available without hover. Focus uses a dark outline with a white separation ring that remains visible on light and dark surfaces.
+- The target audit found the error-toast dismiss button outside the workspace styles. Notifications now share control sizing, fit narrow viewports and scroll when several persistent errors accumulate; optional toast actions also have a usable target.
+- Verification: 38 component/toast tests across eight files, TypeScript, production build, touched-file ESLint and diff checks pass. The 163 selected browser captures cover all 55 baseline states, file/Library workflow recovery at five widths (30), source intake/retry (24), short validation dialogs (36), and keyboard action states at three widths (18). Each selected capture has zero axe findings, overflow, uncaught errors, unmatched requests or enabled controls below the audited 24px minimum. Buttons use 36px; the audit does not treat inline prose links as standalone controls.
+- Keyboard checks exercise file selection, primary focus/hover, the disabled Creating state, disabled wizard progression and destructive draft review with return to editing. Synthetic folder creation is held pending and released explicitly; exactly one request is recorded per submission. Representative screenshots inspected directly. This is not completion of the broader focus-order, nested-dialog or assistive-technology acceptance items.
 
 ## Shared task spacing and surfaces — September 30
 
