@@ -42,6 +42,8 @@ docker compose logs --tail=100 api
 docker compose logs --tail=100 celery
 ```
 
+`status.sh` does not exercise the OCR service. The setup checklist on **Admin → System Config** does: it live-probes OCR after it loads and marks the row "Not working" in red when a real conversion fails. **Test Connection** on the OCR settings runs the same one-page conversion with a step-by-step breakdown. A dead OCR service does not stop uploads (they fall back to basic text extraction), so check that row after any OCR-side change.
+
 ## Backup Procedure
 
 Recommended cadence:
@@ -257,6 +259,10 @@ docker compose up -d
 ```
 
 If a release introduces a schema or data migration, treat the backup as mandatory and do not skip release-note review.
+
+### Catalog content after an upgrade
+
+None of the upgrade paths re-seeds the bundled catalog (starter workflows, extractions and knowledge bases). When a release moves `backend/seeds/VERSION`, apply it with `./setup.sh --seed` or from **Admin → Catalog** (the admin UI also flags a newer catalog version). A catalog knowledge base can list `retired_source_urls`; the re-seed removes exactly those sources and any pages crawled from them, and keeps sources an admin added. Copies a team cloned from a catalog knowledge base are never changed by a re-seed, so remove retired sources from those by hand.
 
 ## Rollback Procedure
 
