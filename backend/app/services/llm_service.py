@@ -465,6 +465,31 @@ def unwrap_model_base_url(model) -> Optional[str]:
     return str(url) if url else None
 
 
+def is_endpoint_path_not_found(exc: BaseException) -> bool:
+    """True when ``exc`` is a 404 for the URL path, not for the model name.
+
+    Both come back as ``ModelHTTPError(status_code=404)``, and pydantic-ai's
+    message always contains ``model_name: …``, so the message text can't tell
+    them apart. The body can: servers that know the route but not the model
+    say so ("The model `x` does not exist", ``model_not_found``, Ollama's
+    "model \"x\" not found"), while a request to a path the server has no
+    route for gets the framework's bare ``{'detail': 'Not Found'}``. That is
+    what an OpenAI-protocol endpoint saved without its ``/v1`` produces —
+    the provider dials it verbatim (Sentry 7719925573:
+    ``POST https://mindrouter.uidaho.edu/chat/completions`` → 404).
+    """
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ModelHTTPError):
+            return current.status_code == 404 and "model" not in str(current.body or "").lower()
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def resolve_thinking_enabled(
     agent_model: str,
     thinking_override: Optional[bool] = None,

@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A model whose endpoint URL is missing `/v1` is now named as an endpoint problem, not a raw error or a wrong model name.** The OpenAI protocol sends requests to the endpoint exactly as entered. A model saved as `https://mindrouter.uidaho.edu` rather than `…/v1` therefore requests a path the server doesn't have and gets a plain 404 (Sentry 7719925573). Chat showed users the raw provider text ("status_code: 404, model_name: …, body: {'detail': 'Not Found'}"), and System Config's **Test** reported "Model not found at endpoint" and said to check the model name, which was correct. A 404 that names no model is now treated as a wrong URL path. Chat tells the user the model's server address is misconfigured, to pick another model and tell their administrator; these are no longer reported to Sentry as errors. **Test** reports "Endpoint path not found" and explains that OpenAI-compatible endpoints usually need `/v1`. A 404 that does name the model ("The model `x` does not exist", `model_not_found`) is reported as before.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
