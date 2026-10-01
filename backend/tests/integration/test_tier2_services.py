@@ -709,3 +709,123 @@ class TestResendCredentialsWithRealDB:
 
         result = await demo_service.resend_credentials("nope", Settings())
         assert result["status"] == "not_found"
+
+
+# ---------------------------------------------------------------------------
+# library_service.get_library_items — quality data is batched (Sentry
+# 7724573628: three queries per library row). Same answers as the per-item
+# lookups: metadata wins; otherwise the newest non-smoke-test run.
+# ---------------------------------------------------------------------------
+
+class TestLibraryQualityBatchedWithRealDB:
+    async def test_batched_quality_matches_per_item_rules(self, mongo_client):
+        from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
+        from app.models.search_set import SearchSet
+        from app.models.user import User
+        from app.models.validation_run import ValidationRun
+        from app.models.verification import VerifiedItemMetadata
+        from app.models.workflow import Workflow
+        from app.services.library_service import get_library_items
+        from app.services.quality_service import SMOKE_TEST_SOURCE
+
+        user = User(user_id="q-owner", email="q@example.com", name="Q")
+        await user.insert()
+        with_meta = Workflow(name="Has Meta", user_id="q-owner", steps=[], space="default")
+        runs_only = Workflow(name="Runs Only", user_id="q-owner", steps=[], space="default")
+        unvalidated = Workflow(name="Never Validated", user_id="q-owner", steps=[], space="default")
+        gone = Workflow(name="Deleted", user_id="q-owner", steps=[], space="default")
+        for wf in (with_meta, runs_only, unvalidated, gone):
+            await wf.insert()
+        ss = SearchSet(title="Award Terms", uuid="ss-award", status="active", set_type="extraction", user_id="q-owner")
+        await ss.insert()
+
+        await VerifiedItemMetadata(item_kind="workflow", item_id=str(with_meta.id), quality_score=91.0, quality_tier="gold").insert()
+        t0 = datetime.datetime(2026, 9, 1, tzinfo=datetime.timezone.utc)
+        for days, score, source in ((0, 50.0, None), (5, 72.0, None), (9, 10.0, SMOKE_TEST_SOURCE)):
+            run = ValidationRun(item_kind="workflow", item_id=str(runs_only.id), score=score,
+                                run_type="workflow", user_id="q-owner",
+                                created_at=t0 + datetime.timedelta(days=days))
+            if source:
+                run.source = source
+            await run.insert()
+        # Search sets are validated under their uuid, not the ObjectId.
+        await ValidationRun(item_kind="search_set", item_id="ss-award", score=88.0,
+                            run_type="extraction", user_id="q-owner", created_at=t0).insert()
+
+        items = [
+            LibraryItem(item_id=wf.id, kind=LibraryItemKind.WORKFLOW, added_by_user_id="q-owner")
+            for wf in (with_meta, runs_only, unvalidated, gone)
+        ] + [LibraryItem(item_id=ss.id, kind=LibraryItemKind.SEARCH_SET, added_by_user_id="q-owner")]
+        for it in items:
+            await it.insert()
+        lib = Library(scope=LibraryScope.PERSONAL, title="Q", owner_user_id="q-owner", items=[i.id for i in items])
+        await lib.insert()
+        await gone.delete()
+
+        rows = {r["name"]: r for r in await get_library_items(str(lib.id), user)}
+
+        assert set(rows) == {"Has Meta", "Runs Only", "Never Validated", "Award Terms"}
+        assert rows["Has Meta"]["quality_score"] == 91.0
+        assert rows["Has Meta"]["quality_tier"] == "gold"
+        # Newest non-smoke run (72), not the newer smoke run (10) or the older one.
+        assert rows["Runs Only"]["quality_score"] == 72.0
+        assert rows["Runs Only"]["quality_asserted"] is False
+        assert rows["Never Validated"].get("quality_score") is None
+        assert rows["Award Terms"]["quality_score"] == 88.0
+
+    async def test_query_count_does_not_grow_with_library_size(self, mongo_client, mongo_db_name):
+        """The N+1 itself: count the commands against a real server. Main
+        issued a target get, a metadata find and a latest-run find per row."""
+        from collections import Counter
+
+        from beanie import init_beanie
+        from motor.motor_asyncio import AsyncIOMotorClient
+        from pymongo import monitoring
+
+        from app.database import ALL_MODELS
+        from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
+        from app.models.user import User
+        from app.models.workflow import Workflow
+        from app.services.library_service import get_library_items
+
+        class _Count(monitoring.CommandListener):
+            def __init__(self):
+                self.by_collection = Counter()
+
+            def started(self, event):
+                if event.command_name in ("find", "aggregate"):
+                    self.by_collection[(event.command_name, event.command.get(event.command_name))] += 1
+
+            def succeeded(self, event):
+                pass
+
+            def failed(self, event):
+                pass
+
+        listener = _Count()
+        client = AsyncIOMotorClient("mongodb://localhost:27017/", event_listeners=[listener])
+        await init_beanie(database=client[mongo_db_name], document_models=ALL_MODELS)
+        try:
+            user = User(user_id="n1-owner", email="n1@example.com", name="N")
+            await user.insert()
+            workflows = [Workflow(name=f"WF {i}", user_id="n1-owner", steps=[], space="default") for i in range(6)]
+            for wf in workflows:
+                await wf.insert()
+            items = [LibraryItem(item_id=wf.id, kind=LibraryItemKind.WORKFLOW, added_by_user_id="n1-owner") for wf in workflows]
+            for it in items:
+                await it.insert()
+            lib = Library(scope=LibraryScope.PERSONAL, title="N", owner_user_id="n1-owner", items=[i.id for i in items])
+            await lib.insert()
+
+            listener.by_collection.clear()
+            rows = await get_library_items(str(lib.id), user)
+            assert len(rows) == 6
+
+            counts = listener.by_collection
+            assert counts[("find", "workflow")] <= 1, counts
+            assert counts[("find", "verified_item_metadata")] <= 1, counts
+            assert counts[("find", "validation_runs")] + counts[("aggregate", "validation_runs")] <= 1, counts
+        finally:
+            # Hand the models back to the session client for later tests.
+            await init_beanie(database=mongo_client[mongo_db_name], document_models=ALL_MODELS)
+            client.close()
