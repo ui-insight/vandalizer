@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Background tasks no longer spend their first moments re-initializing the database layer.** Every background task (document classification, extraction, workflow runs, knowledge-base ingestion and the rest) re-ran the database library's full setup for all 72 data models before doing any work. That meant one round trip to MongoDB per model, even though nothing it sets up changes between tasks; Sentry flagged it as an N+1 query on document classification (Sentry 7598699011). After the first task in each worker process, a task now just points the models at its own database connection. The full setup still runs once per worker process, and also whenever database indexes still need to be checked.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
