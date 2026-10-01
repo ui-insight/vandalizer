@@ -27,6 +27,7 @@ from app.services.llm_service import (
     _get_model_endpoint_sync,
     detect_api_protocol,
     get_agent_model,
+    is_endpoint_path_not_found,
     unwrap_model_base_url,
     use_native_structured_output,
 )
@@ -70,6 +71,16 @@ def _classify_error(exc: Exception) -> dict[str, str]:
             "title": "Authentication rejected",
             "why": "The provider refused the credentials — the API key is missing, wrong, expired, or lacks access to this model.",
             "fix": "Open this model, re-enter the API key, and save. For OpenAI/Anthropic/OpenRouter the key must match the endpoint you pointed at.",
+            "raw": raw,
+        }
+    # Before the model-name branch, which every 404 used to land in: a wrong
+    # URL path got "check the Model Name" when the name was fine.
+    if is_endpoint_path_not_found(exc):
+        return {
+            "category": "endpoint_path",
+            "title": "Endpoint path not found",
+            "why": "The server answered, but has nothing at this URL path — it returned a plain 404 that names no model. The model name is not the problem; the endpoint URL's path is.",
+            "fix": "Check the Endpoint step above for the URL actually dialed. The OpenAI protocol uses the endpoint exactly as entered, so an OpenAI-compatible server usually needs it to end in '/v1' (e.g. 'https://host/v1'); vLLM and Ollama add '/v1' themselves.",
             "raw": raw,
         }
     if has("not found", "does not exist", "no such model", "model_not_found", "unknown model", "404"):
