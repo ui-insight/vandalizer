@@ -107,7 +107,13 @@ async def _workflow_blocker(workflow_id: str) -> Optional[str]:
 
     from app.services.workflow_optimizer import _resolve_test_inputs
 
-    if not await _resolve_test_inputs(wf):
+    unreadable: list[dict] = []
+    if not await _resolve_test_inputs(wf, unreadable):
+        if unreadable:
+            return (
+                f"workflow has no usable test inputs ({len(unreadable)} expected-output "
+                "run(s) whose documents were deleted or have no text)"
+            )
         return "workflow has no test inputs (no run marked as expected output)"
     return None
 
