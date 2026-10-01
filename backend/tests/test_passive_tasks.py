@@ -668,3 +668,58 @@ class TestExecuteWorkflowPassiveRecordsItsAutomation:
         inserted = db.workflow_result.insert_one.call_args[0][0]
         assert inserted["automation_id"] is None
         assert inserted["trigger_event_id"] == str(event_id)
+
+
+class TestExecuteWorkflowPassiveLogLevel:
+    """A step error is the workflow's configuration, not a fault (Sentry
+    7761609315: "Add Website is not configured: no URL", once per scheduled
+    run). It still fails the run and tells the owner; it just stays out of
+    Sentry's error stream, as it does in execute_workflow_task."""
+
+    def _run(self, engine_error):
+        from app.tasks.passive_tasks import execute_workflow_passive
+
+        event_id, wf_id = ObjectId(), ObjectId()
+        db = MagicMock()
+        db.workflow_trigger_event.find_one.return_value = {
+            "_id": event_id, "uuid": "evt-1", "workflow": wf_id, "documents": [],
+            "trigger_type": "schedule", "attempt_number": 1,
+        }
+        db.workflow.find_one.return_value = {
+            "_id": wf_id, "user_id": "u1", "steps": [], "input_config": {},
+        }
+        db.system_config.find_one.return_value = {}
+        db.smart_document.find.return_value = []
+        db.workflow_result.insert_one.return_value.inserted_id = ObjectId()
+        engine = MagicMock()
+        engine.execute.side_effect = engine_error
+
+        with patch("app.tasks.passive_tasks.get_sync_db", return_value=db), \
+             patch("app.services.workflow_engine.build_workflow_engine", return_value=engine), \
+             patch("app.tasks.passive_tasks.logger") as log:
+            execute_workflow_passive(str(event_id))
+
+        def failed(calls):
+            return [c for c in calls if "Passive execution failed" in str(c)]
+
+        return failed(log.error.call_args_list), failed(log.warning.call_args_list), db
+
+    def test_a_step_error_is_logged_at_warning(self):
+        from app.services.workflow_engine import WorkflowStepError
+
+        errors, warnings, db = self._run(WorkflowStepError(
+            "Extraction",
+            "Add Website is not configured: no URL. Open the step and enter "
+            "the address of the page to fetch.",
+        ))
+        assert errors == []
+        assert len(warnings) == 1
+        # Still a failed run, and not retried.
+        event_sets = [c[0][1]["$set"] for c in db.workflow_trigger_event.update_one.call_args_list]
+        assert any(s.get("status") == "failed" for s in event_sets)
+        assert not any(s.get("status") == "pending" for s in event_sets)
+
+    def test_an_unexpected_crash_is_still_an_error(self):
+        errors, warnings, _db = self._run(RuntimeError("boom"))
+        assert len(errors) == 1
+        assert warnings == []
