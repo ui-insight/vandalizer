@@ -557,63 +557,85 @@ async def get_library_items(
 
     # Import metadata for org visibility filtering and quality data
     from app.models.verification import VerifiedItemMetadata
-    from app.services.quality_service import get_latest_validation, compute_quality_tier
+    from app.services.quality_service import get_latest_validations, compute_quality_tier
 
     team_access = await access_control.get_team_access_context(user)
 
-    results = []
+    # Every per-item lookup below is batched: the loop used to issue a target
+    # get, a metadata find_one and a latest-run find per item — three queries
+    # per row of the library (Sentry 7724573628, N+1 on this endpoint).
+    targets = await _prefetch_targets(items)
+    candidates: list[tuple[LibraryItem, dict, str]] = []
     for item in items:
-        deref = await _dereference_item(item, user=user, team_access=team_access)
-        if deref:
-            if search:
-                name_lower = deref.get("name", "").lower()
-                tags_str = " ".join(deref.get("tags", [])).lower()
-                if search.lower() not in name_lower and search.lower() not in tags_str:
-                    continue
+        deref = await _dereference_item(
+            item, user=user, team_access=team_access,
+            target=targets.get((item.kind, item.item_id), _NOT_PREFETCHED),
+        )
+        if not deref:
+            continue
+        if search:
+            name_lower = deref.get("name", "").lower()
+            tags_str = " ".join(deref.get("tags", [])).lower()
+            if search.lower() not in name_lower and search.lower() not in tags_str:
+                continue
+        # Validation stores item_id as the UUID for search sets,
+        # so use item_uuid when available.
+        candidates.append((item, deref, deref.get("item_uuid") or str(item.item_id)))
 
-            # Look up quality metadata for all scopes
-            # Validation stores item_id as the UUID for search sets,
-            # so use item_uuid when available.
-            quality_lookup_id = deref.get("item_uuid") or str(item.item_id)
-            meta = await VerifiedItemMetadata.find_one(
-                VerifiedItemMetadata.item_kind == item.kind.value,
-                VerifiedItemMetadata.item_id == quality_lookup_id,
-            )
+    by_kind: dict[str, list[str]] = {}
+    for item, _deref, lookup_id in candidates:
+        by_kind.setdefault(item.kind.value, []).append(lookup_id)
+    metas: dict[tuple[str, str], VerifiedItemMetadata] = {}
+    if by_kind:
+        for m in await VerifiedItemMetadata.find(
+            {"$or": [{"item_kind": k, "item_id": {"$in": ids}} for k, ids in by_kind.items()]},
+        ).to_list():
+            metas.setdefault((m.item_kind, m.item_id), m)
+    latest_runs = await get_latest_validations([
+        (item.kind.value, lookup_id)
+        for item, _deref, lookup_id in candidates
+        if (item.kind.value, lookup_id) not in metas
+    ])
+    quality_cfg = (await SystemConfig.get_config()).get_quality_config() if latest_runs else None
 
-            # Org visibility filtering for verified-scope libraries
-            if lib.scope == LibraryScope.VERIFIED and item.verified:
-                if user_org_ancestry is not None and meta and meta.organization_ids and not (set(meta.organization_ids) & set(user_org_ancestry)):
-                    continue
+    results = []
+    for item, deref, quality_lookup_id in candidates:
+        # Look up quality metadata for all scopes
+        meta = metas.get((item.kind.value, quality_lookup_id))
 
-            # Attach quality metadata for all scopes
-            if meta:
-                deref["quality_tier"] = meta.quality_tier
-                deref["quality_score"] = meta.quality_score
-                deref["last_validated_at"] = meta.last_validated_at.isoformat() if meta.last_validated_at else None
-                deref["regression_pending_review"] = meta.regression_pending_review
-                # A tier with no measured score behind it is an assertion
-                # (hand-typed in the catalog seed), not a measurement — the
-                # badge has to say which one it is showing.
-                deref["quality_asserted"] = bool(meta.quality_tier) and meta.quality_score is None
-            else:
-                # Fall back to latest ValidationRun
-                latest = await get_latest_validation(item.kind.value, quality_lookup_id)
-                if latest:
-                    score = latest.get("score")
-                    deref["quality_score"] = score
-                    sys_cfg = await SystemConfig.get_config()
-                    deref["quality_tier"] = compute_quality_tier(score, sys_cfg.get_quality_config())
-                    deref["last_validated_at"] = latest.get("created_at")
-                    deref["quality_asserted"] = False
-                    # Stated, not left absent. A flagged item always has a
-                    # metadata row so this branch cannot currently carry a
-                    # regression, but the extraction and workflow routers say
-                    # False explicitly in their fallbacks for the same reason:
-                    # a reader of this payload should never have to know which
-                    # branch produced it to know what the missing key means.
-                    deref["regression_pending_review"] = False
+        # Org visibility filtering for verified-scope libraries
+        if lib.scope == LibraryScope.VERIFIED and item.verified:
+            if user_org_ancestry is not None and meta and meta.organization_ids and not (set(meta.organization_ids) & set(user_org_ancestry)):
+                continue
 
-            results.append(deref)
+        # Attach quality metadata for all scopes
+        if meta:
+            deref["quality_tier"] = meta.quality_tier
+            deref["quality_score"] = meta.quality_score
+            deref["last_validated_at"] = meta.last_validated_at.isoformat() if meta.last_validated_at else None
+            deref["regression_pending_review"] = meta.regression_pending_review
+            # A tier with no measured score behind it is an assertion
+            # (hand-typed in the catalog seed), not a measurement — the
+            # badge has to say which one it is showing.
+            deref["quality_asserted"] = bool(meta.quality_tier) and meta.quality_score is None
+        else:
+            # Fall back to latest ValidationRun
+            latest = latest_runs.get((item.kind.value, quality_lookup_id))
+            if latest:
+                score = latest.get("score")
+                deref["quality_score"] = score
+                deref["quality_tier"] = compute_quality_tier(score, quality_cfg)
+                deref["last_validated_at"] = latest.get("created_at")
+                deref["quality_asserted"] = False
+                # Stated, not left absent. A flagged item always has a
+                # metadata row so this branch cannot currently carry a
+                # regression, but the extraction and workflow routers say
+                # False explicitly in their fallbacks for the same reason:
+                # a reader of this payload should never have to know which
+                # branch produced it to know what the missing key means.
+                deref["regression_pending_review"] = False
+
+        results.append(deref)
 
     await _apply_run_based_last_used(results, user)
     await _attach_authors(results)
@@ -1035,10 +1057,31 @@ def _item_created_at(item: LibraryItem) -> str | None:
     return _iso_utc(item.created_at)
 
 
+_NOT_PREFETCHED = object()
+
+
+async def _prefetch_targets(items: list[LibraryItem]) -> dict:
+    """Load every item's Workflow / SearchSet in one query per kind.
+
+    Keyed by ``(kind, item_id)``; a target that no longer exists maps to
+    None, which ``_dereference_item`` treats exactly like a failed ``get``.
+    """
+    out: dict = {}
+    for kind, model in ((LibraryItemKind.WORKFLOW, Workflow), (LibraryItemKind.SEARCH_SET, SearchSet)):
+        ids = list({i.item_id for i in items if i.kind == kind})
+        if not ids:
+            continue
+        found = {d.id: d for d in await model.find({"_id": {"$in": ids}}).to_list()}
+        for item_id in ids:
+            out[(kind, item_id)] = found.get(item_id)
+    return out
+
+
 async def _dereference_item(
     item: LibraryItem,
     user: User | None = None,
     team_access=None,
+    target=_NOT_PREFETCHED,
 ) -> dict | None:
     """Load the actual Workflow or SearchSet and return combined dict.
 
@@ -1059,7 +1102,7 @@ async def _dereference_item(
     can_delete_underlying = False
 
     if item.kind == LibraryItemKind.WORKFLOW:
-        wf = await Workflow.get(item.item_id)
+        wf = await Workflow.get(item.item_id) if target is _NOT_PREFETCHED else target
         if not wf:
             return None
         name = wf.name
@@ -1068,7 +1111,7 @@ async def _dereference_item(
         if user is not None and team_access is not None:
             can_delete_underlying = access_control.can_manage_workflow(wf, user, team_access)
     elif item.kind == LibraryItemKind.SEARCH_SET:
-        ss = await SearchSet.get(item.item_id)
+        ss = await SearchSet.get(item.item_id) if target is _NOT_PREFETCHED else target
         if not ss:
             return None
         name = ss.title

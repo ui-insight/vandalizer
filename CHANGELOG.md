@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A library loads with a fixed number of database queries, however many items it holds.** Listing a library's items made three database queries per item: the workflow or extraction itself, its quality record, and its latest validation run (Sentry 7724573628). Each of these is now a single query for the whole list. Quality badges, scores and "last validated" dates are unchanged.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
