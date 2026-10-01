@@ -306,8 +306,11 @@ async def test_init_db_dedupes_before_beanie_builds_indexes_and_not_when_skippin
     events = []
     fake_client = MagicMock()
     monkeypatch.setattr(database, "_indexes_ensured", False)
+    monkeypatch.setattr(database, "_beanie_inited", False)
     monkeypatch.setattr(database, "_client", None)
     monkeypatch.setattr(database, "AsyncIOMotorClient", MagicMock(return_value=fake_client))
+    rebinds = []
+    monkeypatch.setattr(database, "_rebind_models", lambda db: rebinds.append(db) or True)
 
     async def fake_migrations(db):
         events.append(("migrate", db))
@@ -323,10 +326,13 @@ async def test_init_db_dedupes_before_beanie_builds_indexes_and_not_when_skippin
     assert events == [("migrate", fake_client["osp"]), ("init_beanie", False)]
 
     # Indexes are now ensured for this process: a later init (a Celery task)
-    # skips both the index build and the dedup that only exists to guard it.
+    # skips both the index build and the dedup that only exists to guard it —
+    # and, with Beanie already initialized, init_beanie itself: the models are
+    # rebound to the new client.
     events.clear()
     await database.init_db(settings)
-    assert events == [("init_beanie", True)]
+    assert events == []
+    assert rebinds == [fake_client["osp"]]
 
 
 @pytest.mark.asyncio
