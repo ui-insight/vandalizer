@@ -12,6 +12,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from beanie.exceptions import DocumentNotFound, RevisionIdWasChanged
 
 from app.services import knowledge_service
 from app.services.web_fetcher import WebFetchResult
@@ -39,6 +40,7 @@ def _source(**overrides):
     for k, v in overrides.items():
         setattr(src, k, v)
     src.save = AsyncMock()
+    src.replace = AsyncMock()
     return src
 
 
@@ -399,6 +401,51 @@ async def test_first_ingest_records_the_advisory_on_the_source():
     assert result is not None
     assert src.status == "ready"
     assert src.warnings == ["hidden_text_unchecked"]
+
+
+
+# A source deleted (and maybe re-added) while its ingest runs. save() upserts,
+# so it resurrected the row — or, with the re-added row holding the same
+# (KB, url), tripped the unique index, which Beanie re-raises as a message-less
+# RevisionIdWasChanged (Sentry 7754089077: "Error ingesting URL source <uuid>: ").
+
+
+@pytest.mark.asyncio
+async def test_ingest_of_a_source_deleted_midway_drops_its_chunks():
+    src = _source(status="pending", content=None, chunk_count=0)
+    src.replace = AsyncMock(side_effect=DocumentNotFound())
+    # What Beanie's upserting save() does once the row is gone and a re-added
+    # one holds its (KB, url): the first save is the "processing" mark.
+    src.save = AsyncMock(side_effect=[None, RevisionIdWasChanged()])
+    dm = _dm()
+    text = "A. Purpose. " + "Award terms and conditions apply to every subaward. " * 20
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=_result(text))), \
+         patch.object(knowledge_service, "_get_dm", return_value=dm), \
+         patch.object(knowledge_service.logger, "error") as log_error:
+        result = await knowledge_service._ingest_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert result is None  # nothing for add_urls to crawl from
+    dm.delete_kb_source.assert_called_once_with("kb-1", "src-1")
+    log_error.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_failed_ingest_of_a_deleted_source_does_not_raise():
+    """The error branches persist too; a vanished row must not turn the
+    handled failure into one that escapes add_urls (leaving the KB building)."""
+    src = _source(status="pending", content=None, chunk_count=0)
+    src.replace = AsyncMock(side_effect=DocumentNotFound())
+    # What Beanie's upserting save() does once the row is gone and a re-added
+    # one holds its (KB, url): the first save is the "processing" mark.
+    src.save = AsyncMock(side_effect=[None, RevisionIdWasChanged()])
+
+    with patch("app.services.web_fetcher.fetch_url",
+               AsyncMock(side_effect=RuntimeError("boom"))):
+        result = await knowledge_service._ingest_url_source(src, MagicMock(uuid="kb-1"))
+
+    assert result is None
+    assert src.status == "error"
 
 
 def _link_hub_result() -> WebFetchResult:

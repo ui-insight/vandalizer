@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Deleting a web source while it is still being added no longer fails the add or brings the source back.** Adding a URL fetches and indexes the page before it saves the result, which can take a while. That final save wrote the row back whether or not it still existed. A source deleted in the meantime came back. If the same URL had been added again, the save collided with the new row and failed with a blank error ("Error ingesting URL source …:" with nothing after it, Sentry 7754089077). The rest of that add run was then abandoned, which could leave the knowledge base showing "building". Now the save never re-creates a deleted row: the result is dropped, and the chunks already indexed for it are removed so they don't keep answering questions.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added

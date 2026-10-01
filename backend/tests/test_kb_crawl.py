@@ -449,6 +449,7 @@ async def test_user_supplied_thin_url_is_still_ingested():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = _page(source.url, _NAV, [])
 
     dm = MagicMock()
@@ -472,6 +473,7 @@ async def test_gated_out_page_never_reaches_chromadb():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = _page(source.url, _NAV, [])
 
     with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=fetched)), \
@@ -496,6 +498,7 @@ async def test_ingest_url_source_errors_on_bot_challenge():
         chunk_count=0, processed_at=None,
     )
     source.save = AsyncMock()
+    source.replace = AsyncMock()
     fetched = WebFetchResult(
         url=source.url, title="Robot or human?",
         text="Robot or human? Activate and hold the button to confirm that you're human.",
