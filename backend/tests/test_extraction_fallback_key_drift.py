@@ -13,8 +13,9 @@ from app.services.extraction_engine import ExtractionEngine, ExtractionError
 
 
 class _Result:
-    def __init__(self, output):
+    def __init__(self, output, finish_reason=None):
         self.output = output
+        self.response = type("R", (), {"finish_reason": finish_reason})()
 
     def usage(self):  # pragma: no cover - not asserted on
         raise AttributeError
@@ -217,3 +218,76 @@ def test_remap_is_a_classmethod_not_an_accidental_instance_method(engine):
     )
     assert matched == 1
     assert entity == {"Award amount": "$1"}
+
+
+# ---------------------------------------------------------------------------
+# A complete answer whose closing brackets are short or wrong (Sentry
+# 7694407872: "Expecting ',' delimiter" on the last character of the output).
+# ---------------------------------------------------------------------------
+
+
+def test_a_missing_final_brace_is_closed(monkeypatch, engine):
+    payload = (
+        '{"entities": [{"Award amount": "$50,000", "PI Name": "Dr. Lee", '
+        '"2 CFR Part 200": null}], "_sources": {"Award amount": "Total award: $50,000"}'
+    )
+    out = _run(monkeypatch, engine, payload, KEYS, capture_sources=True)
+    assert out[0]["Award amount"] == "$50,000"
+    assert out[0]["PI Name"] == "Dr. Lee"
+
+
+def test_a_wrong_closer_at_the_tail_is_replaced(monkeypatch, engine):
+    payload = '{"entities": [{"Award amount": "$50,000", "PI Name": "Dr. Lee", "2 CFR Part 200": "yes"}}\n'
+    out = _run(monkeypatch, engine, payload, KEYS)
+    assert out[0]["Award amount"] == "$50,000"
+
+
+def test_brackets_inside_strings_are_not_counted(monkeypatch, engine):
+    payload = '{"Award amount": "see [Table 2] {draft}", "PI Name": "Dr. Lee", "2 CFR Part 200": "no"'
+    out = _run(monkeypatch, engine, payload, KEYS)
+    assert out[0]["Award amount"] == "see [Table 2] {draft}"
+
+
+def test_output_cut_off_inside_a_string_still_fails(monkeypatch, engine):
+    """Closing a truncated string would invent the end of a value."""
+    payload = '{"Award amount": "$50,000", "PI Name": "Dr. L'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)
+
+
+def test_a_defect_before_the_tail_still_fails(monkeypatch, engine):
+    payload = '{"Award amount": "$50,000" "PI Name": "Dr. Lee"'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)
+
+
+
+# Review of the repair (#978): appending closers cannot tell a missing closer
+# from output that was cut off after a complete value. Each of these parsed
+# into an answer that reported the dropped fields as "not in the document".
+
+
+def test_output_cut_off_after_a_complete_value_still_fails(monkeypatch, engine):
+    payload = '{"entities": [{"Award amount": "$50,000"'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)
+
+
+def test_output_cut_off_mid_number_still_fails(monkeypatch, engine):
+    payload = '{"PI Name": "Dr. Lee", "2 CFR Part 200": "yes", "Award amount": 50'
+    with pytest.raises(ExtractionError, match="unparseable"):
+        _run(monkeypatch, engine, payload, KEYS)
+
+
+def test_a_response_stopped_by_the_token_limit_is_never_repaired(monkeypatch, engine):
+    payload = '{"Award amount": "$50,000", "PI Name": "Dr. Lee", "2 CFR Part 200": "yes"'
+
+    class _Agent2:
+        def run_sync(self, _prompt):
+            return _Result(payload, finish_reason="length")
+
+    monkeypatch.setattr(
+        "app.services.extraction_engine.create_chat_agent", lambda *a, **k: _Agent2(),
+    )
+    with pytest.raises(ExtractionError, match="unparseable"):
+        engine._extract_fallback_json("some document text", KEYS, "test-model")
