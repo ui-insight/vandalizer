@@ -118,3 +118,33 @@ async def test_a_model_rebinding_cannot_cover_falls_back_to_init_beanie():
 
     assert mock_init.await_count == 2
     models[0].set_database.assert_not_called()
+
+
+# --- connection pool warmth ---------------------------------------------------
+# Sentry 7764120249: per-task clients pre-filled a 10-connection pool in the
+# background; a Mongo stutter cancelled those half-open connects and pymongo
+# logged each as an error. Only the long-lived web client keeps a warm pool.
+
+
+@pytest.mark.asyncio
+async def test_task_clients_open_connections_on_demand():
+    with patch("app.database.AsyncIOMotorClient") as client_cls, \
+         patch("app.database.init_beanie", new_callable=AsyncMock):
+        await database.init_db(_settings())
+    assert client_cls.call_args.kwargs["minPoolSize"] == 0
+
+
+@pytest.mark.asyncio
+async def test_the_web_app_keeps_a_warm_pool():
+    with patch("app.database.AsyncIOMotorClient") as client_cls, \
+         patch("app.database.init_beanie", new_callable=AsyncMock):
+        await database.init_db(_settings(), warm_pool=True)
+    assert client_cls.call_args.kwargs["minPoolSize"] == 10
+
+
+def test_the_web_app_asks_for_the_warm_pool():
+    import inspect
+
+    import app.main as main
+
+    assert "warm_pool=True" in inspect.getsource(main.lifespan)

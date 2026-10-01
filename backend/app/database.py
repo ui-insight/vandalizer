@@ -199,12 +199,23 @@ async def _run_pre_index_migrations(db) -> None:
         )
 
 
-async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
+async def init_db(
+    settings: Settings, skip_indexes: bool = False, *, warm_pool: bool = False,
+) -> None:
     """Initialize the Motor client and Beanie ODM.
 
     ``skip_indexes=True`` skips Beanie's per-collection index management
     (the ``listIndexes`` round-trips), which is redundant for short-lived
     periodic Celery tasks — indexes are already ensured by the web app startup.
+
+    ``warm_pool=True`` keeps ``minPoolSize`` connections open in the
+    background; only the web app, whose client lives as long as the process,
+    asks for it. Everything else — every async Celery task builds a client
+    for one run — opens connections on demand. A pre-filled pool there opened
+    up to ten sockets per task that the task never used, and when Mongo
+    stuttered pymongo cancelled the half-open ones and logged "MongoClient
+    background task encountered an error: operation cancelled" (Sentry
+    7764120249).
 
     Index management is also skipped automatically once it has run in this
     process (``_indexes_ensured``), so a Celery worker pays the cost on its
@@ -215,7 +226,7 @@ async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
     _client = AsyncIOMotorClient(
         settings.mongo_host,
         maxPoolSize=100,
-        minPoolSize=10,
+        minPoolSize=10 if warm_pool else 0,
         maxIdleTimeMS=30000,
         serverSelectionTimeoutMS=5000,
         connectTimeoutMS=5000,
