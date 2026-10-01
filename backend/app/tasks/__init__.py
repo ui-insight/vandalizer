@@ -87,7 +87,11 @@ def is_transient_llm_error(exc: BaseException) -> bool:
             return current.status_code in _RETRYABLE_LLM_STATUSES
         if isinstance(current, ModelAPIError):
             return True
-        current = current.__cause__ or current.__context__
+        # ``raise X from None`` sets __suppress_context__: the earlier error
+        # was explicitly disowned, so it must not make X look transient.
+        current = current.__cause__ or (
+            None if current.__suppress_context__ else current.__context__
+        )
     return False
 
 

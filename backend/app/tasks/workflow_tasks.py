@@ -855,6 +855,16 @@ def _retry_if_transient(task, exc: BaseException, what: str, workflow_id) -> Non
     llm = is_transient_llm_error(exc)
     if not (llm or isinstance(exc, TRANSIENT_EXCEPTIONS)):
         return
+    from app.services.workflow_engine import STEP_SIDE_EFFECTS_ATTR
+
+    if getattr(exc, STEP_SIDE_EFFECTS_ATTR, False):
+        # The retry resumes at the failed step and re-runs all of it; a POST
+        # or browser action a sibling task already completed would repeat.
+        logger.warning(
+            "%s %s hit a transient error in a step with side effects; not "
+            "retrying: %s", what, workflow_id, exc,
+        )
+        return
     retries = getattr(task.request, "retries", 0) or 0
     if task.max_retries is not None and retries >= task.max_retries:
         return
