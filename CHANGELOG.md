@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Work a background task leaves running is cancelled cleanly when the task ends, and named in the logs.** Background tasks that run async code use their own event loop. When the task's code returned, the loop was closed immediately, even if something it had started was still running, such as a model call from a failed batch of knowledge-base judging. That leftover work was destroyed mid-flight, which showed up as "Task was destroyed but it is pending! … CombinedCapability.wrap_run()" (Sentry 7613426710). Leftover work is now cancelled and allowed to clean up before the loop closes, the same way Python's own `asyncio.run` does it, and a warning names it so the code that started it can be found.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
