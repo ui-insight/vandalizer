@@ -130,6 +130,25 @@ def _resolve_prompt(variant: str | None, source_label: str) -> str:
     return fn(source_label) + INJECTION_CLAUSE
 
 
+def _log_llm_failure(message: str, exc: BaseException) -> None:
+    """Log a failed extraction LLM call at the level it deserves.
+
+    A provider that can't be reached (DNS, refused connection, 429, 5xx) is
+    an outage, not a bug in this code, and every concurrent call during one
+    used to log its own error with a traceback — one Sentry event per call
+    (Sentry 7723267818: a DNS failure during the nightly quality monitor).
+    The ExtractionError still propagates, and the task that ran the
+    extraction decides whether its failure is worth an error: the extraction
+    task logs one, and a workflow does on its final retry.
+    """
+    from app.tasks import is_transient_llm_error
+
+    if is_transient_llm_error(exc):
+        logger.warning("%s (provider unreachable): %s", message, exc)
+    else:
+        logger.exception(message)
+
+
 _JSON_CLOSERS = {"{": "}", "[": "]"}
 # A value that can only end this way is complete; anything else (a digit, a
 # literal like ``nul``, a colon) may be a fragment of a longer one.
@@ -1156,9 +1175,9 @@ class ExtractionEngine:
                         error_msg,
                     )
                     return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
-                logger.exception("Structured extraction failed with no fallback allowed")
+                _log_llm_failure("Structured extraction failed with no fallback allowed", e)
                 raise ExtractionError(f"Structured extraction failed: {error_msg}") from e
-            logger.exception("Extraction LLM call failed")
+            _log_llm_failure("Extraction LLM call failed", e)
             raise ExtractionError(f"Extraction failed: {error_msg}") from e
 
     # ------------------------------------------------------------------
@@ -1471,5 +1490,5 @@ class ExtractionEngine:
         except ExtractionError:
             raise
         except Exception as e:
-            logger.exception("Fallback extraction LLM call failed")
+            _log_llm_failure("Fallback extraction LLM call failed", e)
             raise ExtractionError(f"Extraction failed: {e}") from e
