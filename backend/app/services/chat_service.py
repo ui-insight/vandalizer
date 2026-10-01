@@ -52,6 +52,7 @@ from app.services.llm_service import (
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
+    is_endpoint_path_not_found,
     KB_CHAT_SYSTEM_PROMPT,
     NO_DOCUMENT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
@@ -331,6 +332,19 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
         return "warning", (
             "This conversation is too large for the selected model. "
             "Remove some documents or switch to a larger model."
+        )
+
+    # The model's endpoint URL has the wrong path (most often an
+    # OpenAI-protocol endpoint saved without "/v1"). Every chat on this model
+    # fails the same way until an admin fixes the config, and the raw text
+    # ("status_code: 404, model_name: …, body: {'detail': 'Not Found'}") says
+    # nothing a user can act on.
+    if is_endpoint_path_not_found(exc):
+        return "warning", (
+            "The selected model's server address is misconfigured, so it can't "
+            "be reached. Pick a different model in Settings, and let your "
+            "administrator know: this model's endpoint in System Config needs "
+            "fixing (OpenAI-compatible endpoints usually end in /v1)."
         )
 
     # Configured model isn't served by the upstream LLM gateway.

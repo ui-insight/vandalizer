@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 import httpx
 import pymongo
 from bs4 import BeautifulSoup
+from beanie.exceptions import DocumentNotFound
 from pymongo.errors import DuplicateKeyError, OperationFailure
 
 if TYPE_CHECKING:
@@ -365,6 +366,31 @@ async def _insert_source_unless_duplicate(source: KnowledgeBaseSource) -> bool:
             "another ingest run",
             source.url, source.knowledge_base_uuid,
         )
+        return False
+    return True
+
+
+async def _save_unless_deleted(source: KnowledgeBaseSource) -> bool:
+    """Persist an ingest outcome; False if the row was deleted meanwhile.
+
+    A URL ingest runs for seconds to minutes, and the user can delete the
+    source (and re-add the same URL) while it does. ``save()`` upserts, so it
+    would resurrect the deleted row — or, when a re-added row now holds the
+    same (KB, url), hit the unique index, which Beanie re-raises as a bare
+    ``RevisionIdWasChanged`` with no message (Sentry: "Error ingesting URL
+    source <uuid>: " with nothing after the colon). ``replace()`` never
+    inserts, so a vanished row surfaces as ``DocumentNotFound`` instead.
+    """
+    try:
+        await source.replace()
+    except DocumentNotFound:
+        logger.info(
+            "KB source %s (%s) was deleted during ingest; discarding the result",
+            source.uuid, source.url,
+        )
+        # In-memory only (the row is gone): lets a crawl tell a page the user
+        # deleted mid-crawl from one it added.
+        source.status = "deleted"
         return False
     return True
 
@@ -1562,6 +1588,10 @@ async def _crawl_from_source(
             visited.add(child_final)
             landed.add(child_final)
 
+        if child.status == "deleted":
+            # Removed by the user while it was being ingested: not added.
+            logger.info(f"Crawl: {url} was deleted during ingest")
+            continue
         if child.status == "skipped":
             # Navigation, not content: drop the source record entirely so it
             # never shows up in the KB, but fall through to harvest its links.
@@ -1580,10 +1610,12 @@ async def _crawl_from_source(
                     queue.append(link)
                     visited.add(link)
 
-    # Update parent with crawled URL list
+    # Update parent with crawled URL list. A crawl runs for many pages, so
+    # the parent may have been deleted (or deleted and re-added) meanwhile;
+    # save() would resurrect it or collide with the re-added row.
     parent.crawled_urls = crawled_urls
     parent.skipped_urls = skipped_urls or None
-    await parent.save()
+    await _save_unless_deleted(parent)
 
     logger.info(
         f"Crawl complete for {parent.url}: {added} child pages added, "
@@ -2074,7 +2106,7 @@ async def _ingest_url_source(
         if reject_reason:
             source.status = "error"
             source.error_message = reject_reason
-            await source.save()
+            await _save_unless_deleted(source)
             return None
 
         if content_gate is not None:
@@ -2083,7 +2115,8 @@ async def _ingest_url_source(
                 source.status = "skipped"
                 source.error_message = skip_reason[:2000]
                 source.url_title = result.title
-                await source.save()
+                if not await _save_unless_deleted(source):
+                    return None
                 # Not an error — the caller still wants the links off this page.
                 return result
 
@@ -2102,7 +2135,11 @@ async def _ingest_url_source(
         source.chunk_count = chunk_count
         source.status = "ready"
         currency.stamp_ingested(source, raw_text)
-        await source.save()
+        if not await _save_unless_deleted(source):
+            # remove_source cleared the chunks before ours landed; nothing
+            # else will ever delete these, and they would keep answering.
+            await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+            return None
         return result
     except httpx.HTTPStatusError as e:
         if 400 <= e.response.status_code < 500:
@@ -2111,19 +2148,19 @@ async def _ingest_url_source(
             logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
         source.error_message = describe_fetch_error(e)[:2000]
-        await source.save()
+        await _save_unless_deleted(source)
         return None
     except (ValueError, httpx.RequestError) as e:
         logger.warning("URL source %s unreachable: %s", source.uuid, e)
         source.status = "error"
         source.error_message = describe_fetch_error(e)[:2000]
-        await source.save()
+        await _save_unless_deleted(source)
         return None
     except Exception as e:
         logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
         source.error_message = describe_fetch_error(e)[:2000]
-        await source.save()
+        await _save_unless_deleted(source)
         return None
 
 
