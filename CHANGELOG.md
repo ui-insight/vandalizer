@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A workflow run survives a brief model-server outage instead of failing.** A run whose model call could not connect failed at once with "Extraction failed: Connection error.", even when the model server was back seconds later (Sentry 7610990045). The model client had retried twice within about a second, and the run itself never retried. A run that fails on a connection error, a rate limit (429), or a gateway or overload error (5xx) is now tried again after 30 seconds, then 60, then 120, picking up at the step that failed; earlier steps are not repeated. Network errors reaching the database or Redis now retry too. Those retries never actually happened before: the run was marked failed before each one, and the retry then skipped it because it was already marked failed. The same fix applies to a run resuming after approval. Errors that won't go away on retry, such as a renamed model, a revoked key or a bad request, still fail the run at once. Only the last attempt marks the run failed and notifies its owner.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
