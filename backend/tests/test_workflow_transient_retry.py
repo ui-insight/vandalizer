@@ -179,3 +179,67 @@ class TestApprovalResumeRetriesTransientFailures:
         assert raised is ValueError
         retry.assert_not_called()
         assert len(_error_writes(db)) == 1
+
+
+# ---------------------------------------------------------------------------
+# Review of #979: a retry resumes at the failed step and re-runs ALL of it.
+# A multi-task step runs its tasks concurrently, so an API POST could finish
+# before a sibling Extraction hit a connection error — and the retry would
+# send it again. Steps that act outside the run are not retried.
+# ---------------------------------------------------------------------------
+
+
+class _Failing:
+    def __init__(self, side_effects):
+        self._side_effects = side_effects
+        self.name = "step"
+
+    def has_side_effects(self):
+        return self._side_effects
+
+    def process(self, _inputs):
+        raise _wrapped(ModelAPIError(model_name="m", message="Connection error."))
+
+
+def test_a_failure_in_a_step_with_side_effects_is_tagged():
+    from app.services.workflow_engine import STEP_SIDE_EFFECTS_ATTR, _process_tagged
+
+    with pytest.raises(ExtractionError) as raised:
+        _process_tagged(_Failing(True), {})
+    assert getattr(raised.value, STEP_SIDE_EFFECTS_ATTR, False) is True
+
+    with pytest.raises(ExtractionError) as raised:
+        _process_tagged(_Failing(False), {})
+    assert not getattr(raised.value, STEP_SIDE_EFFECTS_ATTR, False)
+
+
+def test_a_multi_task_step_has_side_effects_if_any_task_does():
+    from app.services.workflow_engine import APICallNode, MultiTaskNode, PromptNode
+
+    step = MultiTaskNode("Step")
+    step.tasks = [APICallNode({"method": "POST"}), PromptNode.__new__(PromptNode)]
+    assert step.has_side_effects() is True
+    step.tasks = [APICallNode({"method": "GET"}), PromptNode.__new__(PromptNode)]
+    assert step.has_side_effects() is False
+
+
+def test_a_tagged_transient_failure_is_not_retried():
+    from app.services.workflow_engine import STEP_SIDE_EFFECTS_ATTR
+
+    exc = _wrapped(ModelAPIError(model_name="m", message="Connection error."))
+    setattr(exc, STEP_SIDE_EFFECTS_ATTR, True)
+    db = _db()
+    retry, outcome = _run_execute(db, exc)
+    assert outcome == "raised"
+    retry.assert_not_called()
+    assert len(_error_writes(db)) == 1
+
+
+def test_an_error_raised_from_none_is_not_made_transient_by_its_context():
+    try:
+        try:
+            raise ModelAPIError(model_name="m", message="Connection error.")
+        except ModelAPIError:
+            raise ValueError("bad payload") from None
+    except ValueError as e:
+        assert not is_transient_llm_error(e)
