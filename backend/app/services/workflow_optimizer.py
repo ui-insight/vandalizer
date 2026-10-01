@@ -32,6 +32,7 @@ from typing import Any
 
 from beanie import PydanticObjectId
 
+from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.models.workflow import Workflow, WorkflowResult
 from app.models.workflow_optimization_run import WorkflowOptimizationRun
@@ -258,12 +259,10 @@ async def run_optimization(
                 "(Validate tab → Generate plan)."
             )
 
-        test_inputs = await _resolve_test_inputs(wf)
+        unreadable: list[dict] = []
+        test_inputs = await _resolve_test_inputs(wf, unreadable)
         if not test_inputs:
-            raise OptimizationInputError(
-                "No test inputs available. Mark at least one past workflow run "
-                "as 'expected output' on the Validate tab before optimizing."
-            )
+            raise OptimizationInputError(no_test_inputs_message(len(unreadable)))
 
         # Train/holdout split — winner selection happens on train, headline
         # ``optimized_score`` is re-measured on holdout. Without this, best-of-N
@@ -623,7 +622,43 @@ async def run_optimization(
 # ---------------------------------------------------------------------------
 
 
-async def _resolve_test_inputs(wf: Workflow) -> list[dict]:
+def no_test_inputs_message(unreadable: int = 0) -> str:
+    """Why the optimizer has nothing to run, worded for the person starting it."""
+    if unreadable:
+        what = (
+            "1 expected-output run's document was deleted or has"
+            if unreadable == 1
+            else f"{unreadable} expected-output runs' documents were deleted or have"
+        )
+        return (
+            f"No usable test inputs: {what} no extracted text, so the workflow "
+            "would run on nothing. Re-run the workflow on readable documents and "
+            "mark the new run as 'expected output' on the Validate tab."
+        )
+    return (
+        "No test inputs available. Mark at least one past workflow run "
+        "as 'expected output' on the Validate tab before optimizing."
+    )
+
+
+async def _readable_document_uuids(uuids: list[str]) -> set[str]:
+    """The subset of ``uuids`` naming a document that still has text.
+
+    Same test the workflow's step builder applies (truthy ``raw_text``), so a
+    document counted readable here is one a trial will actually be fed.
+    """
+    if not uuids:
+        return set()
+    cursor = SmartDocument.get_motor_collection().find(
+        {"uuid": {"$in": list(uuids)}, "raw_text": {"$nin": [None, ""]}},
+        {"uuid": 1},
+    )
+    return {d["uuid"] async for d in cursor}
+
+
+async def _resolve_test_inputs(
+    wf: Workflow, unreadable: list[dict] | None = None,
+) -> list[dict]:
     """Return the list of test-input dicts the optimizer will run trials against.
 
     A test input is an ``expected_output`` entry on the workflow's
@@ -641,7 +676,14 @@ async def _resolve_test_inputs(wf: Workflow) -> list[dict]:
         }
 
     Entries missing doc_uuids are filtered out — the optimizer can't run a
-    trial without input documents.
+    trial without input documents. So are entries whose documents have since
+    been deleted or lost their text (appended to ``unreadable`` when given):
+    every trial would run the workflow on nothing and the judge would score
+    that emptiness, spending the whole budget on numbers that mean nothing
+    (Sentry 7598676926: "None of the 1 input documents have raw_text
+    available", logged once per trial). An entry missing *any* of its
+    documents is dropped too — its expected output was produced from all
+    of them.
     """
     out: list[dict] = []
     for inp in (wf.validation_inputs or []):
@@ -660,6 +702,17 @@ async def _resolve_test_inputs(wf: Workflow) -> list[dict]:
             continue
         doc_uuids = (wr.input_context or {}).get("doc_uuids") or []
         if not doc_uuids:
+            continue
+        readable = await _readable_document_uuids(doc_uuids)
+        if any(u not in readable for u in doc_uuids):
+            logger.warning(
+                "Skipping workflow %s test input %s — %d of %d document(s) "
+                "deleted or without text",
+                wf.id, inp.get("id", ""),
+                sum(u not in readable for u in doc_uuids), len(doc_uuids),
+            )
+            if unreadable is not None:
+                unreadable.append({"id": inp.get("id", ""), "session_id": session_id})
             continue
         out.append({
             "id": inp.get("id", ""),
