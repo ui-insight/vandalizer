@@ -1175,7 +1175,7 @@ class ExtractionEngine:
                         error_msg,
                     )
                     return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map, prompt_variant=prompt_variant, capture_sources=capture_sources)
-                logger.exception("Structured extraction failed with no fallback allowed")
+                _log_llm_failure("Structured extraction failed with no fallback allowed", e)
                 raise ExtractionError(f"Structured extraction failed: {error_msg}") from e
             _log_llm_failure("Extraction LLM call failed", e)
             raise ExtractionError(f"Extraction failed: {error_msg}") from e
