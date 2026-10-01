@@ -19,7 +19,7 @@
     "@sentry/react": "^10.74.0",
     "@tailwindcss/vite": "^4.3.3",
     "@tanstack/react-query": "^5.103.1",
-    "@tanstack/react-router": "^1.170.36",
+    "@tanstack/react-router": "^1.170.40",
     "@types/d3": "^7.4.3",
     "@types/dompurify": "^3.2.0",
     "clsx": "^2.1.1",
