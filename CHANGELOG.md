@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Refreshing a single web source works again (regression in v4.14.0).** In v4.14.0, the per-source **Refresh** button on a knowledge-base web source failed every time before fetching anything. The task crashed with "can't subtract offset-naive and offset-aware datetimes", the source stayed "pending", and the knowledge base stayed "building" until the stale-refresh window passed (Sentry 7755236750). The check that stops two refreshes of one source from racing compared a timestamp with a time zone against one without. **Refresh all** and scheduled auto-refresh were not affected. Refreshes that were queued before upgrading run normally.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added

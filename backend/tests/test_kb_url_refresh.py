@@ -241,3 +241,28 @@ async def test_service_stores_the_interval(value, stored):
     with patch.object(knowledge_service, "get_knowledge_base", AsyncMock(return_value=kb)):
         await knowledge_service.update_knowledge_base("kb-1", MagicMock(), url_refresh_interval=value)
     assert kb.url_refresh_interval == stored
+
+
+class TestSameStampAcrossTimezoneAwareness:
+    """Sentry 7755236750: the route read its stamp back after save(), which
+    merged in Mongo's naive datetime, so the task received
+    '2026-09-28T22:49:38.603000' and crashed subtracting it from the aware
+    stored value. Every per-source Refresh failed that way."""
+
+    def test_a_naive_stamp_matches_its_aware_stored_value(self):
+        from app.tasks.kb_validation_tasks import _same_stamp
+
+        stored = datetime.datetime(2026, 9, 28, 22, 49, 38, 603000, tzinfo=datetime.timezone.utc)
+        assert _same_stamp(stored, "2026-09-28T22:49:38.603000") is True
+
+    def test_an_aware_stamp_matches_a_naive_stored_value(self):
+        from app.tasks.kb_validation_tasks import _same_stamp
+
+        stored = datetime.datetime(2026, 9, 28, 22, 49, 38, 603000)
+        assert _same_stamp(stored, "2026-09-28T22:49:38.603123+00:00") is True
+
+    def test_a_later_queueing_still_supersedes_a_naive_stamp(self):
+        from app.tasks.kb_validation_tasks import _same_stamp
+
+        stored = datetime.datetime(2026, 9, 28, 23, 49, 38, tzinfo=datetime.timezone.utc)
+        assert _same_stamp(stored, "2026-09-28T22:49:38.603000") is False
