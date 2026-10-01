@@ -132,6 +132,7 @@ async def test_add_urls_continues_past_lost_race_to_next_url():
 async def test_crawl_skips_child_that_lost_the_insert_race():
     parent = SimpleNamespace(uuid="parent-1", url="https://a.gov/start", crawled_urls=None)
     parent.save = AsyncMock()
+    parent.replace = AsyncMock()
     fetched = _html_result(parent.url, '<a href="/dup">D</a> <a href="/ok">O</a>')
     cls, children = _mock_source_cls(duplicate_urls={"https://a.gov/dup"})
 
