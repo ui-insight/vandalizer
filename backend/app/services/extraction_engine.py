@@ -130,6 +130,62 @@ def _resolve_prompt(variant: str | None, source_label: str) -> str:
     return fn(source_label) + INJECTION_CLAUSE
 
 
+_JSON_CLOSERS = {"{": "}", "[": "]"}
+# A value that can only end this way is complete; anything else (a digit, a
+# literal like ``nul``, a colon) may be a fragment of a longer one.
+_CLOSED_VALUE_ENDINGS = '}]"'
+
+
+def _close_json_tail(text: str) -> str | None:
+    """Repair JSON whose only defect is its closing brackets; None otherwise.
+
+    gpt-oss on the JSON-fallback path sometimes ends a nested payload one
+    closer short ({"entities": [...], "_sources": {...} with no final "}") or
+    with the wrong one ("]" where "}" belonged), failing a complete answer on
+    its last character (Sentry 7694407872: "Expecting ',' delimiter" at char
+    1013 of 1015). Only brackets after the last value are touched — missing
+    ones are appended, wrong ones replaced. Text that ends inside a string, or
+    goes wrong before its tail, is left to fail, and so does text whose last
+    value is not closed (a number, ``true``/``null``, a dangling key): output
+    cut off mid-number would otherwise parse as a different number. Closing
+    brackets cannot tell a missing closer from output that was cut off after a
+    complete value, so the caller must also check what the repair produced.
+    """
+    stack: list[str] = []
+    in_string = escaped = False
+    for i, ch in enumerate(text):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+        elif ch in _JSON_CLOSERS:
+            stack.append(_JSON_CLOSERS[ch])
+        elif ch in "}]":
+            if stack and ch == stack[-1]:
+                stack.pop()
+                continue
+            # A wrong closer: repairable only when nothing but closers
+            # follows it, i.e. the model finished its values and fumbled the
+            # brackets.
+            if not stack or text[i:].strip(" \t\r\n}]"):
+                return None
+            head = text[:i].rstrip()
+            if not head or head[-1] not in _CLOSED_VALUE_ENDINGS:
+                return None
+            return head + "".join(reversed(stack))
+    if in_string or not stack:
+        return None
+    head = text.rstrip()
+    if head[-1] not in _CLOSED_VALUE_ENDINGS:
+        return None
+    return head + "".join(reversed(stack))
+
+
 class ExtractionError(RuntimeError):
     """An extraction attempt failed — LLM/provider error or unparseable output.
 
@@ -1114,6 +1170,20 @@ class ExtractionEngine:
         """Case/punctuation/whitespace-insensitive form of a field name."""
         return re.sub(r"[^a-z0-9]", "", str(key).lower())
 
+    @classmethod
+    def _names_every_key(cls, parsed, keys: list[str]) -> bool:
+        """Whether every requested field appears as a key somewhere in ``parsed``."""
+        seen: set[str] = set()
+        stack = [parsed]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, dict):
+                seen.update(cls._fold_key(k) for k in node)
+                stack.extend(node.values())
+            elif isinstance(node, list):
+                stack.extend(node)
+        return all(cls._fold_key(k) in seen for k in keys)
+
     @staticmethod
     def _unwrap_entities_envelope(parsed):
         """Return ``(body, envelope)`` for a parsed fallback payload.
@@ -1297,7 +1367,31 @@ class ExtractionEngine:
                 # for-character, and a passage that spans lines comes back
                 # with real newlines, which strict JSON rejects at the first
                 # one — turning a fully usable answer into a failed run.
-                parsed = json.loads(output.strip(), strict=False)
+                try:
+                    parsed = json.loads(output.strip(), strict=False)
+                except json.JSONDecodeError as original:
+                    # A response stopped by the output-token limit is cut off,
+                    # not mis-bracketed: closing it would turn the missing
+                    # fields into "not in the document".
+                    response = getattr(result, "response", None)
+                    if getattr(response, "finish_reason", None) == "length":
+                        raise
+                    repaired = _close_json_tail(output.strip())
+                    if repaired is None:
+                        raise
+                    try:
+                        parsed = json.loads(repaired, strict=False)
+                    except json.JSONDecodeError:
+                        raise original from None
+                    # The prompt asks for every field (null when not found),
+                    # so a complete answer names them all. One that doesn't
+                    # was cut off after a complete value, not mis-bracketed.
+                    if not self._names_every_key(parsed, keys):
+                        raise original from None
+                    logger.warning(
+                        "Fallback extraction JSON had unbalanced closing "
+                        "brackets; repaired the tail and parsed it"
+                    )
                 # The prompts ask for an {"entities": [...]} envelope, so
                 # unwrap it before deciding the model answered about something
                 # else. ``envelope`` keeps the sibling ``_sources`` block.
