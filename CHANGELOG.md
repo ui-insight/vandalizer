@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **A misconfigured automation no longer reports every failed run to Sentry as an error.** An automation whose workflow has a step that can't run as configured, such as an Add Website step with no URL, a blocked address or an HTTP error the step reported, or that stops because the trial budget is used up, fails every time it fires. It already failed the run without retrying and notified the owner. It also reported each run to Sentry as an error (Sentry 7761609315). These are now logged as warnings, the same as when the workflow is run by hand. Unexpected crashes are still reported as errors.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
