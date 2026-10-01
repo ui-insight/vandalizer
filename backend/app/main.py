@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("Starting Vandalizer backend")
-    await init_db(get_settings())
+    await init_db(get_settings(), warm_pool=True)
 
     # Unique (kb, url) index for KB sources. Lives outside Beanie's index
     # management because it self-heals: duplicates created by the old racy

@@ -472,6 +472,48 @@ def unwrap_model_base_url(model) -> Optional[str]:
     return str(url) if url else None
 
 
+def _looks_like_missing_route(body) -> bool:
+    """Whether a 404 body is a web framework's "no such path", not an API's
+    "no such model / deployment / endpoint for this model"."""
+    if body is None or body == "" or body == {}:
+        return True
+    if isinstance(body, dict):
+        # FastAPI / Starlette's default, and nothing else in the body.
+        return set(body) == {"detail"} and str(body["detail"]).strip().lower() == "not found"
+    text = str(body).strip().lower()
+    return (
+        text in ("not found", "404 not found", "404 page not found")  # Go net/http, nginx
+        or text.startswith("<")  # an HTML error page
+        or text.startswith("cannot post")  # Express
+    )
+
+
+def is_endpoint_path_not_found(exc: BaseException) -> bool:
+    """True when ``exc`` is a 404 for the URL path, not for the model name.
+
+    Both come back as ``ModelHTTPError(status_code=404)``, and pydantic-ai's
+    message always contains ``model_name: …``, so the message text can't tell
+    them apart. The body can — but only by matching what a missing *route*
+    looks like (FastAPI's bare ``{'detail': 'Not Found'}``, Go's or nginx's
+    "404 page not found", an HTML page, Express's "Cannot POST …", or nothing
+    at all). Model 404s are worded too many ways to recognize by absence of a
+    word: OpenRouter says "No endpoints found for …", Azure
+    ``DeploymentNotFound``. That bare ``{'detail': 'Not Found'}`` is what an
+    OpenAI-protocol endpoint saved without its ``/v1`` produces — the
+    provider dials it verbatim (Sentry 7719925573:
+    ``POST https://mindrouter.uidaho.edu/chat/completions`` → 404).
+    """
+    from pydantic_ai.exceptions import ModelHTTPError
+
+    seen: set[int] = set()
+    current: BaseException | None = exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if isinstance(current, ModelHTTPError):
+            return current.status_code == 404 and _looks_like_missing_route(current.body)
+        current = current.__cause__ or current.__context__
+    return False
+
 def resolve_thinking_enabled(
     agent_model: str,
     thinking_override: Optional[bool] = None,

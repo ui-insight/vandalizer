@@ -1873,14 +1873,11 @@ async def start_workflow_optimization(
                 "(Validate tab → Generate plan)."
             ),
         )
-    from app.services.workflow_optimizer import _resolve_test_inputs
-    if not await _resolve_test_inputs(wf):
+    from app.services.workflow_optimizer import _resolve_test_inputs, no_test_inputs_message
+    unreadable: list[dict] = []
+    if not await _resolve_test_inputs(wf, unreadable):
         raise HTTPException(
-            status_code=400,
-            detail=(
-                "No test inputs available. Mark at least one past workflow run "
-                "as 'expected output' on the Validate tab before optimizing."
-            ),
+            status_code=400, detail=no_test_inputs_message(len(unreadable)),
         )
 
     from app.models.workflow_optimization_run import WorkflowOptimizationRun

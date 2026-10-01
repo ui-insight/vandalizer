@@ -569,6 +569,41 @@ async def get_latest_validation(
     return _run_to_dict(run[0])
 
 
+
+async def get_latest_validations(pairs: list[tuple[str, str]]) -> dict[tuple[str, str], dict]:
+    """``get_latest_validation`` for many items in one aggregation.
+
+    Keyed by ``(item_kind, item_id)``; items with no non-smoke-test run are
+    absent. Same selection as the single-item form: newest ``created_at``
+    first, smoke-test runs skipped.
+    """
+    wanted = {(k, i) for k, i in pairs if k and i}
+    if not wanted:
+        return {}
+    by_kind: dict[str, list[str]] = {}
+    for kind, item_id in wanted:
+        by_kind.setdefault(kind, []).append(item_id)
+    pipeline = [
+        {"$match": {
+            "$and": [
+                NOT_SMOKE_TEST,
+                {"$or": [{"item_kind": k, "item_id": {"$in": ids}} for k, ids in by_kind.items()]},
+            ],
+        }},
+        # Same prefix as the (item_kind, item_id, created_at desc) index, so
+        # the index serves the sort instead of an in-memory sort of every
+        # matching run's full document.
+        {"$sort": {"item_kind": 1, "item_id": 1, "created_at": -1}},
+        {"$group": {"_id": {"k": "$item_kind", "i": "$item_id"}, "run": {"$first": "$$ROOT"}}},
+    ]
+    rows = await ValidationRun.get_motor_collection().aggregate(pipeline).to_list(length=None)
+    out: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        key = (row["_id"]["k"], row["_id"]["i"])
+        if key in wanted:
+            out[key] = _run_to_dict(ValidationRun.model_validate(row["run"]))
+    return out
+
 async def get_quality_summary() -> dict:
     """Aggregate stats: avg score, total runs, validated vs unvalidated items."""
     # Use aggregation to avoid loading all runs into memory

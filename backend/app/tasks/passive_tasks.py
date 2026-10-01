@@ -603,7 +603,16 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     except Exception as e:
         from app.services.workflow_engine import WorkflowStepError
 
-        logger.error("Passive execution failed for event %s: %s", event.get("uuid"), e)
+        # A step error (an "Add Website" step with no URL, a blocked address,
+        # an HTTP error the step reported) or a spend block is the workflow's
+        # configuration, not a fault: the owner is told below, and at error
+        # level every scheduled run of a misconfigured automation paged Sentry
+        # (Sentry 7761609315). execute_workflow_task logs the same failure at
+        # warning.
+        _deterministic = isinstance(e, (WorkflowStepError, TrialSpendBlockedError))
+        (logger.warning if _deterministic else logger.error)(
+            "Passive execution failed for event %s: %s", event.get("uuid"), e,
+        )
 
         # Mark the run's WorkflowResult failed too (when it got created) so it
         # doesn't sit in "running" forever in the run history.
@@ -659,7 +668,6 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         # re-spending everything the first pass completed, and cannot succeed
         # until the budget changes. Treated as terminal for the same reason
         # (#808).
-        _deterministic = isinstance(e, (WorkflowStepError, TrialSpendBlockedError))
         if not _deterministic and attempt < max_retries:
             retry_delay = retry_cfg.get("retry_delay_seconds", 300)
             next_retry = datetime.now(timezone.utc) + timedelta(seconds=retry_delay)

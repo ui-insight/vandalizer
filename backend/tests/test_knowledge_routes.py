@@ -1117,6 +1117,55 @@ class TestKnowledgeDocSources:
         assert mock_delay.call_args.args[1] == ["https://example.org/new"]
 
     @pytest.mark.asyncio
+    async def test_refresh_stamp_keeps_its_timezone_through_save(self, client):
+        """Beanie's save() merges back the document Mongo returns, whose
+        datetimes are naive and millisecond-truncated. A stamp read off the
+        source after save() lost its timezone, and the task crashed comparing
+        it (Sentry 7755236750)."""
+        import datetime as _dt
+
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        src = SimpleNamespace(
+            uuid="src-1", source_type="url", url="https://www.uidaho.edu/policies/apm/45/14",
+            status="ready",
+        )
+
+        async def beanie_like_save():
+            stamp = src.refresh_queued_at
+            src.refresh_queued_at = stamp.replace(
+                tzinfo=None, microsecond=stamp.microsecond // 1000 * 1000,
+            )
+
+        src.save = AsyncMock(side_effect=beanie_like_save)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource.find_one", AsyncMock(return_value=src)),
+            patch("app.tasks.kb_validation_tasks.refresh_url_source_task.delay") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/source/src-1/refresh",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        stamp = _dt.datetime.fromisoformat(mock_delay.call_args.args[2])
+        assert stamp.tzinfo is not None
+
+        from app.tasks.kb_validation_tasks import _same_stamp
+        assert _same_stamp(src.refresh_queued_at, mock_delay.call_args.args[2]) is True
+
+    @pytest.mark.asyncio
     async def test_refresh_source_dispatches_worker_and_marks_pending(self, client):
         user = _make_user()
         cookies, headers = _auth()

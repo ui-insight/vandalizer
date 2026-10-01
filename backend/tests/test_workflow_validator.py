@@ -70,9 +70,41 @@ class TestResolveModelName:
     def test_user_config_wins(self, mock_db):
         mock_db.return_value = _make_db(
             user_config={"user_id": "u1", "name": "user-model"},
-            sys_config={"available_models": [{"name": "sys-model"}]},
+            sys_config={"available_models": [{"name": "sys-model"}, {"name": "user-model"}]},
         )
         assert _resolve_model_name("u1") == "user-model"
+
+    # Sentry 7703225327: an unconfigured stored value went out as a bare name,
+    # was read as a local Ollama model, and dialed localhost:11434.
+
+    @patch("app.services.workflow_validator._get_db")
+    def test_a_stored_tag_resolves_to_its_model_name(self, mock_db):
+        mock_db.return_value = _make_db(
+            user_config={"user_id": "u1", "name": "fast"},
+            sys_config={"available_models": [
+                {"name": "openai/gpt-oss-120b"},
+                {"name": "qwen/qwen3.8-27b", "tag": "fast"},
+            ]},
+        )
+        assert _resolve_model_name("u1") == "qwen/qwen3.8-27b"
+
+    @patch("app.services.workflow_validator._get_db")
+    def test_a_model_since_removed_falls_back_to_the_default(self, mock_db):
+        mock_db.return_value = _make_db(
+            user_config={"user_id": "u1", "name": "qwen3.6"},
+            sys_config={
+                "available_models": [{"name": "openai/gpt-oss-120b"}, {"name": "qwen/qwen3.8-27b"}],
+                "default_model": "qwen/qwen3.8-27b",
+            },
+        )
+        assert _resolve_model_name("u1") == "qwen/qwen3.8-27b"
+
+    @patch("app.services.workflow_validator._get_db")
+    def test_an_unconfigured_default_model_is_skipped(self, mock_db):
+        mock_db.return_value = _make_db(
+            sys_config={"available_models": [{"name": "sys-model"}], "default_model": "gone"},
+        )
+        assert _resolve_model_name(None) == "sys-model"
 
     @patch("app.services.workflow_validator._get_db")
     def test_falls_back_to_system_default(self, mock_db):
