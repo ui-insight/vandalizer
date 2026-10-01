@@ -609,40 +609,53 @@ def _evaluate_xlsx_formulas(xlsx_path: str) -> dict[tuple[str, str], object]:
 
 
 # A zip that openpyxl refuses is often a different file under an .xlsx name.
-# Matched against the package's declared content types (or an OpenDocument
-# package's "mimetype" member); first match wins.
+# Matched against the content types of the package's main parts (its
+# ``Override`` entries — never ``Default`` extension entries, which a real
+# workbook carries for any embedded Word or PowerPoint object) or an
+# OpenDocument package's "mimetype" member; first match wins.
 _MISNAMED_PACKAGES = (
-    ("ms-excel.sheet.binary", "an Excel Binary Workbook (.xlsb)",
+    (("ms-excel.sheet.binary.macroenabled.main",), "an Excel Binary Workbook (.xlsb)",
      "Open it in Excel, use Save As → Excel Workbook (.xlsx), and upload that."),
-    ("wordprocessingml.document", "a Word document",
+    (("wordprocessingml.document.main", "wordprocessingml.template.main"), "a Word document",
      "Rename it to .docx and upload it again."),
-    ("presentationml.", "a PowerPoint presentation",
+    (("presentationml.presentation.main", "presentationml.slideshow.main",
+      "presentationml.template.main"), "a PowerPoint presentation",
      "Rename it to .pptx and upload it again."),
-    ("opendocument.spreadsheet", "an OpenDocument spreadsheet (.ods)",
+    (("application/vnd.oasis.opendocument.spreadsheet",), "an OpenDocument spreadsheet (.ods)",
      "Open it in Excel or LibreOffice, save it as .xlsx, and upload that."),
 )
+
+_OVERRIDE_CONTENT_TYPE = re.compile(r"<Override\b[^>]*\bContentType=\"([^\"]+)\"", re.IGNORECASE)
+
+
+def _no_workbook_in_package(exc: BaseException) -> bool:
+    """openpyxl found no workbook at all — not a workbook it failed to parse."""
+    text = str(exc)
+    return "no valid workbook part" in text or "[Content_Types].xml" in text
 
 
 def _describe_misnamed_xlsx(xlsx_path: str) -> str | None:
     """A user-facing message when an .xlsx is really another kind of package.
 
     None when the file isn't a readable zip or declares nothing recognizable.
+    Only meaningful once openpyxl has reported there is no workbook in it.
     """
     import zipfile
 
     try:
         with zipfile.ZipFile(xlsx_path) as zf:
             names = set(zf.namelist())
-            declared = ""
+            declared: list[str] = []
             if "[Content_Types].xml" in names:
-                declared += zf.read("[Content_Types].xml").decode("utf-8", "replace")
+                manifest = zf.read("[Content_Types].xml").decode("utf-8", "replace")
+                declared += _OVERRIDE_CONTENT_TYPE.findall(manifest)
             if "mimetype" in names:
-                declared += zf.read("mimetype").decode("utf-8", "replace")
+                declared.append(zf.read("mimetype").decode("utf-8", "replace").strip())
     except (zipfile.BadZipFile, OSError, KeyError):
         return None
-    declared = declared.lower()
-    for marker, what, remedy in _MISNAMED_PACKAGES:
-        if marker in declared:
+    declared = [d.lower() for d in declared]
+    for markers, what, remedy in _MISNAMED_PACKAGES:
+        if any(m in d for m in markers for d in declared):
             return f"This file is {what} saved with an .xlsx extension, so it can't be read as an Excel workbook. {remedy}"
     return None
 
@@ -669,7 +682,9 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
         # "File conversion failed after 1 attempts: - XlsxConverter threw
         # OSError …" as the message the user saw (Sentry 7598762528). Say
         # what the file is instead.
-        misnamed = _describe_misnamed_xlsx(xlsx_path)
+        # Only when there is no workbook at all: a real workbook that openpyxl
+        # fails to parse for any other reason still falls back to MarkItDown.
+        misnamed = _describe_misnamed_xlsx(xlsx_path) if _no_workbook_in_package(e) else None
         if misnamed:
             raise DocumentReadError(misnamed) from e
         if "no valid workbook part" in str(e):

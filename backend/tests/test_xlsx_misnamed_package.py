@@ -102,3 +102,61 @@ def test_a_real_workbook_still_reads(tmp_path):
     wb.save(path)
     text = extract_text_from_xlsx(str(path))
     assert "Award amount" in text and "50000" in text
+
+
+# Review of #982: the sniffer ran on every openpyxl failure and matched
+# Default extension entries, so a real workbook with an embedded Word object
+# that openpyxl failed to parse for an unrelated reason was called "a Word
+# document" instead of falling back to MarkItDown.
+
+
+def _with_embedded_docx_default(path):
+    """Rewrite a real .xlsx so its manifest declares an embedded .docx."""
+    import shutil
+
+    tmp = str(path) + ".tmp"
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(tmp, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename == "[Content_Types].xml":
+                data = data.replace(
+                    b"<Default ",
+                    b'<Default Extension="docx" ContentType="application/vnd.openxmlformats-'
+                    b'officedocument.wordprocessingml.document"/><Default ',
+                    1,
+                )
+            dst.writestr(item, data)
+    shutil.move(tmp, path)
+
+
+def test_a_real_workbook_that_fails_to_parse_still_falls_back(tmp_path, monkeypatch):
+    path = tmp_path / "budget.xlsx"
+    wb = openpyxl.Workbook()
+    wb.active["A1"] = "Award amount"
+    wb.save(path)
+    _with_embedded_docx_default(path)
+
+    def broken_load(*_a, **_k):
+        raise TypeError("expected <class 'openpyxl.styles.fills.Fill'>")
+
+    monkeypatch.setattr(openpyxl, "load_workbook", broken_load)
+    monkeypatch.setattr(
+        "app.services.document_readers.convert_to_markdown",
+        lambda *_a, **_k: "FALLBACK",
+    )
+    assert extract_text_from_xlsx(str(path)) == "FALLBACK"
+
+
+def test_a_presentation_embedding_a_word_file_is_called_a_presentation(tmp_path):
+    path = tmp_path / "deck.xlsx"
+    types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="docx" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>'
+        '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'
+        "</Types>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("[Content_Types].xml", types)
+    with pytest.raises(DocumentReadError, match="a PowerPoint presentation"):
+        extract_text_from_xlsx(str(path))
