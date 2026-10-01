@@ -149,6 +149,14 @@ _client: AsyncIOMotorClient | None = None
 # ``tasks.document.classify``. After the first ensure we auto-skip it.
 _indexes_ensured = False
 
+# Whether init_beanie has completed in this process. Beanie's per-model setup
+# (settings, fields, caches, actions) is class-level state that a new client
+# does not change, yet init_beanie redoes all of it — and issues one
+# ``buildInfo`` per model (~70) even with skip_indexes. Every async Celery task
+# builds a fresh event loop and therefore a fresh client, so after the first
+# full init a task only needs its models pointed at the new client.
+_beanie_inited = False
+
 
 def get_client() -> AsyncIOMotorClient:
     """Return the shared Motor client. Raises if init_db() hasn't run yet."""
@@ -214,7 +222,7 @@ async def init_db(
     first task only rather than on every task. The web app process runs it once
     at startup so indexes are created/updated on deploy.
     """
-    global _client, _indexes_ensured
+    global _client, _indexes_ensured, _beanie_inited
     _client = AsyncIOMotorClient(
         settings.mongo_host,
         maxPoolSize=100,
@@ -225,6 +233,10 @@ async def init_db(
         socketTimeoutMS=30000,
     )
     effective_skip = skip_indexes or _indexes_ensured
+    # Rebinding is only a substitute for a run that would skip indexes anyway:
+    # a default call in a process that has not ensured them still does.
+    if effective_skip and _beanie_inited and _rebind_models(_client[settings.mongo_db]):
+        return
     if not effective_skip:
         await _run_pre_index_migrations(_client[settings.mongo_db])
     await init_beanie(
@@ -232,5 +244,32 @@ async def init_db(
         document_models=ALL_MODELS,
         skip_indexes=effective_skip,
     )
+    _beanie_inited = True
     if not effective_skip:
         _indexes_ensured = True
+
+
+def _rebind_models(db) -> bool:
+    """Point every already-initialized model at ``db``; False to fall back.
+
+    This is the part of ``init_beanie`` that depends on the client
+    (``Initializer.init_document_collection``: ``set_database`` +
+    ``set_collection``). It is not valid for time-series or union-document
+    models, whose collection setup does more, nor for a model Beanie never
+    initialized — any of those, or a Beanie whose internals have moved, falls
+    back to the full ``init_beanie``.
+    """
+    try:
+        for model in ALL_MODELS:
+            model_settings = model.get_settings()
+            if model_settings.timeseries is not None or model_settings.union_doc is not None:
+                return False
+            if not model_settings.name:
+                return False
+        for model in ALL_MODELS:
+            model.set_database(db)
+            model.set_collection(db[model.get_settings().name])
+    except Exception:
+        logger.warning("Rebinding Beanie models failed; running init_beanie", exc_info=True)
+        return False
+    return True

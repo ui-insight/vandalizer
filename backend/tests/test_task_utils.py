@@ -54,3 +54,65 @@ def test_run_task_async_propagates_exceptions():
 
     with pytest.raises(ValueError, match="kaboom"):
         run_task_async(_boom())
+
+
+def test_run_task_async_cancels_work_the_task_left_running(caplog):
+    """Sentry 7613426710: an agent run still in flight when the task's
+    coroutine returned was destroyed by loop.close() ("Task was destroyed but
+    it is pending! … CombinedCapability.wrap_run()"). It is now cancelled and
+    drained — its cleanup runs — and named in a warning."""
+    import logging
+
+    cleaned_up = []
+
+    async def _straggler():
+        try:
+            await asyncio.sleep(30)
+        finally:
+            cleaned_up.append(True)
+
+    async def _work():
+        asyncio.get_running_loop().create_task(_straggler())
+        await asyncio.sleep(0)
+        return "done"
+
+    with caplog.at_level(logging.WARNING, logger="app.tasks"):
+        assert run_task_async(_work()) == "done"
+
+    assert cleaned_up == [True]
+    assert any("_straggler" in r.getMessage() for r in caplog.records)
+
+
+def test_run_task_async_finalizes_async_generators():
+    """pydantic-ai's agent.iter is an async generator; left suspended, its
+    cleanup (which releases the run's wrap task) must still run."""
+    finalized = []
+
+    async def _gen():
+        try:
+            yield 1
+            yield 2
+        finally:
+            finalized.append(True)
+
+    async def _work():
+        agen = _gen()
+        await agen.__anext__()  # suspended mid-iteration, never closed
+        _work.agen = agen  # keep it alive past the coroutine
+        return "done"
+
+    assert run_task_async(_work()) == "done"
+    assert finalized == [True]
+
+
+def test_run_task_async_still_raises_the_tasks_error_with_leftovers():
+    async def _straggler():
+        await asyncio.sleep(30)
+
+    async def _boom():
+        asyncio.get_running_loop().create_task(_straggler())
+        await asyncio.sleep(0)
+        raise ValueError("kaboom")
+
+    with pytest.raises(ValueError, match="kaboom"):
+        run_task_async(_boom())
