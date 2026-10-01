@@ -388,6 +388,9 @@ async def _save_unless_deleted(source: KnowledgeBaseSource) -> bool:
             "KB source %s (%s) was deleted during ingest; discarding the result",
             source.uuid, source.url,
         )
+        # In-memory only (the row is gone): lets a crawl tell a page the user
+        # deleted mid-crawl from one it added.
+        source.status = "deleted"
         return False
     return True
 
@@ -1585,6 +1588,10 @@ async def _crawl_from_source(
             visited.add(child_final)
             landed.add(child_final)
 
+        if child.status == "deleted":
+            # Removed by the user while it was being ingested: not added.
+            logger.info(f"Crawl: {url} was deleted during ingest")
+            continue
         if child.status == "skipped":
             # Navigation, not content: drop the source record entirely so it
             # never shows up in the KB, but fall through to harvest its links.
@@ -1603,10 +1610,12 @@ async def _crawl_from_source(
                     queue.append(link)
                     visited.add(link)
 
-    # Update parent with crawled URL list
+    # Update parent with crawled URL list. A crawl runs for many pages, so
+    # the parent may have been deleted (or deleted and re-added) meanwhile;
+    # save() would resurrect it or collide with the re-added row.
     parent.crawled_urls = crawled_urls
     parent.skipped_urls = skipped_urls or None
-    await parent.save()
+    await _save_unless_deleted(parent)
 
     logger.info(
         f"Crawl complete for {parent.url}: {added} child pages added, "

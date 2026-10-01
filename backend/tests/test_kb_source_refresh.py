@@ -445,7 +445,8 @@ async def test_failed_ingest_of_a_deleted_source_does_not_raise():
         result = await knowledge_service._ingest_url_source(src, MagicMock(uuid="kb-1"))
 
     assert result is None
-    assert src.status == "error"
+    # The row is gone; the in-memory marker says so (a crawl reads it).
+    assert src.status == "deleted"
 
 
 def _link_hub_result() -> WebFetchResult:
