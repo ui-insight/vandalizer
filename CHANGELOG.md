@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **Workflow tuning no longer runs on documents that are gone or have no text.** Tuning ("Validate & improve") re-runs the workflow on the documents of each past run marked "expected output". When one of those documents had since been deleted, or its text extraction had failed, every trial ran the workflow on nothing and the judge scored the empty result. That spent the tuning budget on meaningless scores, and a winning configuration could be applied on that basis (Sentry 7598676926). A test run is now skipped when any of its documents is deleted or has no text. If that leaves none, tuning stops before any model call, and the message says how many test runs were skipped and why and to mark a run on readable documents. The same check applies to auto-triggered tuning runs, which are now not started at all in that case.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
