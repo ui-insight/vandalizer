@@ -839,6 +839,44 @@ def _activity_owner(db, activity_id) -> str | None:
         return None
 
 
+def _retry_if_transient(task, exc: BaseException, what: str, workflow_id) -> None:
+    """Retry ``task`` for a transient failure that has attempts left.
+
+    Must run *before* the run is marked failed. Both workflow tasks skip a run
+    that is already terminal when a delivery starts (the redelivery guards),
+    so marking it "error" and then letting Celery retry made every retry a
+    no-op: a two-second MindRouter connection blip failed the run outright
+    (Sentry 7610990045: "Extraction failed: Connection error."). Returns
+    without raising when the failure is permanent or the budget is spent;
+    the caller then fails the run as before.
+    """
+    from app.tasks import TRANSIENT_EXCEPTIONS, is_transient_llm_error, llm_retry_countdown
+
+    llm = is_transient_llm_error(exc)
+    if not (llm or isinstance(exc, TRANSIENT_EXCEPTIONS)):
+        return
+    from app.services.workflow_engine import STEP_SIDE_EFFECTS_ATTR
+
+    if getattr(exc, STEP_SIDE_EFFECTS_ATTR, False):
+        # The retry resumes at the failed step and re-runs all of it; a POST
+        # or browser action a sibling task already completed would repeat.
+        logger.warning(
+            "%s %s hit a transient error in a step with side effects; not "
+            "retrying: %s", what, workflow_id, exc,
+        )
+        return
+    retries = getattr(task.request, "retries", 0) or 0
+    if task.max_retries is not None and retries >= task.max_retries:
+        return
+    logger.warning(
+        "%s %s hit a transient error; retrying (attempt %d of %d): %s",
+        what, workflow_id, retries + 2, (task.max_retries or 0) + 1, exc,
+    )
+    raise task.retry(
+        exc=exc, countdown=llm_retry_countdown(retries) if llm else None,
+    )
+
+
 def _mark_workflow_failed(
     db, workflow_result_id, activity_id, error_msg, error_payload=None, notify=True,
 ):
@@ -1329,13 +1367,9 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         )
         return {"status": "error", "result_id": workflow_result_id}
     except Exception as e:
+        _retry_if_transient(self, e, "Workflow", workflow_id)
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
-        from app.services.failure_notifications import is_final_attempt
-
-        _mark_workflow_failed(
-            db, workflow_result_id, activity_id, str(e),
-            notify=is_final_attempt(self, e),
-        )
+        _mark_workflow_failed(db, workflow_result_id, activity_id, str(e))
         raise
 
     # Check if workflow paused for approval. The handling below must run under a
@@ -1847,13 +1881,11 @@ def resume_workflow_after_approval(self, approval_uuid):
         )
         return {"status": "error", "result_id": workflow_result_id}
     except Exception as e:
+        _retry_if_transient(self, e, "Resumed workflow", workflow_id)
         logger.error("Workflow resume failed for %s: %s", workflow_id, e)
-        from app.services.failure_notifications import is_final_attempt
-
         _mark_workflow_failed(
             db, workflow_result_id,
             str(_act["_id"]) if _act else None, str(e),
-            notify=is_final_attempt(self, e),
         )
         raise
 
