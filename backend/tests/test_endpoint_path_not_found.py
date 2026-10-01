@@ -33,6 +33,7 @@ def _wrapped(cause):
     {"detail": "Not Found"},
     "404 page not found",
     "<html><body><h1>404 Not Found</h1></body></html>",
+    "Cannot POST /chat/completions",
     None,
 ])
 def test_a_404_naming_no_model_is_a_path_problem(body):
@@ -47,6 +48,12 @@ def test_a_404_naming_no_model_is_a_path_problem(body):
     {"error": {"code": "model_not_found", "message": "The model `m` does not exist"}},
     # Ollama
     {"error": 'model "m" not found, try pulling it first'},
+    # OpenRouter and Azure-style gateways name no "model" at all (review of
+    # #981: the old absence-of-a-word test called these path problems).
+    {"message": "No endpoints found for acme/mystery-model.", "code": 404},
+    {"message": "No endpoints found that support tool use.", "code": 404},
+    {"code": "DeploymentNotFound", "message": "The API deployment for this resource does not exist."},
+    "Deployment not found",
 ])
 def test_a_404_naming_the_model_is_not(body):
     assert not is_endpoint_path_not_found(
