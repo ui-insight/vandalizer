@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **An .xlsx upload that isn't really an Excel workbook says what it is.** A file named `.xlsx` that was actually an Excel Binary Workbook (`.xlsb`), a Word or PowerPoint file, or an OpenDocument spreadsheet failed with "Could not read this xlsx: File conversion failed after 1 attempts: - XlsxConverter threw OSError with message: File contains no valid workbook part", and each such upload was reported to Sentry as an error (Sentry 7598762528). The document now fails with a message that names the actual format and says how to fix it, for example "This file is an Excel Binary Workbook (.xlsb) saved with an .xlsx extension… Open it in Excel, use Save As → Excel Workbook (.xlsx), and upload that." An .xlsx containing no workbook at all is described as damaged or renamed. Neither case is reported to Sentry any more. Real workbooks read exactly as before.
+
 ## [v4.14.0] - 2026-09-30
 
 ### Added
