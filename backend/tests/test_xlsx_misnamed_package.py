@@ -62,6 +62,29 @@ def test_a_package_declaring_no_workbook_says_so(tmp_path):
         extract_text_from_xlsx(path)
 
 
+def test_the_reported_files_styles_only_package_says_so(tmp_path):
+    """The exact manifest of the file behind Sentry 7764138486/7598762528:
+    styles, theme and document properties, and no workbook or sheet at all —
+    a damaged .xlsx, not a renamed format, so none of the named formats match."""
+    path = tmp_path / "5751456A.xlsx"
+    types = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        '<Override PartName="/xl/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'
+        '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>'
+        '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'
+        "</Types>"
+    )
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("[Content_Types].xml", types)
+        zf.writestr("xl/styles.xml", "<styleSheet/>")
+    with pytest.raises(DocumentReadError, match="contains no Excel workbook"):
+        extract_text_from_xlsx(str(path))
+
+
 def test_the_generic_reader_passes_the_message_through_unwrapped(tmp_path):
     """extract_text_from_file re-raises a DocumentReadError as-is: no second
     "Could not read this xlsx:" prefix, and no error-level log for Sentry."""
